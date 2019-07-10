@@ -23,7 +23,9 @@ The package currently supports the following methods
     * X-learner
     * R-learner
     
-##Installation
+
+## Installation
+
 Install from pip:
 
 ```
@@ -38,9 +40,12 @@ cd causalml
 python setup.py install
 ```
 
-##Quick Start
+
+## Quick Start
+
 ### Average Treatment Effect Estimation with S, T, and X Learners
-```
+
+```python
 from causalml.inference import LinearRegressionSLearner
 from causalml.inference import XGBTLearner, MLPTLearner
 from causalml.inference import BaseXLearner
@@ -69,17 +74,23 @@ logger.info('Average Treatment Effect (XGBoost): {:.2f} ({:.2f}, {:.2f})'.format
 
 ```
 
-##Contributing
+
+## Contributing
+
 We welcome community contributors to the project. 
 
-##Related projects
+
+## Related projects
+
 * [uplift](https://cran.r-project.org/web/packages/uplift/index.html): uplift models in R
 * [grf](https://cran.r-project.org/web/packages/grf/index.html): generalized random forests that include heterogeneous treatment effect estimation in R
 * [rlearner](https://github.com/xnie/rlearner): A R package that implements R-Learner
 * [DoWhy](https://github.com/Microsoft/dowhy):  Causal inference in Python based on Judea Pearl's do-calculus 
 * [EconML](https://github.com/microsoft/EconML): A Python package that implements heterogeneous treatment effect estimators from econometrics and machine learning methods
 
-##References
+
+## References
+
 * Nicholas J Radcliffe and Patrick D Surry. Real-world uplift modelling with significance based uplift trees. White Paper TR-2011-1, Stochastic Solutions, 2011.
 * Yan Zhao, Xiao Fang, and David Simchi-Levi. Uplift modeling with multiple treatments and general response types. Proceedings of the 2017
 SIAM International Conference on Data Mining, SIAM, 2017.
