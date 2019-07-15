@@ -1,7 +1,9 @@
 <div align="center">
   <a href="https://github.com/uber-common/causalml"> <img width="380px" height="140px" src="docs/_static/img/causalml_logo.png"></a>
 </div>
+
 ------------------------------------------------------
+
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2973/badge)](https://bestpractices.coreinfrastructure.org/projects/2973)
 
 
