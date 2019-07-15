@@ -155,11 +155,12 @@ class BaseTLearner(object):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        self.fit(X, treatment, y)
-
         is_treatment = treatment != self.control_name
         w = is_treatment.astype(int)
 
+        self.fit(X, treatment, y)
+
+        X = np.hstack((w.reshape((-1, 1)), X))
         yhat_c = self.model_c.predict(X)
         yhat_t = self.model_t.predict(X)
 
