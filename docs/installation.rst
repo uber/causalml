@@ -17,4 +17,5 @@ From source:
 
     git clone https://github.com/uber-common/causalml.git
     cd causalml
+    python setup.py build_ext --inplace
     python setup.py install
