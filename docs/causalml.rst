@@ -22,6 +22,15 @@ causalml.inference.meta module
     :undoc-members:
     :show-inheritance:
 
+causalml.optimize module
+------------------------
+
+.. automodule:: causalml.optimize
+    :members:
+    :imported-members:
+    :undoc-members:
+    :show-inheritance:
+
 causalml.dataset module
 -----------------------
 

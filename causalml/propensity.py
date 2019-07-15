@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-from kaggler.preprocessing import OneHotEncoder
 import logging
 import numpy as np
 from sklearn.metrics import roc_auc_score as auc
@@ -37,8 +36,32 @@ class ElasticNetPropensityModel(object):
     def __repr__(self):
         return self.model.__repr__()
 
+
+    def fit(self, X, y):
+        """
+        Fit a propensity model.
+
+        Args:
+            X (numpy.ndarray): a feature matrix
+            y (numpy.ndarray): a binary target vector
+        """
+        self.model.fit(X, y)
+
+    def predict(self, X):
+        """
+        Predict propensity scores.
+
+        Args:
+            X (numpy.ndarray): a feature matrix
+
+        Returns:
+            (numpy.ndarray): Propensity scores between 0 and 1.
+        """
+        ps = np.clip(self.model.predict(X), *self.clip_bounds)
+        return ps
+
     def fit_predict(self, X, y):
-        """Fit a propensity model and redict propensity scores.
+        """Fit a propensity model and predict propensity scores.
 
         Args:
             X (numpy.ndarray): a feature matrix
@@ -47,7 +70,7 @@ class ElasticNetPropensityModel(object):
         Returns:
             (numpy.ndarray): Propensity scores between 0 and 1.
         """
-        self.model.fit(X, y)
-        ps = np.clip(self.model.predict(X), *self.clip_bounds)
+        self.fit(X, y)
+        ps = self.predict(X)
         logger.info('AUC score: {:.6f}'.format(auc(y, ps)))
         return ps
