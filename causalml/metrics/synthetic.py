@@ -42,8 +42,8 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
     y, X, w, tau, b, e = synthetic_data_func(n=n)
 
     preds_dict = {}
-    preds_dict['Actuals'] = tau
-    preds_dict['generated_data'] = {'y':y, 'X':X, 'w':w, 'tau':tau, 'b':b, 'e':e}
+    preds_dict[KEY_ACTUAL] = tau
+    preds_dict[KEY_GENERATED_DATA] = {'y':y, 'X':X, 'w':w, 'tau':tau, 'b':b, 'e':e}
 
     # Predict p_hat because e would not be directly observed in real-life
     p_model = ElasticNetPropensityModel()
@@ -82,13 +82,13 @@ def get_synthetic_summary(synthetic_data_func, n=1000, k=1):
 
     for i in range(k):
         synthetic_preds = get_synthetic_preds(synthetic_data_func, n=n)
-        actuals = synthetic_preds['Actuals']
+        actuals = synthetic_preds[KEY_ACTUAL]
         synthetic_summary = pd.DataFrame({label:[preds.mean(), mse(preds,actuals)] for label, preds
-                                          in synthetic_preds.items() if label != 'generated_data'},
+                                          in synthetic_preds.items() if label != KEY_GENERATED_DATA},
                                      index=['ATE', 'MSE']).T
 
         synthetic_summary['Abs % Error of ATE'] = np.abs((synthetic_summary['ATE']/
-                                                          synthetic_summary.loc['Actuals', 'ATE']) - 1
+                                                          synthetic_summary.loc[KEY_ACTUAL, 'ATE']) - 1
                                                         )
 
         for label in synthetic_summary.index:
@@ -256,8 +256,8 @@ def get_synthetic_preds_holdout(synthetic_data_func, n=1000, valid_size=0.2,
     preds_dict_train = {}
     preds_dict_valid = {}
 
-    preds_dict_train['Actuals'] = tau_train
-    preds_dict_valid['Actuals'] = tau_val
+    preds_dict_train[KEY_ACTUAL] = tau_train
+    preds_dict_valid[KEY_ACTUAL] = tau_val
 
     preds_dict_train['generated_data'] = {
         'y': y_train,
@@ -329,20 +329,20 @@ def get_synthetic_summary_holdout(synthetic_data_func, n=1000, valid_size=0.2, k
 
     for i in range(k):
         preds_dict_train, preds_dict_valid = get_synthetic_preds_holdout(synthetic_data_func, n=n, valid_size=valid_size)
-        actuals_train = preds_dict_train['Actuals']
-        actuals_validation = preds_dict_valid['Actuals']
+        actuals_train = preds_dict_train[KEY_ACTUAL]
+        actuals_validation = preds_dict_valid[KEY_ACTUAL]
 
         synthetic_summary_train = pd.DataFrame({label:[preds.mean(), mse(preds, actuals_train)] for label, preds
-                                          in preds_dict_train.items() if 'generated_data' not in label.lower()},
+                                          in preds_dict_train.items() if KEY_GENERATED_DATA not in label.lower()},
                                      index=['ATE', 'MSE']).T
         synthetic_summary_train['Abs % Error of ATE'] = np.abs(
-            (synthetic_summary_train['ATE']/synthetic_summary_train.loc['Actuals', 'ATE']) - 1)
+            (synthetic_summary_train['ATE']/synthetic_summary_train.loc[KEY_ACTUAL, 'ATE']) - 1)
 
         synthetic_summary_validation = pd.DataFrame({label:[preds.mean(), mse(preds, actuals_validation)] for label, preds
-                                          in preds_dict_valid.items() if 'generated_data' not in label.lower()},
+                                          in preds_dict_valid.items() if KEY_GENERATED_DATA not in label.lower()},
                                      index=['ATE', 'MSE']).T
         synthetic_summary_validation['Abs % Error of ATE'] = np.abs(
-            (synthetic_summary_validation['ATE']/synthetic_summary_validation.loc['Actuals', 'ATE']) - 1)
+            (synthetic_summary_validation['ATE']/synthetic_summary_validation.loc[KEY_ACTUAL, 'ATE']) - 1)
 
         #calculate kl divergence for trainning
         for label in synthetic_summary_train.index:
@@ -486,7 +486,7 @@ def get_synthetic_auuc(synthetic_preds, drop_learners=[], outcome_col='y', treat
                           treatment_effect_col='tau', steps=100)
     auuc_df = pd.DataFrame(cumlift.columns)
     auuc_df.columns = ['Learner']
-    auuc_df['cum_gain_auuc'] = [auuc(cumlift.index.values/100, cumlift[learner].values) for learner in cumlift.columns]
+    auuc_df['cum_gain_auuc'] = [auc(cumlift.index.values/100, cumlift[learner].values) for learner in cumlift.columns]
     auuc_df = auuc_df.sort_values('cum_gain_auuc', ascending = False)
 
     if plot:
