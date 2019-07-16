@@ -3,3 +3,4 @@ from .synthetic import simulate_nuisance_and_easy_treatment
 from .synthetic import simulate_randomized_trial
 from .synthetic import simulate_easy_propensity_difficult_baseline
 from .synthetic import simulate_unrelated_treatment_control
+from .classification import make_uplift_classification
