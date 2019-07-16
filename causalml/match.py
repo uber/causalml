@@ -180,25 +180,24 @@ class NearestNeighborMatch(object):
         return matched.reset_index(level=0, drop=True)
 
 class MatchOptimizer(object):
-    def __init__(self, treatment_col='is_treatment', outcome_col='sum_gross_bookings', ps_col='pihat',  max_smd=0.1, max_deviation= 0.1,
-                 caliper_range=(0.01,0.5), max_pihat_range=(0.95,0.999), max_iter_per_param=5, min_users_per_group=1000,
-                 smd_cols=['pihat'], dev_cols_transformations = {'sum_gross_bookings':np.mean}, dev_factor=1.,
-                 verbose=True):
+    def __init__(self, treatment_col='is_treatment', ps_col='pihat', user_col=None, matching_covariates=['pihat'], 
+                 max_smd=0.1, max_deviation= 0.1, caliper_range=(0.01,0.5), max_pihat_range=(0.95,0.999), max_iter_per_param=5,
+                 min_users_per_group=1000, smd_cols=['pihat'], dev_cols_transformations = {'pihat':np.mean},
+                 dev_factor=1., verbose=True):
         """
         Finds the set of parameters that gives the best matching result.
 
         Score = (number of features with SMD > max_smd)
-                + (gb_deviation * 10 * self.gb_imp_factor)
+                + (sum of deviations for important variables * deviation factor)
         The logic behind the scoring is that we are most concerned with minimizing the number of features where
         SMD is lower than a certain threshold (max_smd). However, we would also like the matched dataset not deviate
-        too much from the original dataset, in terms of average GB, so that we still retain a similar userbase.
+        too much from the original dataset, in terms of key variable(s), so that we still retain a similar userbase.
 
         Args:
             - treatment_col (str): name of the treatment column
-            - outcome_col (str): name of the outcome column
             - ps_col (str): name of the propensity score column
-            - max_smd (float): maximum acceptable SMD (hard)
-            - max_deviation (float): maximum acceptable deviation for GB (soft)
+            - max_smd (float): maximum acceptable SMD
+            - max_deviation (float): maximum acceptable deviation for important variables
             - caliper_range (tuple): low and high bounds for caliper search range
             - max_pihat_range (tuple): low and high bounds for max pihat search range
             - max_iter_per_param (int): maximum number of search values per parameters
@@ -212,8 +211,9 @@ class MatchOptimizer(object):
             The best matched dataset (pd.DataFrame)
         """
         self.treatment_col = treatment_col
-        self.outcome_col = outcome_col
         self.ps_col = ps_col
+        self.user_col = user_col
+        self.matching_covariates = matching_covariates
         self.max_smd = max_smd
         self.max_deviation = max_deviation
         self.caliper_range = np.linspace(*caliper_range, num=max_iter_per_param)
@@ -238,7 +238,10 @@ class MatchOptimizer(object):
         smd_values = np.abs(tableone[tableone.index!='n']['SMD'].astype(float))
         num_cols_over_smd = (smd_values >= self.max_smd).sum()
         self.cols_to_fix = smd_values[smd_values >= self.max_smd].sort_values(ascending=False).index.values
-        num_users_per_group = matched.groupby(self.treatment_col)['user_uuid'].count().min()
+        if self.user_col is None:
+            num_users_per_group = matched.reset_index().groupby(self.treatment_col)['index'].count().min()
+        else:
+            num_users_per_group = matched.groupby(self.treatment_col)[self.user_col].count().min()
         deviations = [np.abs(self.original_stats[col] / matched[matched[self.treatment_col]==1][col].mean() - 1) for col in self.dev_cols_transformations.keys()]
 
         score = num_cols_over_smd
@@ -260,7 +263,7 @@ class MatchOptimizer(object):
         if self.verbose:
             logger.info('Preparing match for: caliper={:.03f}, pihat_threshold={:.03f}, score_cols={}'.format(caliper,pihat_threshold,score_cols))
         df_matched = self.single_match(score_cols=score_cols, pihat_threshold=pihat_threshold, caliper=caliper)
-        tableone = create_table_one(df_matched, self.treatment_col, MATCHING_COVARIATES)
+        tableone = create_table_one(df_matched, self.treatment_col, self.matching_covariates)
         self.check_table_one(tableone, df_matched, score_cols, pihat_threshold, caliper)
 
     def search_best_match(self, df):

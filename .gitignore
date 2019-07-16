@@ -7,3 +7,5 @@ build
 dist
 *.pyc
 _build/
+.ipynb_checkpoints/
+*.c
