@@ -179,17 +179,19 @@ class LRSLearner(BaseSLearner):
                                          ate_alpha,
                                          control_name)
 
-    def estimate_ate(self, X, w, y):
+    def estimate_ate(self, X, treatment, y):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
             X (np.matrix): a feature matrix
-            w (np.array): a treatment vector (1 if treatment, otherwise 0)
+            treatment (np.array): a treatment vector
             y (np.array): an outcome vector
 
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
+        is_treatment = treatment != self.control_name
+        w = is_treatment.astype(int)
 
         self.fit(X, w, y)
         te = self.model.coefficients[0]
