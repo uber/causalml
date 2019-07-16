@@ -486,7 +486,7 @@ def get_synthetic_auuc(synthetic_preds, drop_learners=[], outcome_col='y', treat
                           treatment_effect_col='tau', steps=100)
     auuc_df = pd.DataFrame(cumlift.columns)
     auuc_df.columns = ['Learner']
-    auuc_df['cum_gain_auuc'] = [auuc(cumlift.index.values/100, cumlift[learner].values) for learner in cumlift.columns]
+    auuc_df['cum_gain_auuc'] = [auc(cumlift.index.values/100, cumlift[learner].values) for learner in cumlift.columns]
     auuc_df = auuc_df.sort_values('cum_gain_auuc', ascending = False)
 
     if plot:
