@@ -13,9 +13,11 @@ from xgboost import XGBRegressor
 from scipy.stats import entropy
 import warnings
 
-from ..inference.meta import BaseXLearner, BaseRLearner, BaseSLearner, BaseTLearner
-from ..propensity import ElasticNetPropensityModel
-from ..metrics.visualize import plot_gain, get_cumgain
+from causalml.inference.meta import BaseXLearner, BaseRLearner, BaseSLearner, BaseTLearner
+from causalml.inference.tree import CausalTreeRegressor
+from causalml.propensity import ElasticNetPropensityModel
+from causalml.metrics.visualize import plot_gain, get_cumgain
+
 
 plt.style.use('fivethirtyeight')
 warnings.filterwarnings('ignore')
@@ -23,12 +25,19 @@ warnings.filterwarnings('ignore')
 KEY_GENERATED_DATA = 'generated_data'
 KEY_ACTUAL = 'Actuals'
 
-def get_synthetic_preds(synthetic_data_func, n=1000):
+RANDOM_SEED = 42
+
+
+def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
     """Generate predictions for synthetic data using specified function (single simulation)
 
     Args:
         synthetic_data_func (function): synthetic data generation function
         n (int, optional): number of samples
+        estimators (dict of object): dict of names and objects of treatment effect estimators
+
+    Returns:
+        (dict): dict of the actual and estimates of treatuement effects
     """
     y, X, w, tau, b, e = synthetic_data_func(n=n)
 
@@ -40,13 +49,23 @@ def get_synthetic_preds(synthetic_data_func, n=1000):
     p_model = ElasticNetPropensityModel()
     p_hat = p_model.fit_predict(X, w)
 
-    for base_learner,label_l in zip([BaseSLearner, BaseTLearner, BaseXLearner, BaseRLearner],['S', 'T', 'X', 'R']):
-        for model,label_m in zip([LinearRegression, XGBRegressor],['LR', 'XGB']):
-            learner = base_learner(model())
+    if estimators:
+        for name, learner in estimators.items():
             try:
-                preds_dict['{} Learner ({})'.format(label_l, label_m)] = learner.fit_predict(X=X, p=p_hat, treatment=w, y=y)
+                preds_dict[name] = learner.fit_predict(X=X, p=p_hat, treatment=w, y=y).flatten()
             except TypeError:
-                preds_dict['{} Learner ({})'.format(label_l, label_m)] = learner.fit_predict(X=X, treatment=w, y=y)
+                preds_dict[name] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
+    else:
+        for base_learner, label_l in zip([BaseSLearner, BaseTLearner, BaseXLearner, BaseRLearner],['S', 'T', 'X', 'R']):
+            for model, label_m in zip([LinearRegression, XGBRegressor],['LR', 'XGB']):
+                learner = base_learner(model())
+                try:
+                    preds_dict['{} Learner ({})'.format(label_l, label_m)] = learner.fit_predict(X=X, p=p_hat, treatment=w, y=y).flatten()
+                except TypeError:
+                    preds_dict['{} Learner ({})'.format(label_l, label_m)] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
+
+        learner = CausalTreeRegressor(random_state=RANDOM_SEED)
+        preds_dict['Causal Tree'] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
 
     return preds_dict
 
@@ -198,8 +217,9 @@ def scatter_plot_single_sim(synthetic_preds):
 
     #deleted generated data and get actual column name
     del preds_for_plot[KEY_GENERATED_DATA]
+    n_row = int(np.ceil(len(preds_for_plot.keys()) / 3))
 
-    fig, axes = plt.subplots(3, 3, figsize=(15, 15))
+    fig, axes = plt.subplots(n_row, 3, figsize=(5 * n_row, 15))
     axes = np.ravel(axes)
 
     for i, (label, preds) in enumerate(preds_for_plot.items()):
@@ -212,13 +232,15 @@ def scatter_plot_single_sim(synthetic_preds):
         axes[i].plot([xlim[0], xlim[1]], [xlim[0], xlim[1]], label='Perfect Model', linewidth=1, color='grey')
         axes[i].legend(loc=2, prop={'size': 10})
 
-def get_synthetic_preds_holdout(synthetic_data_func, n=1000, valid_size = 0.2):
+def get_synthetic_preds_holdout(synthetic_data_func, n=1000, valid_size=0.2,
+                                estimators={}):
     """Generate predictions for synthetic data using specified function (single simulation) for train and holdout
 
     Args:
         synthetic_data_func (function): synthetic data generation function
         n (int, optional): number of samples
         valid_size(float,optional): validaiton/hold out data size
+        estimators (dict of object): dict of names and objects of treatment effect estimators
 
     Returns:
         (tuple): synthetic training and validation data dictionaries:
@@ -229,7 +251,7 @@ def get_synthetic_preds_holdout(synthetic_data_func, n=1000, valid_size = 0.2):
     y, X, w, tau, b, e = synthetic_data_func(n=n)
 
     X_train, X_val, y_train, y_val, w_train, w_val, tau_train, tau_val, b_train, b_val, e_train, e_val = \
-        train_test_split(X, y, w, tau, b, e, test_size=valid_size, random_state=40, shuffle=True)
+        train_test_split(X, y, w, tau, b, e, test_size=valid_size, random_state=RANDOM_SEED, shuffle=True)
 
     preds_dict_train = {}
     preds_dict_valid = {}

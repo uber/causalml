@@ -1,3 +1,13 @@
+<div align="center">
+  <a href="https://github.com/uber-common/causalml"> <img width="380px" height="140px" src="docs/_static/img/causalml_logo.png"></a>
+</div>
+
+------------------------------------------------------
+
+[![Build Status](https://travis-ci.com/uber-common/causalml.svg?token=t7jFKh1sKGtbqHWp2sGn&branch=master)](https://travis-ci.com/uber-common/causalml)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2973/badge)](https://bestpractices.coreinfrastructure.org/projects/2973)
+
+
 # Disclaimer
 This project is experimental and the APIs are not considered stable.
 
@@ -39,6 +49,7 @@ Install from source:
 ```
 git clone https://github.com/uber-common/causalml.git
 cd causalml
+python setup.py build_ext --inplace
 python setup.py install
 ```
 
