@@ -9,3 +9,4 @@ dist
 _build/
 .ipynb_checkpoints/
 *.c
+*.so

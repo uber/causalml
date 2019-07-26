@@ -8,10 +8,8 @@ The module structure is the following:
 # Authors: Zhenyu Zhao <zhenyuz@uber.com>
 #          Totte Harinen <totte@uber.com>
 
-
 from __future__ import print_function
 from collections import defaultdict
-#import pydotplus
 import numpy as np
 from collections import Counter
 import scipy.stats as stats
@@ -22,7 +20,6 @@ from scipy.special import digamma
 from math import log
 import numpy.random as nr
 from collections import Counter
-import time
 import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import RandomForestRegressor
@@ -31,7 +28,7 @@ from scipy.stats import rankdata
 from scipy.special import expit
 from sklearn.base import clone
 from sklearn.calibration import CalibratedClassifierCV
-
+from sklearn.utils.testing import ignore_warnings
 
 
 class DecisionTree:
@@ -60,7 +57,7 @@ class DecisionTree:
     summary : dictionary
         Summary statistics of the tree nodes, including impurity, sample size, uplift score, etc.
 
-    maxDiffTreatment : string 
+    maxDiffTreatment : string
         The treatment name generating the maximum difference between treatment and control group.
 
     maxDiffSign : float
@@ -69,14 +66,14 @@ class DecisionTree:
     nodeSummary : dictionary
         Summary statistics of the tree nodes {treatment: [y_mean, n]}, where y_mean stands for the target metric mean and n is the sample size.
 
-    backupResults : dictionary 
+    backupResults : dictionary
         The conversion proabilities in each treatment in the parent node {treatment: y_mean}. The parent node information is served as a backup for the children node, in case no valid statistics can be calculated from the children node, the parent node information will be used in certain cases.
 
-    bestTreatment : string 
+    bestTreatment : string
         The treatment name providing the best uplift (treatment effect).
 
     upliftScore : list
-        The uplift score of this node: [max_Diff, p_value], where max_Diff stands for the maxium treatment effect, and p_value stands for the p_value of the treatment effect. 
+        The uplift score of this node: [max_Diff, p_value], where max_Diff stands for the maxium treatment effect, and p_value stands for the p_value of the treatment effect.
 
     matchScore : float
         The uplift score by filling a trained tree with validation dataset or testing dataset.
@@ -102,7 +99,7 @@ class DecisionTree:
 class UpliftTreeClassifier:
     """ Uplift Tree Classifier for Classification Task.
 
-    A uplift tree classifier estimates the individual treatment effect by modifying the loss function in the classification trees. 
+    A uplift tree classifier estimates the individual treatment effect by modifying the loss function in the classification trees.
     The uplift tree classifer is used in uplift random forest to construct the trees in the forest.
 
     Parameters
@@ -157,7 +154,7 @@ class UpliftTreeClassifier:
         ----
         X : ndarray, shape = [num_samples, num_features]
             An ndarray of the covariates used to train the uplift model.
-        
+
         treatment : array-like, shape = [num_samples]
             An array containing the treatment group for each unit.
 
@@ -184,7 +181,7 @@ class UpliftTreeClassifier:
         ----
         X : ndarray, shape = [num_samples, num_features]
             An ndarray of the covariates used to train the uplift model.
-        
+
         treatment : array-like, shape = [num_samples]
             An array containing the treatment group for each unit.
 
@@ -214,7 +211,7 @@ class UpliftTreeClassifier:
         ----
         X : ndarray, shape = [num_samples, num_features]
             An ndarray of the covariates used to train the uplift model.
-        
+
         treatment : array-like, shape = [num_samples]
             An array containing the treatment group for each unit.
 
@@ -311,7 +308,7 @@ class UpliftTreeClassifier:
         ----
         X : ndarray, shape = [num_samples, num_features]
             An ndarray of the covariates used to train the uplift model.
-        
+
         treatment : array-like, shape = [num_samples]
             An array containing the treatment group for each unit.
 
@@ -338,8 +335,8 @@ class UpliftTreeClassifier:
         ----
         rows : list of list
             The internal data format for the training data (combining X, Y, treatment).
-        
-        tree : object 
+
+        tree : object
             object of DecisionTree class
 
         Returns
@@ -376,7 +373,7 @@ class UpliftTreeClassifier:
     def predict(self, X, full_output = False):
         '''
         Returns the recommended treatment group and predicted optimal probability conditional on using the recommended treatment group.
-        
+
         Args
         ----
         X : ndarray, shape = [num_samples, num_features]
@@ -421,22 +418,22 @@ class UpliftTreeClassifier:
     def divideSet(self, rows, column, value):
         '''
         Tree node split.
-        
+
         Args
         ----
-        
+
         rows : list of list
                The internal data format.
 
         column : int
-                The column used to split the data. 
+                The column used to split the data.
 
-        value : float or int 
+        value : float or int
                 The value in the column for splitting the data.
 
         Returns
         -------
-        (list1, list2) : list of list 
+        (list1, list2) : list of list
                 The left node (list of data) and the right node (list of data).
         '''
         splittingFunction = None
@@ -451,10 +448,10 @@ class UpliftTreeClassifier:
     def group_uniqueCounts(self, rows):
         '''
         Count sample size by experiment group.
-        
+
         Args
         ----
-        
+
         rows : list of list
                The internal data format.
 
@@ -478,10 +475,10 @@ class UpliftTreeClassifier:
         Calculate KL Divergence for binary classification.
 
         sum(np.array(pk) * np.log(np.array(pk) / np.array(qk)))
-        
+
         Args
         ----
-        
+
         pk : float
             The probability of 1 in one distribution.
 
@@ -503,10 +500,10 @@ class UpliftTreeClassifier:
     def evaluate_KL(self, nodeSummary, control_name):
         '''
         Calculate KL Divergence as split evaluation criterion for a given node.
-        
+
         Args
         ----
-        
+
         nodeSummary : dictionary
             The tree node summary statistics, produced by tree_node_summary() method.
 
@@ -530,10 +527,10 @@ class UpliftTreeClassifier:
     def evaluate_ED(nodeSummary, control_name):
         '''
         Calculate Euclidean Distance as split evaluation criterion for a given node.
-        
+
         Args
         ----
-        
+
         nodeSummary : dictionary
             The tree node summary statistics, produced by tree_node_summary() method.
 
@@ -557,10 +554,10 @@ class UpliftTreeClassifier:
     def evaluate_Chi(nodeSummary, control_name):
         '''
         Calculate Chi-Square statistic as split evaluation criterion for a given node.
-        
+
         Args
         ----
-        
+
         nodeSummary : dictionary
             The tree node summary statistics, produced by tree_node_summary() method.
 
@@ -584,10 +581,10 @@ class UpliftTreeClassifier:
     def evaluate_CTS(currentNodeSummary):
         '''
         Calculate CTS (conditional treatment selection) as split evaluation criterion for a given node.
-        
+
         Args
         ----
-        
+
         nodeSummary : dictionary
             The tree node summary statistics, produced by tree_node_summary() method.
 
@@ -607,13 +604,13 @@ class UpliftTreeClassifier:
     @staticmethod
     def entropyH(p, q=None):
         '''
-        Entropy 
+        Entropy
 
         Entropy calculation for normalization.
-        
+
         Args
         ----
-        
+
         p : float
             The probability used in the entropy calculation.
 
@@ -634,20 +631,20 @@ class UpliftTreeClassifier:
     def normI(self,currentNodeSummary,leftNodeSummary,rightNodeSummary, control_name, alpha = 0.9):
         '''
         Normalization factor.
-        
+
         Args
         ----
-        
-        currentNodeSummary : dictionary 
+
+        currentNodeSummary : dictionary
             The summary statistics of the current tree node.
 
-        leftNodeSummary : dictionary 
+        leftNodeSummary : dictionary
             The summary statistics of the left tree node.
 
-        rightNodeSummary : dictionary 
+        rightNodeSummary : dictionary
             The summary statistics of the right tree node.
 
-        control_name : string 
+        control_name : string
             The control group name.
 
         alpha : float
@@ -690,10 +687,10 @@ class UpliftTreeClassifier:
     def tree_node_summary(self, rows, min_samples_treatment = 10, n_reg = 100, parentNodeSummary = None):
         '''
         Tree node summary statistics.
-        
+
         Args
         ----
-        
+
         rows : list of list
             The internal data format for the training data (combining X, Y, treatment).
 
@@ -731,10 +728,10 @@ class UpliftTreeClassifier:
     def uplift_classification_results(self,rows):
         '''
         Classification probability for each treatment in the tree node.
-        
+
         Args
         ----
-        
+
         rows : list of list
             The internal data format for the training data (combining X, Y, treatment).
 
@@ -754,10 +751,10 @@ class UpliftTreeClassifier:
                              min_samples_treatment=10, n_reg=100, parentNodeSummary=None):
         '''
         Train the uplift decision tree.
-        
+
         Args
         ----
-        
+
         rows : list of list
             The internal data format for the training data (combining X, Y, treatment).
 
@@ -928,10 +925,10 @@ class UpliftTreeClassifier:
     def classify(self, observations, tree, dataMissing=False):
         '''
         Classifies (prediction) the observationss according to the tree.
-        
+
         Args
         ----
-        
+
         observations : list of list
             The internal data format for the training data (combining X, Y, treatment).
 
@@ -947,10 +944,10 @@ class UpliftTreeClassifier:
         def classifyWithoutMissingData(observations, tree):
             '''
             Classifies (prediction) the observationss according to the tree, assuming without missing data.
-            
+
             Args
             ----
-            
+
             observations : list of list
                 The internal data format for the training data (combining X, Y, treatment).
 
@@ -979,10 +976,10 @@ class UpliftTreeClassifier:
         def classifyWithMissingData(observations, tree):
             '''
             Classifies (prediction) the observationss according to the tree, assuming with missing data.
-            
+
             Args
             ----
-            
+
             observations : list of list
                 The internal data format for the training data (combining X, Y, treatment).
 
@@ -1030,11 +1027,11 @@ class UpliftTreeClassifier:
 def plot(decisionTree):
     '''
     Convert the tree to string for print.
-    
+
     Args
     ----
-    
-    decisionTree : object 
+
+    decisionTree : object
         object of DecisionTree class
 
     Returns
@@ -1045,11 +1042,11 @@ def plot(decisionTree):
     def toString(decisionTree, indent=''):
         '''
         Convert the tree to string for print.
-        
+
         Args
         ----
-        
-        decisionTree : object 
+
+        decisionTree : object
             object of DecisionTree class
 
         indent : string, optional (default = '')
@@ -1082,12 +1079,12 @@ def cat_group(dfx,kpix, n_group = 10):
 
     Args
     ----
-    
+
     dfx : dataframe
         The inputs data dataframe.
 
     kpix : string
-        The column of the feature. 
+        The column of the feature.
 
     n_group : int, optional (default = 10)
         The number of top category values to be remained, other category values will be put into "Other".
@@ -1125,7 +1122,7 @@ def cat_transform(dfx, kpix, kpi1):
     dfx : DataFrame
         The updated dataframe containing the encoded data.
 
-    kpi1 : list 
+    kpi1 : list
         The updated feature names containing the new dummy feature names.
     '''
     df_dummy = pd.get_dummies(dfx[kpix].values)
@@ -1145,12 +1142,12 @@ def cv_fold_index(n, i, k, random_seed = 2018):
 
     Args
     ----
-    
+
     dfx : dataframe
         The inputs data dataframe.
 
     kpix : string
-        The column of the feature. 
+        The column of the feature.
 
     kpi1 : list
         The list of feature names.
@@ -1160,7 +1157,7 @@ def cv_fold_index(n, i, k, random_seed = 2018):
     dfx : DataFrame
         The updated dataframe containing the encoded data.
 
-    kpi1 : list 
+    kpi1 : list
         The updated feature names containing the new dummy feature names.
     '''
     np.random.seed(random_seed)
@@ -1175,7 +1172,7 @@ def cat_continuous(x, granularity = 'Medium'):
 
     Args
     ----
-    
+
     x : list
         Feature values.
 
@@ -1184,8 +1181,8 @@ def cat_continuous(x, granularity = 'Medium'):
 
     Returns
     -------
-    res : list 
-        List of percentile bins for the feature value. 
+    res : list
+        List of percentile bins for the feature value.
     '''
     if granularity == 'High':
         lspercentile = [np.percentile(x, 5),
@@ -1259,12 +1256,12 @@ def kpi_transform(dfx,kpi_combo,kpi_combo_new):
 
     Args
     ----
-    
+
     dfx : DataFrame
         DataFrame containing the features.
 
     kpi_combo : list of string
-        List of feature names to be transformed 
+        List of feature names to be transformed
 
     kpi_combo_new : list of string
         List of new feature names to be assigned to the transformed features.
@@ -1615,6 +1612,7 @@ class UpliftRandomForestClassifier:
                 self.uplift_forest[tree_i].fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
         return
 
+    @ignore_warnings(category=FutureWarning)
     def predict(self, X, full_output=False):
         '''
         Returns the recommended treatment group and predicted optimal probability conditional on using the recommended treatment group.
