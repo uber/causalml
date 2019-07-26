@@ -5,7 +5,7 @@
 ------------------------------------------------------
 
 [![Build Status](https://travis-ci.com/uber-common/causalml.svg?token=t7jFKh1sKGtbqHWp2sGn&branch=master)](https://travis-ci.com/uber-common/causalml)
-[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2973/badge)](https://bestpractices.coreinfrastructure.org/projects/2973)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3015/badge)](https://bestpractices.coreinfrastructure.org/projects/3015)
 
 
 # Disclaimer
