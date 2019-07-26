@@ -7,9 +7,10 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 from sklearn.dummy import DummyRegressor
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import mean_squared_error as mse, mean_absolute_error as mae
 from sklearn.neural_network import MLPRegressor
-from sklearn.metrics import mean_squared_error as mse, mean_absolute_error as mae
+from sklearn.utils.testing import ignore_warnings
 from xgboost import XGBRegressor
 
 
@@ -57,6 +58,7 @@ class BaseTLearner(object):
                                                    self.model_c.__repr__(),
                                                    self.model_t.__repr__())
 
+    @ignore_warnings(category=ConvergenceWarning)
     def fit(self, X, treatment, y):
         """Fit the inference model
 
