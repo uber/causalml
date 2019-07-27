@@ -88,7 +88,7 @@ logger.info('Average Treatment Effect (XGBoost): {:.2f} ({:.2f}, {:.2f})'.format
 
 # Contributing
 
-We welcome community contributors to the project.
+We welcome community contributors to the project. Before you start, please check out [contributing guidelines](./CONTRIBUTING.md) first.
 
 
 # Related projects
