@@ -1,10 +1,10 @@
 <div align="center">
-  <a href="https://github.com/uber-common/causalml"> <img width="380px" height="140px" src="docs/_static/img/causalml_logo.png"></a>
+  <a href="https://github.com/uber/causalml"> <img width="380px" height="140px" src="docs/_static/img/causalml_logo.png"></a>
 </div>
 
 ------------------------------------------------------
 
-[![Build Status](https://travis-ci.com/uber-common/causalml.svg?token=t7jFKh1sKGtbqHWp2sGn&branch=master)](https://travis-ci.com/uber-common/causalml)
+[![Build Status](https://travis-ci.com/uber/causalml.svg?token=t7jFKh1sKGtbqHWp2sGn&branch=master)](https://travis-ci.com/uber/causalml)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3015/badge)](https://bestpractices.coreinfrastructure.org/projects/3015)
 
 
