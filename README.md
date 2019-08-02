@@ -9,7 +9,7 @@
 
 
 # Disclaimer
-This project is experimental and the APIs are not considered stable.
+This project is stable and being incubated for long-term support. It may contain new experimental code, for which APIs are subject to change.
 
 # Causal ML: A Python Package for Uplift Modeling and Causal Inference with ML
 
