@@ -17,7 +17,6 @@ class BaseXLearner(object):
     An X-learner estimates treatment effects with four machine learning models.
 
     Details of X-learner are available at Kunzel et al. (2018) (https://arxiv.org/abs/1706.03461).
-
     """
 
     def __init__(self,
@@ -31,7 +30,8 @@ class BaseXLearner(object):
         """Initialize a X-learner.
 
         Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment groups
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
+                groups
             control_outcome_learner (optional): a model to estimate outcomes in the control group
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
             control_effect_learner (optional): a model to estimate treatment effects in the control group
@@ -89,11 +89,10 @@ class BaseXLearner(object):
             y (np.array): an outcome vector
         """
         is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
 
         t_groups = np.unique(treatment[is_treatment])
         self._classes = {}
-        self._classes[t_groups[0]] = 0 # this should be updated for multi-treatment case
+        self._classes[t_groups[0]] = 0  # this should be updated for multi-treatment case
 
         logger.info('Training the control group outcome model')
         self.model_mu_c.fit(X[~is_treatment], y[~is_treatment])
@@ -127,7 +126,7 @@ class BaseXLearner(object):
         dhat_c = self.model_tau_c.predict(X)
         dhat_t = self.model_tau_t.predict(X)
 
-        return (p * dhat_c + (1 - p) * dhat_t).reshape(-1,1)
+        return (p * dhat_c + (1 - p) * dhat_t).reshape(-1, 1)
 
     def fit_predict(self, X, p, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=False):
         """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
@@ -144,7 +143,8 @@ class BaseXLearner(object):
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
-                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment], UB [n_samples, n_treatment]
+                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
+                UB [n_samples, n_treatment]
         """
         self.fit(X, treatment, y)
         te = self.predict(X, p)
@@ -156,7 +156,7 @@ class BaseXLearner(object):
             te_bootstraps = np.zeros(shape=(X.shape[0], n_bootstraps))
             for i in range(n_bootstraps):
                 te_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
-                te_bootstraps[:,i] = np.ravel(te_b)
+                te_bootstraps[:, i] = np.ravel(te_b)
                 if verbose:
                     now = pd.datetime.today()
                     lapsed = (now-start).seconds / 60
@@ -189,14 +189,12 @@ class BaseXLearner(object):
         dhat_c = self.model_tau_c.predict(X)
         dhat_t = self.model_tau_t.predict(X)
 
-
         te = (p * dhat_c + (1 - p) * dhat_t).mean()
 
         # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
         # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
-
         se = np.sqrt((
-                self.t_var/prob_treatment + self.c_var/(1-prob_treatment)+
+                self.t_var/prob_treatment + self.c_var/(1-prob_treatment) +
                 (p * dhat_c + (1-p) * dhat_t).var()
             ) / X.shape[0])
 
@@ -206,12 +204,9 @@ class BaseXLearner(object):
         return te, te_lb, te_ub
 
     def bootstrap(self, X, p, treatment, y, size=10000):
-        """
-        Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population.
-        """
+        """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
-        p_b = p[idxs]
         treatment_b = treatment[idxs]
         y_b = y[idxs]
         self.fit(X=X_b, treatment=treatment_b, y=y_b)
