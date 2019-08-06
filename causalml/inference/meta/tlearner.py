@@ -73,7 +73,6 @@ class BaseTLearner(object):
         t_groups = np.unique(treatment[is_treatment])
         self._classes = {}
         self._classes[t_groups[0]] = 0 # this should be updated for multi-treatment case
-        X = np.hstack((w.reshape((-1, 1)), X))
 
         logger.info('Training a control group model')
         self.model_c.fit(X[~is_treatment], y[~is_treatment])
@@ -94,8 +93,6 @@ class BaseTLearner(object):
         """
         is_treatment = treatment!=self.control_name
         w = is_treatment.astype(int)
-
-        X = np.hstack((w.reshape((-1, 1)), X))
 
         yhat_c = self.model_c.predict(X)
         yhat_t = self.model_t.predict(X)
@@ -162,7 +159,6 @@ class BaseTLearner(object):
 
         self.fit(X, treatment, y)
 
-        X = np.hstack((w.reshape((-1, 1)), X))
         yhat_c = self.model_c.predict(X)
         yhat_t = self.model_t.predict(X)
 
