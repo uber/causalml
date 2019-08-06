@@ -179,8 +179,9 @@ class NearestNeighborMatch(object):
                                                                        score_cols=score_cols))
         return matched.reset_index(level=0, drop=True)
 
+
 class MatchOptimizer(object):
-    def __init__(self, treatment_col='is_treatment', ps_col='pihat', user_col=None, matching_covariates=['pihat'], 
+    def __init__(self, treatment_col='is_treatment', ps_col='pihat', user_col=None, matching_covariates=['pihat'],
                  max_smd=0.1, max_deviation= 0.1, caliper_range=(0.01,0.5), max_pihat_range=(0.95,0.999), max_iter_per_param=5,
                  min_users_per_group=1000, smd_cols=['pihat'], dev_cols_transformations = {'pihat':np.mean},
                  dev_factor=1., verbose=True):
@@ -309,6 +310,7 @@ class MatchOptimizer(object):
             logger.info('\n-----\nBest params are:\n{}'.format(self.best_params))
 
         return self.best_matched
+
 
 if __name__ == '__main__':
 
