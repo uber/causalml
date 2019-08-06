@@ -15,12 +15,9 @@ logger = logging.getLogger('causalml')
 class BaseRLearner(object):
     """A parent class for R-learner classes.
 
-    An R-learner estimates treatment effects with two machine learning models
-    and the propensity score.
+    An R-learner estimates treatment effects with two machine learning models and the propensity score.
 
-    Details of R-learner are available at Nie and Wager (2019)
-    (https://arxiv.org/abs/1712.04912).
-
+    Details of R-learner are available at Nie and Wager (2019) (https://arxiv.org/abs/1712.04912).
     """
 
     def __init__(self,
@@ -34,22 +31,16 @@ class BaseRLearner(object):
         """Initialize a R-learner.
 
         Args:
-            learner (optional): a model to estimate outcomes and treatment
-                effects
+            learner (optional): a model to estimate outcomes and treatment effects
             outcome_learner (optional): a model to estimate outcomes
-            effect_learner (optional): a model to estimate treatment effects.
-                It needs to take `sample_weight` as an input argument for
-                `fit()`
-            ate_alpha (float, optional): the confidence level alpha of the ATE
-                estimate
+            effect_learner (optional): a model to estimate treatment effects. It needs to take `sample_weight` as an
+                input argument for `fit()`
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
-            n_fold (int, optional): the number of cross validation folds for
-                outcome_learner
-            random_state (int or RandomState, optional): a seed (int) or
-                random number generater (RandomState)
+            n_fold (int, optional): the number of cross validation folds for outcome_learner
+            random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
         """
-        assert (learner is not None) or ((outcome_learner is not None) and
-               (effect_learner is not None))
+        assert (learner is not None) or ((outcome_learner is not None) and (effect_learner is not None))
 
         if outcome_learner is None:
             self.model_mu = deepcopy(learner)
@@ -64,8 +55,7 @@ class BaseRLearner(object):
         self.ate_alpha = ate_alpha
         self.control_name = control_name
 
-        self.cv = KFold(n_splits=n_fold, shuffle=True,
-                        random_state=random_state)
+        self.cv = KFold(n_splits=n_fold, shuffle=True, random_state=random_state)
 
         self.t_var = 0.0
         self.c_var = 0.0
@@ -78,13 +68,11 @@ class BaseRLearner(object):
 
     def fit_predict(self, X, p, treatment, y, return_ci=False,
                     n_bootstraps=1000, bootstrap_size=10000, verbose=False):
-        """Fit the treatment effect and outcome models of the R learner and
-        predict treatment effects.
+        """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
 
         Args:
             X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1
-            treatment (np.array): a treatment vector
+            p (np.array): a propensity vector between 0 and 1 treatment (np.array): a treatment vector
             y (np.array): an outcome vector
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
@@ -92,9 +80,8 @@ class BaseRLearner(object):
             verbose (str): whether to output progress logs
 
         Returns:
-            (numpy.ndarray): Predictions of treatment effects.
-                Output dim: [n_samples, n_treatment]. If return_ci, returns
-                CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
+            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
+                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
                 UB [n_samples, n_treatment]
         """
         self.fit(X, p, treatment, y)
@@ -111,14 +98,10 @@ class BaseRLearner(object):
                 if verbose:
                     now = pd.datetime.today()
                     lapsed = (now-start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min '
-                                'lapsed)'.format(i+1, n_bootstraps, lapsed))
+                    logger.info('{}/{} bootstraps completed. ({:.01f} min ' 'lapsed)'.format(i+1, n_bootstraps, lapsed))
 
-            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100,
-                                     axis=1)
-            te_upper = np.percentile(te_bootstraps,
-                                     (1 - self.ate_alpha / 2) * 100,
-                                     axis=1)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
+            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
 
             return (te, te_lower, te_upper)
 
@@ -137,13 +120,9 @@ class BaseRLearner(object):
         dhat = self.fit_predict(X, p, treatment, y)
 
         te = dhat.mean()
-        prob_treatment = (float(sum(treatment != self.control_name))
-                          / X.shape[0])
+        prob_treatment = float(sum(treatment != self.control_name)) / X.shape[0]
 
-        se = np.sqrt((
-                self.t_var / prob_treatment + self.c_var / (1 - prob_treatment)
-                + dhat.var()
-            ) / X.shape[0])
+        se = np.sqrt(self.t_var / prob_treatment + self.c_var / (1 - prob_treatment) + dhat.var()) / X.shape[0]
 
         te_lb = te - se * norm.ppf(1 - self.ate_alpha / 2)
         te_ub = te + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -167,12 +146,10 @@ class BaseRLearner(object):
         # this should be updated for multi-treatment case
         self._classes[t_groups[0]] = 0
 
-        logger.info('generating out-of-fold CV outcome estimates with '
-                    '{}'.format(self.model_mu))
+        logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
         yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
 
-        logger.info('training the treatment effect model, '
-                    '{} with R-loss'.format(self.model_tau))
+        logger.info('training the treatment effect model, {} with R-loss'.format(self.model_tau))
         self.model_tau.fit(X, (y - yhat) / (w - p), sample_weight=(w - p) ** 2)
 
         self.t_var = (y[w == 1] - yhat[w == 1]).var()
@@ -193,10 +170,8 @@ class BaseRLearner(object):
         return dhat.reshape(-1, 1)
 
     def bootstrap(self, X, p, treatment, y, size=10000):
-        """
-        Runs a single bootstrap. Fits on bootstrapped sample, then predicts on
-        whole population.
-        """
+        """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
+
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
         p_b = p[idxs]

@@ -38,8 +38,7 @@ class DecisionTree:
         The column index for splitting the tree node to children nodes.
 
     value : float, optional (default = None)
-        The value of the feature column to split the tree node to children
-        nodes.
+        The value of the feature column to split the tree node to children nodes.
 
     trueBranch : object of DecisionTree
         The true branch tree node (feature > value).
@@ -48,42 +47,35 @@ class DecisionTree:
         The flase branch tree node (feature > value).
 
     results : dictionary
-        The classification probability Pr(1) for each experiment group in the
-        tree node.
+        The classification probability Pr(1) for each experiment group in the tree node.
 
     summary : dictionary
-        Summary statistics of the tree nodes, including impurity, sample size,
-        uplift score, etc.
+        Summary statistics of the tree nodes, including impurity, sample size, uplift score, etc.
 
     maxDiffTreatment : string
-        The treatment name generating the maximum difference between treatment
-        and control group.
+        The treatment name generating the maximum difference between treatment and control group.
 
     maxDiffSign : float
         The sign of the maxium difference (1. or -1.).
 
     nodeSummary : dictionary
-        Summary statistics of the tree nodes {treatment: [y_mean, n]}, where
-        y_mean stands for the target metric mean and n is the sample size.
+        Summary statistics of the tree nodes {treatment: [y_mean, n]}, where y_mean stands for the target metric mean
+        and n is the sample size.
 
     backupResults : dictionary
-        The conversion proabilities in each treatment in the parent node
-        {treatment: y_mean}. The parent node information is served as a backup
-        for the children node, in case no valid statistics can be calculated
-        from the children node, the parent node information will be used in
-        certain cases.
+        The conversion proabilities in each treatment in the parent node {treatment: y_mean}. The parent node
+        information is served as a backup for the children node, in case no valid statistics can be calculated from the
+        children node, the parent node information will be used in certain cases.
 
     bestTreatment : string
         The treatment name providing the best uplift (treatment effect).
 
     upliftScore : list
-        The uplift score of this node: [max_Diff, p_value], where max_Diff
-        stands for the maxium treatment effect, and p_value stands for the
-        p_value of the treatment effect.
+        The uplift score of this node: [max_Diff, p_value], where max_Diff stands for the maxium treatment effect, and
+        p_value stands for the p_value of the treatment effect.
 
     matchScore : float
-        The uplift score by filling a trained tree with validation dataset or
-        testing dataset.
+        The uplift score by filling a trained tree with validation dataset or testing dataset.
 
     """
 
@@ -113,11 +105,10 @@ class DecisionTree:
 class UpliftTreeClassifier:
     """ Uplift Tree Classifier for Classification Task.
 
-    A uplift tree classifier estimates the individual treatment effect by
-    modifying the loss function in the classification trees.
+    A uplift tree classifier estimates the individual treatment effect by modifying the loss function in the
+    classification trees.
 
-    The uplift tree classifer is used in uplift random forest to construct the
-    trees in the forest.
+    The uplift tree classifer is used in uplift random forest to construct the trees in the forest.
 
     Parameters
     ----------
@@ -135,22 +126,18 @@ class UpliftTreeClassifier:
         The minimum number of samples required to be split at a leaf node.
 
     min_samples_treatment: int, optional (default=10)
-        The minimum number of samples required of the experiment group to be
-        split at a leaf node.
+        The minimum number of samples required of the experiment group to be split at a leaf node.
 
     n_reg: int, optional (default=10)
-        The regularization parameter defined in Rzepakowski et al. 2012, the
-        weight (in terms of sample size) of the parent node influence on the
-        child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
+        The regularization parameter defined in Rzepakowski et al. 2012, the weight (in terms of sample size) of the
+        parent node influence on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
     control_name: string
-        The name of the control group (other experiment groups will be
-        regarded as treatment groups)
+        The name of the control group (other experiment groups will be regarded as treatment groups)
 
     normalization: boolean, optional (default=True)
-        The normalization factor defined in Rzepakowski et al. 2012,
-        correcting for tests with large number of splits and imbalanced
-        treatment and control splits
+        The normalization factor defined in Rzepakowski et al. 2012, correcting for tests with large number of splits
+        and imbalanced treatment and control splits
 
     """
     def __init__(self, max_features=None, max_depth=3, min_samples_leaf=100,
@@ -175,6 +162,7 @@ class UpliftTreeClassifier:
 
     def fit(self, X, treatment, y):
         """ Fit the uplift model.
+
         Args
         ----
         X : ndarray, shape = [num_samples, num_features]
@@ -190,8 +178,7 @@ class UpliftTreeClassifier:
         -------
         self : object
         """
-        assert len(X) == len(y) and len(X) == len(treatment), \
-            'Data length must be equal for X, treatment, and y.'
+        assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
         rows = [list(X[i]) + [treatment[i]] + [y[i]] for i in range(len(X))]
         resTree = self.growDecisionTreeFrom(
@@ -206,6 +193,7 @@ class UpliftTreeClassifier:
     # Prune Trees
     def prune(self, X, treatment, y, minGain=0.0001, rule='maxAbsDiff'):
         """ Prune the uplift model.
+
         Args
         ----
         X : ndarray, shape = [num_samples, num_features]
@@ -231,8 +219,7 @@ class UpliftTreeClassifier:
         -------
         self : object
         """
-        assert len(X) == len(y) and len(X) == len(treatment), \
-            'Data length must be equal for X, treatment, and y.'
+        assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
         rows = [list(X[i]) + [treatment[i]] + [y[i]] for i in range(len(X))]
         self.pruneTree(rows,
@@ -249,6 +236,7 @@ class UpliftTreeClassifier:
                   evaluationFunction=None, notify=False, n_reg=0,
                   parentNodeSummary=None):
         """Prune one single tree node in the uplift model.
+
         Args
         ----
         X : ndarray, shape = [num_samples, num_features]
@@ -261,14 +249,12 @@ class UpliftTreeClassifier:
             An array containing the outcome of interest for each unit.
 
         minGain : float, optional (default = 0.0001)
-            The minimum gain required to make a tree node split. The children
-            tree branches are trimmed if the actual split gain is less than
-            the minimum gain.
+            The minimum gain required to make a tree node split. The children tree branches are trimmed if the actual
+            split gain is less than the minimum gain.
 
         rule : string, optional (default = 'maxAbsDiff')
-            The prune rules. Supported values are 'maxAbsDiff' for optimizing
-            the maximum absolute difference, and 'bestUplift' for optimizing
-            the node-size weighted treatment effect.
+            The prune rules. Supported values are 'maxAbsDiff' for optimizing the maximum absolute difference, and
+            'bestUplift' for optimizing the node-size weighted treatment effect.
 
         Returns
         -------
@@ -300,10 +286,8 @@ class UpliftTreeClassifier:
                 # Current D
                 if (tree.maxDiffTreatment in currentNodeSummary and
                     self.control_name in currentNodeSummary):
-                    currentScoreD = (tree.maxDiffSign *
-                        (currentNodeSummary[tree.maxDiffTreatment][0]
-                         - currentNodeSummary[self.control_name][0])
-                    )
+                    currentScoreD = tree.maxDiffSign * (currentNodeSummary[tree.maxDiffTreatment][0]
+                                                        - currentNodeSummary[self.control_name][0])
                 else:
                     currentScoreD = 0
 
@@ -314,14 +298,11 @@ class UpliftTreeClassifier:
                 )
                 if (tree.trueBranch.maxDiffTreatment in trueNodeSummary and
                     self.control_name in trueNodeSummary):
+                    trueScoreD = tree.trueBranch.maxDiffSign * (trueNodeSummary[tree.trueBranch.maxDiffTreatment][0]
+                                                                - trueNodeSummary[self.control_name][0])
                     trueScoreD = (
-                        tree.trueBranch.maxDiffSign
-                        * (trueNodeSummary[tree.trueBranch.maxDiffTreatment][0]
-                           - trueNodeSummary[self.control_name][0])
-                    )
-                    trueScoreD = (
-                        trueScoreD *
-                        (trueNodeSummary[tree.trueBranch.maxDiffTreatment][1]
+                        trueScoreD
+                        * (trueNodeSummary[tree.trueBranch.maxDiffTreatment][1]
                          + trueNodeSummary[self.control_name][1])
                         / (currentNodeSummary[tree.trueBranch.maxDiffTreatment][1]
                            + currentNodeSummary[self.control_name][1])
@@ -424,8 +405,7 @@ class UpliftTreeClassifier:
         -------
         self : object
         """
-        assert len(X) == len(y) and len(X) != len(treatment), \
-            'Data length must be equal for X, treatment, and y.'
+        assert len(X) == len(y) and len(X) != len(treatment), 'Data length must be equal for X, treatment, and y.'
 
         rows = [list(X[i]) + [treatment[i]] + [y[i]] for i in range(len(X))]
         self.fillTree(rows, tree=self.fitted_uplift_tree)
@@ -439,8 +419,7 @@ class UpliftTreeClassifier:
         Args
         ----
         rows : list of list
-            The internal data format for the training data (combining X, Y,
-            treatment).
+            The internal data format for the training data (combining X, Y, treatment).
 
         tree : object
             object of DecisionTree class
@@ -450,10 +429,7 @@ class UpliftTreeClassifier:
         self : object
         """
         # Current Node Summary for Validation Data Set
-        currentNodeSummary = self.tree_node_summary(rows,
-                                                    min_samples_treatment=0,
-                                                    n_reg=0,
-                                                    parentNodeSummary=None)
+        currentNodeSummary = self.tree_node_summary(rows, min_samples_treatment=0, n_reg=0, parentNodeSummary=None)
         tree.nodeSummary = currentNodeSummary
         # Divide sets for child nodes
         (set1, set2) = self.divideSet(rows, tree.col, tree.value)
@@ -467,8 +443,7 @@ class UpliftTreeClassifier:
         # Update Information
 
         # matchScore
-        matchScore = (currentNodeSummary[tree.bestTreatment][0]
-                      - currentNodeSummary[self.control_name][0])
+        matchScore = (currentNodeSummary[tree.bestTreatment][0] - currentNodeSummary[self.control_name][0])
         tree.matchScore = round(matchScore, 4)
         tree.summary['matchScore'] = round(matchScore, 4)
 
@@ -476,10 +451,7 @@ class UpliftTreeClassifier:
         tree.summary['samples'] = len(rows)
         tree.summary['group_size'] = ''
         for treatment_group in currentNodeSummary:
-            tree.summary['group_size'] += (
-                ' ' + treatment_group + ': '
-                + str(currentNodeSummary[treatment_group][1])
-            )
+            tree.summary['group_size'] += ' ' + treatment_group + ': ' + str(currentNodeSummary[treatment_group][1])
         # classProb
         if tree.results is not None:
             tree.results = self.uplift_classification_results(rows)
@@ -497,8 +469,7 @@ class UpliftTreeClassifier:
 
         full_output : bool, optional (default=False)
             Whether the UpliftTree algorithm returns upliftScores, pred_nodes
-            alongside the recommended treatment group and p_hat in the
-            treatment group.
+            alongside the recommended treatment group and p_hat in the treatment group.
 
         Returns
         -------
@@ -513,9 +484,7 @@ class UpliftTreeClassifier:
         pred_nodes = {}
         upliftScores = []
         for xi in range(len(X)):
-            pred_leaf, upliftScore = self.classify(X[xi],
-                                                   self.fitted_uplift_tree,
-                                                   dataMissing=False)
+            pred_leaf, upliftScore = self.classify(X[xi], self.fitted_uplift_tree, dataMissing=False)
             # Predict under uplift optimal treatment
             opt_treat = max(pred_leaf, key=pred_leaf.get)
             p_hat_optimal.append(pred_leaf[opt_treat])
@@ -641,15 +610,13 @@ class UpliftTreeClassifier:
         d_res = 0
         for treatment_group in nodeSummary:
             if treatment_group != control_name:
-                d_res += self.kl_divergence(nodeSummary[treatment_group][0],
-                                            pc)
+                d_res += self.kl_divergence(nodeSummary[treatment_group][0], pc)
         return d_res
 
     @staticmethod
     def evaluate_ED(nodeSummary, control_name):
         '''
-        Calculate Euclidean Distance as split evaluation criterion for a given
-        node.
+        Calculate Euclidean Distance as split evaluation criterion for a given node.
 
         Args
         ----
@@ -677,15 +644,13 @@ class UpliftTreeClassifier:
     @staticmethod
     def evaluate_Chi(nodeSummary, control_name):
         '''
-        Calculate Chi-Square statistic as split evaluation criterion for a
-        given node.
+        Calculate Chi-Square statistic as split evaluation criterion for a given node.
 
         Args
         ----
 
         nodeSummary : dictionary
-            The tree node summary statistics, produced by tree_node_summary()
-            method.
+            The tree node summary statistics, produced by tree_node_summary() method.
 
         control_name : string
             The control group name.
@@ -700,26 +665,20 @@ class UpliftTreeClassifier:
         d_res = 0
         for treatment_group in nodeSummary:
             if treatment_group != control_name:
-                d_res += (
-                    (nodeSummary[treatment_group][0] - pc) ** 2
-                    / max(0.1 ** 6, pc)
-                    + (nodeSummary[treatment_group][0] - pc) ** 2
-                    / max(0.1 ** 6, 1 - pc)
-                )
+                d_res += ((nodeSummary[treatment_group][0] - pc) ** 2 / max(0.1 ** 6, pc)
+                          + (nodeSummary[treatment_group][0] - pc) ** 2 / max(0.1 ** 6, 1 - pc))
         return d_res
 
     @staticmethod
     def evaluate_CTS(currentNodeSummary):
         '''
-        Calculate CTS (conditional treatment selection) as split evaluation
-        criterion for a given node.
+        Calculate CTS (conditional treatment selection) as split evaluation criterion for a given node.
 
         Args
         ----
 
         nodeSummary : dictionary
-            The tree node summary statistics, produced by tree_node_summary()
-            method.
+            The tree node summary statistics, produced by tree_node_summary() method.
 
         control_name : string
             The control group name.
@@ -761,8 +720,7 @@ class UpliftTreeClassifier:
         else:
             return 0
 
-    def normI(self, currentNodeSummary, leftNodeSummary, rightNodeSummary,
-              control_name, alpha=0.9):
+    def normI(self, currentNodeSummary, leftNodeSummary, rightNodeSummary, control_name, alpha=0.9):
         '''
         Normalization factor.
 
@@ -791,8 +749,7 @@ class UpliftTreeClassifier:
         '''
         norm_res = 0
         # n_t, n_c: sample size for all treatment, and control
-        # pt_a, pc_a: % of treatment is in left node, % of control is in left
-        # node
+        # pt_a, pc_a: % of treatment is in left node, % of control is in left node
         n_c = currentNodeSummary[control_name][1]
         n_c_left = leftNodeSummary[control_name][1]
         n_t = []
@@ -808,20 +765,17 @@ class UpliftTreeClassifier:
         pc_a = 1. * n_c_left / (n_c + 0.1)
         # Normalization Part 1
         norm_res += (
-            alpha * self.entropyH(1. * np.sum(n_t) / (np.sum(n_t) + n_c),
-                                  1. * n_c / (np.sum(n_t) + n_c))
+            alpha * self.entropyH(1. * np.sum(n_t) / (np.sum(n_t) + n_c), 1. * n_c / (np.sum(n_t) + n_c))
             * self.kl_divergence(pt_a, pc_a)
         )
         # Normalization Part 2 & 3
         for i in range(len(n_t)):
             pt_a_i = 1. * n_t_left[i] / (n_t[i] + 0.1)
             norm_res += (
-                (1 - alpha) * self.entropyH(1. * n_t[i] / (n_t[i] + n_c),
-                                            1. * n_c / (n_t[i] + n_c))
+                (1 - alpha) * self.entropyH(1. * n_t[i] / (n_t[i] + n_c), 1. * n_c / (n_t[i] + n_c))
                 * self.kl_divergence(1. * pt_a_i, pc_a)
             )
-            norm_res += (1. * n_t[i] / (np.sum(n_t) + n_c)
-                         * self.entropyH(pt_a_i))
+            norm_res += (1. * n_t[i] / (np.sum(n_t) + n_c) * self.entropyH(pt_a_i))
         # Normalization Part 4
         norm_res += 1. * n_c/(np.sum(n_t) + n_c) * self.entropyH(pc_a)
 
@@ -829,8 +783,7 @@ class UpliftTreeClassifier:
         norm_res += 0.5
         return norm_res
 
-    def tree_node_summary(self, rows, min_samples_treatment=10, n_reg=100,
-                          parentNodeSummary=None):
+    def tree_node_summary(self, rows, min_samples_treatment=10, n_reg=100, parentNodeSummary=None):
         '''
         Tree node summary statistics.
 
@@ -838,18 +791,15 @@ class UpliftTreeClassifier:
         ----
 
         rows : list of list
-            The internal data format for the training data (combining X, Y,
-            treatment).
+            The internal data format for the training data (combining X, Y, treatment).
 
         min_samples_treatment: int, optional (default=10)
-            The minimum number of samples required of the experiment group t
-            be split at a leaf node.
+            The minimum number of samples required of the experiment group t be split at a leaf node.
 
         n_reg :  int, optional (default=10)
             The regularization parameter defined in Rzepakowski et al. 2012,
             the weight (in terms of sample size) of the parent node influence
-            on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS'
-            methods.
+            on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
         parentNodeSummary : dictionary
             Node summary statistics of the parent tree node.
@@ -870,10 +820,7 @@ class UpliftTreeClassifier:
             if parentNodeSummary is None:
                 y_mean = 1.*n1/ntot
             elif ntot > min_samples_treatment:
-                y_mean = (
-                    1. * (results[r][1] + parentNodeSummary[r][0] * n_reg)
-                    / (ntot + n_reg)
-                )
+                y_mean = 1. * (results[r][1] + parentNodeSummary[r][0] * n_reg) / (ntot + n_reg)
             else:
                 y_mean = parentNodeSummary[r][0]
             nodeSummary[r] = [y_mean, ntot]
@@ -887,8 +834,7 @@ class UpliftTreeClassifier:
         ----
 
         rows : list of list
-            The internal data format for the training data (combining X, Y,
-            treatment).
+            The internal data format for the training data (combining X, Y, treatment).
 
         Returns
         -------
@@ -913,8 +859,7 @@ class UpliftTreeClassifier:
         ----
 
         rows : list of list
-            The internal data format for the training data (combining X, Y,
-            treatment).
+            The internal data format for the training data (combining X, Y, treatment).
 
         evaluationFunction : string
             Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
@@ -929,14 +874,12 @@ class UpliftTreeClassifier:
             The current depth.
 
         min_samples_treatment: int, optional (default=10)
-            The minimum number of samples required of the experiment group to
-            be split at a leaf node.
+            The minimum number of samples required of the experiment group to be split at a leaf node.
 
         n_reg: int, optional (default=10)
             The regularization parameter defined in Rzepakowski et al. 2012,
             the weight (in terms of sample size) of the parent node influence
-            on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS'
-            methods.
+            on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
         parentNodeSummary : dictionary, optional (default = None)
             Node summary statistics of the parent tree node.
@@ -951,14 +894,12 @@ class UpliftTreeClassifier:
 
         # Current Node Info and Summary
         currentNodeSummary = self.tree_node_summary(
-            rows, min_samples_treatment=min_samples_treatment, n_reg=n_reg,
-            parentNodeSummary=parentNodeSummary
+            rows, min_samples_treatment=min_samples_treatment, n_reg=n_reg, parentNodeSummary=parentNodeSummary
         )
         if evaluationFunction == self.evaluate_CTS:
             currentScore = evaluationFunction(currentNodeSummary)
         else:
-            currentScore = evaluationFunction(currentNodeSummary,
-                                              control_name=self.control_name)
+            currentScore = evaluationFunction(currentNodeSummary, control_name=self.control_name)
 
         # Prune Stats
         maxAbsDiff = 0
@@ -985,39 +926,27 @@ class UpliftTreeClassifier:
             nt = currentNodeSummary[bestTreatment][1]
             pc = currentNodeSummary[self.control_name][0]
             nc = currentNodeSummary[self.control_name][1]
-            p_value = (
-                (1. - stats.norm.cdf((pt - pc)
-                                     / np.sqrt(pt * (1 - pt) / nt
-                                               + pc * (1 - pc) / nc))) * 2
-            )
+            p_value = (1. - stats.norm.cdf((pt - pc) / np.sqrt(pt * (1 - pt) / nt + pc * (1 - pc) / nc))) * 2
         else:
             pt = currentNodeSummary[suboptTreatment][0]
             nt = currentNodeSummary[suboptTreatment][1]
             pc = currentNodeSummary[self.control_name][0]
             nc = currentNodeSummary[self.control_name][1]
-            p_value = (
-                (1. - stats.norm.cdf((pc - pt)
-                                     / np.sqrt(pt * (1 - pt) / nt
-                                               + pc * (1 - pc) / nc))) * 2
-            )
+            p_value = (1. - stats.norm.cdf((pc - pt) / np.sqrt(pt * (1 - pt) / nt + pc * (1 - pc) / nc))) * 2
         upliftScore = [maxDiff, p_value]
 
         bestGain = 0.0
         bestAttribute = None
         bestSets = None
 
-        # last column is the result/target column, 2nd to the last is the
-        # treatment group
+        # last column is the result/target column, 2nd to the last is the treatment group
         columnCount = len(rows[0]) - 2
-        if (self.max_features and self.max_features > 0 and
-            self.max_features <= columnCount):
+        if (self.max_features and self.max_features > 0 and self.max_features <= columnCount):
             max_features = self.max_features
         else:
             max_features = columnCount
 
-        for col in list(np.random.choice(a=range(columnCount),
-                                         size=max_features,
-                                         replace=False)):
+        for col in list(np.random.choice(a=range(columnCount), size=max_features, replace=False)):
             columnValues = [row[col] for row in rows]
             # unique values
             lsUnique = list(set(columnValues))
@@ -1025,9 +954,7 @@ class UpliftTreeClassifier:
             if (isinstance(lsUnique[0], int) or
                 isinstance(lsUnique[0], float)):
                 if len(lsUnique) > 10:
-                    lspercentile = np.percentile(columnValues,
-                                                 [3, 5, 10, 20, 30, 50, 70, 80,
-                                                  90, 95, 97])
+                    lspercentile = np.percentile(columnValues, [3, 5, 10, 20, 30, 50, 70, 80, 90, 95, 97])
                 else:
                     lspercentile = np.percentile(lsUnique, [10, 50, 90])
                 lsUnique = list(set(lspercentile))
@@ -1035,8 +962,7 @@ class UpliftTreeClassifier:
             for value in lsUnique:
                 (set1, set2) = self.divideSet(rows, col, value)
                 # check the split validity on min_samples_leaf  372
-                if (len(set1) < min_samples_leaf or
-                    len(set2) < min_samples_leaf):
+                if (len(set1) < min_samples_leaf or len(set2) < min_samples_leaf):
                     continue
                 # summarize notes
                 # Gain -- Entropy or Gini
@@ -1064,21 +990,13 @@ class UpliftTreeClassifier:
                 if evaluationFunction == self.evaluate_CTS:
                     leftScore1 = evaluationFunction(leftNodeSummary)
                     rightScore2 = evaluationFunction(rightNodeSummary)
-                    gain = (currentScore
-                            - p * leftScore1
-                            - (1 - p) * rightScore2)
+                    gain = (currentScore - p * leftScore1 - (1 - p) * rightScore2)
                 else:
                     if (self.control_name in leftNodeSummary and
                         self.control_name in rightNodeSummary):
-                        leftScore1 = evaluationFunction(
-                            leftNodeSummary, control_name=self.control_name
-                        )
-                        rightScore2 = evaluationFunction(
-                            rightNodeSummary, control_name=self.control_name
-                        )
-                        gain = (p * leftScore1
-                                + (1 - p) * rightScore2
-                                - currentScore)
+                        leftScore1 = evaluationFunction(leftNodeSummary, control_name=self.control_name)
+                        rightScore2 = evaluationFunction(rightNodeSummary, control_name=self.control_name)
+                        gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)
                         if self.normalization:
                             norm_factor = self.normI(currentNodeSummary,
                                                      leftNodeSummary,
@@ -1100,12 +1018,8 @@ class UpliftTreeClassifier:
         # Add treatment size
         dcY['group_size'] = ''
         for treatment_group in currentNodeSummary:
-            dcY['group_size'] += (
-                ' ' + treatment_group + ': '
-                + str(currentNodeSummary[treatment_group][1])
-            )
-        dcY['upliftScore'] = [round(upliftScore[0], 4),
-                              round(upliftScore[1], 4)]
+            dcY['group_size'] += ' ' + treatment_group + ': ' + str(currentNodeSummary[treatment_group][1])
+        dcY['upliftScore'] = [round(upliftScore[0], 4), round(upliftScore[1], 4)]
         dcY['matchScore'] = round(upliftScore[0], 4)
 
         if bestGain > 0 and depth < max_depth:
@@ -1151,8 +1065,7 @@ class UpliftTreeClassifier:
         ----
 
         observations : list of list
-            The internal data format for the training data (combining X, Y,
-            treatment).
+            The internal data format for the training data (combining X, Y, treatment).
 
         dataMissing: boolean, optional (default = False)
             An indicator for if data are missing or not.
@@ -1165,15 +1078,13 @@ class UpliftTreeClassifier:
 
         def classifyWithoutMissingData(observations, tree):
             '''
-            Classifies (prediction) the observationss according to the tree,
-            assuming without missing data.
+            Classifies (prediction) the observationss according to the tree, assuming without missing data.
 
             Args
             ----
 
             observations : list of list
-                The internal data format for the training data (combining X, Y,
-                treatment).
+                The internal data format for the training data (combining X, Y, treatment).
 
             Returns
             -------
@@ -1199,15 +1110,13 @@ class UpliftTreeClassifier:
 
         def classifyWithMissingData(observations, tree):
             '''
-            Classifies (prediction) the observationss according to the tree,
-            assuming with missing data.
+            Classifies (prediction) the observationss according to the tree, assuming with missing data.
 
             Args
             ----
 
             observations : list of list
-                The internal data format for the training data (combining X, Y,
-                treatment).
+                The internal data format for the training data (combining X, Y, treatment).
 
             Returns
             -------
@@ -1220,15 +1129,13 @@ class UpliftTreeClassifier:
                 v = observations[tree.col]
                 if v is None:
                     tr = classifyWithMissingData(observations, tree.trueBranch)
-                    fr = classifyWithMissingData(observations,
-                                                 tree.falseBranch)
+                    fr = classifyWithMissingData(observations, tree.falseBranch)
                     tcount = sum(tr.values())
                     fcount = sum(fr.values())
                     tw = float(tcount) / (tcount + fcount)
                     fw = float(fcount) / (tcount + fcount)
 
-                    # Problem description:
-                    # http://blog.ludovf.net/python-collections-defaultdict/
+                    # Problem description: http://blog.ludovf.net/python-collections-defaultdict/
                     result = defaultdict(int)
                     for k, v in tr.items():
                         result[k] += v * tw
@@ -1292,17 +1199,12 @@ def plot(decisionTree):
             return str(decisionTree.results)
         else:
             szCol = 'Column %s' % decisionTree.col
-            if (isinstance(decisionTree.value, int) or
-                isinstance(decisionTree.value, float)):
+            if (isinstance(decisionTree.value, int) or isinstance(decisionTree.value, float)):
                 decision = '%s >= %s?' % (szCol, decisionTree.value)
             else:
                 decision = '%s == %s?' % (szCol, decisionTree.value)
-            trueBranch = (indent + 'yes -> '
-                          + toString(decisionTree.trueBranch,
-                                     indent + '\t\t'))
-            falseBranch = (indent + 'no  -> '
-                           + toString(decisionTree.falseBranch,
-                                      indent + '\t\t'))
+            trueBranch = (indent + 'yes -> ' + toString(decisionTree.trueBranch, indent + '\t\t'))
+            falseBranch = (indent + 'no  -> ' + toString(decisionTree.falseBranch, indent + '\t\t'))
             return (decision + '\n' + trueBranch + '\n' + falseBranch)
 
     print(toString(decisionTree))
@@ -1322,8 +1224,7 @@ def cat_group(dfx, kpix, n_group=10):
         The column of the feature.
 
     n_group : int, optional (default = 10)
-        The number of top category values to be remained, other category
-        values will be put into "Other".
+        The number of top category values to be remained, other category values will be put into "Other".
 
     Returns
     -------
@@ -1416,8 +1317,7 @@ def cat_continuous(x, granularity='Medium'):
         Feature values.
 
     granularity : string, optional, (default = 'Medium')
-        Control the granularity of the bins, optional values are: 'High',
-        'Medium', 'Low'.
+        Control the granularity of the bins, optional values are: 'High', 'Medium', 'Low'.
 
     Returns
     -------
@@ -1479,10 +1379,7 @@ def cat_continuous(x, granularity='Medium'):
                '<= p90 (%s)' % (lspercentile[8]) if z <= lspercentile[8] else
                '> p90 (%s)' % (lspercentile[8]) for z in x]
     else:
-        lspercentile = [np.percentile(x, 15),
-                        np.percentile(x, 50),
-                        np.percentile(x, 85)
-                        ]
+        lspercentile = [np.percentile(x, 15), np.percentile(x, 50), np.percentile(x, 85)]
         res = ['1-Very Low' if z < lspercentile[0] else
                '2-Low' if z < lspercentile[1] else
                '3-High' if z < lspercentile[2] else
@@ -1492,8 +1389,7 @@ def cat_continuous(x, granularity='Medium'):
 
 def kpi_transform(dfx, kpi_combo, kpi_combo_new):
     '''
-    Feature transformation from continuous feature to binned features for a
-    list of features
+    Feature transformation from continuous feature to binned features for a list of features
 
     Args
     ----
@@ -1538,8 +1434,7 @@ class UpliftRandomForestClassifier:
         The number of trees in the uplift random forest.
 
     evaluationFunction : string
-        Choose from one of the models: 'TwoModel', 'XLearner', 'RLearner',
-        'KL', 'ED', 'Chi', 'CTS'.
+        Choose from one of the models: 'TwoModel', 'XLearner', 'RLearner', 'KL', 'ED', 'Chi', 'CTS'.
 
     max_features: int, optional (default=10)
         The number of features to consider when looking for the best split.
@@ -1554,8 +1449,7 @@ class UpliftRandomForestClassifier:
         The minimum number of samples required to be split at a leaf node.
 
     min_samples_treatment: int, optional (default=10)
-        The minimum number of samples required of the experiment group to be
-        split at a leaf node.
+        The minimum number of samples required of the experiment group to be split at a leaf node.
 
     n_reg: int, optional (default=10)
         The regularization parameter defined in Rzepakowski et al. 2012, the
@@ -1563,8 +1457,7 @@ class UpliftRandomForestClassifier:
         child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
     control_name: string
-        The name of the control group (other experiment groups will be
-        regarded as treatment groups)
+        The name of the control group (other experiment groups will be regarded as treatment groups)
 
     normalization: boolean, optional (default=True)
         The normalization factor defined in Rzepakowski et al. 2012,
@@ -1584,8 +1477,7 @@ class UpliftRandomForestClassifier:
     Outputs
     ----------
     df_res: pandas dataframe
-        A user-level results dataframe containing the estimated individual
-        treatment effect.
+        A user-level results dataframe containing the estimated individual treatment effect.
     """
     def __init__(self,
                  n_estimators=10,
@@ -1664,8 +1556,7 @@ class UpliftRandomForestClassifier:
                 )
                 self.uplift_forest.append(uplift_tree)
 
-    def fit(self, X, treatment, y, nvcate=False, value=None, imp_cost=None,
-            trigger_cost=None):
+    def fit(self, X, treatment, y, nvcate=False, value=None, imp_cost=None, trigger_cost=None):
         """
         Fit the UpliftRandomForestClassifier.
 
@@ -1720,14 +1611,12 @@ class UpliftRandomForestClassifier:
                         est, cv=4, method=self.y_calibration_method
                     )
                 else:
-                    self.uplift_forest[treatment_group_key] = clone(
-                        model_RF, safe=True)
-                data_index = [i for i, xi in enumerate(treatment)
-                              if xi == treatment_group_key]
+                    self.uplift_forest[treatment_group_key] = clone(model_RF, safe=True)
+                data_index = [i for i, xi in enumerate(treatment) if xi == treatment_group_key]
                 x_train = X[data_index]
                 y_train = y[data_index]
-                self.uplift_forest[treatment_group_key].fit(X=x_train,
-                                                            y=y_train)
+                self.uplift_forest[treatment_group_key].fit(X=x_train, y=y_train)
+
         elif self.evaluationFunction in ['RLearner', 'XLearner']:
             # Get treatment and control group keys
             # Remove control group from the keys to prevent control-control
@@ -1749,8 +1638,7 @@ class UpliftRandomForestClassifier:
             # R-Learner
             if self.evaluationFunction == 'RLearner':
                 # Estimate propensity scores and get base regressors
-                w_probs = pd.DataFrame(
-                    self.w_forest_fit.predict_proba(self.w_predictors))
+                w_probs = pd.DataFrame(self.w_forest_fit.predict_proba(self.w_predictors))
                 w_probs.columns = self.w_col
                 mu_forest = self.mu_forest[0]
                 tau_forest = self.tau_forest[0]
@@ -1763,18 +1651,15 @@ class UpliftRandomForestClassifier:
                 if trigger_cost is None:
                     trigger_cost = {}
                 if nvcate:
-                    trigger_cost_l = np.array([trigger_cost[ti]
-                                               for ti in treatment])
-                    imp_cost_l = np.array([imp_cost[ti]
-                                           for ti in treatment])
+                    trigger_cost_l = np.array([trigger_cost[ti] for ti in treatment])
+                    imp_cost_l = np.array([imp_cost[ti] for ti in treatment])
+
                 # Iterate treatment groups to build models
                 for i in range(len(treatment_group_keys)):
                     # Get X, W and Y data for the treatment vs control pair
                     treatment_group_key = treatment_group_keys[i]
-                    treatment_index = [i for i, xi in enumerate(
-                        treatment) if xi == treatment_group_key]
-                    control_index = [i for i, xi in enumerate(
-                        treatment) if xi == self.control_name]
+                    treatment_index = [i for i, xi in enumerate(treatment) if xi == treatment_group_key]
+                    control_index = [i for i, xi in enumerate(treatment) if xi == self.control_name]
                     data_index = control_index + treatment_index
                     x_train = X[data_index]
                     y_train = y[data_index]
@@ -1785,8 +1670,7 @@ class UpliftRandomForestClassifier:
                     # Optional Y ~ X regressor calibration
                     if self.y_calibration_method in ['isotonic', 'sigmoid']:
                         est = clone(mu_forest, safe=True)
-                        mu_reg = CalibratedClassifierCV(
-                            est, cv=4, method=self.y_calibration_method)
+                        mu_reg = CalibratedClassifierCV(est, cv=4, method=self.y_calibration_method)
                     else:
                         mu_reg = clone(mu_forest, safe=True)
                     # Fit the optionally calibrated regressor and predict
@@ -1796,37 +1680,29 @@ class UpliftRandomForestClassifier:
                     # Optional net value optimization
                     if nvcate:
                         y_tilde = (
-                            (value[data_index] - trigger_cost_l[data_index])
-                            * y_train
-                            - (value[data_index]
-                               - np.mean(trigger_cost_l[data_index])) * mu_hat
-                            - (imp_cost_l[data_index]
-                               - np.mean(imp_cost_l[data_index]))
+                            (value[data_index] - trigger_cost_l[data_index]) * y_train
+                            - (value[data_index] - np.mean(trigger_cost_l[data_index])) * mu_hat
+                            - (imp_cost_l[data_index] - np.mean(imp_cost_l[data_index]))
                         )
                     else:
                         y_tilde = y_train - mu_hat
                     # TODO: Establish a way to balance w_tilde
                     w_tilde = w_train - w_hat
                     if (w_tilde == 0).any():
-                        raise ValueError("Some propensity scores are zero. "
-                                         "Check that your sample size is "
-                                         "sufficient for "
-                                         "RandomForestClassifier with "
-                                         "{} classes.".format(
+                        raise ValueError("Some propensity scores are zero. Check that your sample size is "
+                                         "sufficient for RandomForestClassifier with {} classes.".format(
                                              len(set(treatment)))
                                          )
                     pseudo_outcome = y_tilde / w_tilde
                     rlearner_weights = np.asarray(np.power(w_tilde, 2))
                     # Outcome regressor
                     tau_forest = clone(tau_forest, safe=True)
-                    self.tau_fit[treatment_group_key] = tau_forest.fit(
-                        X=x_train, y=pseudo_outcome,
-                        sample_weight=rlearner_weights
-                    )
+                    self.tau_fit[treatment_group_key] = tau_forest.fit(X=x_train, y=pseudo_outcome,
+                                                                       sample_weight=rlearner_weights)
+
             # X-Learner
             elif self.evaluationFunction == 'XLearner':
-                # X-Learner requires splitting the dataset into control and
-                # treatment
+                # X-Learner requires splitting the dataset into control and treatment
                 x_train = X
                 y_train = y
                 X_0 = x_train[treatment == self.control_name]
@@ -1850,30 +1726,22 @@ class UpliftRandomForestClassifier:
                     else:
                         mu_reg = clone(mu_forest, safe=True)
                     tau_reg = clone(tau_forest, safe=True)
-                    # Estimate pseudo-residuals by crossing control and
-                    # tretment trained models with control and treatment
-                    # features
-                    mu_hat_1 = mu_reg.fit(
-                        X=X_0, y=y_0).predict_proba(X_1)[:, 1]
-                    mu_hat_0 = mu_reg.fit(
-                        X=X_1, y=y_1).predict_proba(X_0)[:, 1]
+                    # Estimate pseudo-residuals by crossing control and tretment trained models with control and
+                    # treatment features
+                    mu_hat_1 = mu_reg.fit(X=X_0, y=y_0).predict_proba(X_1)[:, 1]
+                    mu_hat_0 = mu_reg.fit(X=X_1, y=y_1).predict_proba(X_0)[:, 1]
                     if nvcate:
                         value0 = value[treatment == self.control_name]
-                        value1 = value[treatment ==
-                                       treatment_group_key]
+                        value1 = value[treatment == treatment_group_key]
                         pseudo_residual_1 = (
                             (value1 - trigger_cost[treatment_group_key]) * y_1
-                            - (value1 - trigger_cost[self.control_name])
-                            * mu_hat_1
-                            - (imp_cost[treatment_group_key]
-                               - imp_cost[self.control_name])
+                            - (value1 - trigger_cost[self.control_name]) * mu_hat_1
+                            - (imp_cost[treatment_group_key] - imp_cost[self.control_name])
                         )
                         pseudo_residual_0 = (
-                            (value0 - trigger_cost[treatment_group_key])
-                            * mu_hat_0
+                            (value0 - trigger_cost[treatment_group_key]) * mu_hat_0
                             - (value0 - trigger_cost[self.control_name]) * y_0
-                            - (imp_cost[treatment_group_key]
-                               - imp_cost[self.control_name])
+                            - (imp_cost[treatment_group_key] - imp_cost[self.control_name])
                         )
                     else:
                         pseudo_residual_1 = y_1 - mu_hat_1
@@ -1881,12 +1749,8 @@ class UpliftRandomForestClassifier:
 
                     # Fit tau regressors and store models, together with
                     # weights g
-                    self.tau_fit_0[treatment_group_key] = tau_reg.fit(
-                        X=X_0, y=pseudo_residual_0
-                    )
-                    self.tau_fit_1[treatment_group_key] = tau_reg.fit(
-                        X=X_1, y=pseudo_residual_1
-                    )
+                    self.tau_fit_0[treatment_group_key] = tau_reg.fit(X=X_0, y=pseudo_residual_0)
+                    self.tau_fit_1[treatment_group_key] = tau_reg.fit(X=X_1, y=pseudo_residual_1)
 
         # Uplift Model Approach
         else:
@@ -1896,9 +1760,7 @@ class UpliftRandomForestClassifier:
                 x_train_bt = X[bt_index]
                 y_train_bt = y[bt_index]
                 treatment_train_bt = treatment[bt_index]
-                self.uplift_forest[tree_i].fit(
-                    X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt
-                )
+                self.uplift_forest[tree_i].fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
         return
 
     @ignore_warnings(category=FutureWarning)
@@ -1914,8 +1776,7 @@ class UpliftRandomForestClassifier:
 
         full_output : bool, optional (default=False)
             Whether the UpliftTree algorithm returns upliftScores, pred_nodes
-            alongside the recommended treatment group and p_hat in the
-            treatment group.
+            alongside the recommended treatment group and p_hat in the treatment group.
 
         Returns
         -------
@@ -1932,8 +1793,7 @@ class UpliftRandomForestClassifier:
             x_test = X
             for i in range(len(self.treatment_group_keys)):
                 treatment_group_key = self.treatment_group_keys[i]
-                y_pred = self.uplift_forest[treatment_group_key].predict_proba(
-                    X=x_test)
+                y_pred = self.uplift_forest[treatment_group_key].predict_proba(X=x_test)
                 y_pred_ensemble[treatment_group_key] = [xi[1] for xi in y_pred]
         elif self.evaluationFunction == 'RLearner':
             x_test = X
@@ -1956,10 +1816,8 @@ class UpliftRandomForestClassifier:
                 tau_1 = tau_fit_1.predict(X=x_test)
                 treatment_prob = w_probs.loc[:, treatment_group_key]
                 y_pred = (
-                    ((treatment_prob / (treatment_prob + control_prob))
-                     * tau_0)
-                    + ((control_prob / (treatment_prob + control_prob))
-                       * tau_1)
+                    ((treatment_prob / (treatment_prob + control_prob)) * tau_0)
+                    + ((control_prob / (treatment_prob + control_prob)) * tau_1)
                 )
                 y_pred_ensemble[treatment_group_key] = [xi for xi in y_pred]
         else:
@@ -1970,15 +1828,13 @@ class UpliftRandomForestClassifier:
                 if tree_i == 0:
                     for treatment_group in y_pred_full:
                         y_pred_ensemble[treatment_group] = (
-                            np.array(y_pred_full[treatment_group])
-                            / len(self.uplift_forest)
+                            np.array(y_pred_full[treatment_group]) / len(self.uplift_forest)
                         )
                 else:
                     for treatment_group in y_pred_full:
                         y_pred_ensemble[treatment_group] = (
                             np.array(y_pred_ensemble[treatment_group])
-                            + np.array(y_pred_full[treatment_group])
-                            / len(self.uplift_forest)
+                            + np.array(y_pred_full[treatment_group]) / len(self.uplift_forest)
                         )
 
         # Summary results into dataframe
@@ -1996,21 +1852,17 @@ class UpliftRandomForestClassifier:
         if self.evaluationFunction in ['XLearner', 'RLearner']:
             for treatment_group in y_pred_ensemble:
                 delta_cols.append('delta_%s' % (treatment_group))
-                df_res['delta_%s' %
-                       (treatment_group)] = df_res[treatment_group]
+                df_res['delta_%s' % (treatment_group)] = df_res[treatment_group]
                 # add deltas to results list
-                y_pred_list[:, self.classes_[treatment_group]] = \
-                    df_res['delta_%s' % (treatment_group)].values
+                y_pred_list[:, self.classes_[treatment_group]] = df_res['delta_%s' % (treatment_group)].values
             df_res['max_delta'] = df_res[delta_cols].max(axis=1)
         else:
             for treatment_group in y_pred_ensemble:
                 if treatment_group != self.control_name:
                     delta_cols.append('delta_%s' % (treatment_group))
-                    df_res['delta_%s' % (treatment_group)] = \
-                        df_res[treatment_group] - df_res[self.control_name]
+                    df_res['delta_%s' % (treatment_group)] = df_res[treatment_group] - df_res[self.control_name]
                     # add deltas to results list
-                    y_pred_list[:, self.classes_[treatment_group]] = \
-                        df_res['delta_%s' % (treatment_group)].values
+                    y_pred_list[:, self.classes_[treatment_group]] = df_res['delta_%s' % (treatment_group)].values
             df_res['max_delta'] = df_res[delta_cols].max(axis=1)
 
         return y_pred_list
