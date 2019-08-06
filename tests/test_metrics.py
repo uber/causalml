@@ -39,5 +39,5 @@ def test_get_synthetic_auuc():
                                      n=1000,
                                      estimators={'S Learner (LR)': LRSLearner(), 'T Learner (XGB)': XGBTLearner()})
 
-    auuc_df = get_synthetic_auuc(preds_dict)
+    auuc_df = get_synthetic_auuc(preds_dict, plot=False)
     print(auuc_df)
