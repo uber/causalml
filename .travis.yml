@@ -13,7 +13,7 @@ jobs:
     include:
         - stage: test
           name: test
-          script: pytest -v
+          script: pytest -sv
         - stage: fossa
           name: fossa
           script:

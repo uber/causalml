@@ -23,8 +23,8 @@ class ElasticNetPropensityModel(object):
 
         Args:
             n_fold (int): the number of cross-validation fold
-            clip_bounds (tuple): lower and upper bounds for clipping propensity scores. Bounds should be implemented such that:
-                0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
+            clip_bounds (tuple): lower and upper bounds for clipping propensity scores. Bounds should be implemented
+                such that: 0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
             random_state (numpy.random.RandomState or int): RandomState or an int seed
 
         Returns:
@@ -35,7 +35,6 @@ class ElasticNetPropensityModel(object):
 
     def __repr__(self):
         return self.model.__repr__()
-
 
     def fit(self, X, y):
         """

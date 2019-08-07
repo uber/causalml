@@ -10,3 +10,4 @@ _build/
 .ipynb_checkpoints/
 *.c
 *.so
+.coverage*

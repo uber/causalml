@@ -23,7 +23,7 @@ class LabelEncoder(base.BaseEstimator):
     """
 
     def __init__(self, min_obs=10):
-        """Initialize the OneHotEncoder class object.
+        """Initialize the LabelEncoder class object.
 
         Args:
             min_obs (int): minimum number of observation to assign a label.

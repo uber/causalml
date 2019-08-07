@@ -5,7 +5,8 @@ import logging
 import pandas as pd
 import numpy as np
 from sklearn.dummy import DummyRegressor
-from sklearn.metrics import mean_squared_error as mse, mean_absolute_error as mae
+from sklearn.metrics import mean_squared_error as mse
+from sklearn.metrics import mean_absolute_error as mae
 import statsmodels.api as sm
 
 
@@ -32,13 +33,15 @@ class StatsmodelsOLS(object):
             X (np.matrix): a feature matrix
             y (np.array): a label vector
         """
-        X = sm.add_constant(X, prepend=False, has_constant='add')   # Append ones. The first column is for the treatment indicator.
+        # Append ones. The first column is for the treatment indicator.
+        X = sm.add_constant(X, prepend=False, has_constant='add')
         self.model = sm.OLS(y, X).fit(cov_type=self.cov_type)
         self.coefficients = self.model.params
         self.conf_ints = self.model.conf_int(alpha=self.alpha)
 
     def predict(self, X):
-        X = sm.add_constant(X, prepend=False, has_constant='add')   # Append ones. The first column is for the treatment indicator.
+        # Append ones. The first column is for the treatment indicator.
+        X = sm.add_constant(X, prepend=False, has_constant='add')
         return self.model.predict(X)
 
 
@@ -65,7 +68,8 @@ class BaseSLearner(object):
         self.control_name = control_name
 
     def __repr__(self):
-        return '{}(model={})'.format(self.__class__.__name__, self.model.__repr__())
+        return '{}(model={})'.format(self.__class__.__name__,
+                                     self.model.__repr__())
 
     def fit(self, X, treatment, y):
         """Fit the inference model
@@ -80,7 +84,9 @@ class BaseSLearner(object):
 
         t_groups = np.unique(treatment[is_treatment])
         self._classes = {}
-        self._classes[t_groups[0]] = 0 # this should be updated for multi-treatment case
+
+        # this should be updated for multi-treatment case
+        self._classes[t_groups[0]] = 0
         X = np.hstack((w.reshape((-1, 1)), X))
         self.model.fit(X, y)
 
@@ -107,12 +113,20 @@ class BaseSLearner(object):
         yhat_t = self.model.predict(X)
 
         if y is not None:
-            logger.info('RMSE (Control): {:.6f}'.format(np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment]))))
-            logger.info(' MAE (Control): {:.6f}'.format(mae(y[~is_treatment], yhat_c[~is_treatment])))
-            logger.info('RMSE (Treatment): {:.6f}'.format(np.sqrt(mse(y[is_treatment], yhat_t[is_treatment]))))
-            logger.info(' MAE (Treatment): {:.6f}'.format(mae(y[is_treatment], yhat_t[is_treatment])))
+            logger.info('RMSE (Control): {:.6f}'.format(
+                np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment])))
+            )
+            logger.info(' MAE (Control): {:.6f}'.format(
+                mae(y[~is_treatment], yhat_c[~is_treatment]))
+            )
+            logger.info('RMSE (Treatment): {:.6f}'.format(
+                np.sqrt(mse(y[is_treatment], yhat_t[is_treatment])))
+            )
+            logger.info(' MAE (Treatment): {:.6f}'.format(
+                mae(y[is_treatment], yhat_t[is_treatment]))
+            )
 
-        return (yhat_t - yhat_c).reshape(-1,1)
+        return (yhat_t - yhat_c).reshape(-1, 1)
 
     def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=False):
         """Fit the inference model of the S learner and predict treatment effects.
@@ -127,8 +141,9 @@ class BaseSLearner(object):
             verbose (str, optional): whether to output progress logs
 
         Returns:
-            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
-                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment], UB [n_samples, n_treatment]
+            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
+                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
+                UB [n_samples, n_treatment]
         """
         self.fit(X, treatment, y)
         te = self.predict(X, treatment, y)
@@ -140,24 +155,24 @@ class BaseSLearner(object):
             te_bootstraps = np.zeros(shape=(X.shape[0], n_bootstraps))
             for i in range(n_bootstraps):
                 te_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
-                te_bootstraps[:,i] = np.ravel(te_b)
+                te_bootstraps[:, i] = np.ravel(te_b)
                 if verbose:
                     now = pd.datetime.today()
                     lapsed = (now-start).seconds / 60
                     logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i+1, n_bootstraps, lapsed))
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=1)
-            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha/2)*100, axis=1)
+            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
 
             return (te, te_lower, te_upper)
 
     def estimate_ate(self, X, treatment, y):
-        raise NotImplementedError
+        te, te_lb, te_ub = self.fit_predict(X, treatment, y, return_ci=True)
+        return te.mean(), te_lb.mean(), te_ub.mean()
 
     def bootstrap(self, X, treatment, y, size=10000):
-        """
-        Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population.
-        """
+        """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
+
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
         treatment_b = treatment[idxs]
@@ -175,9 +190,7 @@ class LRSLearner(BaseSLearner):
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        super(LRSLearner, self).__init__(StatsmodelsOLS(alpha=ate_alpha),
-                                         ate_alpha,
-                                         control_name)
+        super(LRSLearner, self).__init__(StatsmodelsOLS(alpha=ate_alpha), ate_alpha, control_name)
 
     def estimate_ate(self, X, treatment, y):
         """Estimate the Average Treatment Effect (ATE).
