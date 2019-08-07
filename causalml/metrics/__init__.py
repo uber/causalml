@@ -1,5 +1,5 @@
 from .classification import roc_auc_score, logloss
-from .regression import ape, mape, mae, rmse, r2_score
+from .regression import ape, mape, mae, rmse, r2_score, gini
 
 from .synthetic import get_synthetic_preds, get_synthetic_preds_holdout
 from .synthetic import get_synthetic_summary, get_synthetic_summary_holdout

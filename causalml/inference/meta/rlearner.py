@@ -18,7 +18,6 @@ class BaseRLearner(object):
     An R-learner estimates treatment effects with two machine learning models and the propensity score.
 
     Details of R-learner are available at Nie and Wager (2019) (https://arxiv.org/abs/1712.04912).
-
     """
 
     def __init__(self,
@@ -34,8 +33,8 @@ class BaseRLearner(object):
         Args:
             learner (optional): a model to estimate outcomes and treatment effects
             outcome_learner (optional): a model to estimate outcomes
-            effect_learner (optional): a model to estimate treatment effects.
-                                       It needs to take `sample_weight` as an input argument for `fit()`
+            effect_learner (optional): a model to estimate treatment effects. It needs to take `sample_weight` as an
+                input argument for `fit()`
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
             n_fold (int, optional): the number of cross validation folds for outcome_learner
@@ -61,20 +60,19 @@ class BaseRLearner(object):
         self.t_var = 0.0
         self.c_var = 0.0
 
-
     def __repr__(self):
         return ('{}(model_mu={},\n'
                 '\tmodel_tau={})'.format(self.__class__.__name__,
                                          self.model_mu.__repr__(),
                                          self.model_tau.__repr__()))
 
-    def fit_predict(self, X, p, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=False):
+    def fit_predict(self, X, p, treatment, y, return_ci=False,
+                    n_bootstraps=1000, bootstrap_size=10000, verbose=False):
         """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
 
         Args:
             X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1
-            treatment (np.array): a treatment vector
+            p (np.array): a propensity vector between 0 and 1 treatment (np.array): a treatment vector
             y (np.array): an outcome vector
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
@@ -82,8 +80,9 @@ class BaseRLearner(object):
             verbose (str): whether to output progress logs
 
         Returns:
-            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
-                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment], UB [n_samples, n_treatment]
+            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
+                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
+                UB [n_samples, n_treatment]
         """
         self.fit(X, p, treatment, y)
         te = self.predict(X)
@@ -95,14 +94,14 @@ class BaseRLearner(object):
             te_bootstraps = np.zeros(shape=(X.shape[0], n_bootstraps))
             for i in range(n_bootstraps):
                 te_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
-                te_bootstraps[:,i] = np.ravel(te_b)
+                te_bootstraps[:, i] = np.ravel(te_b)
                 if verbose:
                     now = pd.datetime.today()
                     lapsed = (now-start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i+1, n_bootstraps, lapsed))
+                    logger.info('{}/{} bootstraps completed. ({:.01f} min ' 'lapsed)'.format(i+1, n_bootstraps, lapsed))
 
-            te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=1)
-            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha/2)*100, axis=1)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
+            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
 
             return (te, te_lower, te_upper)
 
@@ -123,12 +122,7 @@ class BaseRLearner(object):
         te = dhat.mean()
         prob_treatment = float(sum(treatment != self.control_name)) / X.shape[0]
 
-        se = np.sqrt((
-                self.t_var/prob_treatment + self.c_var/(1-prob_treatment)+
-                dhat.var()
-            ) / X.shape[0])
-
-        #se = dhat.std() / np.sqrt(X.shape[0])
+        se = np.sqrt(self.t_var / prob_treatment + self.c_var / (1 - prob_treatment) + dhat.var()) / X.shape[0]
 
         te_lb = te - se * norm.ppf(1 - self.ate_alpha / 2)
         te_ub = te + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -149,7 +143,8 @@ class BaseRLearner(object):
 
         t_groups = np.unique(treatment[is_treatment])
         self._classes = {}
-        self._classes[t_groups[0]] = 0 # this should be updated for multi-treatment case
+        # this should be updated for multi-treatment case
+        self._classes[t_groups[0]] = 0
 
         logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
         yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
@@ -157,8 +152,8 @@ class BaseRLearner(object):
         logger.info('training the treatment effect model, {} with R-loss'.format(self.model_tau))
         self.model_tau.fit(X, (y - yhat) / (w - p), sample_weight=(w - p) ** 2)
 
-        self.t_var = (y[w==1]-yhat[w==1]).var()
-        self.c_var = (y[w==0]-yhat[w==0]).var()
+        self.t_var = (y[w == 1] - yhat[w == 1]).var()
+        self.c_var = (y[w == 0] - yhat[w == 0]).var()
 
     def predict(self, X):
         """Predict treatment effects.
@@ -172,12 +167,11 @@ class BaseRLearner(object):
 
         dhat = self.model_tau.predict(X)
 
-        return dhat.reshape(-1,1)
+        return dhat.reshape(-1, 1)
 
     def bootstrap(self, X, p, treatment, y, size=10000):
-        """
-        Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population.
-        """
+        """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
+
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
         p_b = p[idxs]
