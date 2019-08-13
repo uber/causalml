@@ -1,9 +1,10 @@
 <div align="center">
-  <a href="https://github.com/uber/causalml"> <img width="380px" height="140px" src="docs/_static/img/causalml_logo.png"></a>
+  <a href="https://github.com/uber/causalml"> <img width="380px" height="140px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/causalml_logo.png"></a>
 </div>
 
 ------------------------------------------------------
 
+[![PyPI Version](https://badge.fury.io/py/causalml.svg)](https://pypi.org/project/causalml/)
 [![Build Status](https://travis-ci.com/uber/causalml.svg?token=t7jFKh1sKGtbqHWp2sGn&branch=master)](https://travis-ci.com/uber/causalml)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3015/badge)](https://bestpractices.coreinfrastructure.org/projects/3015)
 

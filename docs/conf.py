@@ -77,7 +77,7 @@ author = 'CausalML'
 # the built documents.
 #
 # The short X.Y version.
-# version = causalml.__version__
+version = causalml.__version__
 # The full version, including alpha/beta/rc tags.
 # release = causalml.__version__
 
