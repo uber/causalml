@@ -3,7 +3,7 @@
 Changelog
 =========
 
-0.2.0 (unreleased)
+0.2.0 (2019-08-12)
 ------------------
 
 - Add `optimize.PolicyLearner` based on Athey and Wager 2017 :cite:`athey2017efficient`
