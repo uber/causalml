@@ -26,6 +26,7 @@ class BaseRLearner(object):
                  effect_learner=None,
                  ate_alpha=.05,
                  control_name=0,
+                 binary_outcome=False,
                  n_fold=5,
                  random_state=None):
         """Initialize a R-learner.
@@ -37,9 +38,15 @@ class BaseRLearner(object):
                 input argument for `fit()`
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
+            binary_outcome (bool, optional): whether or not the outcome is
+            binary. If True, outcome_learner must be specified and have a
+            predict_proba() method.
             n_fold (int, optional): the number of cross validation folds for outcome_learner
             random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
         """
+        if binary_outcome and outcome_learner is None:
+            raise ValueError("Argument outcome_learner must be specified for binary outcomes.")
+        
         assert (learner is not None) or ((outcome_learner is not None) and (effect_learner is not None))
 
         if outcome_learner is None:
@@ -54,6 +61,7 @@ class BaseRLearner(object):
 
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.binary_outcome = binary_outcome
 
         self.cv = KFold(n_splits=n_fold, shuffle=True, random_state=random_state)
 
@@ -147,7 +155,13 @@ class BaseRLearner(object):
         self._classes[t_groups[0]] = 0
 
         logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
-        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
+        
+        if self.binary_outcome:
+            yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv, 
+            method='predict_proba')[:, 1]
+
+        else:
+            yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
 
         logger.info('training the treatment effect model, {} with R-loss'.format(self.model_tau))
         self.model_tau.fit(X, (y - yhat) / (w - p), sample_weight=(w - p) ** 2)
