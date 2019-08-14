@@ -9,4 +9,3 @@ statsmodels>=0.9.0
 seaborn
 Cython
 xgboost==0.82
-pytest==4.6
