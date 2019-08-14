@@ -3,6 +3,7 @@ language: python
 install:
     - pip install -U pip
     - pip install -r requirements.txt
+    - pip install -r requirements-test.txt
     - python setup.py build_ext --inplace
     - python setup.py install
 
