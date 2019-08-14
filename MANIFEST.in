@@ -1,6 +1,7 @@
 # Include the README
-include *.txt
-include *.md
+include *.txt *.md
+recursive-include docs *.txt
+recursive-include causalml *.pyx *.pxd *.c *.h
 
 # Include the license file
 include LICENSE
