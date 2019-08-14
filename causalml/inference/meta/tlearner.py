@@ -20,12 +20,13 @@ logger = logging.getLogger('causalml')
 class BaseTLearner(object):
     """A parent class for T-learner classes.
 
-    An T-learner estimates treatment effects with two machine learning models.
+    A T-learner estimates treatment effects with two machine learning models.
 
     Details of T-learner are available at Kunzel et al. (2018) (https://arxiv.org/abs/1706.03461).
     """
 
-    def __init__(self, learner=None, control_learner=None, treatment_learner=None, ate_alpha=.05, control_name=0):
+    def __init__(self, learner=None, control_learner=None, treatment_learner=None, ate_alpha=.05, control_name=0,
+    binary_outcome=False):
         """Initialize a T-learner.
 
         Args:
@@ -34,6 +35,8 @@ class BaseTLearner(object):
             treatment_learner (model, optional): a model to estimate treatment outcomes
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
+            binary_outcome (bool, optional): whether or not the outcome is
+            binary 
         """
         assert (learner is not None) or ((control_learner is not None) and (treatment_learner is not None))
 
@@ -49,6 +52,7 @@ class BaseTLearner(object):
 
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.binary_outcome = binary_outcome
 
     def __repr__(self):
         return '{}(model_c={}, model_t={})'.format(self.__class__.__name__,
@@ -88,15 +92,18 @@ class BaseTLearner(object):
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
-        """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        """   
+        if self.binary_outcome:
+            yhat_c = self.model_c.predict_proba(X)[:, 1]
+            yhat_t = self.model_t.predict_proba(X)[:, 1]
+        
+        else:
+            yhat_c = self.model_c.predict(X)
+            yhat_t = self.model_t.predict(X)
 
-        yhat_c = self.model_c.predict(X)
-        yhat_t = self.model_t.predict(X)
-
-        if (y is not None) and (w is not None):
-            is_treatment = w == 1
+        if (y is not None) and (treatment is not None):
+            is_treatment = treatment != self.control_name
+            w = is_treatment.astype(int)
             logger.info('RMSE (Control): {:.6f}'.format(np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment]))))
             logger.info(' MAE (Control): {:.6f}'.format(mae(y[~is_treatment], yhat_c[~is_treatment])))
             logger.info('RMSE (Treatment): {:.6f}'.format(np.sqrt(mse(y[is_treatment], yhat_t[is_treatment]))))
