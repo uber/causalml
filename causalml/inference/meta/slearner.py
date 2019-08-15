@@ -53,12 +53,15 @@ class BaseSLearner(object):
     Details of S-learner are available at Kunzel et al. (2018) (https://arxiv.org/abs/1706.03461).
     """
 
-    def __init__(self, learner=None, ate_alpha=0.05, control_name=0):
+    def __init__(self, learner=None, ate_alpha=0.05, control_name=0, 
+    binary_outcome=False):
         """Initialize an S-learner.
 
         Args:
             learner (optional): a model to estimate the treatment effect
             control_name (str or int, optional): name of control group
+            binary_outcome (bool, optional): whether or not the outcome is
+            binary. If True, learner must have a predict_proba() method.
         """
         if learner:
             self.model = learner
@@ -66,6 +69,7 @@ class BaseSLearner(object):
             self.model = DummyRegressor()
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.binary_outcome = binary_outcome
 
     def __repr__(self):
         return '{}(model={})'.format(self.__class__.__name__,
@@ -106,11 +110,19 @@ class BaseSLearner(object):
 
         X = np.hstack((w.reshape((-1, 1)), X))
 
-        X[:, 0] = 0    # set the treatment column to zero (the control group)
-        yhat_c = self.model.predict(X)
+        X_control = X.copy()
+        X_control[:, 0] = 0
+        
+        X_treatment = X.copy()
+        X_treatment[:, 0] = 1
+        
+        if self.binary_outcome:
+            yhat_c = self.model.predict_proba(X_control)[:, 1]
+            yhat_t = self.model.predict_proba(X_treatment)[:, 1]
 
-        X[:, 0] = 1    # set the treatment column to one (the treatment group)
-        yhat_t = self.model.predict(X)
+        else:
+            yhat_c = self.model.predict(X_control)
+            yhat_t = self.model.predict(X_treatment)
 
         if y is not None:
             logger.info('RMSE (Control): {:.6f}'.format(
