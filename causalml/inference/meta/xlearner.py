@@ -26,19 +26,26 @@ class BaseXLearner(object):
                  control_effect_learner=None,
                  treatment_effect_learner=None,
                  ate_alpha=.05,
-                 control_name=0):
+                 control_name=0,
+                 binary_outcome=False):
         """Initialize a X-learner.
 
         Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
-                groups
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment groups
             control_outcome_learner (optional): a model to estimate outcomes in the control group
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
             control_effect_learner (optional): a model to estimate treatment effects in the control group
             treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
+            binary_outcome (bool): whether or not the outcome is binary. If True, control_outcome_learner and
+            treatment_outcome_learner must be specified and have a predict_proba() method.
         """
+        if binary_outcome and ((control_outcome_learner is None) or
+                               (treatment_outcome_learner is None)):
+            raise ValueError(
+                "Arguments control_outcome_learner and treatment_outcome_learner must be specified for binary outcomes.")
+
         assert (learner is not None) or ((control_outcome_learner is not None) and
                                          (treatment_outcome_learner is not None) and
                                          (control_effect_learner is not None) and
@@ -66,6 +73,7 @@ class BaseXLearner(object):
 
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.binary_outcome = binary_outcome
 
         self.t_var = 0.0
         self.c_var = 0.0
@@ -96,15 +104,28 @@ class BaseXLearner(object):
 
         logger.info('Training the control group outcome model')
         self.model_mu_c.fit(X[~is_treatment], y[~is_treatment])
-        self.c_var = (y[~is_treatment] - self.model_mu_c.predict(X[~is_treatment])).var()
 
         logger.info('Training the treatment group outcome model')
         self.model_mu_t.fit(X[is_treatment], y[is_treatment])
-        self.t_var = (y[is_treatment] - self.model_mu_t.predict(X[is_treatment])).var()
 
-        # Estimate treatment effects of the control and treatment groups
-        d_c = self.model_mu_t.predict(X[~is_treatment]) - y[~is_treatment]
-        d_t = y[is_treatment] - self.model_mu_c.predict(X[is_treatment])
+        # Calculate variances and treatment effects
+        if self.binary_outcome:
+            self.c_var = (y[~is_treatment] - self.model_mu_c.predict_proba(
+                X[~is_treatment])[:, 1]).var()
+            self.t_var = (y[is_treatment] - self.model_mu_t.predict_proba(
+                X[is_treatment])[:, 1]).var()
+
+            d_c = self.model_mu_t.predict_proba(X[~is_treatment])[:, 1] - y[~is_treatment]
+            d_t = y[is_treatment] - self.model_mu_c.predict_proba(X[is_treatment])[:, 1]
+
+        else:
+            self.c_var = (y[~is_treatment] - self.model_mu_c.predict(
+                X[~is_treatment])).var()
+            self.t_var = (y[is_treatment] - self.model_mu_t.predict(
+                X[is_treatment])).var()
+
+            d_c = self.model_mu_t.predict(X[~is_treatment]) - y[~is_treatment]
+            d_t = y[is_treatment] - self.model_mu_c.predict(X[is_treatment])
 
         logger.info('Training the control group treatment model')
         self.model_tau_c.fit(X[~is_treatment], d_c)
@@ -159,11 +180,11 @@ class BaseXLearner(object):
                 te_bootstraps[:, i] = np.ravel(te_b)
                 if verbose:
                     now = pd.datetime.today()
-                    lapsed = (now-start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i+1, n_bootstraps, lapsed))
+                    lapsed = (now - start).seconds / 60
+                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i + 1, n_bootstraps, lapsed))
 
-            te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=1)
-            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha/2)*100, axis=1)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
+            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
 
             return (te, te_lower, te_upper)
 
@@ -184,7 +205,7 @@ class BaseXLearner(object):
 
         self.fit(X, treatment, y)
 
-        prob_treatment = float(sum(w))/X.shape[0]
+        prob_treatment = float(sum(w)) / X.shape[0]
 
         dhat_c = self.model_tau_c.predict(X)
         dhat_t = self.model_tau_t.predict(X)
@@ -194,9 +215,9 @@ class BaseXLearner(object):
         # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
         # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
         se = np.sqrt((
-                self.t_var/prob_treatment + self.c_var/(1-prob_treatment) +
-                (p * dhat_c + (1-p) * dhat_t).var()
-            ) / X.shape[0])
+            self.t_var / prob_treatment + self.c_var / (1 - prob_treatment) +
+            (p * dhat_c + (1 - p) * dhat_t).var()
+        ) / X.shape[0])
 
         te_lb = te - se * norm.ppf(1 - self.ate_alpha / 2)
         te_ub = te + se * norm.ppf(1 - self.ate_alpha / 2)
