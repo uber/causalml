@@ -1,4 +1,4 @@
-from .slearner import LRSLearner, BaseSLearner
-from .tlearner import XGBTLearner, MLPTLearner, BaseTLearner
-from .xlearner import BaseXLearner
-from .rlearner import BaseRLearner
+from .slearner import LRSRegressor, BaseSRegressor, BaseSClassifier
+from .tlearner import XGBTRegressor, MLPTRegressor, BaseTRegressor, BaseTClassifier
+from .xlearner import BaseXRegressor, BaseXClassifier
+from .rlearner import BaseRRegressor, BaseRClassifier
