@@ -12,7 +12,7 @@ logger = logging.getLogger('causalml')
 
 
 class BaseXLearner(object):
-    """A parent class for X-learner classes.
+    """A parent class for X-learner regressor classes.
 
     An X-learner estimates treatment effects with four machine learning models.
 
@@ -30,8 +30,7 @@ class BaseXLearner(object):
         """Initialize a X-learner.
 
         Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
-                groups
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment groups
             control_outcome_learner (optional): a model to estimate outcomes in the control group
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
             control_effect_learner (optional): a model to estimate treatment effects in the control group
@@ -96,13 +95,16 @@ class BaseXLearner(object):
 
         logger.info('Training the control group outcome model')
         self.model_mu_c.fit(X[~is_treatment], y[~is_treatment])
-        self.c_var = (y[~is_treatment] - self.model_mu_c.predict(X[~is_treatment])).var()
 
         logger.info('Training the treatment group outcome model')
         self.model_mu_t.fit(X[is_treatment], y[is_treatment])
-        self.t_var = (y[is_treatment] - self.model_mu_t.predict(X[is_treatment])).var()
 
-        # Estimate treatment effects of the control and treatment groups
+        # Calculate variances and treatment effects
+        self.c_var = (y[~is_treatment] - self.model_mu_c.predict(
+            X[~is_treatment])).var()
+        self.t_var = (y[is_treatment] - self.model_mu_t.predict(
+            X[is_treatment])).var()
+
         d_c = self.model_mu_t.predict(X[~is_treatment]) - y[~is_treatment]
         d_t = y[is_treatment] - self.model_mu_c.predict(X[is_treatment])
 
@@ -159,11 +161,11 @@ class BaseXLearner(object):
                 te_bootstraps[:, i] = np.ravel(te_b)
                 if verbose:
                     now = pd.datetime.today()
-                    lapsed = (now-start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i+1, n_bootstraps, lapsed))
+                    lapsed = (now - start).seconds / 60
+                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i + 1, n_bootstraps, lapsed))
 
-            te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=1)
-            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha/2)*100, axis=1)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
+            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
 
             return (te, te_lower, te_upper)
 
@@ -184,7 +186,7 @@ class BaseXLearner(object):
 
         self.fit(X, treatment, y)
 
-        prob_treatment = float(sum(w))/X.shape[0]
+        prob_treatment = float(sum(w)) / X.shape[0]
 
         dhat_c = self.model_tau_c.predict(X)
         dhat_t = self.model_tau_t.predict(X)
@@ -194,9 +196,9 @@ class BaseXLearner(object):
         # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
         # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
         se = np.sqrt((
-                self.t_var/prob_treatment + self.c_var/(1-prob_treatment) +
-                (p * dhat_c + (1-p) * dhat_t).var()
-            ) / X.shape[0])
+            self.t_var / prob_treatment + self.c_var / (1 - prob_treatment) +
+            (p * dhat_c + (1 - p) * dhat_t).var()
+        ) / X.shape[0])
 
         te_lb = te - se * norm.ppf(1 - self.ate_alpha / 2)
         te_ub = te + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -212,3 +214,113 @@ class BaseXLearner(object):
         self.fit(X=X_b, treatment=treatment_b, y=y_b)
         te_b = self.predict(X=X, p=p)
         return te_b
+
+
+class BaseXRegressor(BaseXLearner):
+    """
+    A parent class for X-learner regressor classes.
+    """
+
+    def __init__(self,
+                 learner=None,
+                 control_outcome_learner=None,
+                 treatment_outcome_learner=None,
+                 control_effect_learner=None,
+                 treatment_effect_learner=None,
+                 ate_alpha=.05,
+                 control_name=0):
+        """Initialize an X-learner regressor.
+
+        Args:
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment groups
+            control_outcome_learner (optional): a model to estimate outcomes in the control group
+            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
+            control_effect_learner (optional): a model to estimate treatment effects in the control group
+            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
+        super(BaseXRegressor, self).__init__(
+            learner=learner,
+            control_outcome_learner=control_outcome_learner,
+            treatment_outcome_learner=treatment_outcome_learner,
+            control_effect_learner=control_effect_learner,
+            treatment_effect_learner=treatment_effect_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name)
+
+
+class BaseXClassifier(BaseXLearner):
+    """
+    A parent class for X-learner classifier classes.
+    """
+
+    def __init__(self,
+                 learner=None,
+                 control_outcome_learner=None,
+                 treatment_outcome_learner=None,
+                 control_effect_learner=None,
+                 treatment_effect_learner=None,
+                 ate_alpha=.05,
+                 control_name=0):
+        """Initialize an X-learner classifier.
+
+        Args:
+            learner (optional): a model to estimate outcomes or treatment effects in both the control and treatment groups.
+                Even if specified, the user must still input either the outcome learner or the effect learner pair.
+            control_outcome_learner (optional): a model to estimate outcomes in the control group.
+                Should have a predict_proba() method.
+            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group.
+                Should have a predict_proba() method.
+            control_effect_learner (optional): a model to estimate treatment effects in the control group
+            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
+        super(BaseXClassifier, self).__init__(
+            learner=learner,
+            control_outcome_learner=control_outcome_learner,
+            treatment_outcome_learner=treatment_outcome_learner,
+            control_effect_learner=control_effect_learner,
+            treatment_effect_learner=treatment_effect_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name)
+
+        if ((control_outcome_learner is None) or (treatment_outcome_learner is None)) and (
+                (control_effect_learner is None) or (treatment_effect_learner is None)):
+            raise ValueError("Either the outcome learner or the effect learner pair must be specified.")
+
+    def fit(self, X, treatment, y):
+        """Fit the inference model.
+
+        Args:
+            X (np.matrix): a feature matrix
+            treatment (np.array): a treatment vector
+            y (np.array): an outcome vector
+        """
+        is_treatment = treatment != self.control_name
+
+        t_groups = np.unique(treatment[is_treatment])
+        self._classes = {}
+        self._classes[t_groups[0]] = 0  # this should be updated for multi-treatment case
+
+        logger.info('Training the control group outcome model')
+        self.model_mu_c.fit(X[~is_treatment], y[~is_treatment])
+
+        logger.info('Training the treatment group outcome model')
+        self.model_mu_t.fit(X[is_treatment], y[is_treatment])
+
+        # Calculate variances and treatment effects
+        self.c_var = (y[~is_treatment] - self.model_mu_c.predict_proba(
+            X[~is_treatment])[:, 1]).var()
+        self.t_var = (y[is_treatment] - self.model_mu_t.predict_proba(
+            X[is_treatment])[:, 1]).var()
+
+        d_c = self.model_mu_t.predict_proba(X[~is_treatment])[:, 1] - y[~is_treatment]
+        d_t = y[is_treatment] - self.model_mu_c.predict_proba(X[is_treatment])[:, 1]
+
+        logger.info('Training the control group treatment model')
+        self.model_tau_c.fit(X[~is_treatment], d_c)
+
+        logger.info('Training the treatment group treatment model')
+        self.model_tau_t.fit(X[is_treatment], d_t)
