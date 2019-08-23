@@ -28,7 +28,7 @@ class BaseRLearner(object):
                  control_name=0,
                  n_fold=5,
                  random_state=None):
-        """Initialize a R-learner.
+        """Initialize an R-learner.
 
         Args:
             learner (optional): a model to estimate outcomes and treatment effects
@@ -97,8 +97,8 @@ class BaseRLearner(object):
                 te_bootstraps[:, i] = np.ravel(te_b)
                 if verbose:
                     now = pd.datetime.today()
-                    lapsed = (now-start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min ' 'lapsed)'.format(i+1, n_bootstraps, lapsed))
+                    lapsed = (now - start).seconds / 60
+                    logger.info('{}/{} bootstraps completed. ({:.01f} min ' 'lapsed)'.format(i + 1, n_bootstraps, lapsed))
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
             te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
@@ -147,6 +147,7 @@ class BaseRLearner(object):
         self._classes[t_groups[0]] = 0
 
         logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
+
         yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
 
         logger.info('training the treatment effect model, {} with R-loss'.format(self.model_tau))
@@ -180,3 +181,105 @@ class BaseRLearner(object):
         self.fit(X=X_b, p=p_b, treatment=treatment_b, y=y_b)
         te_b = self.predict(X=X)
         return te_b
+
+
+class BaseRRegressor(BaseRLearner):
+    """
+    A parent class for R-learner regressor classes.
+    """
+
+    def __init__(self,
+                 learner=None,
+                 outcome_learner=None,
+                 effect_learner=None,
+                 ate_alpha=.05,
+                 control_name=0,
+                 n_fold=5,
+                 random_state=None):
+        """Initialize an R-learner regressor.
+
+        Args:
+            learner (optional): a model to estimate outcomes and treatment effects
+            outcome_learner (optional): a model to estimate outcomes
+            effect_learner (optional): a model to estimate treatment effects. It needs to take `sample_weight` as an
+                input argument for `fit()`
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+            n_fold (int, optional): the number of cross validation folds for outcome_learner
+            random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
+        """
+        super(BaseRRegressor, self).__init__(
+            learner=learner,
+            outcome_learner=outcome_learner,
+            effect_learner=effect_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+            n_fold=n_fold,
+            random_state=random_state)
+
+
+class BaseRClassifier(BaseRLearner):
+    """
+    A parent class for R-learner classifier classes.
+    """
+
+    def __init__(self,
+                 learner=None,
+                 outcome_learner=None,
+                 effect_learner=None,
+                 ate_alpha=.05,
+                 control_name=0,
+                 n_fold=5,
+                 random_state=None):
+        """Initialize an R-learner classifier.
+
+        Args:
+            learner (optional): a model to estimate outcomes and treatment effects. Even if specified, the user
+                must still specify either the outcome learner or the effect learner.
+            outcome_learner (optional): a model to estimate outcomes. Should have a predict_proba() method.
+            effect_learner (optional): a model to estimate treatment effects. It needs to take `sample_weight` as an
+                input argument for `fit()`
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+            n_fold (int, optional): the number of cross validation folds for outcome_learner
+            random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
+        """
+        super(BaseRClassifier, self).__init__(
+            learner=learner,
+            outcome_learner=outcome_learner,
+            effect_learner=effect_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+            n_fold=n_fold,
+            random_state=random_state)
+
+        if (outcome_learner is None) and (effect_learner is None):
+            raise ValueError("Either the outcome learner or the effect learner must be specified.")
+
+    def fit(self, X, p, treatment, y):
+        """Fit the treatment effect and outcome models of the R learner.
+
+        Args:
+            X (np.matrix): a feature matrix
+            p (np.array): a propensity vector between 0 and 1
+            treatment (np.array): a treatment vector
+            y (np.array): an outcome vector
+        """
+        is_treatment = treatment != self.control_name
+        w = is_treatment.astype(int)
+
+        t_groups = np.unique(treatment[is_treatment])
+        self._classes = {}
+        # this should be updated for multi-treatment case
+        self._classes[t_groups[0]] = 0
+
+        logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
+
+        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv,
+                                 method='predict_proba')[:, 1]
+
+        logger.info('training the treatment effect model, {} with R-loss'.format(self.model_tau))
+        self.model_tau.fit(X, (y - yhat) / (w - p), sample_weight=(w - p) ** 2)
+
+        self.t_var = (y[w == 1] - yhat[w == 1]).var()
+        self.c_var = (y[w == 0] - yhat[w == 0]).var()

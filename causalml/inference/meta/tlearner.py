@@ -18,9 +18,9 @@ logger = logging.getLogger('causalml')
 
 
 class BaseTLearner(object):
-    """A parent class for T-learner classes.
+    """A parent class for T-learner regressor classes.
 
-    An T-learner estimates treatment effects with two machine learning models.
+    A T-learner estimates treatment effects with two machine learning models.
 
     Details of T-learner are available at Kunzel et al. (2018) (https://arxiv.org/abs/1706.03461).
     """
@@ -65,7 +65,6 @@ class BaseTLearner(object):
             y (np.array): an outcome vector
         """
         is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
 
         t_groups = np.unique(treatment[is_treatment])
         self._classes = {}
@@ -89,14 +88,11 @@ class BaseTLearner(object):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
-
         yhat_c = self.model_c.predict(X)
         yhat_t = self.model_t.predict(X)
 
-        if (y is not None) and (w is not None):
-            is_treatment = w == 1
+        if (y is not None) and (treatment is not None):
+            is_treatment = treatment != self.control_name
             logger.info('RMSE (Control): {:.6f}'.format(np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment]))))
             logger.info(' MAE (Control): {:.6f}'.format(mae(y[~is_treatment], yhat_c[~is_treatment])))
             logger.info('RMSE (Treatment): {:.6f}'.format(np.sqrt(mse(y[is_treatment], yhat_t[is_treatment]))))
@@ -134,8 +130,8 @@ class BaseTLearner(object):
                 te_bootstraps[:, i] = np.ravel(te_b)
                 if verbose:
                     now = pd.datetime.today()
-                    lapsed = (now-start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i+1, n_bootstraps, lapsed))
+                    lapsed = (now - start).seconds / 60
+                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i + 1, n_bootstraps, lapsed))
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
             te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
@@ -162,15 +158,15 @@ class BaseTLearner(object):
         yhat_t = self.model_t.predict(X)
 
         te = (yhat_t - yhat_c).mean()
-        prob_treatment = float(sum(w))/X.shape[0]
+        prob_treatment = float(sum(w)) / X.shape[0]
 
         se = np.sqrt((
-                (y[~is_treatment] - yhat_c[~is_treatment]).var()
-                / (1 - prob_treatment) +
-                (y[is_treatment] - yhat_t[is_treatment]).var()
-                / prob_treatment +
-                (yhat_t - yhat_c).var()
-            ) / y.shape[0])
+            (y[~is_treatment] - yhat_c[~is_treatment]).var()
+            / (1 - prob_treatment) +
+            (y[is_treatment] - yhat_t[is_treatment]).var()
+            / prob_treatment +
+            (yhat_t - yhat_c).var()
+        ) / y.shape[0])
 
         te_lb = te - se * norm.ppf(1 - self.ate_alpha / 2)
         te_ub = te + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -189,17 +185,96 @@ class BaseTLearner(object):
         return te_b
 
 
-class XGBTLearner(BaseTLearner):
+class BaseTRegressor(BaseTLearner):
+    """
+    A parent class for T-learner regressor classes.
+    """
+
+    def __init__(self,
+                 learner=None,
+                 control_learner=None,
+                 treatment_learner=None,
+                 ate_alpha=.05,
+                 control_name=0):
+        """Initialize a T-learner regressor.
+
+        Args:
+            learner (model): a model to estimate control and treatment outcomes.
+            control_learner (model, optional): a model to estimate control outcomes
+            treatment_learner (model, optional): a model to estimate treatment outcomes
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
+        super(BaseTRegressor, self).__init__(
+            learner=learner,
+            control_learner=control_learner,
+            treatment_learner=treatment_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name)
+
+
+class BaseTClassifier(BaseTLearner):
+    """
+    A parent class for T-learner classifier classes.
+    """
+
+    def __init__(self,
+                 learner=None,
+                 control_learner=None,
+                 treatment_learner=None,
+                 ate_alpha=.05,
+                 control_name=0):
+        """Initialize a T-learner classifier.
+
+        Args:
+            learner (model): a model to estimate control and treatment outcomes.
+            control_learner (model, optional): a model to estimate control outcomes
+            treatment_learner (model, optional): a model to estimate treatment outcomes
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
+        super(BaseTClassifier, self).__init__(
+            learner=learner,
+            control_learner=control_learner,
+            treatment_learner=treatment_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name)
+
+    def predict(self, X, treatment=None, y=None):
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix): a feature matrix
+            treatment (np.array): a treatment vector
+            y (np.array, optional): an optional outcome vector
+
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        yhat_c = self.model_c.predict_proba(X)[:, 1]
+        yhat_t = self.model_t.predict_proba(X)[:, 1]
+
+        if (y is not None) and (treatment is not None):
+            is_treatment = treatment != self.control_name
+            logger.info('RMSE (Control): {:.6f}'.format(np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment]))))
+            logger.info(' MAE (Control): {:.6f}'.format(mae(y[~is_treatment], yhat_c[~is_treatment])))
+            logger.info('RMSE (Treatment): {:.6f}'.format(np.sqrt(mse(y[is_treatment], yhat_t[is_treatment]))))
+            logger.info(' MAE (Treatment): {:.6f}'.format(mae(y[is_treatment], yhat_t[is_treatment])))
+
+        return (yhat_t - yhat_c).reshape(-1, 1)
+
+
+class XGBTRegressor(BaseTRegressor):
     def __init__(self, ate_alpha=.05, control_name=0, *args, **kwargs):
         """Initialize a T-learner with two XGBoost models."""
-        super(XGBTLearner, self).__init__(learner=XGBRegressor(*args, **kwargs),
-                                          ate_alpha=ate_alpha,
-                                          control_name=control_name)
+        super(XGBTRegressor, self).__init__(learner=XGBRegressor(*args, **kwargs),
+                                            ate_alpha=ate_alpha,
+                                            control_name=control_name)
 
 
-class MLPTLearner(BaseTLearner):
+class MLPTRegressor(BaseTRegressor):
     def __init__(self, ate_alpha=.05, control_name=0, *args, **kwargs):
         """Initialize a T-learner with two MLP models."""
-        super(MLPTLearner, self).__init__(learner=MLPRegressor(*args, **kwargs),
-                                          ate_alpha=ate_alpha,
-                                          control_name=control_name)
+        super(MLPTRegressor, self).__init__(learner=MLPRegressor(*args, **kwargs),
+                                            ate_alpha=ate_alpha,
+                                            control_name=control_name)
