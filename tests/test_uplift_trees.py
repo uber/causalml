@@ -3,44 +3,19 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import train_test_split
 
-from causalml.dataset import make_uplift_classification
 from causalml.inference.tree import UpliftTreeClassifier
 from causalml.inference.tree import UpliftRandomForestClassifier
 from causalml.metrics import get_cumgain
 
-from .const import RANDOM_SEED, N_SAMPLE
+from .const import RANDOM_SEED, N_SAMPLE, CONTROL_NAME, TREATMENT_NAMES, CONVERSION
 
-
-CONTROL_NAME = 'c'
-TREATMENT_NAMES = [CONTROL_NAME, 'treatment1', 'treatment2', 'treatment3']
-CONVERSION = 'conversion'
-
-
-@pytest.fixture
-def generate_data():
-
-    generated = False
-
-    def _generate_data():
-        if not generated:
-            np.random.seed(RANDOM_SEED)
-            data = make_uplift_classification(n_samples=N_SAMPLE,
-                                              treatment_name=TREATMENT_NAMES,
-                                              y_name=CONVERSION,
-                                              random_seed=RANDOM_SEED)
-
-        return data
-
-    yield _generate_data
-
-
-def test_make_uplift_classification(generate_data):
-    df, x_names = generate_data()
+def test_make_uplift_classification(generate_classification_data):
+    df, _ = generate_classification_data()
     assert df.shape[0] == N_SAMPLE * len(TREATMENT_NAMES)
 
 
-def test_UpliftRandomForestClassifier(generate_data):
-    df, x_names = generate_data()
+def test_UpliftRandomForestClassifier(generate_classification_data):
+    df, x_names = generate_classification_data()
     df_train, df_test = train_test_split(df,
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
@@ -90,8 +65,8 @@ def test_UpliftRandomForestClassifier(generate_data):
     assert cumgain['uplift_tree'].sum() > cumgain['Random'].sum()
 
 
-def test_UpliftTreeClassifier(generate_data):
-    df, x_names = generate_data()
+def test_UpliftTreeClassifier(generate_classification_data):
+    df, x_names = generate_classification_data()
     df_train, df_test = train_test_split(df,
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
