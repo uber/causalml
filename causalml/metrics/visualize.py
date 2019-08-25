@@ -46,27 +46,18 @@ def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='ta
 
     lift = []
     for i, col in enumerate(model_names):
+        df = df.sort_values(col, ascending=False).reset_index(drop=True)
+        df['quantile'] = (df.index.values * steps) // df.shape[0] + 1
+
         if treatment_effect_col in df.columns:
             # When treatment_effect_col is given, use it to calculate treatment effect
             # in each quantile.
-            df = df.sort_values(col, ascending=False).reset_index(drop=True)
-            df['quantile'] = (df.index.values * steps) // df.shape[0] + 1
-
             lift.append(df.groupby('quantile')[treatment_effect_col].mean())
         else:
             # When treatment_effect_col is not given, use outcome_col and treatment_col
             # to calculate treatment_effect in each quantile.
-
-            if i == 0:
-                # Create the treatment and control data frames only once.
-                treatment = df.loc[df[treatment_col] == 1].drop(treatment_col, axis=1)
-                control = df.loc[df[treatment_col] == 0].drop(treatment_col, axis=1)
-
-            treatment = treatment.sort_values(col, ascending=False).reset_index(drop=True)
-            treatment['quantile'] = (treatment.index.values * steps) // treatment.shape[0] + 1
-
-            control = control.sort_values(col, ascending=False).reset_index(drop=True)
-            control['quantile'] = (control.index.values * steps) // control.shape[0] + 1
+            treatment = df.loc[df[treatment_col] == 1].drop(treatment_col, axis=1)
+            control = df.loc[df[treatment_col] == 0].drop(treatment_col, axis=1)
 
             lift.append(treatment.groupby('quantile')[outcome_col].mean() -
                         control.groupby('quantile')[outcome_col].mean())
@@ -82,7 +73,7 @@ def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='ta
 
 
 def get_cumgain(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
-                steps=100):
+                steps=100, normalize=False):
     """Get cumulative gains of model estimates in quantiles.
 
     If the true treatment effect is provided (e.g. in synthetic data), it's calculated
@@ -102,19 +93,25 @@ def get_cumgain(df, outcome_col='y', treatment_col='w', treatment_effect_col='ta
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
         steps (int, optional): the number of quantiles
+        normalize (bool, optional): whether to normalize the y-axis to 1 or not
 
     Returns:
         (pandas.DataFrame): cumulative gains of model estimates in quantiles
     """
 
     cumlift = get_cumlift(df, outcome_col, treatment_col, treatment_effect_col, steps)
-    cumgain = cumlift.mul(cumlift.index.values, axis=0)
+
+    # cumulative gain = cumulative lift x (# of population)
+    cumgain = cumlift.mul(cumlift.index.values, axis=0) / 100 * df.shape[0]
+
+    if normalize:
+        cumgain = cumgain.div(cumgain.iloc[-1, :], axis=1)
 
     return cumgain
 
 
 def plot_gain(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
-              steps=100, figsize=(8, 8)):
+              steps=100, normalize=False, figsize=(8, 8)):
     """Plot the cumulative gain chart (or uplift curve) of model estimates.
 
     If the true treatment effect is provided (e.g. in synthetic data), it's calculated
@@ -134,9 +131,10 @@ def plot_gain(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
         steps (int, optional): the number of quantiles
+        normalize (bool, optional): whether to normalize the y-axis to 1 or not
     """
 
-    cumgain = get_cumgain(df, outcome_col, treatment_col, treatment_effect_col, steps)
+    cumgain = get_cumgain(df, outcome_col, treatment_col, treatment_effect_col, steps, normalize=normalize)
 
     cumgain.plot(figsize=figsize)
     plt.xlabel('Fraction of Population')
