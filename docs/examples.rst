@@ -35,26 +35,26 @@ Average Treatment Effect (ATE) Estimation
 
 .. code-block:: python
 
-    from causalml.inference.meta import LRSLearner
-    from causalml.inference.meta import XGBTLearner, MLPTLearner
-    from causalml.inference.meta import BaseXLearner
+    from causalml.inference.meta import LRSRegressor
+    from causalml.inference.meta import XGBTRegressor, MLPTRegressor
+    from causalml.inference.meta import BaseXRegressor
 
-    lr = LRSLearner()
+    lr = LRSRegressor()
     te, lb, ub = lr.estimate_ate(X, treatment, y)
     logger.info('Average Treatment Effect (Linear Regression): {:.2f} ({:.2f}, {:.2f})'.format(te, lb, ub))
 
-    xg = XGBTLearner(random_state=42)
+    xg = XGBTRegressor(random_state=42)
     te, lb, ub = xg.estimate_ate(X, treatment, y)
     logger.info('Average Treatment Effect (XGBoost): {:.2f} ({:.2f}, {:.2f})'.format(te, lb, ub))
 
-    nn = MLPTLearner(hidden_layer_sizes=(10, 10),
+    nn = MLPTRegressor(hidden_layer_sizes=(10, 10),
                      learning_rate_init=.1,
                      early_stopping=True,
                      random_state=42)
     te, lb, ub = nn.estimate_ate(X, treatment, y)
     logger.info('Average Treatment Effect (Neural Network (MLP)): {:.2f} ({:.2f}, {:.2f})'.format(te, lb, ub))
 
-    xl = BaseXLearner(learner=XGBRegressor(random_state=42))
+    xl = BaseXRegressor(learner=XGBRegressor(random_state=42))
     te, lb, ub = xl.estimate_ate(X, p, treatment, y)
     logger.info('Average Treatment Effect (XGBoost): {:.2f} ({:.2f}, {:.2f})'.format(te, lb, ub))
 
