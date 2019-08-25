@@ -248,7 +248,7 @@ def test_BaseTClassifier(generate_classification_data):
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
 
-    uplift_model = BaseTClassifier(learner=XGBClassifier())
+    uplift_model = BaseTClassifier(learner=LogisticRegression())
 
     uplift_model.fit(X=df_train[x_names].values,
                      treatment=df_train['treatment_group_key'].values,
