@@ -41,6 +41,7 @@ def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='ta
     assert ((outcome_col in df.columns) and (treatment_col in df.columns) or
             treatment_effect_col in df.columns)
 
+    df = df.copy()
     np.random.seed(random_seed)
     random_cols = []
     for i in range(10):
