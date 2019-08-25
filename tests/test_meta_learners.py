@@ -228,7 +228,8 @@ def test_BaseSClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          steps=20)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -262,7 +263,8 @@ def test_BaseTClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          steps=20)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -302,7 +304,8 @@ def test_BaseXClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          steps=20)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -341,7 +344,8 @@ def test_BaseRClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          steps=20)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
