@@ -59,7 +59,8 @@ def test_UpliftRandomForestClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='is_treated')
+                          treatment_col='is_treated',
+                          steps=20)
 
     # Check if the cumulative gain of UpLift Random Forest is higher than
     # random
@@ -110,7 +111,8 @@ def test_UpliftTreeClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='is_treated')
+                          treatment_col='is_treated',
+                          steps=20)
 
     # Check if the cumulative gain of UpLift Random Forest is higher than
     # random
