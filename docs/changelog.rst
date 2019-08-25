@@ -3,6 +3,12 @@
 Changelog
 =========
 
+0.3.0 (unreleased)
+------------------
+
+- Extend meta-learners to support classification
+- Fix a bug in uplift curves (`get_cumgain()` and `plot_cumgain()` in `metrics`)
+
 0.2.0 (2019-08-12)
 ------------------
 

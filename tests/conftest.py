@@ -6,6 +6,7 @@ from causalml.dataset import make_uplift_classification
 
 from .const import RANDOM_SEED, N_SAMPLE, TREATMENT_NAMES, CONVERSION
 
+
 @pytest.fixture(scope='module')
 def generate_regression_data():
 
@@ -19,6 +20,7 @@ def generate_regression_data():
         return data
 
     yield _generate_data
+
 
 @pytest.fixture(scope='module')
 def generate_classification_data():

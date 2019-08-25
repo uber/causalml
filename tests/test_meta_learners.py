@@ -228,7 +228,8 @@ def test_BaseSClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          steps=20)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -247,7 +248,7 @@ def test_BaseTClassifier(generate_classification_data):
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
 
-    uplift_model = BaseTClassifier(learner=XGBClassifier())
+    uplift_model = BaseTClassifier(learner=LogisticRegression())
 
     uplift_model.fit(X=df_train[x_names].values,
                      treatment=df_train['treatment_group_key'].values,
@@ -262,7 +263,8 @@ def test_BaseTClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          steps=20)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -302,7 +304,8 @@ def test_BaseXClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          steps=20)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -341,7 +344,8 @@ def test_BaseRClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          steps=20)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
