@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import pytest
 from sklearn.model_selection import train_test_split
 
 from causalml.inference.tree import UpliftTreeClassifier
@@ -8,6 +7,7 @@ from causalml.inference.tree import UpliftRandomForestClassifier
 from causalml.metrics import get_cumgain
 
 from .const import RANDOM_SEED, N_SAMPLE, CONTROL_NAME, TREATMENT_NAMES, CONVERSION
+
 
 def test_make_uplift_classification(generate_classification_data):
     df, _ = generate_classification_data()
@@ -22,6 +22,7 @@ def test_UpliftRandomForestClassifier(generate_classification_data):
 
     # Train the UpLift Random Forest classifer
     uplift_model = UpliftRandomForestClassifier(
+        min_samples_leaf=50,
         control_name=TREATMENT_NAMES[0]
     )
 
