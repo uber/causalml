@@ -12,7 +12,7 @@ from xgboost import XGBRegressor
 from scipy.stats import entropy
 import warnings
 
-from causalml.inference.meta import BaseXLearner, BaseRLearner, BaseSLearner, BaseTLearner
+from causalml.inference.meta import BaseXRegressor, BaseRRegressor, BaseSRegressor, BaseTRegressor
 from causalml.inference.tree import CausalTreeRegressor
 from causalml.propensity import ElasticNetPropensityModel
 from causalml.metrics.visualize import plot_gain, get_cumgain
@@ -55,7 +55,7 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
             except TypeError:
                 preds_dict[name] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
     else:
-        for base_learner, label_l in zip([BaseSLearner, BaseTLearner, BaseXLearner, BaseRLearner],
+        for base_learner, label_l in zip([BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
                                          ['S', 'T', 'X', 'R']):
             for model, label_m in zip([LinearRegression, XGBRegressor], ['LR', 'XGB']):
                 learner = base_learner(model())
@@ -277,7 +277,8 @@ def get_synthetic_preds_holdout(synthetic_data_func, n=1000, valid_size=0.2,
     p_hat_train = p_model.fit_predict(X_train, w_train)
     p_hat_val = p_model.fit_predict(X_val, w_val)
 
-    for base_learner, label_l in zip([BaseSLearner, BaseTLearner, BaseXLearner, BaseRLearner], ['S', 'T', 'X', 'R']):
+    for base_learner, label_l in zip([BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
+                                     ['S', 'T', 'X', 'R']):
         for model, label_m in zip([LinearRegression, XGBRegressor], ['LR', 'XGB']):
             # RLearner will need to fit on the p_hat
             if label_l != 'R':

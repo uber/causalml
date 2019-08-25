@@ -30,7 +30,8 @@ class BaseXLearner(object):
         """Initialize a X-learner.
 
         Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment groups
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
+                groups
             control_outcome_learner (optional): a model to estimate outcomes in the control group
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
             control_effect_learner (optional): a model to estimate treatment effects in the control group
@@ -232,7 +233,8 @@ class BaseXRegressor(BaseXLearner):
         """Initialize an X-learner regressor.
 
         Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment groups
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
+                groups
             control_outcome_learner (optional): a model to estimate outcomes in the control group
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
             control_effect_learner (optional): a model to estimate treatment effects in the control group
@@ -266,8 +268,9 @@ class BaseXClassifier(BaseXLearner):
         """Initialize an X-learner classifier.
 
         Args:
-            learner (optional): a model to estimate outcomes or treatment effects in both the control and treatment groups.
-                Even if specified, the user must still input either the outcome learner or the effect learner pair.
+            learner (optional): a model to estimate outcomes or treatment effects in both the control and treatment
+                groups. Even if specified, the user must still input either the outcome learner or the effect learner
+                pair.
             control_outcome_learner (optional): a model to estimate outcomes in the control group.
                 Should have a predict_proba() method.
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group.
