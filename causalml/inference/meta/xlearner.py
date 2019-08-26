@@ -345,29 +345,66 @@ class BaseXClassifier(BaseXLearner):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
-        is_treatment = treatment != self.control_name
+        check_control_in_treatment(treatment, self.control_name)
+        self.t_groups = np.unique(treatment[treatment != self.control_name])
+        self.t_groups.sort()
+        self._classes = {group: i for i, group in enumerate(self.t_groups)}
+        self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
+        self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
+        self.models_tau_c = {group: deepcopy(self.model_tau_c) for group in self.t_groups}
+        self.models_tau_t = {group: deepcopy(self.model_tau_t) for group in self.t_groups}
+        self.vars_c = {}
+        self.vars_t = {}
 
-        t_groups = np.unique(treatment[is_treatment])
-        self._classes = {}
-        self._classes[t_groups[0]] = 0  # this should be updated for multi-treatment case
+        for group in self.t_groups:
+            w = (treatment == group).astype(int)
 
-        logger.info('Training the control group outcome model')
-        self.model_mu_c.fit(X[~is_treatment], y[~is_treatment])
+            # Train outcome models
+            self.models_mu_c[group].fit(X[w == 0], y[w == 0])
+            self.models_mu_t[group].fit(X[w == 1], y[w == 1])
 
-        logger.info('Training the treatment group outcome model')
-        self.model_mu_t.fit(X[is_treatment], y[is_treatment])
+            # Calculate variances and treatment effects
+            var_c = (y[w == 0] - self.models_mu_c[group].predict_proba(X[w == 0])[:, 1]).var()
+            self.vars_c[group] = var_c
+            var_t = (y[w == 1] - self.models_mu_t[group].predict_proba(X[w == 1])[:, 1]).var()
+            self.vars_t[group] = var_t
 
-        # Calculate variances and treatment effects
-        self.c_var = (y[~is_treatment] - self.model_mu_c.predict_proba(
-            X[~is_treatment])[:, 1]).var()
-        self.t_var = (y[is_treatment] - self.model_mu_t.predict_proba(
-            X[is_treatment])[:, 1]).var()
+            # Train treatment models
+            d_c = self.models_mu_t[group].predict_proba(X[w == 0])[:, 1] - y[w == 0]
+            d_t = y[w == 1] - self.models_mu_c[group].predict_proba(X[w == 1])[:, 1]
+            self.models_tau_c[group].fit(X[w == 0], d_c)
+            self.models_tau_t[group].fit(X[w == 1], d_t)
 
-        d_c = self.model_mu_t.predict_proba(X[~is_treatment])[:, 1] - y[~is_treatment]
-        d_t = y[is_treatment] - self.model_mu_c.predict_proba(X[is_treatment])[:, 1]
+    def predict(self, X, p, return_components=False):
+        """Predict treatment effects.
 
-        logger.info('Training the control group treatment model')
-        self.model_tau_c.fit(X[~is_treatment], d_c)
+        Args:
+            X (np.matrix): a feature matrix
+            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
+                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
 
-        logger.info('Training the treatment group treatment model')
-        self.model_tau_t.fit(X[is_treatment], d_t)
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
+            treatment_name = self.t_groups[0]
+            p = {treatment_name: p}
+
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        dhat_cs = {}
+        dhat_ts = {}
+
+        for i, group in enumerate(self.t_groups):
+            model_tau_c = self.models_tau_c[group]
+            model_tau_t = self.models_tau_t[group]
+            dhat_cs[group] = model_tau_c.predict(X)
+            dhat_ts[group] = model_tau_t.predict(X)
+
+            _te = (p[group] * dhat_cs[group] + (1 - p[group]) * dhat_cs[group]).reshape(-1, 1)
+            te[:, i] = np.ravel(_te)
+
+        if not return_components:
+            return te
+        else:
+            return te, dhat_cs, dhat_ts

@@ -299,30 +299,55 @@ class BaseRClassifier(BaseRLearner):
         if (outcome_learner is None) and (effect_learner is None):
             raise ValueError("Either the outcome learner or the effect learner must be specified.")
 
-    def fit(self, X, p, treatment, y):
+    def fit(self, X, p, treatment, y, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
             X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1
+            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
+                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        check_control_in_treatment(treatment, self.control_name)
+        self.t_groups = np.unique(treatment[treatment != self.control_name])
+        self.t_groups.sort()
+        check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
+            treatment_name = self.t_groups[0]
+            p = {treatment_name: p}
 
-        t_groups = np.unique(treatment[is_treatment])
-        self._classes = {}
-        # this should be updated for multi-treatment case
-        self._classes[t_groups[0]] = 0
+        self._classes = {group: i for i, group in enumerate(self.t_groups)}
+        self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
+        self.vars_c = {}
+        self.vars_t = {}
 
-        logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
+        if verbose:
+            logger.info('generating out-of-fold CV outcome estimates')
+        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv, method='predict_proba')[:, 1]
 
-        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv,
-                                 method='predict_proba')[:, 1]
+        for group in self.t_groups:
+            w = (treatment == group).astype(int)
 
-        logger.info('training the treatment effect model, {} with R-loss'.format(self.model_tau))
-        self.model_tau.fit(X, (y - yhat) / (w - p), sample_weight=(w - p) ** 2)
+            if verbose:
+                logger.info('training the treatment effect model for {} with R-loss'.format(group))
+            self.models_tau[group].fit(X, (y - yhat) / (w - p[group]), sample_weight=(w - p[group]) ** 2)
 
-        self.t_var = (y[w == 1] - yhat[w == 1]).var()
-        self.c_var = (y[w == 0] - yhat[w == 0]).var()
+            self.vars_c[group] = (y[w == 0] - yhat[w == 0]).var()
+            self.vars_t[group] = (y[w == 1] - yhat[w == 1]).var()
+
+    def predict(self, X):
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix): a feature matrix
+
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            dhat = self.models_tau[group].predict(X)
+            te[:, i] = dhat
+
+        return te

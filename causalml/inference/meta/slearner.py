@@ -101,7 +101,7 @@ class BaseSLearner(object):
             model = self.models[group]
             X_new = np.hstack((w.reshape((-1, 1)), X))
 
-            X_new[:, 0] = 0   # set the treatment column to zero (the control group)
+            X_new[:, 0] = 0  # set the treatment column to zero (the control group)
             yhat_cs[group] = model.predict(X_new)
             X_new[:, 0] = 1   # set the treatment column to one (the treatment group)
             yhat_ts[group] = model.predict(X_new)
@@ -234,7 +234,7 @@ class BaseSClassifier(BaseSLearner):
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-    def predict(self, X, treatment, y=None):
+    def predict(self, X, treatment, y=None, verbose=True):
         """Predict treatment effects.
         Args:
             X (np.matrix): a feature matrix
@@ -243,32 +243,40 @@ class BaseSClassifier(BaseSLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        yhat_cs = {}
+        yhat_ts = {}
 
-        X = np.hstack((w.reshape((-1, 1)), X))
+        for group in self.t_groups:
+            w = (treatment != group).astype(int)
+            model = self.models[group]
+            X_new = np.hstack((w.reshape((-1, 1)), X))
 
-        X[:, 0] = 0    # set the treatment column to zero (the control group)
-        yhat_c = self.model.predict_proba(X)[:, 1]
+            X_new[:, 0] = 0  # set the treatment column to zero (the control group)
+            yhat_cs[group] = model.predict_proba(X_new)[:, 1]
+            X_new[:, 0] = 1   # set the treatment column to one (the treatment group)
+            yhat_ts[group] = model.predict_proba(X_new)[:, 1]
 
-        X[:, 0] = 1    # set the treatment column to one (the treatment group)
-        yhat_t = self.model.predict_proba(X)[:, 1]
+        if y is not None and verbose:
+            for group in self.t_groups:
+                logger.info('Error metrics for {}'.format(group))
+                logger.info('RMSE (Control): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
+                )
+                logger.info(' MAE (Control): {:.6f}'.format(
+                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
+                )
+                logger.info('RMSE (Treatment): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
+                )
+                logger.info(' MAE (Treatment): {:.6f}'.format(
+                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
+                )
 
-        if y is not None:
-            logger.info('RMSE (Control): {:.6f}'.format(
-                np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment])))
-            )
-            logger.info(' MAE (Control): {:.6f}'.format(
-                mae(y[~is_treatment], yhat_c[~is_treatment]))
-            )
-            logger.info('RMSE (Treatment): {:.6f}'.format(
-                np.sqrt(mse(y[is_treatment], yhat_t[is_treatment])))
-            )
-            logger.info(' MAE (Treatment): {:.6f}'.format(
-                mae(y[is_treatment], yhat_t[is_treatment]))
-            )
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            te[:, i] = yhat_ts[group] - yhat_cs[group]
 
-        return (yhat_t - yhat_c).reshape(-1, 1)
+        return te
 
 
 class LRSRegressor(BaseSRegressor):
@@ -289,11 +297,15 @@ class LRSRegressor(BaseSRegressor):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        self.fit(X, treatment, y)
 
-        self.fit(X, w, y)
-        te = self.model.coefficients[0]
-        te_lb = self.model.conf_ints[0, 0]
-        te_ub = self.model.conf_ints[0, 1]
-        return te, te_lb, te_ub
+        ate = np.zeros(self.t_groups.shape[0])
+        ate_lb = np.zeros(self.t_groups.shape[0])
+        ate_ub = np.zeros(self.t_groups.shape[0])
+
+        for i, group in enumerate(self.t_groups):
+            ate[i] = self.models[group].coefficients[0]
+            ate_lb[i] = self.models[group].conf_ints[0, 0]
+            ate_ub[i] = self.models[group].conf_ints[0, 1]
+
+        return ate, ate_lb, ate_ub

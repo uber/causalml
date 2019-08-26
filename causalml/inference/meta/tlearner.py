@@ -282,7 +282,7 @@ class BaseTClassifier(BaseTLearner):
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-    def predict(self, X, treatment=None, y=None):
+    def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
 
         Args:
@@ -293,17 +293,42 @@ class BaseTClassifier(BaseTLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        yhat_c = self.model_c.predict_proba(X)[:, 1]
-        yhat_t = self.model_t.predict_proba(X)[:, 1]
+        yhat_cs = {}
+        yhat_ts = {}
 
-        if (y is not None) and (treatment is not None):
-            is_treatment = treatment != self.control_name
-            logger.info('RMSE (Control): {:.6f}'.format(np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment]))))
-            logger.info(' MAE (Control): {:.6f}'.format(mae(y[~is_treatment], yhat_c[~is_treatment])))
-            logger.info('RMSE (Treatment): {:.6f}'.format(np.sqrt(mse(y[is_treatment], yhat_t[is_treatment]))))
-            logger.info(' MAE (Treatment): {:.6f}'.format(mae(y[is_treatment], yhat_t[is_treatment])))
+        for group in self.t_groups:
+            w = (treatment != group).astype(int)
+            X_new = np.hstack((w.reshape((-1, 1)), X))
 
-        return (yhat_t - yhat_c).reshape(-1, 1)
+            model_c = self.models_c[group]
+            model_t = self.models_t[group]
+            yhat_cs[group] = model_c.predict(X_new)
+            yhat_ts[group] = model_t.predict(X_new)
+
+        if (y is not None) and (treatment is not None) and verbose:
+            for group in self.t_groups:
+                logger.info('Error metrics for {}'.format(group))
+                logger.info('RMSE (Control): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
+                )
+                logger.info(' MAE (Control): {:.6f}'.format(
+                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
+                )
+                logger.info('RMSE (Treatment): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
+                )
+                logger.info(' MAE (Treatment): {:.6f}'.format(
+                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
+                )
+
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            te[:, i] = yhat_ts[group] - yhat_cs[group]
+
+        if not return_components:
+            return te
+        else:
+            return te, yhat_cs, yhat_ts
 
 
 class XGBTRegressor(BaseTRegressor):
