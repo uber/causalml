@@ -156,7 +156,8 @@ class BaseXLearner(object):
 
         Args:
             X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1
+            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
+                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
             return_ci (bool): whether to return confidence intervals
@@ -209,7 +210,8 @@ class BaseXLearner(object):
 
         Args:
             X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1
+            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
+                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
 
