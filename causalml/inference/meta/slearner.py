@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from future.builtins import super
 import logging
 import pandas as pd
 import numpy as np
@@ -8,7 +9,7 @@ from sklearn.dummy import DummyRegressor
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.metrics import mean_absolute_error as mae
 import statsmodels.api as sm
-
+from copy import deepcopy
 
 logger = logging.getLogger('causalml')
 
@@ -73,18 +74,17 @@ class BaseSLearner(object):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        self.t_groups = np.unique(treatment[treatment != self.control_name])
+        self.t_groups.sort()
+        self._classes = {group: i for i, group in enumerate(self.t_groups)}
+        self.models = {group: deepcopy(self.model) for group in self.t_groups}
 
-        t_groups = np.unique(treatment[is_treatment])
-        self._classes = {}
+        for group in self.t_groups:
+            w = (treatment == group).astype(int)
+            X_new = np.hstack((w.reshape((-1, 1)), X))
+            self.models[group].fit(X_new, y)
 
-        # this should be updated for multi-treatment case
-        self._classes[t_groups[0]] = 0
-        X = np.hstack((w.reshape((-1, 1)), X))
-        self.model.fit(X, y)
-
-    def predict(self, X, treatment, y=None):
+    def predict(self, X, treatment, y=None, verbose=True):
         """Predict treatment effects.
         Args:
             X (np.matrix): a feature matrix
@@ -93,34 +93,42 @@ class BaseSLearner(object):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        yhat_cs = {}
+        yhat_ts = {}
 
-        X = np.hstack((w.reshape((-1, 1)), X))
+        for group in self.t_groups:
+            w = (treatment != group).astype(int)
+            model = self.models[group]
+            X_new = np.hstack((w.reshape((-1, 1)), X))
 
-        X[:, 0] = 0    # set the treatment column to zero (the control group)
-        yhat_c = self.model.predict(X)
+            X_new[:, 0] = 0  # set the treatment column to zero (the control group)
+            yhat_cs[group] = model.predict(X_new)
+            X_new[:, 0] = 1   # set the treatment column to one (the treatment group)
+            yhat_ts[group] = model.predict(X_new)
 
-        X[:, 0] = 1    # set the treatment column to one (the treatment group)
-        yhat_t = self.model.predict(X)
+        if y is not None and verbose:
+            for group in self.t_groups:
+                logger.info('Error metrics for {}'.format(group))
+                logger.info('RMSE (Control): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
+                )
+                logger.info(' MAE (Control): {:.6f}'.format(
+                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
+                )
+                logger.info('RMSE (Treatment): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
+                )
+                logger.info(' MAE (Treatment): {:.6f}'.format(
+                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
+                )
 
-        if y is not None:
-            logger.info('RMSE (Control): {:.6f}'.format(
-                np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment])))
-            )
-            logger.info(' MAE (Control): {:.6f}'.format(
-                mae(y[~is_treatment], yhat_c[~is_treatment]))
-            )
-            logger.info('RMSE (Treatment): {:.6f}'.format(
-                np.sqrt(mse(y[is_treatment], yhat_t[is_treatment])))
-            )
-            logger.info(' MAE (Treatment): {:.6f}'.format(
-                mae(y[is_treatment], yhat_t[is_treatment]))
-            )
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            te[:, i] = yhat_ts[group] - yhat_cs[group]
 
-        return (yhat_t - yhat_c).reshape(-1, 1)
+        return te
 
-    def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=False):
+    def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=True):
         """Fit the inference model of the S learner and predict treatment effects.
         Args:
             X (np.matrix): a feature matrix
@@ -142,23 +150,43 @@ class BaseSLearner(object):
             return te
         else:
             start = pd.datetime.today()
-            te_bootstraps = np.zeros(shape=(X.shape[0], n_bootstraps))
+            self.t_groups_global = self.t_groups
+            self._classes_global = self._classes
+            self.models_global = deepcopy(self.models)
+            te_bootstraps = np.zeros(shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps))
             for i in range(n_bootstraps):
                 te_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
-                te_bootstraps[:, i] = np.ravel(te_b)
-                if verbose:
+                te_bootstraps[:, :, i] = te_b
+                if verbose and i % 10 == 0 and i > 0:
                     now = pd.datetime.today()
-                    lapsed = (now - start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i + 1, n_bootstraps, lapsed))
+                    lapsed = (now-start).seconds
+                    logger.info('{}/{} bootstraps completed. ({}s lapsed)'.format(i+1, n_bootstraps, lapsed))
 
-            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
-            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=2)
+            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
+
+            # set member variables back to global (currently last bootstrapped outcome)
+            self.t_groups = self.t_groups_global
+            self._classes = self._classes_global
+            self.models = self.models_global
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, treatment, y):
-        te, te_lb, te_ub = self.fit_predict(X, treatment, y, return_ci=True)
-        return te.mean(), te_lb.mean(), te_ub.mean()
+    def estimate_ate(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=True):
+        if return_ci:
+            te, te_lb, te_ub = self.fit_predict(X, treatment, y, return_ci=True, n_bootstraps=n_bootstraps,
+                                                bootstrap_size=bootstrap_size, verbose=verbose)
+
+            ate = te.mean(axis=0)
+            ate_lb = te_lb.mean(axis=0)
+            ate_ub = te_ub.mean(axis=0)
+            return ate, ate_lb, ate_ub
+
+        else:
+            te = self.fit_predict(X, treatment, y, return_ci=False, n_bootstraps=n_bootstraps,
+                                  bootstrap_size=bootstrap_size, verbose=verbose)
+            ate = te.mean(axis=0)
+            return ate
 
     def bootstrap(self, X, treatment, y, size=10000):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population.
@@ -168,7 +196,7 @@ class BaseSLearner(object):
         treatment_b = treatment[idxs]
         y_b = y[idxs]
         self.fit(X=X_b, treatment=treatment_b, y=y_b)
-        te_b = self.predict(X=X, treatment=treatment, y=y)
+        te_b = self.predict(X=X, treatment=treatment, verbose=False)
         return te_b
 
 
@@ -183,7 +211,7 @@ class BaseSRegressor(BaseSLearner):
             learner (optional): a model to estimate the treatment effect
             control_name (str or int, optional): name of control group
         """
-        super(BaseSRegressor, self).__init__(
+        super().__init__(
             learner=learner,
             ate_alpha=ate_alpha,
             control_name=control_name)
@@ -201,12 +229,12 @@ class BaseSClassifier(BaseSLearner):
                 Should have a predict_proba() method.
             control_name (str or int, optional): name of control group
         """
-        super(BaseSClassifier, self).__init__(
+        super().__init__(
             learner=learner,
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-    def predict(self, X, treatment, y=None):
+    def predict(self, X, treatment, y=None, verbose=True):
         """Predict treatment effects.
         Args:
             X (np.matrix): a feature matrix
@@ -215,32 +243,40 @@ class BaseSClassifier(BaseSLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        yhat_cs = {}
+        yhat_ts = {}
 
-        X = np.hstack((w.reshape((-1, 1)), X))
+        for group in self.t_groups:
+            w = (treatment != group).astype(int)
+            model = self.models[group]
+            X_new = np.hstack((w.reshape((-1, 1)), X))
 
-        X[:, 0] = 0    # set the treatment column to zero (the control group)
-        yhat_c = self.model.predict_proba(X)[:, 1]
+            X_new[:, 0] = 0  # set the treatment column to zero (the control group)
+            yhat_cs[group] = model.predict_proba(X_new)[:, 1]
+            X_new[:, 0] = 1   # set the treatment column to one (the treatment group)
+            yhat_ts[group] = model.predict_proba(X_new)[:, 1]
 
-        X[:, 0] = 1    # set the treatment column to one (the treatment group)
-        yhat_t = self.model.predict_proba(X)[:, 1]
+        if y is not None and verbose:
+            for group in self.t_groups:
+                logger.info('Error metrics for {}'.format(group))
+                logger.info('RMSE (Control): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
+                )
+                logger.info(' MAE (Control): {:.6f}'.format(
+                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
+                )
+                logger.info('RMSE (Treatment): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
+                )
+                logger.info(' MAE (Treatment): {:.6f}'.format(
+                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
+                )
 
-        if y is not None:
-            logger.info('RMSE (Control): {:.6f}'.format(
-                np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment])))
-            )
-            logger.info(' MAE (Control): {:.6f}'.format(
-                mae(y[~is_treatment], yhat_c[~is_treatment]))
-            )
-            logger.info('RMSE (Treatment): {:.6f}'.format(
-                np.sqrt(mse(y[is_treatment], yhat_t[is_treatment])))
-            )
-            logger.info(' MAE (Treatment): {:.6f}'.format(
-                mae(y[is_treatment], yhat_t[is_treatment]))
-            )
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            te[:, i] = yhat_ts[group] - yhat_cs[group]
 
-        return (yhat_t - yhat_c).reshape(-1, 1)
+        return te
 
 
 class LRSRegressor(BaseSRegressor):
@@ -250,7 +286,7 @@ class LRSRegressor(BaseSRegressor):
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        super(LRSRegressor, self).__init__(StatsmodelsOLS(alpha=ate_alpha), ate_alpha, control_name)
+        super().__init__(StatsmodelsOLS(alpha=ate_alpha), ate_alpha, control_name)
 
     def estimate_ate(self, X, treatment, y):
         """Estimate the Average Treatment Effect (ATE).
@@ -261,11 +297,15 @@ class LRSRegressor(BaseSRegressor):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        self.fit(X, treatment, y)
 
-        self.fit(X, w, y)
-        te = self.model.coefficients[0]
-        te_lb = self.model.conf_ints[0, 0]
-        te_ub = self.model.conf_ints[0, 1]
-        return te, te_lb, te_ub
+        ate = np.zeros(self.t_groups.shape[0])
+        ate_lb = np.zeros(self.t_groups.shape[0])
+        ate_ub = np.zeros(self.t_groups.shape[0])
+
+        for i, group in enumerate(self.t_groups):
+            ate[i] = self.models[group].coefficients[0]
+            ate_lb[i] = self.models[group].conf_ints[0, 0]
+            ate_ub[i] = self.models[group].conf_ints[0, 1]
+
+        return ate, ate_lb, ate_ub

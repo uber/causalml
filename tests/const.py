@@ -6,6 +6,6 @@ TREATMENT_COL = 'treatment'
 SCORE_COL = 'score'
 GROUP_COL = 'group'
 
-CONTROL_NAME = 'c'
+CONTROL_NAME = 'control'
 TREATMENT_NAMES = [CONTROL_NAME, 'treatment1', 'treatment2', 'treatment3']
 CONVERSION = 'conversion'
