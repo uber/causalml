@@ -1434,7 +1434,7 @@ class UpliftRandomForestClassifier:
         The number of trees in the uplift random forest.
 
     evaluationFunction : string
-        Choose from one of the models: 'TwoModel', 'XLearner', 'RLearner', 'KL', 'ED', 'Chi', 'CTS'.
+        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
 
     max_features: int, optional (default=10)
         The number of features to consider when looking for the best split.
@@ -1464,16 +1464,6 @@ class UpliftRandomForestClassifier:
         correcting for tests with large number of splits and imbalanced
         treatment and control splits
 
-    y_calibration_method: string, optional (default=None)
-        Choose calibration method from 'isotonic', 'sigmoid' for calibrating
-        the classification probability in meta-learners. Only applicable for
-        'TwoModel', 'XLearner', 'RLearner' uplift models.
-
-    w_calibration_method: string, optional (default='sigmoid')
-        Choose calibration method from 'isotonic', 'sigmoid' for calibrating
-        the treatment propensity in meta-learners. Only applicable for
-        'XLearner', 'RLearner' uplift models.
-
     Outputs
     ----------
     df_res: pandas dataframe
@@ -1489,9 +1479,7 @@ class UpliftRandomForestClassifier:
                  n_reg=10,
                  evaluationFunction=None,
                  control_name=None,
-                 normalization=True,
-                 y_calibration_method=None,
-                 w_calibration_method='sigmoid'):
+                 normalization=True):
         """
         Initialize the UpliftRandomForestClassifier class.
         """
@@ -1505,58 +1493,22 @@ class UpliftRandomForestClassifier:
         self.n_reg = n_reg
         self.evaluationFunction = evaluationFunction
         self.control_name = control_name
-        self.y_calibration_method = y_calibration_method
-        self.w_calibration_method = w_calibration_method
-        if self.evaluationFunction == 'TwoModel':
-            classification_tree = RandomForestClassifier(
-                n_estimators=n_estimators, criterion='gini',
-                max_depth=max_depth, min_samples_leaf=min_samples_leaf,
-                max_features=max_features, random_state=None
-            )
-            self.uplift_forest = [classification_tree]
-        elif self.evaluationFunction == 'RLearner':
-            classification_tree = RandomForestClassifier(
-                n_estimators=n_estimators, criterion='gini',
-                max_depth=max_depth, min_samples_leaf=min_samples_leaf,
-                max_features=max_features, random_state=None
-            )
-            regression_tree = RandomForestRegressor(
-                n_estimators=n_estimators, criterion='mse',
-                max_depth=max_depth, min_samples_leaf=min_samples_leaf,
-                max_features=max_features, random_state=None
-            )
-            self.mu_forest = [classification_tree]
-            self.w_forest = [classification_tree]
-            self.tau_forest = [regression_tree]
-        elif self.evaluationFunction == 'XLearner':
-            classification_tree = RandomForestClassifier(
-                n_estimators=n_estimators, criterion='gini',
-                max_depth=max_depth, min_samples_leaf=min_samples_leaf,
-                max_features=max_features, random_state=None
-            )
-            regression_tree = RandomForestRegressor(
-                n_estimators=n_estimators, criterion='mse',
-                max_depth=max_depth, min_samples_leaf=min_samples_leaf,
-                max_features=max_features, random_state=None
-            )
-            self.mu_forest = [classification_tree]
-            self.tau_forest = [regression_tree]
-        else:
-            # Create Forest
-            self.uplift_forest = []
-            for tree_i in range(n_estimators):
-                uplift_tree = UpliftTreeClassifier(
-                    max_features=self.max_features, max_depth=self.max_depth,
-                    min_samples_leaf=self.min_samples_leaf,
-                    min_samples_treatment=self.min_samples_treatment,
-                    n_reg=self.n_reg,
-                    evaluationFunction=self.evaluationFunction,
-                    control_name=self.control_name,
-                    normalization=normalization
-                )
-                self.uplift_forest.append(uplift_tree)
+        
+        # Create forest
+        self.uplift_forest = []
+        for _ in range(n_estimators):
+            uplift_tree = UpliftTreeClassifier(
+                max_features=self.max_features, max_depth=self.max_depth,
+                min_samples_leaf=self.min_samples_leaf,
+                min_samples_treatment=self.min_samples_treatment,
+                n_reg=self.n_reg,
+                evaluationFunction=self.evaluationFunction,
+                control_name=self.control_name,
+                normalization=normalization)
+            
+            self.uplift_forest.append(uplift_tree)
 
-    def fit(self, X, treatment, y, nvcate=False, value=None, imp_cost=None, trigger_cost=None):
+    def fit(self, X, treatment, y):
         """
         Fit the UpliftRandomForestClassifier.
 
@@ -1570,23 +1522,9 @@ class UpliftRandomForestClassifier:
 
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
-
-        nvcate : bool, optional (default=False)
-            Whether or not the model uses net value optimization.
-
-        value : list, optional (default=None)
-            A list containing the value of conversion for each unit.
-
-        imp_cost : dict, optional (default=None)
-            A dict containing the impression cost of each treatment, ie a cost
-            that is associated with each treatment event.
-
-        trigger_cost : dict, optional (default=None)
-            A dict containing the triggered cost of each treatment, ie a cost
-            that is associated with a user taking an action (such as promo
-            redemption) in the treatment group.
         """
         np.random.seed(self.random_state)
+        
         # Get treatment group keys
         treatment_group_keys = list(set(treatment))
         treatment_group_keys.remove(self.control_name)
@@ -1595,173 +1533,13 @@ class UpliftRandomForestClassifier:
         for i, treatment_group_key in enumerate(treatment_group_keys):
             self.classes_[treatment_group_key] = i
 
-        # Two Model Approach
-        if self.evaluationFunction == 'TwoModel':
-            treatment_group_keys = list(set(treatment))
-            model_RF = self.uplift_forest[0]
-            self.uplift_forest = {}
-            self.treatment_group_keys = treatment_group_keys
-            for i in range(len(treatment_group_keys)):
-                # Random Forests
-                treatment_group_key = treatment_group_keys[i]
-                # Clone random forests
-                if self.y_calibration_method in ['isotonic', 'sigmoid']:
-                    est = clone(model_RF, safe=True)
-                    self.uplift_forest[treatment_group_key] = CalibratedClassifierCV(
-                        est, cv=4, method=self.y_calibration_method
-                    )
-                else:
-                    self.uplift_forest[treatment_group_key] = clone(model_RF, safe=True)
-                data_index = [i for i, xi in enumerate(treatment) if xi == treatment_group_key]
-                x_train = X[data_index]
-                y_train = y[data_index]
-                self.uplift_forest[treatment_group_key].fit(X=x_train, y=y_train)
-
-        elif self.evaluationFunction in ['RLearner', 'XLearner']:
-            # Get treatment and control group keys
-            # Remove control group from the keys to prevent control-control
-            # comparison
-            treatment_group_keys = list(set(treatment))
-            self.treatment_group_keys = treatment_group_keys
-            treatment_group_keys.remove(self.control_name)
-            # Turn experiment group labels into numbered categories
-            w_cat = pd.Series(treatment, dtype='category')
-            self.w_num = w_cat.cat.codes
-            self.w_col = w_cat.cat.categories
-            self.w_predictors = X
-            # Load calibrated classifier for propensity score
-            w_forest = RandomForestClassifier(n_estimators=100)
-            w_forest_calib = CalibratedClassifierCV(
-                w_forest, cv=4, method=self.w_calibration_method)
-            self.w_forest_fit = w_forest_calib.fit(
-                self.w_predictors, self.w_num)
-            # R-Learner
-            if self.evaluationFunction == 'RLearner':
-                # Estimate propensity scores and get base regressors
-                w_probs = pd.DataFrame(self.w_forest_fit.predict_proba(self.w_predictors))
-                w_probs.columns = self.w_col
-                mu_forest = self.mu_forest[0]
-                tau_forest = self.tau_forest[0]
-                self.tau_fit = {}
-                # Net Value Optimization
-                if value is None:
-                    value = []
-                if imp_cost is None:
-                    imp_cost = {}
-                if trigger_cost is None:
-                    trigger_cost = {}
-                if nvcate:
-                    trigger_cost_l = np.array([trigger_cost[ti] for ti in treatment])
-                    imp_cost_l = np.array([imp_cost[ti] for ti in treatment])
-
-                # Iterate treatment groups to build models
-                for i in range(len(treatment_group_keys)):
-                    # Get X, W and Y data for the treatment vs control pair
-                    treatment_group_key = treatment_group_keys[i]
-                    treatment_index = [i for i, xi in enumerate(treatment) if xi == treatment_group_key]
-                    control_index = [i for i, xi in enumerate(treatment) if xi == self.control_name]
-                    data_index = control_index + treatment_index
-                    x_train = X[data_index]
-                    y_train = y[data_index]
-                    w_train = np.zeros(len(X))
-                    w_train[treatment_index] = 1
-                    w_train = w_train[data_index]
-                    w_hat = w_probs[treatment_group_key].iloc[data_index]
-                    # Optional Y ~ X regressor calibration
-                    if self.y_calibration_method in ['isotonic', 'sigmoid']:
-                        est = clone(mu_forest, safe=True)
-                        mu_reg = CalibratedClassifierCV(est, cv=4, method=self.y_calibration_method)
-                    else:
-                        mu_reg = clone(mu_forest, safe=True)
-                    # Fit the optionally calibrated regressor and predict
-                    # mu_hat
-                    mu_reg_fit = mu_reg.fit(X=x_train, y=y_train)
-                    mu_hat = mu_reg_fit.predict_proba(X=x_train)[:, 1]
-                    # Optional net value optimization
-                    if nvcate:
-                        y_tilde = (
-                            (value[data_index] - trigger_cost_l[data_index]) * y_train
-                            - (value[data_index] - np.mean(trigger_cost_l[data_index])) * mu_hat
-                            - (imp_cost_l[data_index] - np.mean(imp_cost_l[data_index]))
-                        )
-                    else:
-                        y_tilde = y_train - mu_hat
-                    # TODO: Establish a way to balance w_tilde
-                    w_tilde = w_train - w_hat
-                    if (w_tilde == 0).any():
-                        raise ValueError("Some propensity scores are zero. Check that your sample size is "
-                                         "sufficient for RandomForestClassifier with {} classes.".format(
-                                             len(set(treatment)))
-                                         )
-                    pseudo_outcome = y_tilde / w_tilde
-                    rlearner_weights = np.asarray(np.power(w_tilde, 2))
-                    # Outcome regressor
-                    tau_forest = clone(tau_forest, safe=True)
-                    self.tau_fit[treatment_group_key] = tau_forest.fit(X=x_train, y=pseudo_outcome,
-                                                                       sample_weight=rlearner_weights)
-
-            # X-Learner
-            elif self.evaluationFunction == 'XLearner':
-                # X-Learner requires splitting the dataset into control and treatment
-                x_train = X
-                y_train = y
-                X_0 = x_train[treatment == self.control_name]
-                y_0 = y_train[treatment == self.control_name]
-                mu_forest = self.mu_forest[0]
-                tau_forest = self.tau_forest[0]
-                self.tau_fit_0 = {}
-                self.tau_fit_1 = {}
-                self.tau_weight = {}
-                # Fitting the model for each treatment against the control
-                for i in range(len(treatment_group_keys)):
-                    # Select treatment group observations
-                    treatment_group_key = self.treatment_group_keys[i]
-                    X_1 = x_train[treatment == treatment_group_key]
-                    y_1 = y_train[treatment == treatment_group_key]
-                    # Clone random forests
-                    if self.y_calibration_method in ['isotonic', 'sigmoid']:
-                        est = clone(mu_forest, safe=True)
-                        mu_reg = CalibratedClassifierCV(
-                            est, cv=4, method=self.y_calibration_method)
-                    else:
-                        mu_reg = clone(mu_forest, safe=True)
-                    tau_reg = clone(tau_forest, safe=True)
-                    # Estimate pseudo-residuals by crossing control and tretment trained models with control and
-                    # treatment features
-                    mu_hat_1 = mu_reg.fit(X=X_0, y=y_0).predict_proba(X_1)[:, 1]
-                    mu_hat_0 = mu_reg.fit(X=X_1, y=y_1).predict_proba(X_0)[:, 1]
-                    if nvcate:
-                        value0 = value[treatment == self.control_name]
-                        value1 = value[treatment == treatment_group_key]
-                        pseudo_residual_1 = (
-                            (value1 - trigger_cost[treatment_group_key]) * y_1
-                            - (value1 - trigger_cost[self.control_name]) * mu_hat_1
-                            - (imp_cost[treatment_group_key] - imp_cost[self.control_name])
-                        )
-                        pseudo_residual_0 = (
-                            (value0 - trigger_cost[treatment_group_key]) * mu_hat_0
-                            - (value0 - trigger_cost[self.control_name]) * y_0
-                            - (imp_cost[treatment_group_key] - imp_cost[self.control_name])
-                        )
-                    else:
-                        pseudo_residual_1 = y_1 - mu_hat_1
-                        pseudo_residual_0 = mu_hat_0 - y_0
-
-                    # Fit tau regressors and store models, together with
-                    # weights g
-                    self.tau_fit_0[treatment_group_key] = tau_reg.fit(X=X_0, y=pseudo_residual_0)
-                    self.tau_fit_1[treatment_group_key] = tau_reg.fit(X=X_1, y=pseudo_residual_1)
-
-        # Uplift Model Approach
-        else:
-            for tree_i in range(len(self.uplift_forest)):
-                # Bootstrap
-                bt_index = np.random.choice(len(X), len(X))
-                x_train_bt = X[bt_index]
-                y_train_bt = y[bt_index]
-                treatment_train_bt = treatment[bt_index]
-                self.uplift_forest[tree_i].fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
-        return
+        # Bootstrap
+        for tree_i in range(len(self.uplift_forest)):
+            bt_index = np.random.choice(len(X), len(X))
+            x_train_bt = X[bt_index]
+            y_train_bt = y[bt_index]
+            treatment_train_bt = treatment[bt_index]
+            self.uplift_forest[tree_i].fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
 
     @ignore_warnings(category=FutureWarning)
     def predict(self, X, full_output=False):
@@ -1788,81 +1566,38 @@ class UpliftRandomForestClassifier:
         df_res = pd.DataFrame()
         y_pred_ensemble = dict()
         y_pred_list = np.zeros((X.shape[0], len(self.classes_)))
-        # Two Model Approach
-        if self.evaluationFunction == 'TwoModel':
-            x_test = X
-            for i in range(len(self.treatment_group_keys)):
-                treatment_group_key = self.treatment_group_keys[i]
-                y_pred = self.uplift_forest[treatment_group_key].predict_proba(X=x_test)
-                y_pred_ensemble[treatment_group_key] = [xi[1] for xi in y_pred]
-        elif self.evaluationFunction == 'RLearner':
-            x_test = X
-            for i in range(len(self.treatment_group_keys)):
-                treatment_group_key = self.treatment_group_keys[i]
-                tau_fit = self.tau_fit[treatment_group_key]
-                y_pred = tau_fit.predict(X=x_test)
-                y_pred_ensemble[treatment_group_key] = [xi for xi in y_pred]
-        elif self.evaluationFunction == 'XLearner':
-            x_test = X
-            control_name = self.control_name
-            w_probs = pd.DataFrame(self.w_forest_fit.predict_proba(x_test))
-            w_probs.columns = self.w_col
-            control_prob = w_probs.loc[:, control_name]
-            for i in range(len(self.treatment_group_keys)):
-                treatment_group_key = self.treatment_group_keys[i]
-                tau_fit_0 = self.tau_fit_0[treatment_group_key]
-                tau_fit_1 = self.tau_fit_1[treatment_group_key]
-                tau_0 = tau_fit_0.predict(X=x_test)
-                tau_1 = tau_fit_1.predict(X=x_test)
-                treatment_prob = w_probs.loc[:, treatment_group_key]
-                y_pred = (
-                    ((treatment_prob / (treatment_prob + control_prob)) * tau_0)
-                    + ((control_prob / (treatment_prob + control_prob)) * tau_1)
-                )
-                y_pred_ensemble[treatment_group_key] = [xi for xi in y_pred]
-        else:
-            # Make prediction by each tree
-            for tree_i in range(len(self.uplift_forest)):
-                rec_treatment, y_pred_opt, upliftScores, y_pred_full = \
-                    self.uplift_forest[tree_i].predict(X=X, full_output=True)
-                if tree_i == 0:
-                    for treatment_group in y_pred_full:
-                        y_pred_ensemble[treatment_group] = (
-                            np.array(y_pred_full[treatment_group]) / len(self.uplift_forest)
-                        )
-                else:
-                    for treatment_group in y_pred_full:
-                        y_pred_ensemble[treatment_group] = (
-                            np.array(y_pred_ensemble[treatment_group])
-                            + np.array(y_pred_full[treatment_group]) / len(self.uplift_forest)
-                        )
+ 
+        # Make prediction by each tree
+        for tree_i in range(len(self.uplift_forest)):
+            
+            _, _, _, y_pred_full = self.uplift_forest[tree_i].predict(X=X, full_output=True)
+            
+            if tree_i == 0:
+                for treatment_group in y_pred_full:
+                    y_pred_ensemble[treatment_group] = (
+                        np.array(y_pred_full[treatment_group]) / len(self.uplift_forest)
+                    )
+            else:
+                for treatment_group in y_pred_full:
+                    y_pred_ensemble[treatment_group] = (
+                        np.array(y_pred_ensemble[treatment_group])
+                        + np.array(y_pred_full[treatment_group]) / len(self.uplift_forest)
+                    )
 
-        # Summary results into dataframe
+        # Summarize results into dataframe
         for treatment_group in y_pred_ensemble:
             df_res[treatment_group] = y_pred_ensemble[treatment_group]
-        if self.evaluationFunction in ['XLearner', 'RLearner']:
-            neg_lift = df_res.max(axis=1) < 0
-            df_res['recommended_treatment'] = df_res.apply(np.argmax, axis=1)
-            df_res.loc[neg_lift, 'recommended_treatment'] = self.control_name
-        else:
-            df_res['recommended_treatment'] = df_res.apply(np.argmax, axis=1)
 
-        # Calculating delta
+        df_res['recommended_treatment'] = df_res.apply(np.argmax, axis=1)
+
+        # Calculate delta
         delta_cols = []
-        if self.evaluationFunction in ['XLearner', 'RLearner']:
-            for treatment_group in y_pred_ensemble:
+        for treatment_group in y_pred_ensemble:
+            if treatment_group != self.control_name:
                 delta_cols.append('delta_%s' % (treatment_group))
-                df_res['delta_%s' % (treatment_group)] = df_res[treatment_group]
-                # add deltas to results list
+                df_res['delta_%s' % (treatment_group)] = df_res[treatment_group] - df_res[self.control_name]
+                # Add deltas to results list
                 y_pred_list[:, self.classes_[treatment_group]] = df_res['delta_%s' % (treatment_group)].values
-            df_res['max_delta'] = df_res[delta_cols].max(axis=1)
-        else:
-            for treatment_group in y_pred_ensemble:
-                if treatment_group != self.control_name:
-                    delta_cols.append('delta_%s' % (treatment_group))
-                    df_res['delta_%s' % (treatment_group)] = df_res[treatment_group] - df_res[self.control_name]
-                    # add deltas to results list
-                    y_pred_list[:, self.classes_[treatment_group]] = df_res['delta_%s' % (treatment_group)].values
-            df_res['max_delta'] = df_res[delta_cols].max(axis=1)
+        df_res['max_delta'] = df_res[delta_cols].max(axis=1)
 
         return y_pred_list
