@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from future.builtins import super
 from copy import deepcopy
 import logging
 import pandas as pd
@@ -64,20 +65,19 @@ class BaseTLearner(object):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
-        is_treatment = treatment != self.control_name
+        self.t_groups = np.unique(treatment[treatment != self.control_name])
+        self.t_groups.sort()
+        self._classes = {group: i for i, group in enumerate(self.t_groups)}
+        self.models_c = {group: deepcopy(self.model_c) for group in self.t_groups}
+        self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
 
-        t_groups = np.unique(treatment[is_treatment])
-        self._classes = {}
-        # this should be updated for multi-treatment case
-        self._classes[t_groups[0]] = 0
+        for group in self.t_groups:
+            w = (treatment == group).astype(int)
+            X_new = np.hstack((w.reshape((-1, 1)), X))
+            self.models_c[group].fit(X_new[w == 0], y[w == 0])
+            self.models_t[group].fit(X_new[w == 1], y[w == 1])
 
-        logger.info('Training a control group model')
-        self.model_c.fit(X[~is_treatment], y[~is_treatment])
-
-        logger.info('Training a treatment group model')
-        self.model_t.fit(X[is_treatment], y[is_treatment])
-
-    def predict(self, X, treatment=None, y=None):
+    def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
 
         Args:
@@ -88,19 +88,45 @@ class BaseTLearner(object):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        yhat_c = self.model_c.predict(X)
-        yhat_t = self.model_t.predict(X)
+        yhat_cs = {}
+        yhat_ts = {}
 
-        if (y is not None) and (treatment is not None):
-            is_treatment = treatment != self.control_name
-            logger.info('RMSE (Control): {:.6f}'.format(np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment]))))
-            logger.info(' MAE (Control): {:.6f}'.format(mae(y[~is_treatment], yhat_c[~is_treatment])))
-            logger.info('RMSE (Treatment): {:.6f}'.format(np.sqrt(mse(y[is_treatment], yhat_t[is_treatment]))))
-            logger.info(' MAE (Treatment): {:.6f}'.format(mae(y[is_treatment], yhat_t[is_treatment])))
+        for group in self.t_groups:
+            w = (treatment != group).astype(int)
+            X_new = np.hstack((w.reshape((-1, 1)), X))
 
-        return (yhat_t - yhat_c).reshape(-1, 1)
+            model_c = self.models_c[group]
+            model_t = self.models_t[group]
+            yhat_cs[group] = model_c.predict(X_new)
+            yhat_ts[group] = model_t.predict(X_new)
 
-    def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=False):
+        if (y is not None) and (treatment is not None) and verbose:
+            for group in self.t_groups:
+                logger.info('Error metrics for {}'.format(group))
+                logger.info('RMSE (Control): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
+                )
+                logger.info(' MAE (Control): {:.6f}'.format(
+                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
+                )
+                logger.info('RMSE (Treatment): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
+                )
+                logger.info(' MAE (Treatment): {:.6f}'.format(
+                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
+                )
+
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            te[:, i] = yhat_ts[group] - yhat_cs[group]
+
+        if not return_components:
+            return te
+        else:
+            return te, yhat_cs, yhat_ts
+
+    def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
+                    return_components=False, verbose=True):
         """Fit the inference model of the T learner and predict treatment effects.
 
         Args:
@@ -118,23 +144,33 @@ class BaseTLearner(object):
                 UB [n_samples, n_treatment]
         """
         self.fit(X, treatment, y)
-        te = self.predict(X, treatment, y)
+        te = self.predict(X, treatment, y, return_components=return_components)
 
         if not return_ci:
             return te
         else:
             start = pd.datetime.today()
-            te_bootstraps = np.zeros(shape=(X.shape[0], n_bootstraps))
+            self.t_groups_global = self.t_groups
+            self._classes_global = self._classes
+            self.models_c_global = deepcopy(self.models_c)
+            self.models_t_global = deepcopy(self.models_t)
+            te_bootstraps = np.zeros(shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps))
             for i in range(n_bootstraps):
                 te_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
-                te_bootstraps[:, i] = np.ravel(te_b)
-                if verbose:
+                te_bootstraps[:, :, i] = te_b
+                if verbose and i % 10 == 0 and i > 0:
                     now = pd.datetime.today()
-                    lapsed = (now - start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min lapsed)'.format(i + 1, n_bootstraps, lapsed))
+                    lapsed = (now-start).seconds
+                    logger.info('{}/{} bootstraps completed. ({}s lapsed)'.format(i, n_bootstraps, lapsed))
 
-            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
-            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=2)
+            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
+
+            # set member variables back to global (currently last bootstrapped outcome)
+            self.t_groups = self.t_groups_global
+            self._classes = self._classes_global
+            self.models_c = self.models_c_global
+            self.models_t = self.models_t_global
 
             return (te, te_lower, te_upper)
 
@@ -149,39 +185,45 @@ class BaseTLearner(object):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, return_components=True)
 
-        self.fit(X, treatment, y)
+        ate = np.zeros(self.t_groups.shape[0])
+        ate_lb = np.zeros(self.t_groups.shape[0])
+        ate_ub = np.zeros(self.t_groups.shape[0])
 
-        yhat_c = self.model_c.predict(X)
-        yhat_t = self.model_t.predict(X)
+        for i, group in enumerate(self.t_groups):
+            yhat_c = yhat_cs[group]
+            yhat_t = yhat_ts[group]
+            _ate = te[:, i].mean()
 
-        te = (yhat_t - yhat_c).mean()
-        prob_treatment = float(sum(w)) / X.shape[0]
+            w = (treatment == group).astype(int)
+            prob_treatment = float(sum(w)) / X.shape[0]
 
-        se = np.sqrt((
-            (y[~is_treatment] - yhat_c[~is_treatment]).var()
-            / (1 - prob_treatment) +
-            (y[is_treatment] - yhat_t[is_treatment]).var()
-            / prob_treatment +
-            (yhat_t - yhat_c).var()
-        ) / y.shape[0])
+            se = np.sqrt((
+                (y[treatment != group] - yhat_c[treatment != group]).var()
+                / (1 - prob_treatment) +
+                (y[treatment == group] - yhat_t[treatment == group]).var()
+                / prob_treatment +
+                (yhat_t - yhat_c).var()
+            ) / y.shape[0])
 
-        te_lb = te - se * norm.ppf(1 - self.ate_alpha / 2)
-        te_ub = te + se * norm.ppf(1 - self.ate_alpha / 2)
+            _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
+            _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
 
-        return te, te_lb, te_ub
+            ate[i] = _ate
+            ate_lb[i] = _ate_lb
+            ate_ub[i] = _ate_ub
+
+        return ate, ate_lb, ate_ub
 
     def bootstrap(self, X, treatment, y, size=10000):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
-
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
         treatment_b = treatment[idxs]
         y_b = y[idxs]
         self.fit(X=X_b, treatment=treatment_b, y=y_b)
-        te_b = self.predict(X=X, treatment=treatment, y=y)
+        te_b = self.predict(X=X, treatment=treatment, verbose=False)
         return te_b
 
 
@@ -205,7 +247,7 @@ class BaseTRegressor(BaseTLearner):
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        super(BaseTRegressor, self).__init__(
+        super().__init__(
             learner=learner,
             control_learner=control_learner,
             treatment_learner=treatment_learner,
@@ -233,14 +275,14 @@ class BaseTClassifier(BaseTLearner):
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        super(BaseTClassifier, self).__init__(
+        super().__init__(
             learner=learner,
             control_learner=control_learner,
             treatment_learner=treatment_learner,
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-    def predict(self, X, treatment=None, y=None):
+    def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
 
         Args:
@@ -251,30 +293,55 @@ class BaseTClassifier(BaseTLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        yhat_c = self.model_c.predict_proba(X)[:, 1]
-        yhat_t = self.model_t.predict_proba(X)[:, 1]
+        yhat_cs = {}
+        yhat_ts = {}
 
-        if (y is not None) and (treatment is not None):
-            is_treatment = treatment != self.control_name
-            logger.info('RMSE (Control): {:.6f}'.format(np.sqrt(mse(y[~is_treatment], yhat_c[~is_treatment]))))
-            logger.info(' MAE (Control): {:.6f}'.format(mae(y[~is_treatment], yhat_c[~is_treatment])))
-            logger.info('RMSE (Treatment): {:.6f}'.format(np.sqrt(mse(y[is_treatment], yhat_t[is_treatment]))))
-            logger.info(' MAE (Treatment): {:.6f}'.format(mae(y[is_treatment], yhat_t[is_treatment])))
+        for group in self.t_groups:
+            w = (treatment != group).astype(int)
+            X_new = np.hstack((w.reshape((-1, 1)), X))
 
-        return (yhat_t - yhat_c).reshape(-1, 1)
+            model_c = self.models_c[group]
+            model_t = self.models_t[group]
+            yhat_cs[group] = model_c.predict(X_new)
+            yhat_ts[group] = model_t.predict(X_new)
+
+        if (y is not None) and (treatment is not None) and verbose:
+            for group in self.t_groups:
+                logger.info('Error metrics for {}'.format(group))
+                logger.info('RMSE (Control): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
+                )
+                logger.info(' MAE (Control): {:.6f}'.format(
+                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
+                )
+                logger.info('RMSE (Treatment): {:.6f}'.format(
+                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
+                )
+                logger.info(' MAE (Treatment): {:.6f}'.format(
+                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
+                )
+
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            te[:, i] = yhat_ts[group] - yhat_cs[group]
+
+        if not return_components:
+            return te
+        else:
+            return te, yhat_cs, yhat_ts
 
 
 class XGBTRegressor(BaseTRegressor):
     def __init__(self, ate_alpha=.05, control_name=0, *args, **kwargs):
         """Initialize a T-learner with two XGBoost models."""
-        super(XGBTRegressor, self).__init__(learner=XGBRegressor(*args, **kwargs),
-                                            ate_alpha=ate_alpha,
-                                            control_name=control_name)
+        super().__init__(learner=XGBRegressor(*args, **kwargs),
+                         ate_alpha=ate_alpha,
+                         control_name=control_name)
 
 
 class MLPTRegressor(BaseTRegressor):
     def __init__(self, ate_alpha=.05, control_name=0, *args, **kwargs):
         """Initialize a T-learner with two MLP models."""
-        super(MLPTRegressor, self).__init__(learner=MLPRegressor(*args, **kwargs),
-                                            ate_alpha=ate_alpha,
-                                            control_name=control_name)
+        super().__init__(learner=MLPRegressor(*args, **kwargs),
+                         ate_alpha=ate_alpha,
+                         control_name=control_name)

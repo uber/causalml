@@ -50,7 +50,7 @@ def test_BaseSLearner(generate_regression_data):
     learner = BaseSLearner(learner=LinearRegression())
 
     # check the accuracy of the ATE estimation
-    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
@@ -61,7 +61,7 @@ def test_BaseSRegressor(generate_regression_data):
     learner = BaseSRegressor(learner=XGBRegressor())
 
     # check the accuracy of the ATE estimation
-    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
@@ -229,7 +229,7 @@ def test_BaseSClassifier(generate_classification_data):
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
                           treatment_col='W',
-                          steps=20)
+                          steps=15)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -264,7 +264,7 @@ def test_BaseTClassifier(generate_classification_data):
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
                           treatment_col='W',
-                          steps=20)
+                          steps=15)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -287,9 +287,10 @@ def test_BaseXClassifier(generate_classification_data):
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
 
-    uplift_model = BaseXClassifier(learner=XGBRegressor(),
-                                   control_outcome_learner=XGBClassifier(),
-                                   treatment_outcome_learner=XGBClassifier())
+    uplift_model = BaseXClassifier(control_outcome_learner=XGBClassifier(),
+                                   control_effect_learner=XGBRegressor(),
+                                   treatment_outcome_learner=XGBClassifier(),
+                                   treatment_effect_learner=XGBRegressor())
 
     uplift_model.fit(X=df_train[x_names].values,
                      treatment=df_train['treatment_group_key'].values,
@@ -305,7 +306,7 @@ def test_BaseXClassifier(generate_classification_data):
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
                           treatment_col='W',
-                          steps=20)
+                          steps=15)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -328,8 +329,8 @@ def test_BaseRClassifier(generate_classification_data):
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
 
-    uplift_model = BaseRClassifier(learner=XGBRegressor(),
-                                   outcome_learner=XGBClassifier())
+    uplift_model = BaseRClassifier(outcome_learner=XGBClassifier(),
+                                   effect_learner=XGBRegressor())
 
     uplift_model.fit(X=df_train[x_names].values,
                      p=df_train['propensity_score'].values,
@@ -345,7 +346,7 @@ def test_BaseRClassifier(generate_classification_data):
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
                           treatment_col='W',
-                          steps=20)
+                          steps=15)
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting

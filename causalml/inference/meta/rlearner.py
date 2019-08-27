@@ -1,13 +1,14 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+from future.builtins import super
 from copy import deepcopy
 import logging
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold
-
+from .utils import check_control_in_treatment, check_p_conditions
 
 logger = logging.getLogger('causalml')
 
@@ -57,22 +58,73 @@ class BaseRLearner(object):
 
         self.cv = KFold(n_splits=n_fold, shuffle=True, random_state=random_state)
 
-        self.t_var = 0.0
-        self.c_var = 0.0
-
     def __repr__(self):
         return ('{}(model_mu={},\n'
                 '\tmodel_tau={})'.format(self.__class__.__name__,
                                          self.model_mu.__repr__(),
                                          self.model_tau.__repr__()))
 
+    def fit(self, X, p, treatment, y, verbose=True):
+        """Fit the treatment effect and outcome models of the R learner.
+
+        Args:
+            X (np.matrix): a feature matrix
+            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
+                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array): a treatment vector
+            y (np.array): an outcome vector
+        """
+        check_control_in_treatment(treatment, self.control_name)
+        self.t_groups = np.unique(treatment[treatment != self.control_name])
+        self.t_groups.sort()
+        check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
+            treatment_name = self.t_groups[0]
+            p = {treatment_name: p}
+
+        self._classes = {group: i for i, group in enumerate(self.t_groups)}
+        self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
+        self.vars_c = {}
+        self.vars_t = {}
+
+        if verbose:
+            logger.info('generating out-of-fold CV outcome estimates')
+        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
+
+        for group in self.t_groups:
+            w = (treatment == group).astype(int)
+
+            if verbose:
+                logger.info('training the treatment effect model for {} with R-loss'.format(group))
+            self.models_tau[group].fit(X, (y - yhat) / (w - p[group]), sample_weight=(w - p[group]) ** 2)
+
+            self.vars_c[group] = (y[w == 0] - yhat[w == 0]).var()
+            self.vars_t[group] = (y[w == 1] - yhat[w == 1]).var()
+
+    def predict(self, X):
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix): a feature matrix
+
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            dhat = self.models_tau[group].predict(X)
+            te[:, i] = dhat
+
+        return te
+
     def fit_predict(self, X, p, treatment, y, return_ci=False,
-                    n_bootstraps=1000, bootstrap_size=10000, verbose=False):
+                    n_bootstraps=1000, bootstrap_size=10000, verbose=True):
         """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
 
         Args:
             X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1 treatment (np.array): a treatment vector
+            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
+                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             y (np.array): an outcome vector
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
@@ -87,21 +139,36 @@ class BaseRLearner(object):
         self.fit(X, p, treatment, y)
         te = self.predict(X)
 
+        check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
+            treatment_name = self.t_groups[0]
+            p = {treatment_name: p}
+
         if not return_ci:
             return te
         else:
             start = pd.datetime.today()
-            te_bootstraps = np.zeros(shape=(X.shape[0], n_bootstraps))
+            self.t_groups_global = self.t_groups
+            self._classes_global = self._classes
+            self.model_mu_global = deepcopy(self.model_mu)
+            self.models_tau_global = deepcopy(self.models_tau)
+            te_bootstraps = np.zeros(shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps))
             for i in range(n_bootstraps):
                 te_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
-                te_bootstraps[:, i] = np.ravel(te_b)
-                if verbose:
+                te_bootstraps[:, :, i] = te_b
+                if verbose and i % 10 == 0 and i > 0:
                     now = pd.datetime.today()
-                    lapsed = (now - start).seconds / 60
-                    logger.info('{}/{} bootstraps completed. ({:.01f} min ' 'lapsed)'.format(i + 1, n_bootstraps, lapsed))
+                    lapsed = (now-start).seconds
+                    logger.info('{}/{} bootstraps completed. ({}s lapsed)'.format(i, n_bootstraps, lapsed))
 
-            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
-            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
+            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
+
+            # set member variables back to global (currently last bootstrapped outcome)
+            self.t_groups = self.t_groups_global
+            self._classes = self._classes_global
+            self.model_mu = self.model_mu_global
+            self.models_tau = self.models_tau_global
 
             return (te, te_lower, te_upper)
 
@@ -110,75 +177,53 @@ class BaseRLearner(object):
 
         Args:
             X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1
+            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
+                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
 
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        dhat = self.fit_predict(X, p, treatment, y)
+        te = self.fit_predict(X, p, treatment, y)
 
-        te = dhat.mean()
-        prob_treatment = float(sum(treatment != self.control_name)) / X.shape[0]
+        check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
+            treatment_name = self.t_groups[0]
+            p = {treatment_name: p}
 
-        se = np.sqrt(self.t_var / prob_treatment + self.c_var / (1 - prob_treatment) + dhat.var()) / X.shape[0]
+        ate = np.zeros(self.t_groups.shape[0])
+        ate_lb = np.zeros(self.t_groups.shape[0])
+        ate_ub = np.zeros(self.t_groups.shape[0])
 
-        te_lb = te - se * norm.ppf(1 - self.ate_alpha / 2)
-        te_ub = te + se * norm.ppf(1 - self.ate_alpha / 2)
+        for i, group in enumerate(self.t_groups):
+            w = (treatment == group).astype(int)
+            prob_treatment = float(sum(w)) / X.shape[0]
+            _ate = te[:, i].mean()
 
-        return te, te_lb, te_ub
+            se = (np.sqrt((self.vars_t[group] / prob_treatment)
+                          + (self.vars_c[group] / (1 - prob_treatment))
+                          + te[:, i].var())
+                  / X.shape[0])
 
-    def fit(self, X, p, treatment, y):
-        """Fit the treatment effect and outcome models of the R learner.
+            _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
+            _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
 
-        Args:
-            X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
-        """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+            ate[i] = _ate
+            ate_lb[i] = _ate_lb
+            ate_ub[i] = _ate_ub
 
-        t_groups = np.unique(treatment[is_treatment])
-        self._classes = {}
-        # this should be updated for multi-treatment case
-        self._classes[t_groups[0]] = 0
-
-        logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
-
-        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
-
-        logger.info('training the treatment effect model, {} with R-loss'.format(self.model_tau))
-        self.model_tau.fit(X, (y - yhat) / (w - p), sample_weight=(w - p) ** 2)
-
-        self.t_var = (y[w == 1] - yhat[w == 1]).var()
-        self.c_var = (y[w == 0] - yhat[w == 0]).var()
-
-    def predict(self, X):
-        """Predict treatment effects.
-
-        Args:
-            X (np.matrix): a feature matrix
-
-        Returns:
-            (numpy.ndarray): Predictions of treatment effects.
-        """
-
-        dhat = self.model_tau.predict(X)
-
-        return dhat.reshape(-1, 1)
+        return ate, ate_lb, ate_ub
 
     def bootstrap(self, X, p, treatment, y, size=10000):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
 
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
-        p_b = p[idxs]
+        p_b = {group: _p[idxs] for group, _p in p.items()}
         treatment_b = treatment[idxs]
         y_b = y[idxs]
-        self.fit(X=X_b, p=p_b, treatment=treatment_b, y=y_b)
+        self.fit(X=X_b, p=p_b, treatment=treatment_b, y=y_b, verbose=False)
         te_b = self.predict(X=X)
         return te_b
 
@@ -208,7 +253,7 @@ class BaseRRegressor(BaseRLearner):
             n_fold (int, optional): the number of cross validation folds for outcome_learner
             random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
         """
-        super(BaseRRegressor, self).__init__(
+        super().__init__(
             learner=learner,
             outcome_learner=outcome_learner,
             effect_learner=effect_learner,
@@ -244,7 +289,7 @@ class BaseRClassifier(BaseRLearner):
             n_fold (int, optional): the number of cross validation folds for outcome_learner
             random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
         """
-        super(BaseRClassifier, self).__init__(
+        super().__init__(
             learner=learner,
             outcome_learner=outcome_learner,
             effect_learner=effect_learner,
@@ -256,30 +301,55 @@ class BaseRClassifier(BaseRLearner):
         if (outcome_learner is None) and (effect_learner is None):
             raise ValueError("Either the outcome learner or the effect learner must be specified.")
 
-    def fit(self, X, p, treatment, y):
+    def fit(self, X, p, treatment, y, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
             X (np.matrix): a feature matrix
-            p (np.array): a propensity vector between 0 and 1
+            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
+                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
-        is_treatment = treatment != self.control_name
-        w = is_treatment.astype(int)
+        check_control_in_treatment(treatment, self.control_name)
+        self.t_groups = np.unique(treatment[treatment != self.control_name])
+        self.t_groups.sort()
+        check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
+            treatment_name = self.t_groups[0]
+            p = {treatment_name: p}
 
-        t_groups = np.unique(treatment[is_treatment])
-        self._classes = {}
-        # this should be updated for multi-treatment case
-        self._classes[t_groups[0]] = 0
+        self._classes = {group: i for i, group in enumerate(self.t_groups)}
+        self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
+        self.vars_c = {}
+        self.vars_t = {}
 
-        logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
+        if verbose:
+            logger.info('generating out-of-fold CV outcome estimates')
+        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv, method='predict_proba')[:, 1]
 
-        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv,
-                                 method='predict_proba')[:, 1]
+        for group in self.t_groups:
+            w = (treatment == group).astype(int)
 
-        logger.info('training the treatment effect model, {} with R-loss'.format(self.model_tau))
-        self.model_tau.fit(X, (y - yhat) / (w - p), sample_weight=(w - p) ** 2)
+            if verbose:
+                logger.info('training the treatment effect model for {} with R-loss'.format(group))
+            self.models_tau[group].fit(X, (y - yhat) / (w - p[group]), sample_weight=(w - p[group]) ** 2)
 
-        self.t_var = (y[w == 1] - yhat[w == 1]).var()
-        self.c_var = (y[w == 0] - yhat[w == 0]).var()
+            self.vars_c[group] = (y[w == 0] - yhat[w == 0]).var()
+            self.vars_t[group] = (y[w == 1] - yhat[w == 1]).var()
+
+    def predict(self, X):
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix): a feature matrix
+
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        for i, group in enumerate(self.t_groups):
+            dhat = self.models_tau[group].predict(X)
+            te[:, i] = dhat
+
+        return te
