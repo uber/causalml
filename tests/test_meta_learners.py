@@ -330,7 +330,7 @@ def test_BaseRClassifier(generate_classification_data):
                                          random_state=RANDOM_SEED)
 
     uplift_model = BaseRClassifier(outcome_learner=XGBClassifier(),
-                                   effect_learner=XGBRegressor)
+                                   effect_learner=XGBRegressor())
 
     uplift_model.fit(X=df_train[x_names].values,
                      p=df_train['propensity_score'].values,
