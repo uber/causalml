@@ -15,7 +15,7 @@ import warnings
 from causalml.inference.meta import BaseXRegressor, BaseRRegressor, BaseSRegressor, BaseTRegressor
 from causalml.inference.tree import CausalTreeRegressor
 from causalml.propensity import ElasticNetPropensityModel
-from causalml.metrics.visualize import plot_gain, get_cumgain
+from causalml.metrics import plot_gain, get_cumgain
 
 
 plt.style.use('fivethirtyeight')

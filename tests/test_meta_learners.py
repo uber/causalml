@@ -8,14 +8,13 @@ from xgboost import XGBRegressor
 from xgboost import XGBClassifier
 
 from causalml.dataset import synthetic_data
-from causalml.dataset import make_uplift_classification
 from causalml.inference.meta import BaseSLearner, BaseSRegressor, BaseSClassifier, LRSRegressor
 from causalml.inference.meta import BaseTLearner, BaseTRegressor, BaseTClassifier, XGBTRegressor, MLPTRegressor
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
 from causalml.inference.meta import BaseRLearner, BaseRClassifier, BaseRRegressor
 from causalml.metrics import ape, gini, get_cumgain
 
-from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, TREATMENT_NAMES, CONVERSION
+from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
 
 
 def test_synthetic_data():
