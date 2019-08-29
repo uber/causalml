@@ -85,11 +85,11 @@ class BaseSLearner(object):
             X_new = np.hstack((w.reshape((-1, 1)), X))
             self.models[group].fit(X_new, y)
 
-    def predict(self, X, treatment, y=None, verbose=True):
+    def predict(self, X, treatment=None, y=None, verbose=True):
         """Predict treatment effects.
         Args:
             X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
+            treatment (np.array, optional): a treatment vector
             y (np.array, optional): an outcome vector
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -98,16 +98,18 @@ class BaseSLearner(object):
         yhat_ts = {}
 
         for group in self.t_groups:
-            w = (treatment != group).astype(int)
             model = self.models[group]
-            X_new = np.hstack((w.reshape((-1, 1)), X))
 
-            X_new[:, 0] = 0  # set the treatment column to zero (the control group)
+            # set the treatment column to zero (the control group)
+            X_new = np.hstack((np.zeros((X.shape[0], 1)), X))
             yhat_cs[group] = model.predict(X_new)
-            X_new[:, 0] = 1   # set the treatment column to one (the treatment group)
+
+            # set the treatment column to one (the treatment group)
+            X_new[:, 0] = 1
             yhat_ts[group] = model.predict(X_new)
 
-            if y is not None and verbose:
+            if (y is not None) and (treatment is not None) and verbose:
+                w = (treatment == group).astype(int)
                 yhat = np.zeros_like(y, dtype=float)
                 yhat[w == 0] = yhat_cs[group][w == 0]
                 yhat[w == 1] = yhat_ts[group][w == 1]
@@ -227,11 +229,11 @@ class BaseSClassifier(BaseSLearner):
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-    def predict(self, X, treatment, y=None, verbose=True):
+    def predict(self, X, treatment=None, y=None, verbose=True):
         """Predict treatment effects.
         Args:
             X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
+            treatment (np.array, optional): a treatment vector
             y (np.array, optional): an outcome vector
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -240,16 +242,18 @@ class BaseSClassifier(BaseSLearner):
         yhat_ts = {}
 
         for group in self.t_groups:
-            w = (treatment != group).astype(int)
             model = self.models[group]
-            X_new = np.hstack((w.reshape((-1, 1)), X))
 
-            X_new[:, 0] = 0  # set the treatment column to zero (the control group)
+            # set the treatment column to zero (the control group)
+            X_new = np.hstack((np.zeros((X.shape[0], 1)), X))
             yhat_cs[group] = model.predict_proba(X_new)[:, 1]
-            X_new[:, 0] = 1   # set the treatment column to one (the treatment group)
+
+            # set the treatment column to one (the treatment group)
+            X_new[:, 0] = 1
             yhat_ts[group] = model.predict_proba(X_new)[:, 1]
 
             if y is not None and verbose:
+                w = (treatment == group).astype(int)
                 yhat = np.zeros_like(y, dtype=float)
                 yhat[w == 0] = yhat_cs[group][w == 0]
                 yhat[w == 1] = yhat_ts[group][w == 1]
