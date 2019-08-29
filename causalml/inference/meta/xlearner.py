@@ -7,7 +7,10 @@ import logging
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
+
 from .utils import check_control_in_treatment, check_p_conditions
+from causalml.metrics import regression_metrics, classification_metrics
+
 
 logger = logging.getLogger('causalml')
 
@@ -98,31 +101,33 @@ class BaseXLearner(object):
         self.vars_t = {}
 
         for group in self.t_groups:
-            w = (treatment == group).astype(int)
+            w = (treatment == group)
 
             # Train outcome models
-            self.models_mu_c[group].fit(X[w == 0], y[w == 0])
-            self.models_mu_t[group].fit(X[w == 1], y[w == 1])
+            self.models_mu_c[group].fit(X[~w], y[~w])
+            self.models_mu_t[group].fit(X[w], y[w])
 
             # Calculate variances and treatment effects
-            var_c = (y[w == 0] - self.models_mu_c[group].predict(X[w == 0])).var()
+            var_c = (y[~w] - self.models_mu_c[group].predict(X[~w])).var()
             self.vars_c[group] = var_c
-            var_t = (y[w == 1] - self.models_mu_t[group].predict(X[w == 1])).var()
+            var_t = (y[w] - self.models_mu_t[group].predict(X[w])).var()
             self.vars_t[group] = var_t
 
             # Train treatment models
-            d_c = self.models_mu_t[group].predict(X[w == 0]) - y[w == 0]
-            d_t = y[w == 1] - self.models_mu_c[group].predict(X[w == 1])
-            self.models_tau_c[group].fit(X[w == 0], d_c)
-            self.models_tau_t[group].fit(X[w == 1], d_t)
+            d_c = self.models_mu_t[group].predict(X[~w]) - y[~w]
+            d_t = y[w] - self.models_mu_c[group].predict(X[w])
+            self.models_tau_c[group].fit(X[~w], d_c)
+            self.models_tau_t[group].fit(X[w], d_t)
 
-    def predict(self, X, p, return_components=False):
+    def predict(self, X, p, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
 
         Args:
             X (np.matrix): a feature matrix
             p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
                                     or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array, optional): a treatment vector
+            y (np.array, optional): an optional outcome vector
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -144,6 +149,15 @@ class BaseXLearner(object):
 
             _te = (p[group] * dhat_cs[group] + (1 - p[group]) * dhat_cs[group]).reshape(-1, 1)
             te[:, i] = np.ravel(_te)
+
+            if (y is not None) and (treatment is not None) and verbose:
+                w = (treatment == group)
+                yhat = np.zeros_like(y, dtype=float)
+                yhat[~w] = self.models_mu_c[group].predict(X[~w])
+                yhat[w] = self.models_mu_t[group].predict(X[w])
+
+                logger.info('Error metrics for group {}'.format(group))
+                regression_metrics(y, yhat, w)
 
         if not return_components:
             return te
@@ -171,7 +185,7 @@ class BaseXLearner(object):
                 UB [n_samples, n_treatment]
         """
         self.fit(X, treatment, y)
-        te = self.predict(X, p, return_components=return_components)
+        te = self.predict(X, p, treatment=treatment, y=y, return_components=return_components)
 
         if not return_ci:
             return te
@@ -359,31 +373,33 @@ class BaseXClassifier(BaseXLearner):
         self.vars_t = {}
 
         for group in self.t_groups:
-            w = (treatment == group).astype(int)
+            w = (treatment == group)
 
             # Train outcome models
-            self.models_mu_c[group].fit(X[w == 0], y[w == 0])
-            self.models_mu_t[group].fit(X[w == 1], y[w == 1])
+            self.models_mu_c[group].fit(X[~w], y[~w])
+            self.models_mu_t[group].fit(X[w], y[w])
 
             # Calculate variances and treatment effects
-            var_c = (y[w == 0] - self.models_mu_c[group].predict_proba(X[w == 0])[:, 1]).var()
+            var_c = (y[~w] - self.models_mu_c[group].predict_proba(X[~w])[:, 1]).var()
             self.vars_c[group] = var_c
-            var_t = (y[w == 1] - self.models_mu_t[group].predict_proba(X[w == 1])[:, 1]).var()
+            var_t = (y[w] - self.models_mu_t[group].predict_proba(X[w])[:, 1]).var()
             self.vars_t[group] = var_t
 
             # Train treatment models
-            d_c = self.models_mu_t[group].predict_proba(X[w == 0])[:, 1] - y[w == 0]
-            d_t = y[w == 1] - self.models_mu_c[group].predict_proba(X[w == 1])[:, 1]
-            self.models_tau_c[group].fit(X[w == 0], d_c)
-            self.models_tau_t[group].fit(X[w == 1], d_t)
+            d_c = self.models_mu_t[group].predict_proba(X[~w])[:, 1] - y[~w]
+            d_t = y[w] - self.models_mu_c[group].predict_proba(X[w])[:, 1]
+            self.models_tau_c[group].fit(X[~w], d_c)
+            self.models_tau_t[group].fit(X[w], d_t)
 
-    def predict(self, X, p, return_components=False):
+    def predict(self, X, p, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
 
         Args:
             X (np.matrix): a feature matrix
             p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
                                     or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array, optional): a treatment vector
+            y (np.array, optional): an optional outcome vector
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -405,6 +421,15 @@ class BaseXClassifier(BaseXLearner):
 
             _te = (p[group] * dhat_cs[group] + (1 - p[group]) * dhat_cs[group]).reshape(-1, 1)
             te[:, i] = np.ravel(_te)
+
+            if (y is not None) and (treatment is not None) and verbose:
+                w = (treatment == group)
+                yhat = np.zeros_like(y, dtype=float)
+                yhat[~w] = self.models_mu_c[group].predict_proba(X[~w])[:, 1]
+                yhat[w] = self.models_mu_t[group].predict_proba(X[w])[:, 1]
+
+                logger.info('Error metrics for group {}'.format(group))
+                classification_metrics(y, yhat, w)
 
         if not return_components:
             return te

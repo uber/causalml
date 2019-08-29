@@ -15,7 +15,7 @@ import warnings
 from causalml.inference.meta import BaseXRegressor, BaseRRegressor, BaseSRegressor, BaseTRegressor
 from causalml.inference.tree import CausalTreeRegressor
 from causalml.propensity import ElasticNetPropensityModel
-from causalml.metrics.visualize import plot_gain, get_cumgain
+from causalml.metrics import plot_gain, get_cumgain
 
 
 plt.style.use('fivethirtyeight')
@@ -456,7 +456,7 @@ def bar_plot_summary_holdout(train_summary, validation_summary, k, drop_learners
 
 
 def get_synthetic_auuc(synthetic_preds, drop_learners=[], outcome_col='y', treatment_col='w',
-                       treatment_effect_col='tau', steps=100, plot=True):
+                       treatment_effect_col='tau', plot=True):
     """Get auuc values for cumulative gains of model estimates in quantiles.
 
     For details, reference get_cumgain() and plot_gain()
@@ -466,7 +466,6 @@ def get_synthetic_auuc(synthetic_preds, drop_learners=[], outcome_col='y', treat
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
-        steps (int, optional): the number of quantiles
         plot (boolean,optional): plot the cumulative gain chart or not
 
     Returns:
@@ -487,7 +486,7 @@ def get_synthetic_auuc(synthetic_preds, drop_learners=[], outcome_col='y', treat
             treatment_effect_col in synthetic_preds_df.columns)
 
     cumlift = get_cumgain(synthetic_preds_df, outcome_col='y', treatment_col='w',
-                          treatment_effect_col='tau', steps=100)
+                          treatment_effect_col='tau')
     auuc_df = pd.DataFrame(cumlift.columns)
     auuc_df.columns = ['Learner']
     auuc_df['cum_gain_auuc'] = [auc(cumlift.index.values/100, cumlift[learner].values) for learner in cumlift.columns]
@@ -495,6 +494,6 @@ def get_synthetic_auuc(synthetic_preds, drop_learners=[], outcome_col='y', treat
 
     if plot:
         plot_gain(synthetic_preds_df, outcome_col=outcome_col,
-                  treatment_col=treatment_col, treatment_effect_col=treatment_effect_col, steps=steps)
+                  treatment_col=treatment_col, treatment_effect_col=treatment_effect_col)
 
     return auuc_df

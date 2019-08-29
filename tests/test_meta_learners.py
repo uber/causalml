@@ -8,14 +8,13 @@ from xgboost import XGBRegressor
 from xgboost import XGBClassifier
 
 from causalml.dataset import synthetic_data
-from causalml.dataset import make_uplift_classification
 from causalml.inference.meta import BaseSLearner, BaseSRegressor, BaseSClassifier, LRSRegressor
 from causalml.inference.meta import BaseTLearner, BaseTRegressor, BaseTClassifier, XGBTRegressor, MLPTRegressor
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
 from causalml.inference.meta import BaseRLearner, BaseRClassifier, BaseRRegressor
 from causalml.metrics import ape, gini, get_cumgain
 
-from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, TREATMENT_NAMES, CONVERSION
+from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
 
 
 def test_synthetic_data():
@@ -228,8 +227,7 @@ def test_BaseSClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W',
-                          steps=15)
+                          treatment_col='W')
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -263,8 +261,7 @@ def test_BaseTClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W',
-                          steps=15)
+                          treatment_col='W')
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -305,8 +302,7 @@ def test_BaseXClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W',
-                          steps=15)
+                          treatment_col='W')
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
@@ -345,8 +341,7 @@ def test_BaseRClassifier(generate_classification_data):
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W',
-                          steps=15)
+                          treatment_col='W')
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
