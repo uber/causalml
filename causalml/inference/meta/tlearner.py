@@ -8,11 +8,11 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 from sklearn.exceptions import ConvergenceWarning
-from sklearn.metrics import mean_squared_error as mse
-from sklearn.metrics import mean_absolute_error as mae
 from sklearn.neural_network import MLPRegressor
 from sklearn.utils.testing import ignore_warnings
 from xgboost import XGBRegressor
+
+from causalml.metrics import regression_metrics, classification_metrics
 
 
 logger = logging.getLogger('causalml')
@@ -72,17 +72,16 @@ class BaseTLearner(object):
         self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
 
         for group in self.t_groups:
-            w = (treatment == group).astype(int)
-            X_new = np.hstack((w.reshape((-1, 1)), X))
-            self.models_c[group].fit(X_new[w == 0], y[w == 0])
-            self.models_t[group].fit(X_new[w == 1], y[w == 1])
+            w = (treatment == group)
+            self.models_c[group].fit(X[~w], y[~w])
+            self.models_t[group].fit(X[w], y[w])
 
     def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
 
         Args:
             X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
+            treatment (np.array, optional): a treatment vector
             y (np.array, optional): an optional outcome vector
 
         Returns:
@@ -92,29 +91,20 @@ class BaseTLearner(object):
         yhat_ts = {}
 
         for group in self.t_groups:
-            w = (treatment != group).astype(int)
-            X_new = np.hstack((w.reshape((-1, 1)), X))
 
             model_c = self.models_c[group]
             model_t = self.models_t[group]
-            yhat_cs[group] = model_c.predict(X_new)
-            yhat_ts[group] = model_t.predict(X_new)
+            yhat_cs[group] = model_c.predict(X)
+            yhat_ts[group] = model_t.predict(X)
 
-        if (y is not None) and (treatment is not None) and verbose:
-            for group in self.t_groups:
-                logger.info('Error metrics for {}'.format(group))
-                logger.info('RMSE (Control): {:.6f}'.format(
-                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
-                )
-                logger.info(' MAE (Control): {:.6f}'.format(
-                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
-                )
-                logger.info('RMSE (Treatment): {:.6f}'.format(
-                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
-                )
-                logger.info(' MAE (Treatment): {:.6f}'.format(
-                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
-                )
+            if (y is not None) and (treatment is not None) and verbose:
+                w = (treatment == group)
+                yhat = np.zeros_like(y, dtype=float)
+                yhat[~w] = yhat_cs[group][~w]
+                yhat[w] = yhat_ts[group][w]
+
+                logger.info('Error metrics for group {}'.format(group))
+                regression_metrics(y, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
@@ -287,7 +277,7 @@ class BaseTClassifier(BaseTLearner):
 
         Args:
             X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
+            treatment (np.array, optional): a treatment vector
             y (np.array, optional): an optional outcome vector
 
         Returns:
@@ -297,29 +287,20 @@ class BaseTClassifier(BaseTLearner):
         yhat_ts = {}
 
         for group in self.t_groups:
-            w = (treatment != group).astype(int)
-            X_new = np.hstack((w.reshape((-1, 1)), X))
 
             model_c = self.models_c[group]
             model_t = self.models_t[group]
-            yhat_cs[group] = model_c.predict(X_new)
-            yhat_ts[group] = model_t.predict(X_new)
+            yhat_cs[group] = model_c.predict_proba(X)[:, 1]
+            yhat_ts[group] = model_t.predict_proba(X)[:, 1]
 
-        if (y is not None) and (treatment is not None) and verbose:
-            for group in self.t_groups:
-                logger.info('Error metrics for {}'.format(group))
-                logger.info('RMSE (Control): {:.6f}'.format(
-                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
-                )
-                logger.info(' MAE (Control): {:.6f}'.format(
-                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
-                )
-                logger.info('RMSE (Treatment): {:.6f}'.format(
-                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
-                )
-                logger.info(' MAE (Treatment): {:.6f}'.format(
-                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
-                )
+            if (y is not None) and (treatment is not None) and verbose:
+                w = (treatment == group)
+                yhat = np.zeros_like(y, dtype=float)
+                yhat[~w] = yhat_cs[group][~w]
+                yhat[w] = yhat_ts[group][w]
+
+                logger.info('Error metrics for group {}'.format(group))
+                classification_metrics(y, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
