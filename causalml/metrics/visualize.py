@@ -310,7 +310,7 @@ def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
         normalize (bool, optional): whether to normalize the y-axis to 1 or not
 
     Returns:
-        (float): the AAUC score
+        (float): the AUUC score
     """
     cumgain = get_cumgain(df, outcome_col, treatment_col, treatment_effect_col, normalize)
     return cumgain.sum() / cumgain.shape[0]
