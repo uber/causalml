@@ -1,13 +1,16 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import logging
+import numpy as np
 from sklearn.metrics import mean_squared_error as mse
 from sklearn.metrics import mean_absolute_error as mae # noqa
 from sklearn.metrics import r2_score    # noqa
 
-import numpy as np
-
 from .const import EPS
+
+
+logger = logging.getLogger('causalml')
 
 
 def ape(y, p):
@@ -36,6 +39,18 @@ def mape(y, p):
 
     filt = np.abs(y) > EPS
     return np.mean(np.abs(1 - p[filt] / y[filt]))
+
+
+def smape(y, p):
+    """Symmetric Mean Absolute Percentage Error (sMAPE).
+    Args:
+        y (numpy.array): target
+        p (numpy.array): prediction
+
+    Returns:
+        e (numpy.float64): sMAPE
+    """
+    return 2. * np.mean(np.abs(y - p) / (np.abs(y) + np.abs(p)))
 
 
 def rmse(y, p):
@@ -87,3 +102,27 @@ def gini(y, p):
 
     # normalize to true Gini coefficient
     return g_pred / g_true
+
+
+def regression_metrics(y, p, w=None, metrics={'RMSE': rmse, 'sMAPE': smape, 'Gini': gini}):
+    """Log metrics for regressors.
+
+    Args:
+        y (numpy.array): target
+        p (numpy.array): prediction
+        w (numpy.array, optional): a treatment vector (1 or True: treatment, 0 or False: control). If given, log
+            metrics for the treatment and control group separately
+        metrics (dict, optional): a dictonary of the metric names and functions
+    """
+    assert metrics
+    assert y.shape[0] == p.shape[0]
+
+    for name, func in metrics.items():
+        if w is not None:
+            assert y.shape[0] == w.shape[0]
+            if w.dtype != bool:
+                w = w == 1
+            logger.info('{:>8s}   (Control): {:10.4f}'.format(name, func(y[~w], p[~w])))
+            logger.info('{:>8s} (Treatment): {:10.4f}'.format(name, func(y[w], p[w])))
+        else:
+            logger.info('{:>8s}: {:10.4f}'.format(name, func(y, p)))
