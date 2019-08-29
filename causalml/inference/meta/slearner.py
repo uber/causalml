@@ -98,7 +98,7 @@ class BaseSLearner(object):
         yhat_ts = {}
 
         for group in self.t_groups:
-            w = (treatment != group).astype(int)
+            w = (treatment == group).astype(int)
             model = self.models[group]
             X_new = np.hstack((w.reshape((-1, 1)), X))
 
@@ -240,7 +240,7 @@ class BaseSClassifier(BaseSLearner):
         yhat_ts = {}
 
         for group in self.t_groups:
-            w = (treatment != group).astype(int)
+            w = (treatment == group).astype(int)
             model = self.models[group]
             X_new = np.hstack((w.reshape((-1, 1)), X))
 
