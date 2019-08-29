@@ -122,7 +122,7 @@ def regression_metrics(y, p, w=None, metrics={'RMSE': rmse, 'sMAPE': smape, 'Gin
             assert y.shape[0] == w.shape[0]
             if w.dtype != bool:
                 w = w == 1
-            logger.info('{:>8s}   (Control): {:6.4f}'.format(name, func(y[~w], p[~w])))
-            logger.info('{:>8s} (Treatment): {:6.4f}'.format(name, func(y[w], p[w])))
+            logger.info('{:>8s}   (Control): {:10.4f}'.format(name, func(y[~w], p[~w])))
+            logger.info('{:>8s} (Treatment): {:10.4f}'.format(name, func(y[w], p[w])))
         else:
-            logger.info('{:>8s}: {:6.4f}'.format(name, func(y, p)))
+            logger.info('{:>8s}: {:10.4f}'.format(name, func(y, p)))
