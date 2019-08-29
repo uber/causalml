@@ -361,7 +361,9 @@ class XGBRRegressor(BaseRRegressor):
     def __init__(self,
                  early_stopping=True,
                  test_size=0.3, 
-                 early_stopping_rounds=30, 
+                 early_stopping_rounds=30,
+                 effect_learner_objective='rank:pairwise',
+                 effect_learner_n_estimators=500,
                  *args, 
                  **kwargs):
         """Initialize an R-learner regressor with XGBoost model using pairwise ranking objective.
@@ -370,15 +372,26 @@ class XGBRRegressor(BaseRRegressor):
             early_stopping: whether or not to use early stopping when fitting effect learner
             test_size (float, optional): the proportion of the dataset to use as validation set when early stopping is enabled 
             early_stopping_rounds (int, optional): validation metric needs to improve at least once in every early_stopping_rounds round(s) to continue training
+            effect_learner_objective (str, optional): the learning objective for the efffect learner (default = 'rank:pairwise')
+            effect_learner_n_estimators (int, optional): number of trees to fit for the effect learner (default = 500)
         """
-        super().__init__(
-            outcome_learner = XGBRegressor(*args, **kwargs),
-            effect_learner = XGBRegressor(objective='rank:pairwise', n_estimators=500, *args, **kwargs))
 
+        assert (effect_learner_objective == 'rank:pairwise' or effect_learner_objective == 'reg:linear'), 'Effect learner objective has to be rank:pairwise or reg:linear'
+        
+        self.effect_learner_objective = effect_learner_objective
+        if self.effect_learner_objective == 'rank:pairwise':
+            self.effect_learner_eval_metric = 'auc'
+        if self.effect_learner_objective == 'reg:linear':
+            self.effect_learner_eval_metric = 'rmse'
+        self.effect_learner_n_estimators = effect_learner_n_estimators
         self.early_stopping = early_stopping
         if self.early_stopping == True:
             self.test_size = test_size
             self.early_stopping_rounds = early_stopping_rounds
+
+        super().__init__(
+            outcome_learner = XGBRegressor(*args, **kwargs),
+            effect_learner = XGBRegressor(objective=self.effect_learner_objective, n_estimators=self.effect_learner_n_estimators, *args, **kwargs))
 
     def fit(self, X, p, treatment, y, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
@@ -433,7 +446,7 @@ class XGBRRegressor(BaseRRegressor):
                     sample_weight = (w_train - p_train) ** 2, 
                     eval_set = [(X_test, (y_test - yhat_test) / (w_test - p_test))],
                     sample_weight_eval_set = [(w_test - p_test) ** 2],
-                    eval_metric = 'auc',
+                    eval_metric = self.effect_learner_eval_metric,
                     early_stopping_rounds = self.early_stopping_rounds,
                     verbose = verbose)
 
@@ -446,7 +459,7 @@ class XGBRRegressor(BaseRRegressor):
 
                 if verbose:
                     logger.info('training the treatment effect model for {} with R-loss'.format(group))
-                self.models_tau[group].fit(X, (y - yhat) / (w - p[group]), sample_weight=(w - p[group]) ** 2, eval_metric='auc')
+                self.models_tau[group].fit(X, (y - yhat) / (w - p[group]), sample_weight=(w - p[group]) ** 2, eval_metric=self.effect_learner_eval_metric)
 
                 self.vars_c[group] = (y[w == 0] - yhat[w == 0]).var()
                 self.vars_t[group] = (y[w == 1] - yhat[w == 1]).var()
