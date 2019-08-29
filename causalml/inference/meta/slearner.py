@@ -6,10 +6,11 @@ import logging
 import pandas as pd
 import numpy as np
 from sklearn.dummy import DummyRegressor
-from sklearn.metrics import mean_squared_error as mse
-from sklearn.metrics import mean_absolute_error as mae
 import statsmodels.api as sm
 from copy import deepcopy
+
+from causalml.metrics import regression_metrics, classification_metrics
+
 
 logger = logging.getLogger('causalml')
 
@@ -106,21 +107,13 @@ class BaseSLearner(object):
             X_new[:, 0] = 1   # set the treatment column to one (the treatment group)
             yhat_ts[group] = model.predict(X_new)
 
-        if y is not None and verbose:
-            for group in self.t_groups:
-                logger.info('Error metrics for {}'.format(group))
-                logger.info('RMSE (Control): {:.6f}'.format(
-                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
-                )
-                logger.info(' MAE (Control): {:.6f}'.format(
-                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
-                )
-                logger.info('RMSE (Treatment): {:.6f}'.format(
-                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
-                )
-                logger.info(' MAE (Treatment): {:.6f}'.format(
-                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
-                )
+            if y is not None and verbose:
+                yhat = np.zeros_like(y, dtype=float)
+                yhat[w == 0] = yhat_cs[group][w == 0]
+                yhat[w == 1] = yhat_ts[group][w == 1]
+
+                logger.info('Error metrics for group {}'.format(group))
+                regression_metrics(y, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
@@ -256,21 +249,13 @@ class BaseSClassifier(BaseSLearner):
             X_new[:, 0] = 1   # set the treatment column to one (the treatment group)
             yhat_ts[group] = model.predict_proba(X_new)[:, 1]
 
-        if y is not None and verbose:
-            for group in self.t_groups:
-                logger.info('Error metrics for {}'.format(group))
-                logger.info('RMSE (Control): {:.6f}'.format(
-                    np.sqrt(mse(y[treatment != group], yhat_cs[group][treatment != group])))
-                )
-                logger.info(' MAE (Control): {:.6f}'.format(
-                    mae(y[treatment != group], yhat_cs[group][treatment != group]))
-                )
-                logger.info('RMSE (Treatment): {:.6f}'.format(
-                    np.sqrt(mse(y[treatment == group], yhat_ts[group][treatment == group])))
-                )
-                logger.info(' MAE (Treatment): {:.6f}'.format(
-                    mae(y[treatment == group], yhat_ts[group][treatment == group]))
-                )
+            if y is not None and verbose:
+                yhat = np.zeros_like(y, dtype=float)
+                yhat[w == 0] = yhat_cs[group][w == 0]
+                yhat[w == 1] = yhat_ts[group][w == 1]
+
+                logger.info('Error metrics for group {}'.format(group))
+                classification_metrics(y, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):

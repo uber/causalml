@@ -8,7 +8,9 @@ import pandas as pd
 import numpy as np
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold
+
 from .utils import check_control_in_treatment, check_p_conditions
+
 
 logger = logging.getLogger('causalml')
 
