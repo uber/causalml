@@ -12,6 +12,16 @@ sns.set_palette("Paired")
 
 
 def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
+    """Plot one of the lift/gain/Qini charts of model estimates.
+
+    A factory method for `plot_lift()`, `plot_gain()` and `plot_qini()`. For details, pleas see docstrings of each
+    function.
+
+    Args:
+        df (pandas.DataFrame): a data frame with model estimates and actual data as columns.
+        kind (str, optional): the kind of plot to draw. 'lift', 'gain', and 'qini' are supported.
+        n (int, optional): the number of samples to be used for plotting.
+    """
     catalog = {'lift': get_cumlift,
                'gain': get_cumgain,
                'qini': get_qini}
@@ -28,7 +38,7 @@ def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
 
     df.plot(figsize=figsize)
     plt.xlabel('Population')
-    plt.ylabel('{}'.format(kind))
+    plt.ylabel('{}'.format(kind.title()))
 
 
 def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
