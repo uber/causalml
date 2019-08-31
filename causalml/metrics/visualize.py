@@ -11,8 +11,28 @@ plt.style.use('fivethirtyeight')
 sns.set_palette("Paired")
 
 
+def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
+    catalog = {'lift': get_cumlift,
+               'gain': get_cumgain,
+               'qini': get_qini}
+
+    assert kind in catalog.keys(), '{} plot is not implemented. Select one of {}'.format(kind, catalog.keys())
+
+    df = catalog[kind](df, *args, **kwarg)
+
+    if (n is not None) and (n < df.shape[0]):
+        df = df.iloc[::-int(df.shape[0]) // n]
+
+    df.loc[0] = np.zeros((df.shape[1], ))
+    df.sort_index(inplace=True)
+
+    df.plot(figsize=figsize)
+    plt.xlabel('Population')
+    plt.ylabel('{}'.format(kind))
+
+
 def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
-                steps=100, random_seed=42):
+                random_seed=42):
     """Get average uplifts of model estimates in cumulative population.
 
     If the true treatment effect is provided (e.g. in synthetic data), it's calculated
@@ -31,7 +51,6 @@ def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='ta
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
-        steps (int, optional): the number of quantiles
         random_seed (int, optional): random seed for numpy.random.rand()
 
     Returns:
@@ -217,15 +236,8 @@ def plot_gain(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'
         n (int, optional): the number of samples to be used for plotting
     """
 
-    cumgain = get_cumgain(df, outcome_col, treatment_col, treatment_effect_col, normalize, random_seed)
-
-    if (n is None) or (n > cumgain.shape[0]):
-        cumgain.plot(figsize=figsize)
-    else:
-        cumgain.sample(n=n, random_state=random_seed).sort_index().plot(figsize=figsize)
-
-    plt.xlabel('Population')
-    plt.ylabel('Cumulative Gain')
+    plot(df, kind='gain', n=n, figsize=figsize, outcome_col=outcome_col, treatment_col=treatment_col,
+         treatment_effect_col=treatment_effect_col, normalize=normalize, random_seed=random_seed)
 
 
 def plot_lift(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
@@ -252,15 +264,8 @@ def plot_lift(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'
         n (int, optional): the number of samples to be used for plotting
     """
 
-    cumlift = get_cumlift(df, outcome_col, treatment_col, treatment_effect_col, random_seed)
-
-    if (n is None) or (n > cumlift.shape[0]):
-        cumlift.plot(figsize=figsize)
-    else:
-        cumlift.sample(n=n, random_state=random_seed).sort_index().plot(figsize=figsize)
-
-    plt.xlabel('Population')
-    plt.ylabel('Cumulative Uplift')
+    plot(df, kind='lift', n=n, figsize=figsize, outcome_col=outcome_col, treatment_col=treatment_col,
+         treatment_effect_col=treatment_effect_col, random_seed=random_seed)
 
 
 def plot_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
@@ -288,15 +293,8 @@ def plot_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'
         n (int, optional): the number of samples to be used for plotting
     """
 
-    qini = get_qini(df, outcome_col, treatment_col, treatment_effect_col, normalize, random_seed)
-
-    if (n is None) or (n > qini.shape[0]):
-        qini.plot(figsize=figsize)
-    else:
-        qini.sample(n=n, random_state=random_seed).sort_index().plot(figsize=figsize)
-
-    plt.xlabel('Population')
-    plt.ylabel('Cumulative Gain')
+    plot(df, kind='qini', n=n, figsize=figsize, outcome_col=outcome_col, treatment_col=treatment_col,
+         treatment_effect_col=treatment_effect_col, normalize=normalize, random_seed=random_seed)
 
 
 def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau', normalize=True):
