@@ -9,6 +9,7 @@ import seaborn as sns
 
 plt.style.use('fivethirtyeight')
 sns.set_palette("Paired")
+RANDOM_COL = 'Random'
 
 
 def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
@@ -31,10 +32,7 @@ def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
     df = catalog[kind](df, *args, **kwarg)
 
     if (n is not None) and (n < df.shape[0]):
-        df = df.iloc[::-int(df.shape[0]) // n]
-
-    df.loc[0] = np.zeros((df.shape[1], ))
-    df.sort_index(inplace=True)
+        df = df.iloc[np.linspace(0, df.index[-1], n, endpoint=True)]
 
     df.plot(figsize=figsize)
     plt.xlabel('Population')
@@ -97,14 +95,15 @@ def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='ta
             df['cumsum_ct'] = df.index.values - df['cumsum_tr']
             df['cumsum_y_tr'] = (df[outcome_col] * df[treatment_col]).cumsum()
             df['cumsum_y_ct'] = (df[outcome_col] * (1 - df[treatment_col])).cumsum()
-            df = df.loc[(df['cumsum_tr'] > 0) & (df['cumsum_ct'] > 0)]
 
             lift.append(df['cumsum_y_tr'] / df['cumsum_tr'] - df['cumsum_y_ct'] / df['cumsum_ct'])
 
     lift = pd.concat(lift, join='inner', axis=1)
+    lift.loc[0] = np.zeros((lift.shape[1], ))
+    lift = lift.sort_index().interpolate()
 
     lift.columns = model_names
-    lift['Random'] = lift[random_cols].mean(axis=1)
+    lift[RANDOM_COL] = lift[random_cols].mean(axis=1)
     lift.drop(random_cols, axis=1, inplace=True)
 
     return lift
@@ -204,15 +203,17 @@ def get_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
             df['cumsum_ct'] = df.index.values - df['cumsum_tr']
             df['cumsum_y_tr'] = (df[outcome_col] * df[treatment_col]).cumsum()
             df['cumsum_y_ct'] = (df[outcome_col] * (1 - df[treatment_col])).cumsum()
-            df = df.loc[(df['cumsum_tr'] > 0) & (df['cumsum_ct'] > 0)]
 
             l = df['cumsum_y_tr'] - df['cumsum_y_ct'] * df['cumsum_tr'] / df['cumsum_ct']
 
         qini.append(l)
 
     qini = pd.concat(qini, join='inner', axis=1)
+    qini.loc[0] = np.zeros((qini.shape[1], ))
+    qini = qini.sort_index().interpolate()
+
     qini.columns = model_names
-    qini['Random'] = qini[random_cols].mean(axis=1)
+    qini[RANDOM_COL] = qini[random_cols].mean(axis=1)
     qini.drop(random_cols, axis=1, inplace=True)
 
     if normalize:
@@ -322,3 +323,45 @@ def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
     """
     cumgain = get_cumgain(df, outcome_col, treatment_col, treatment_effect_col, normalize)
     return cumgain.sum() / cumgain.shape[0]
+
+
+def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'):
+    """Calculate the Qini score.
+
+    For details, see Radcliffe (2007), `Using Control Group to Target on Predicted Lift:
+    Building and Assessing Uplift Models`
+
+     Args:
+        df (pandas.DataFrame): a data frame with model estimates and actual data as columns
+        outcome_col (str, optional): the column name for the actual outcome
+        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
+        treatment_effect_col (str, optional): the column name for the true treatment effect
+
+    Returns:
+        (float): the Qini score
+    """
+
+    qini = get_qini(df, outcome_col, treatment_col, treatment_effect_col, normalize=False)
+
+    n = qini.index.values[-1]
+    area_above_diag = qini.sum(axis=0) - n * qini[RANDOM_COL].values[-1] / 2
+
+    if df[outcome_col].isin([0, 1]).all():
+        # For classification, Qini score is the ratio between the area above the diagonal line and that of the optimal
+        # line.
+        i_tr = df[treatment_col] == 1
+        n_tr = sum(i_tr)
+        n_ct = n - n_tr
+        total_conv_tr = df.loc[i_tr, outcome_col].sum()
+        total_conv_ct = df.loc[~i_tr, outcome_col].sum()
+
+        Q_opt = (total_conv_tr ** 2 / 2
+                 + total_conv_tr * (n_tr - n_ct)
+                 + total_conv_ct ** 2 / 2
+                 + (total_conv_tr - total_conv_ct) * total_conv_ct)
+
+        return area_above_diag / Q_opt
+    else:
+        # For regression, the optimal score is not defined, and use the ratio between the area above the diagonal line
+        # and (# of population)^2 / 2.
+        return 2 * area_above_diag / n ** 2
