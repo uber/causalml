@@ -65,9 +65,9 @@ $ python setup.py install
 ## Average Treatment Effect Estimation with S, T, and X Learners
 
 ```python
-from causalml.inference import LRSRegressor
-from causalml.inference import XGBTRegressor, MLPTRegressor
-from causalml.inference import BaseXRegressor
+from causalml.inference.meta import LRSRegressor
+from causalml.inference.meta import XGBTRegressor, MLPTRegressor
+from causalml.inference.meta import BaseXRegressor
 from causalml.dataset import synthetic_data
 
 y, X, treatment, _ = synthetic_data(mode=1, n=1000, p=5, sigma=1.0)
