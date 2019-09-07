@@ -81,9 +81,14 @@ class BaseSLearner(object):
         self.models = {group: deepcopy(self.model) for group in self.t_groups}
 
         for group in self.t_groups:
-            w = (treatment == group).astype(int)
-            X_new = np.hstack((w.reshape((-1, 1)), X))
-            self.models[group].fit(X_new, y)
+            mask = (treatment == group) | (treatment == self.control_name)
+            treatment_filt = treatment[mask]
+            X_filt = X[mask]
+            y_filt = y[mask]
+
+            w = (treatment_filt == group).astype(int)
+            X_new = np.hstack((w.reshape((-1, 1)), X_filt))
+            self.models[group].fit(X_new, y_filt)
 
     def predict(self, X, treatment=None, y=None, verbose=True):
         """Predict treatment effects.
@@ -109,13 +114,17 @@ class BaseSLearner(object):
             yhat_ts[group] = model.predict(X_new)
 
             if (y is not None) and (treatment is not None) and verbose:
-                w = (treatment == group).astype(int)
-                yhat = np.zeros_like(y, dtype=float)
-                yhat[w == 0] = yhat_cs[group][w == 0]
-                yhat[w == 1] = yhat_ts[group][w == 1]
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                w = (treatment_filt == group).astype(int)
+                y_filt = y[mask]
+
+                yhat = np.zeros_like(y_filt, dtype=float)
+                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info('Error metrics for group {}'.format(group))
-                regression_metrics(y, yhat, w)
+                regression_metrics(y_filt, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
@@ -252,14 +261,18 @@ class BaseSClassifier(BaseSLearner):
             X_new[:, 0] = 1
             yhat_ts[group] = model.predict_proba(X_new)[:, 1]
 
-            if y is not None and verbose:
-                w = (treatment == group).astype(int)
-                yhat = np.zeros_like(y, dtype=float)
-                yhat[w == 0] = yhat_cs[group][w == 0]
-                yhat[w == 1] = yhat_ts[group][w == 1]
+            if y is not None and (treatment is not None) and verbose:
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                w = (treatment_filt == group).astype(int)
+                y_filt = y[mask]
+
+                yhat = np.zeros_like(y_filt, dtype=float)
+                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info('Error metrics for group {}'.format(group))
-                classification_metrics(y, yhat, w)
+                classification_metrics(y_filt, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
