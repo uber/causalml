@@ -101,23 +101,27 @@ class BaseXLearner(object):
         self.vars_t = {}
 
         for group in self.t_groups:
-            w = (treatment == group)
+            mask = (treatment == group) | (treatment == self.control_name)
+            treatment_filt = treatment[mask]
+            X_filt = X[mask]
+            y_filt = y[mask]
+            w = (treatment_filt == group).astype(int)
 
             # Train outcome models
-            self.models_mu_c[group].fit(X[~w], y[~w])
-            self.models_mu_t[group].fit(X[w], y[w])
+            self.models_mu_c[group].fit(X_filt[w == 0], y_filt[w == 0])
+            self.models_mu_t[group].fit(X_filt[w == 1], y_filt[w == 1])
 
             # Calculate variances and treatment effects
-            var_c = (y[~w] - self.models_mu_c[group].predict(X[~w])).var()
+            var_c = (y_filt[w == 0] - self.models_mu_c[group].predict(X_filt[w == 0])).var()
             self.vars_c[group] = var_c
-            var_t = (y[w] - self.models_mu_t[group].predict(X[w])).var()
+            var_t = (y_filt[w == 1] - self.models_mu_t[group].predict(X_filt[w == 1])).var()
             self.vars_t[group] = var_t
 
             # Train treatment models
-            d_c = self.models_mu_t[group].predict(X[~w]) - y[~w]
-            d_t = y[w] - self.models_mu_c[group].predict(X[w])
-            self.models_tau_c[group].fit(X[~w], d_c)
-            self.models_tau_t[group].fit(X[w], d_t)
+            d_c = self.models_mu_t[group].predict(X_filt[w == 0]) - y_filt[w == 0]
+            d_t = y_filt[w == 1] - self.models_mu_c[group].predict(X_filt[w == 1])
+            self.models_tau_c[group].fit(X_filt[w == 0], d_c)
+            self.models_tau_t[group].fit(X_filt[w == 1], d_t)
 
     def predict(self, X, p, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
@@ -151,13 +155,18 @@ class BaseXLearner(object):
             te[:, i] = np.ravel(_te)
 
             if (y is not None) and (treatment is not None) and verbose:
-                w = (treatment == group)
-                yhat = np.zeros_like(y, dtype=float)
-                yhat[~w] = self.models_mu_c[group].predict(X[~w])
-                yhat[w] = self.models_mu_t[group].predict(X[w])
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                X_filt = X[mask]
+                y_filt = y[mask]
+                w = (treatment_filt == group).astype(int)
+
+                yhat = np.zeros_like(y_filt, dtype=float)
+                yhat[w == 0] = self.models_mu_c[group].predict(X_filt[w == 0])
+                yhat[w == 1] = self.models_mu_t[group].predict(X_filt[w == 1])
 
                 logger.info('Error metrics for group {}'.format(group))
-                regression_metrics(y, yhat, w)
+                regression_metrics(y_filt, yhat, w)
 
         if not return_components:
             return te
@@ -244,18 +253,23 @@ class BaseXLearner(object):
         ate_ub = np.zeros(self.t_groups.shape[0])
 
         for i, group in enumerate(self.t_groups):
-            w = (treatment == group).astype(int)
-            prob_treatment = float(sum(w)) / X.shape[0]
             _ate = te[:, i].mean()
-            dhat_c = dhat_cs[group]
-            dhat_t = dhat_ts[group]
+
+            mask = (treatment == group) | (treatment == self.control_name)
+            treatment_filt = treatment[mask]
+            w = (treatment_filt == group).astype(int)
+            prob_treatment = float(sum(w)) / w.shape[0]
+
+            dhat_c = dhat_cs[group][mask]
+            dhat_t = dhat_ts[group][mask]
+            p_filt = p[group][mask]
 
             # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
             # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
             se = np.sqrt((
                 self.vars_t[group] / prob_treatment + self.vars_c[group] / (1 - prob_treatment) +
-                (p[group] * dhat_c + (1 - p[group]) * dhat_t).var()
-            ) / X.shape[0])
+                (p_filt * dhat_c + (1 - p_filt) * dhat_t).var()
+            ) / w.shape[0])
 
             _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
             _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -373,23 +387,27 @@ class BaseXClassifier(BaseXLearner):
         self.vars_t = {}
 
         for group in self.t_groups:
-            w = (treatment == group)
+            mask = (treatment == group) | (treatment == self.control_name)
+            treatment_filt = treatment[mask]
+            X_filt = X[mask]
+            y_filt = y[mask]
+            w = (treatment_filt == group).astype(int)
 
             # Train outcome models
-            self.models_mu_c[group].fit(X[~w], y[~w])
-            self.models_mu_t[group].fit(X[w], y[w])
+            self.models_mu_c[group].fit(X_filt[w == 0], y_filt[w == 0])
+            self.models_mu_t[group].fit(X_filt[w == 1], y_filt[w == 1])
 
             # Calculate variances and treatment effects
-            var_c = (y[~w] - self.models_mu_c[group].predict_proba(X[~w])[:, 1]).var()
+            var_c = (y_filt[w == 0] - self.models_mu_c[group].predict_proba(X_filt[w == 0])[:, 1]).var()
             self.vars_c[group] = var_c
-            var_t = (y[w] - self.models_mu_t[group].predict_proba(X[w])[:, 1]).var()
+            var_t = (y_filt[w == 1] - self.models_mu_t[group].predict_proba(X_filt[w == 1])[:, 1]).var()
             self.vars_t[group] = var_t
 
             # Train treatment models
-            d_c = self.models_mu_t[group].predict_proba(X[~w])[:, 1] - y[~w]
-            d_t = y[w] - self.models_mu_c[group].predict_proba(X[w])[:, 1]
-            self.models_tau_c[group].fit(X[~w], d_c)
-            self.models_tau_t[group].fit(X[w], d_t)
+            d_c = self.models_mu_t[group].predict_proba(X_filt[w == 0])[:, 1] - y_filt[w == 0]
+            d_t = y_filt[w == 1] - self.models_mu_c[group].predict_proba(X_filt[w == 1])[:, 1]
+            self.models_tau_c[group].fit(X_filt[w == 0], d_c)
+            self.models_tau_t[group].fit(X_filt[w == 1], d_t)
 
     def predict(self, X, p, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
@@ -423,13 +441,18 @@ class BaseXClassifier(BaseXLearner):
             te[:, i] = np.ravel(_te)
 
             if (y is not None) and (treatment is not None) and verbose:
-                w = (treatment == group)
-                yhat = np.zeros_like(y, dtype=float)
-                yhat[~w] = self.models_mu_c[group].predict_proba(X[~w])[:, 1]
-                yhat[w] = self.models_mu_t[group].predict_proba(X[w])[:, 1]
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                X_filt = X[mask]
+                y_filt = y[mask]
+                w = (treatment_filt == group).astype(int)
+
+                yhat = np.zeros_like(y_filt, dtype=float)
+                yhat[w == 0] = self.models_mu_c[group].predict_proba(X_filt[w == 0])[:, 1]
+                yhat[w == 1] = self.models_mu_t[group].predict_proba(X_filt[w == 1])[:, 1]
 
                 logger.info('Error metrics for group {}'.format(group))
-                classification_metrics(y, yhat, w)
+                classification_metrics(y_filt, yhat, w)
 
         if not return_components:
             return te
