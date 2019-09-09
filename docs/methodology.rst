@@ -76,7 +76,7 @@ X-learner :cite:`kunzel2019metalearners` is an extension of T-learner, and consi
 | Impute the user level treatment effects, :math:`D^1_i` and :math:`D^0_j` for user :math:`i` in the treatment group based on :math:`\mu_0(x)`, and user :math:`j` in the control groups based on :math:`\mu_1(x)`:
 |
 |   :math:`D^1_i = Y^1_i - \hat\mu_0(X^1_i)`, and
-|   :math:`D^0_i = Y^0_i - \hat\mu_1(X^0_i)`
+|   :math:`D^0_i = \hat\mu_1(X^0_i)` - Y^0_i
 |
 | then estimate :math:`\tau_1(x) = E[D^1|X=x]`, and :math:`\tau_0(x) = E[D^0|X=x]` using machine learning models.
 |
