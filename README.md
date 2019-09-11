@@ -70,7 +70,7 @@ from causalml.inference.meta import XGBTRegressor, MLPTRegressor
 from causalml.inference.meta import BaseXRegressor
 from causalml.dataset import synthetic_data
 
-y, X, treatment, _ = synthetic_data(mode=1, n=1000, p=5, sigma=1.0)
+y, X, treatment, _, _, e = synthetic_data(mode=1, n=1000, p=5, sigma=1.0)
 
 lr = LRSRegressor()
 te, lb, ub = lr.estimate_ate(X, treatment, y)
@@ -88,7 +88,7 @@ te, lb, ub = nn.estimate_ate(X, treatment, y)
 logger.info('Average Treatment Effect (Neural Network (MLP)): {:.2f} ({:.2f}, {:.2f})'.format(te, lb, ub))
 
 xl = BaseXRegressor(learner=XGBRegressor(random_state=42))
-te, lb, ub = xl.estimate_ate(X, p, treatment, y)
+te, lb, ub = xl.estimate_ate(X, e, treatment, y)
 logger.info('Average Treatment Effect (XGBoost): {:.2f} ({:.2f}, {:.2f})'.format(te, lb, ub))
 
 ```
