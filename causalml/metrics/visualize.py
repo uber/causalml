@@ -325,8 +325,8 @@ def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
     return cumgain.sum() / cumgain.shape[0]
 
 
-def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'):
-    """Calculate the Qini score.
+def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau', normalize=True):
+    """Calculate the Qini score: the area between the Qini curves of a model and random.
 
     For details, see Radcliffe (2007), `Using Control Group to Target on Predicted Lift:
     Building and Assessing Uplift Models`
@@ -336,32 +336,11 @@ def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
+        normalize (bool, optional): whether to normalize the y-axis to 1 or not
 
     Returns:
         (float): the Qini score
     """
 
-    qini = get_qini(df, outcome_col, treatment_col, treatment_effect_col, normalize=False)
-
-    n = qini.index.values[-1]
-    area_above_diag = qini.sum(axis=0) - n * qini[RANDOM_COL].values[-1] / 2
-
-    if df[outcome_col].isin([0, 1]).all():
-        # For classification, Qini score is the ratio between the area above the diagonal line and that of the optimal
-        # line.
-        i_tr = df[treatment_col] == 1
-        n_tr = sum(i_tr)
-        n_ct = n - n_tr
-        total_conv_tr = df.loc[i_tr, outcome_col].sum()
-        total_conv_ct = df.loc[~i_tr, outcome_col].sum()
-
-        Q_opt = (total_conv_tr ** 2 / 2
-                 + total_conv_tr * (n_tr - n_ct)
-                 + total_conv_ct ** 2 / 2
-                 + (total_conv_tr - total_conv_ct) * total_conv_ct)
-
-        return area_above_diag / Q_opt
-    else:
-        # For regression, the optimal score is not defined, and use the ratio between the area above the diagonal line
-        # and (# of population)^2 / 2.
-        return 2 * area_above_diag / n ** 2
+    qini = get_qini(df, outcome_col, treatment_col, treatment_effect_col, normalize)
+    return (qini.sum(axis=0) - qini[RANDOM_COL].sum()) / qini.shape[0]
