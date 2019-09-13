@@ -72,9 +72,14 @@ class BaseTLearner(object):
         self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
 
         for group in self.t_groups:
-            w = (treatment == group)
-            self.models_c[group].fit(X[~w], y[~w])
-            self.models_t[group].fit(X[w], y[w])
+            mask = (treatment == group) | (treatment == self.control_name)
+            treatment_filt = treatment[mask]
+            X_filt = X[mask]
+            y_filt = y[mask]
+            w = (treatment_filt == group).astype(int)
+
+            self.models_c[group].fit(X_filt[w == 0], y_filt[w == 0])
+            self.models_t[group].fit(X_filt[w == 1], y_filt[w == 1])
 
     def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
@@ -91,20 +96,23 @@ class BaseTLearner(object):
         yhat_ts = {}
 
         for group in self.t_groups:
-
             model_c = self.models_c[group]
             model_t = self.models_t[group]
             yhat_cs[group] = model_c.predict(X)
             yhat_ts[group] = model_t.predict(X)
 
             if (y is not None) and (treatment is not None) and verbose:
-                w = (treatment == group)
-                yhat = np.zeros_like(y, dtype=float)
-                yhat[~w] = yhat_cs[group][~w]
-                yhat[w] = yhat_ts[group][w]
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                y_filt = y[mask]
+                w = (treatment_filt == group).astype(int)
+
+                yhat = np.zeros_like(y_filt, dtype=float)
+                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info('Error metrics for group {}'.format(group))
-                regression_metrics(y, yhat, w)
+                regression_metrics(y_filt, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
@@ -182,20 +190,24 @@ class BaseTLearner(object):
         ate_ub = np.zeros(self.t_groups.shape[0])
 
         for i, group in enumerate(self.t_groups):
-            yhat_c = yhat_cs[group]
-            yhat_t = yhat_ts[group]
             _ate = te[:, i].mean()
 
-            w = (treatment == group).astype(int)
-            prob_treatment = float(sum(w)) / X.shape[0]
+            mask = (treatment == group) | (treatment == self.control_name)
+            treatment_filt = treatment[mask]
+            y_filt = y[mask]
+            w = (treatment_filt == group).astype(int)
+            prob_treatment = float(sum(w)) / w.shape[0]
+
+            yhat_c = yhat_cs[group][mask]
+            yhat_t = yhat_ts[group][mask]
 
             se = np.sqrt((
-                (y[treatment != group] - yhat_c[treatment != group]).var()
+                (y_filt[w == 0] - yhat_c[w == 0]).var()
                 / (1 - prob_treatment) +
-                (y[treatment == group] - yhat_t[treatment == group]).var()
+                (y_filt[w == 1] - yhat_t[w == 1]).var()
                 / prob_treatment +
                 (yhat_t - yhat_c).var()
-            ) / y.shape[0])
+            ) / y_filt.shape[0])
 
             _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
             _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -287,20 +299,23 @@ class BaseTClassifier(BaseTLearner):
         yhat_ts = {}
 
         for group in self.t_groups:
-
             model_c = self.models_c[group]
             model_t = self.models_t[group]
             yhat_cs[group] = model_c.predict_proba(X)[:, 1]
             yhat_ts[group] = model_t.predict_proba(X)[:, 1]
 
             if (y is not None) and (treatment is not None) and verbose:
-                w = (treatment == group)
-                yhat = np.zeros_like(y, dtype=float)
-                yhat[~w] = yhat_cs[group][~w]
-                yhat[w] = yhat_ts[group][w]
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                y_filt = y[mask]
+                w = (treatment_filt == group).astype(int)
+
+                yhat = np.zeros_like(y_filt, dtype=float)
+                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info('Error metrics for group {}'.format(group))
-                classification_metrics(y, yhat, w)
+                classification_metrics(y_filt, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
