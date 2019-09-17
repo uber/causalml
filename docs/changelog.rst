@@ -3,11 +3,13 @@
 Changelog
 =========
 
-0.3.0 (unreleased)
+0.3.0 (2019-09-17)
 ------------------
 
-- Extend meta-learners to support classification
-- Fix a bug in uplift curves (`get_cumgain()` and `plot_cumgain()` in `metrics`)
+- Extend meta-learners to support classification by @t-tte
+- Extend meta-learners to support multiple treatments by @yungmsh
+- Fix a bug in uplift curves and add Qini curves/scores to `metrics` by @jeongyoonlee
+- Add `inference.meta.XGBRRegressor` with early stopping and ranking optimizatino by @yluogit
 
 0.2.0 (2019-08-12)
 ------------------
