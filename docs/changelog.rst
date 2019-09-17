@@ -9,7 +9,7 @@ Changelog
 - Extend meta-learners to support classification by @t-tte
 - Extend meta-learners to support multiple treatments by @yungmsh
 - Fix a bug in uplift curves and add Qini curves/scores to `metrics` by @jeongyoonlee
-- Add `inference.meta.XGBRRegressor` with early stopping and ranking optimizatino by @yluogit
+- Add `inference.meta.XGBRRegressor` with early stopping and ranking optimization by @yluogit
 
 0.2.0 (2019-08-12)
 ------------------
