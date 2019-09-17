@@ -363,9 +363,9 @@ class BaseXClassifier(BaseXLearner):
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-        if ((control_outcome_learner is None) or (treatment_outcome_learner is None)) and (
-                (control_effect_learner is None) or (treatment_effect_learner is None)):
-            raise ValueError("Either the outcome learner or the effect learner pair must be specified.")
+        #if ((control_outcome_learner is None) or (treatment_outcome_learner is None)) and (
+        #        (control_effect_learner is None) or (treatment_effect_learner is None)):
+        #    raise ValueError("Either the outcome learner or the effect learner pair must be specified.")
 
     def fit(self, X, treatment, y):
         """Fit the inference model.

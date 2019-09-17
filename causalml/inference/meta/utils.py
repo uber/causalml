@@ -3,7 +3,7 @@ import numpy as np
 
 def check_control_in_treatment(treatment, control_name):
     if np.unique(treatment).shape[0] == 2:
-        assert control_name in treatment, \
+        assert np.isin(control_name, treatment).all(), \
             'If treatment vector has 2 unique values, one of them must be the control (specify in init step).'
 
 
