@@ -7,7 +7,7 @@ import logging
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
-from sklearn.model_selection import cross_val_predict, KFold
+from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
 from .utils import check_control_in_treatment, check_p_conditions
 
@@ -58,6 +58,7 @@ class BaseRLearner(object):
         self.ate_alpha = ate_alpha
         self.control_name = control_name
 
+        self.random_state = random_state
         self.cv = KFold(n_splits=n_fold, shuffle=True, random_state=random_state)
 
     def __repr__(self):
@@ -378,6 +379,7 @@ class XGBRRegressor(BaseRRegressor):
                  early_stopping_rounds=30,
                  effect_learner_objective='rank:pairwise',
                  effect_learner_n_estimators=500,
+                 random_state=42,
                  *args,
                  **kwargs):
         """Initialize an R-learner regressor with XGBoost model using pairwise ranking objective.
@@ -391,6 +393,7 @@ class XGBRRegressor(BaseRRegressor):
         """
 
         assert (effect_learner_objective == 'rank:pairwise' or effect_learner_objective == 'reg:linear'), 'Effect learner objective has to be rank:pairwise or reg:linear'
+        assert isinstance(random_state, int), 'random_state should be int.'
 
         self.effect_learner_objective = effect_learner_objective
         if self.effect_learner_objective == 'rank:pairwise':
@@ -399,13 +402,18 @@ class XGBRRegressor(BaseRRegressor):
             self.effect_learner_eval_metric = 'rmse'
         self.effect_learner_n_estimators = effect_learner_n_estimators
         self.early_stopping = early_stopping
-        if self.early_stopping == True:
+        if self.early_stopping:
             self.test_size = test_size
             self.early_stopping_rounds = early_stopping_rounds
 
         super().__init__(
-            outcome_learner = XGBRegressor(*args, **kwargs),
-            effect_learner = XGBRegressor(objective=self.effect_learner_objective, n_estimators=self.effect_learner_n_estimators, *args, **kwargs))
+            outcome_learner=XGBRegressor(random_state=random_state, *args, **kwargs),
+            effect_learner=XGBRegressor(objective=self.effect_learner_objective,
+                                        n_estimators=self.effect_learner_n_estimators,
+                                        random_state=random_state,
+                                        *args,
+                                        **kwargs)
+        )
 
     def fit(self, X, p, treatment, y, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
@@ -434,63 +442,40 @@ class XGBRRegressor(BaseRRegressor):
             logger.info('generating out-of-fold CV outcome estimates')
         yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
 
-        if self.early_stopping:
-            msk = np.random.rand(len(y)) < self.test_size
-            X_test = X[msk]
-            y_test = y[msk]
-            yhat_test = yhat[msk]
+        for group in self.t_groups:
+            treatment_mask = (treatment == group) | (treatment == self.control_name)
+            treatment_filt = treatment[treatment_mask]
+            w = (treatment_filt == group).astype(int)
 
-            X_train = X[~msk]
-            y_train = y[~msk]
-            yhat_train = yhat[~msk]
+            X_filt = X[treatment_mask]
+            y_filt = y[treatment_mask]
+            yhat_filt = yhat[treatment_mask]
+            p_filt = p[group][treatment_mask]
 
-            for group in self.t_groups:
-                treatment_mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[treatment_mask]
+            if verbose:
+                logger.info('training the treatment effect model for {} with R-loss'.format(group))
 
-                X_test_filt = X_test[treatment_mask]
-                X_train_filt = X_train[treatment_mask]
-                y_test_filt = y_test[treatment_mask]
-                y_train_filt = y_train[treatment_mask]
-                yhat_test_filt = yhat_test[treatment_mask]
-                yhat_train_filt = yhat_train[treatment_mask]
+            if self.early_stopping:
+                X_train_filt, X_test_filt, y_train_filt, y_test_filt, yhat_train_filt, yhat_test_filt, \
+                    w_train, w_test, p_train_filt, p_test_filt = train_test_split(
+                        X_filt, y_filt, yhat_filt, w, p_filt,
+                        test_size=self.test_size, random_state=self.random_state
+                    )
 
-                w = (treatment_filt == group).astype(int)
-                w_test = w[msk]
-                w_train = w[~msk]
+                self.models_tau[group].fit(X=X_train_filt,
+                                           y=(y_train_filt - yhat_train_filt) / (w_train - p_train_filt),
+                                           sample_weight=(w_train - p_train_filt) ** 2,
+                                           eval_set=[(X_test_filt,
+                                                      (y_test_filt - yhat_test_filt) / (w_test - p_test_filt))],
+                                           sample_weight_eval_set=[(w_test - p_test_filt) ** 2],
+                                           eval_metric=self.effect_learner_eval_metric,
+                                           early_stopping_rounds=self.early_stopping_rounds,
+                                           verbose=verbose)
 
-                p_test_filt = p[group][treatment_mask][msk]
-                p_train_filt = p[group][treatment_mask][~msk]
-
-                if verbose:
-                    logger.info('training the treatment effect model for {} with R-loss'.format(group))
-                self.models_tau[group].fit(X = X_train_filt,
-                    y = (y_train_filt - yhat_train_filt) / (w_train - p_train_filt),
-                    sample_weight = (w_train - p_train_filt) ** 2,
-                    eval_set = [(X_test_filt, (y_test_filt - yhat_test_filt) / (w_test - p_test_filt))],
-                    sample_weight_eval_set = [(w_test - p_test_filt) ** 2],
-                    eval_metric = self.effect_learner_eval_metric,
-                    early_stopping_rounds = self.early_stopping_rounds,
-                    verbose = verbose)
-
-                self.vars_c[group] = (y_train_filt[w == 0] - yhat_train_filt[w == 0]).var()
-                self.vars_t[group] = (y_train_filt[w == 1] - yhat_train_filt[w == 1]).var()
-
-        else:
-            for group in self.t_groups:
-                treatment_mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[treatment_mask]
-                X_filt = X[treatment_mask]
-                y_filt = y[treatment_mask]
-                yhat_filt = yhat[treatment_mask]
-                p_filt = p[group][treatment_mask]
-                w = (treatment_filt == group).astype(int)
-
-                if verbose:
-                    logger.info('training the treatment effect model for {} with R-loss'.format(group))
+            else:
                 self.models_tau[group].fit(X_filt, (y_filt - yhat_filt) / (w - p_filt),
-                                           sample_weight=(w - p_filt)** 2,
+                                           sample_weight=(w - p_filt) ** 2,
                                            eval_metric=self.effect_learner_eval_metric)
 
-                self.vars_c[group] = (y_filt[w == 0] - yhat_filt[w == 0]).var()
-                self.vars_t[group] = (y_filt[w == 1] - yhat_filt[w == 1]).var()
+            self.vars_c[group] = (y_filt[w == 0] - yhat_filt[w == 0]).var()
+            self.vars_t[group] = (y_filt[w == 1] - yhat_filt[w == 1]).var()
