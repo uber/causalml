@@ -151,7 +151,7 @@ class BaseXLearner(object):
             dhat_cs[group] = model_tau_c.predict(X)
             dhat_ts[group] = model_tau_t.predict(X)
 
-            _te = (p[group] * dhat_cs[group] + (1 - p[group]) * dhat_cs[group]).reshape(-1, 1)
+            _te = (p[group] * dhat_cs[group] + (1 - p[group]) * dhat_ts[group]).reshape(-1, 1)
             te[:, i] = np.ravel(_te)
 
             if (y is not None) and (treatment is not None) and verbose:
@@ -437,7 +437,7 @@ class BaseXClassifier(BaseXLearner):
             dhat_cs[group] = model_tau_c.predict(X)
             dhat_ts[group] = model_tau_t.predict(X)
 
-            _te = (p[group] * dhat_cs[group] + (1 - p[group]) * dhat_cs[group]).reshape(-1, 1)
+            _te = (p[group] * dhat_cs[group] + (1 - p[group]) * dhat_ts[group]).reshape(-1, 1)
             te[:, i] = np.ravel(_te)
 
             if (y is not None) and (treatment is not None) and verbose:
