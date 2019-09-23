@@ -7,6 +7,7 @@ import logging
 import pandas as pd
 import numpy as np
 from scipy.stats import norm
+from eli5.sklearn import PermutationImportance
 
 from .utils import check_control_in_treatment, check_p_conditions
 from causalml.metrics import regression_metrics, classification_metrics
@@ -289,6 +290,52 @@ class BaseXLearner(object):
         self.fit(X=X_b, treatment=treatment_b, y=y_b)
         te_b = self.predict(X=X, p=p)
         return te_b
+
+    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini'):
+        """
+        Calculates feature importances based on specified method.
+        Hint: downsample dataset for better performance, especially if X.shape[1] is large
+        Args:
+            method (str): "gini" (mean decrease in impurity), or "permutation" (mean decrease in error)
+        """
+        assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
+
+        if method == 'gini':
+            fi_c = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_tau_c.items()})
+            fi_t = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_tau_t.items()})
+        elif method == 'permutation':
+            assert all([arr is not None for arr in (X, treatment, y)]), \
+                   "X, treatment, and y must be provided if method='permutation'"
+            fi_c = pd.DataFrame()
+            fi_t = pd.DataFrame()
+            for group in self.t_groups:
+                mask = (treatment == group) | (treatment == self.control_name)
+                X_filt = X[mask]
+                y_filt = y[mask]
+
+                # tau - control learner
+                mod = self.models_tau_c[group]
+                perm_fitter = PermutationImportance(mod, cv='prefit')
+                perm_fitter.fit(X_filt, y_filt)
+                fi_c[group] = perm_fitter.feature_importances_
+
+                # tau - treatment learner
+                mod = self.models_tau_t[group]
+                perm_fitter = PermutationImportance(mod, cv='prefit')
+                perm_fitter.fit(X_filt, y_filt)
+                fi_t[group] = perm_fitter.feature_importances_
+
+        if features is None:
+            features = ['Feature_{}'.format(i) for i in range(fi_c.shape[0] - 1)]
+        features = ['is_treatment'] + list(features)
+
+        fi = pd.concat((fi_c, fi_t), axis=1)
+        columns = ([('Tau - Control Learner', group) for group in fi_c.columns]
+                  + [('Tau - Treatment Learner', group) for group in fi_t.columns])
+        fi.columns = pd.MultiIndex.from_tuples(columns)
+        fi.index = features
+        fi = fi.sort_values(fi.columns[0], ascending=False)
+        return fi
 
 
 class BaseXRegressor(BaseXLearner):

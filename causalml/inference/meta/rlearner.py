@@ -10,7 +10,7 @@ from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
 from .utils import check_control_in_treatment, check_p_conditions
-
+from eli5.sklearn import PermutationImportance
 
 logger = logging.getLogger('causalml')
 
@@ -236,6 +236,39 @@ class BaseRLearner(object):
         self.fit(X=X_b, p=p_b, treatment=treatment_b, y=y_b, verbose=False)
         te_b = self.predict(X=X)
         return te_b
+
+    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini'):
+        """
+        Calculates feature importances based on specified method.
+        Hint: downsample dataset for better performance, especially if X.shape[1] is large
+        Args:
+            method (str): "gini" (mean decrease in impurity), or "permutation" (mean decrease in error)
+        """
+        assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
+
+        if method == 'gini':
+            fi = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_tau.items()})
+        elif method == 'permutation':
+            assert all([arr is not None for arr in (X, treatment, y)]), \
+                   "X, treatment, and y must be provided if method='permutation'"
+            fi = pd.DataFrame()
+            for group in self.t_groups:
+                mask = (treatment == group) | (treatment == self.control_name)
+                X_filt = X[mask]
+                y_filt = y[mask]
+
+                mod = self.models_tau[group]
+                perm_fitter = PermutationImportance(mod, cv='prefit')
+                perm_fitter.fit(X_filt, y_filt)
+                fi[group] = perm_fitter.feature_importances_
+
+        if features is None:
+            features = ['Feature_{}'.format(i) for i in range(fi.shape[0] - 1)]
+        features = ['is_treatment'] + list(features)
+
+        fi.index = features
+        fi = fi.sort_values(fi.columns[0], ascending=False)
+        return fi
 
 
 class BaseRRegressor(BaseRLearner):
