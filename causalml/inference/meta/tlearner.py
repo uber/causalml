@@ -11,8 +11,8 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.neural_network import MLPRegressor
 from sklearn.utils.testing import ignore_warnings
 from xgboost import XGBRegressor
-from eli5.sklearn import PermutationImportance
 
+from causalml.inference.meta.utils import get_importance, check_importance_conditions
 from causalml.metrics import regression_metrics, classification_metrics
 
 
@@ -229,28 +229,38 @@ class BaseTLearner(object):
         te_b = self.predict(X=X, treatment=treatment, verbose=False)
         return te_b
 
-    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini'):
+    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini', normalize=True):
         """
         Calculates feature importances based on specified method.
-        Hint: downsample dataset for better performance, especially if X.shape[1] is large
+        Currently support methods include:
+            - gini (mean decrease in impurity)
+            - permutation (mean decrease in accuracy)
+            - shapley (mean absolute shapley values)
+        Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
         Args:
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
             X (np.matrix): a feature matrix
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
-            method (str): "gini" (mean decrease in impurity), or "permutation" (mean decrease in accuracy)
+            method (str): gini, permutation, or shapley
+            normalize (bool): normalize by sum of importances (defaults to True)
         """
-        assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
+        check_importance_conditions(method=method,
+                                    models=[self.models_c[self.t_groups[0]], self.models_t[self.t_groups[0]]],
+                                    X=X,
+                                    treatment=treatment,
+                                    y=y)
 
         if method == 'gini':
-            cond1 = hasattr(self.models_c[self.t_groups[0]], "feature_importances_")
-            cond2 = hasattr(self.models_t[self.t_groups[0]], "feature_importances_")
-            assert cond1 and cond2, "Both models must have .feature_importances_ method to use gini importance"
             fi_c = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_c.items()})
             fi_t = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_t.items()})
-        elif method == 'permutation':
-            assert all([arr is not None for arr in (X, treatment, y)]), \
-                   "X, treatment, and y must be provided if method='permutation'"
+
+            if normalize:
+                for group in self.t_groups:
+                    fi_c[group] = fi_c[group] / fi_c[group].sum()
+                    fi_t[group] = fi_t[group] / fi_t[group].sum()
+
+        elif method in ('permutation', 'shapley'):
             fi_c = pd.DataFrame()
             fi_t = pd.DataFrame()
             for group in self.t_groups:
@@ -260,15 +270,11 @@ class BaseTLearner(object):
 
                 # control learner
                 mod = self.models_c[group]
-                perm_fitter = PermutationImportance(mod, cv='prefit')
-                perm_fitter.fit(X_filt, y_filt)
-                fi_c[group] = perm_fitter.feature_importances_
+                fi_c[group] = get_importance(X_filt, y_filt, mod, method)
 
                 # treatment learner
                 mod = self.models_t[group]
-                perm_fitter = PermutationImportance(mod, cv='prefit')
-                perm_fitter.fit(X_filt, y_filt)
-                fi_t[group] = perm_fitter.feature_importances_
+                fi_t[group] = get_importance(X_filt, y_filt, mod, method)
 
         if features is None:
             features = ['Feature_{}'.format(i) for i in range(fi_c.shape[0])]

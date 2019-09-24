@@ -8,8 +8,8 @@ import numpy as np
 from sklearn.dummy import DummyRegressor
 import statsmodels.api as sm
 from copy import deepcopy
-from eli5.sklearn import PermutationImportance
 
+from causalml.inference.meta.utils import get_importance, check_importance_conditions
 from causalml.metrics import regression_metrics, classification_metrics
 
 
@@ -204,26 +204,35 @@ class BaseSLearner(object):
         te_b = self.predict(X=X, treatment=treatment, verbose=False)
         return te_b
 
-    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini'):
+    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini', normalize=True):
         """
         Calculates feature importances based on specified method.
-        Hint: downsample dataset for better performance, especially if X.shape[1] is large
+        Currently support methods include:
+            - gini (mean decrease in impurity)
+            - permutation (mean decrease in accuracy)
+            - shapley (mean absolute shapley values)
+        Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
         Args:
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
             X (np.matrix): a feature matrix
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
-            method (str): "gini" (mean decrease in impurity), or "permutation" (mean decrease in accuracy)
+            method (str): gini, permutation, or shapley
+            normalize (bool): normalize by sum of importances (defaults to True)
         """
-        assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
+        check_importance_conditions(method=method,
+                                    models=[self.models[self.t_groups[0]]],
+                                    X=X,
+                                    treatment=treatment,
+                                    y=y)
 
         if method == 'gini':
-            assert hasattr(self.models[self.t_groups[0]], "feature_importances_"), \
-                   "Model must have .feature_importances_ method to use gini importance"
             fi = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models.items()})
-        elif method == 'permutation':
-            assert all([arr is not None for arr in (X, treatment, y)]), \
-                   "X, treatment, and y must be provided if method='permutation'"
+            if normalize:
+                for group in self.t_groups:
+                    fi[group] = fi[group] / fi[group].sum()
+
+        elif method in ('permutation', 'shapley'):
             fi = pd.DataFrame()
             for group, mod in self.models.items():
                 mask = (treatment == group) | (treatment == self.control_name)
@@ -232,9 +241,7 @@ class BaseSLearner(object):
                 w = (treatment[mask] == group).astype(int)
                 X_new = np.hstack((w.reshape((-1, 1)), X_filt))
 
-                perm_fitter = PermutationImportance(mod, cv='prefit')
-                perm_fitter.fit(X_new, y_filt)
-                fi[group] = perm_fitter.feature_importances_
+                fi[group] = get_importance(X_new, y_filt, mod, method)
 
         if features is None:
             features = ['Feature_{}'.format(i) for i in range(fi.shape[0] - 1)]
