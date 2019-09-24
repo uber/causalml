@@ -9,8 +9,9 @@ import numpy as np
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
-from .utils import check_control_in_treatment, check_p_conditions
-from eli5.sklearn import PermutationImportance
+
+from causalml.inference.meta.utils import check_control_in_treatment, check_p_conditions
+from causalml.inference.meta.utils import get_importance, check_importance_conditions
 
 logger = logging.getLogger('causalml')
 
@@ -237,7 +238,7 @@ class BaseRLearner(object):
         te_b = self.predict(X=X)
         return te_b
 
-    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini'):
+    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini', normalize=True):
         """
         Calculates feature importances based on specified method.
         Hint: downsample dataset for better performance, especially if X.shape[1] is large
@@ -247,14 +248,22 @@ class BaseRLearner(object):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
             method (str): "gini" (mean decrease in impurity), or "permutation" (mean decrease in accuracy)
+            normalize (bool): normalize by sum of importances (defaults to True)
         """
-        assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
+        check_importance_conditions(method=method,
+                                    models=[self.models_tau[self.t_groups[0]]],
+                                    X=X,
+                                    treatment=treatment,
+                                    y=y)
 
         if method == 'gini':
-            assert hasattr(self.models_tau[self.t_groups[0]], "feature_importances_"), \
-                   "Model must have .feature_importances_ method to use gini importance"
             fi = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_tau.items()})
-        elif method == 'permutation':
+
+            if normalize:
+                for group in self.t_groups:
+                    fi[group] = fi[group] / fi[group].sum()
+
+        elif method in ('permutation', 'shapley'):
             assert all([arr is not None for arr in (X, treatment, y)]), \
                    "X, treatment, and y must be provided if method='permutation'"
             fi = pd.DataFrame()
@@ -264,9 +273,7 @@ class BaseRLearner(object):
                 y_filt = y[mask]
 
                 mod = self.models_tau[group]
-                perm_fitter = PermutationImportance(mod, cv='prefit')
-                perm_fitter.fit(X_filt, y_filt)
-                fi[group] = perm_fitter.feature_importances_
+                fi[group] = get_importance(X_filt, y_filt, mod, method)
 
         if features is None:
             features = ['Feature_{}'.format(i) for i in range(fi.shape[0])]
