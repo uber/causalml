@@ -251,7 +251,7 @@ class BaseRLearner(object):
         assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
 
         if method == 'gini':
-            assert hasattr(self.model_tau, "feature_importances_"), \
+            assert hasattr(self.models_tau[self.t_groups[0]], "feature_importances_"), \
                    "Model must have .feature_importances_ method to use gini importance"
             fi = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_tau.items()})
         elif method == 'permutation':
@@ -269,8 +269,7 @@ class BaseRLearner(object):
                 fi[group] = perm_fitter.feature_importances_
 
         if features is None:
-            features = ['Feature_{}'.format(i) for i in range(fi.shape[0] - 1)]
-        features = ['is_treatment'] + list(features)
+            features = ['Feature_{}'.format(i) for i in range(fi.shape[0])]
 
         fi.index = features
         fi = fi.sort_values(fi.columns[0], ascending=False)

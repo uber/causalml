@@ -305,8 +305,8 @@ class BaseXLearner(object):
         assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
 
         if method == 'gini':
-            cond1 = hasattr(self.model_tau_c, "feature_importances_")
-            cond2 = hasattr(self.model_tau_t, "feature_importances_")
+            cond1 = hasattr(self.models_tau_c[self.t_groups[0]], "feature_importances_")
+            cond2 = hasattr(self.models_tau_t[self.t_groups[0]], "feature_importances_")
             assert cond1 and cond2, "Both tau models must have .feature_importances_ method to use gini importance"
             fi_c = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_tau_c.items()})
             fi_t = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models_tau_t.items()})
@@ -333,8 +333,7 @@ class BaseXLearner(object):
                 fi_t[group] = perm_fitter.feature_importances_
 
         if features is None:
-            features = ['Feature_{}'.format(i) for i in range(fi_c.shape[0] - 1)]
-        features = ['is_treatment'] + list(features)
+            features = ['Feature_{}'.format(i) for i in range(fi_c.shape[0])]
 
         fi = pd.concat((fi_c, fi_t), axis=1)
         columns = ([('Tau - Control Learner', group) for group in fi_c.columns]
