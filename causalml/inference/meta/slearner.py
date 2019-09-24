@@ -218,7 +218,7 @@ class BaseSLearner(object):
         assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
 
         if method == 'gini':
-            assert hasattr(self.model, "feature_importances_"), \
+            assert hasattr(self.models[self.t_groups[0]], "feature_importances_"), \
                    "Model must have .feature_importances_ method to use gini importance"
             fi = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models.items()})
         elif method == 'permutation':
