@@ -296,7 +296,11 @@ class BaseXLearner(object):
         Calculates feature importances based on specified method.
         Hint: downsample dataset for better performance, especially if X.shape[1] is large
         Args:
-            method (str): "gini" (mean decrease in impurity), or "permutation" (mean decrease in error)
+            features (np.array): list/array of feature names. If not provided, an enumerated list will be used.
+            X (np.matrix): a feature matrix
+            treatment (np.array): a treatment vector
+            y (np.array): an outcome vector
+            method (str): "gini" (mean decrease in impurity), or "permutation" (mean decrease in accuracy)
         """
         assert method in ('gini', 'permutation'), 'Current supported methods: gini and permutation.'
 
