@@ -92,7 +92,7 @@ class BaseRLearner(object):
 
         if verbose:
             logger.info('generating out-of-fold CV outcome estimates')
-        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
+        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv, n_jobs=-1)
 
         for group in self.t_groups:
             mask = (treatment == group) | (treatment == self.control_name)
@@ -336,7 +336,7 @@ class BaseRClassifier(BaseRLearner):
 
         if verbose:
             logger.info('generating out-of-fold CV outcome estimates')
-        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv, method='predict_proba')[:, 1]
+        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv, method='predict_proba', n_jobs=-1)[:, 1]
 
         for group in self.t_groups:
             mask = (treatment == group) | (treatment == self.control_name)
@@ -440,7 +440,7 @@ class XGBRRegressor(BaseRRegressor):
 
         if verbose:
             logger.info('generating out-of-fold CV outcome estimates')
-        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv)
+        yhat = cross_val_predict(self.model_mu, X, y, cv=self.cv, n_jobs=-1)
 
         for group in self.t_groups:
             treatment_mask = (treatment == group) | (treatment == self.control_name)
