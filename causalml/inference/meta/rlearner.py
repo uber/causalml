@@ -307,8 +307,11 @@ class BaseRClassifier(BaseRLearner):
             n_fold=n_fold,
             random_state=random_state)
 
-        # if (outcome_learner is None) and (effect_learner is None):
-        #    raise ValueError("Either the outcome learner or the effect learner must be specified.")
+        if (outcome_learner is None) or (effect_learner is None):
+            raise ValueError("Both the outcome learner and the effect learner must be specified.")
+
+        if ('predict_proba' not in dir(outcome_learner)):
+            raise ValueError("Outcome learner must be a classification model (have predict_proba method).")
 
     def fit(self, X, p, treatment, y, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.

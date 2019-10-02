@@ -363,9 +363,14 @@ class BaseXClassifier(BaseXLearner):
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-        #if ((control_outcome_learner is None) or (treatment_outcome_learner is None)) and (
-        #        (control_effect_learner is None) or (treatment_effect_learner is None)):
-        #    raise ValueError("Either the outcome learner or the effect learner pair must be specified.")
+        if ((control_outcome_learner is None) or (treatment_outcome_learner is None) or 
+                (control_effect_learner is None) or (treatment_effect_learner is None)):
+            raise ValueError("All outcome and effect learners must be specified.")
+
+        if (('predict_proba' not in dir(control_outcome_learner)) or 
+            ('predict_proba' not in dir(treatment_outcome_learner))):
+            raise ValueError("Outcome learners must be a classification model (have predict_proba method).")
+
 
     def fit(self, X, treatment, y):
         """Fit the inference model.
