@@ -352,8 +352,8 @@ class BaseRClassifier(BaseRLearner):
             self.models_tau[group].fit(X_filt, (y_filt - yhat_filt) / (w - p_filt),
                                        sample_weight=(w - p_filt) ** 2)
 
-            self.vars_c[group] = (y[w == 0] - yhat[w == 0]).var()
-            self.vars_t[group] = (y[w == 1] - yhat[w == 1]).var()
+            self.vars_c[group] = (y_filt[w == 0] - yhat_filt[w == 0]).var()
+            self.vars_t[group] = (y_filt[w == 1] - yhat_filt[w == 1]).var()
 
     def predict(self, X):
         """Predict treatment effects.
