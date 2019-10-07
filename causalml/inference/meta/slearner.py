@@ -8,10 +8,11 @@ import numpy as np
 from sklearn.dummy import DummyRegressor
 import statsmodels.api as sm
 from copy import deepcopy
+import matplotlib.pyplot as plt
 
-from causalml.inference.meta.utils import get_importance, check_importance_conditions
+from causalml.inference.meta.explainer import Explainer
 from causalml.metrics import regression_metrics, classification_metrics
-
+import shap
 
 logger = logging.getLogger('causalml')
 
@@ -204,51 +205,106 @@ class BaseSLearner(object):
         te_b = self.predict(X=X, treatment=treatment, verbose=False)
         return te_b
 
-    def feature_importance(self, features=None, X=None, treatment=None, y=None, method='gini', normalize=True):
+    def get_importance(self, X=None, treatment=None, y=None, features=None, method='gini', normalize=True):
         """
         Calculates feature importances based on specified method.
-        Currently support methods include:
-            - gini (mean decrease in impurity)
-            - permutation (mean decrease in accuracy)
-            - shapley (mean absolute shapley values)
+        Currently supported methods include:
+            - gini (outputs feature importance, based on mean decrease in impurity)
+            - permutation (outputs feature importance, based on mean decrease in accuracy)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
         Args:
-            features (np.array): list/array of feature names. If None, an enumerated list will be used.
             X (np.matrix): a feature matrix
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
-            method (str): gini, permutation, or shapley
-            normalize (bool): normalize by sum of importances (defaults to True)
+            features (np.array): list/array of feature names. If None, an enumerated list will be used.
+            method (str): gini, permutation
+            normalize (bool): normalize by sum of importances if method=gini (defaults to True)
         """
-        check_importance_conditions(method=method,
-                                    models=[self.models[self.t_groups[0]]],
-                                    X=X,
-                                    treatment=treatment,
-                                    y=y)
+        explainer = Explainer(method=method, models=self.models, control_name=self.control_name, learner_type='S',
+                              X=X, treatment=treatment, y=y, features=features, normalize=normalize)
+        return explainer.get_importance()
 
-        if method == 'gini':
-            fi = pd.DataFrame({group: mod.feature_importances_ for group, mod in self.models.items()})
-            if normalize:
-                for group in self.t_groups:
-                    fi[group] = fi[group] / fi[group].sum()
+    def get_shap_values(self, X=None, treatment=None, y=None, features=None):
+        """
+        Calculates shapley values for the outcome learner.
+        Args:
+            X (np.matrix): a feature matrix
+            treatment (np.array): a treatment vector
+            y (np.array): an outcome vector
+            features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
+        """
+        explainer = Explainer(method='shapley', models=self.models, control_name=self.control_name, learner_type='S',
+                              X=X, treatment=treatment, y=y, features=features)
+        return explainer.get_shap_values()
 
-        elif method in ('permutation', 'shapley'):
-            fi = pd.DataFrame()
-            for group, mod in self.models.items():
-                mask = (treatment == group) | (treatment == self.control_name)
-                X_filt = X[mask]
-                y_filt = y[mask]
-                w = (treatment[mask] == group).astype(int)
-                X_new = np.hstack((w.reshape((-1, 1)), X_filt))
+    def plot_importance(self, X=None, treatment=None, y=None, features=None, method='gini', normalize=True):
+        """
+        Plots feature importances based on specified method.
+        Currently supported methods include:
+            - gini (outputs feature importance, based on mean decrease in impurity)
+            - permutation (outputs feature importance, based on mean decrease in accuracy)
+        Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
+        Args:
+            X (np.matrix): a feature matrix
+            treatment (np.array): a treatment vector
+            y (np.array): an outcome vector
+            features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
+            method (str): gini, permutation
+            normalize (bool): normalize by sum of importances if method=gini (defaults to True)
+        """
+        explainer = Explainer(method=method, models=self.models, control_name=self.control_name, learner_type='S',
+                              X=X, treatment=treatment, y=y, normalize=normalize, features=features)
 
-                fi[group] = get_importance(X_new, y_filt, mod, method)
+        explainer.plot_importance()
 
-        if features is None:
-            features = ['Feature_{}'.format(i) for i in range(fi.shape[0] - 1)]
-        features = ['is_treatment'] + list(features)
-        fi.index = features
-        fi = fi.sort_values(fi.columns[0], ascending=False)
-        return fi
+    def plot_shap_values(self, X=None, treatment=None, y=None, features=None, shap_dict=None, **kwargs):
+        """
+        Plots distribution of shapley values for the outcome learner.
+        Args:
+            X (np.matrix): a feature matrix. Required if shap_dict is None.
+            treatment (np.array): a treatment vector. Required if shap_dict is None.
+            y (np.array): an outcome vector. Required if shap_dict is None.
+            features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
+            shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
+        """
+        override_checks = False if shap_dict is None else True
+        explainer = Explainer(method='shapley', models=self.models, control_name=self.control_name, learner_type='S',
+                              X=X, treatment=treatment, y=y, features=features, override_checks=override_checks)
+        explainer.plot_shap_values(shap_dict=shap_dict)
+
+    def plot_shap_dependence(self, treatment_group, feature_idx, X, treatment, y=None, features=None, shap_dict=None,
+                             interaction_idx='auto', **kwargs):
+        """
+        Plots dependency of shapley values (outcome learner) for a specified feature, colored by an interaction feature.
+
+        Plots the value of the feature on the x-axis and the SHAP value of the same feature
+        on the y-axis. This shows how the model depends on the given feature, and is like a
+        richer extenstion of the classical parital dependence plots. Vertical dispersion of the
+        data points represents interaction effects.
+
+        If shapley values have been pre-computed, pass it through the shap_dict parameter.
+
+        Args:
+            treatment_group (str or int): name of treatment group to create dependency plot on
+            feature_idx (str or int): feature index / name to create dependency plot on
+            X (np.matrix): a feature matrix
+            treatment (np.array): a treatment vector
+            y (np.array): an outcome vector. Must be provided if shap_dict is None.
+            features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
+            shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
+            interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
+                If "auto" then shap.common.approximate_interactions is used to pick what seems to be the
+                strongest interaction (note that to find to true stongest interaction you need to compute
+                the SHAP interaction values).
+        """
+        override_checks = False if shap_dict is None else True
+        explainer = Explainer(method='shapley', models=self.models, control_name=self.control_name, learner_type='S',
+                              X=X, treatment=treatment, y=y, features=features, override_checks=override_checks)
+        explainer.plot_shap_dependence(treatment_group=treatment_group,
+                                       feature_idx=feature_idx,
+                                       shap_dict=shap_dict,
+                                       interaction_idx=interaction_idx,
+                                       **kwargs)
 
 
 class BaseSRegressor(BaseSLearner):
