@@ -172,13 +172,18 @@ class BaseTLearner(object):
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, treatment, y):
+    def estimate_ate(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
+                    verbose=True):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
             X (np.matrix): a feature matrix
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
+            return_ci (bool): whether to return confidence intervals
+            n_bootstraps (int): number of bootstrap iterations
+            bootstrap_size (int): number of samples per bootstrap
+            verbose (str): whether to output progress logs
 
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
@@ -216,7 +221,34 @@ class BaseTLearner(object):
             ate_lb[i] = _ate_lb
             ate_ub[i] = _ate_ub
 
-        return ate, ate_lb, ate_ub
+        if not return_ci:
+            return ate, ate_lb, ate_ub
+        else:
+            start = pd.datetime.today()
+            self.t_groups_global = self.t_groups
+            self._classes_global = self._classes
+            self.models_c_global = deepcopy(self.models_c)
+            self.models_t_global = deepcopy(self.models_t)
+            ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
+
+            for n in range(n_bootstraps):
+                ate_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
+                ate_bootstraps[:, n] = ate_b.mean()
+                if verbose and n % 10 == 0 and n > 0:
+                    now = pd.datetime.today()
+                    lapsed = (now-start).seconds
+                    logger.info('{}/{} bootstraps completed. ({}s lapsed)'.format(n, n_bootstraps, lapsed))
+
+            ate_lower = np.percentile(ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
+            ate_upper = np.percentile(ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
+
+            # set member variables back to global (currently last bootstrapped outcome)
+            self.t_groups = self.t_groups_global
+            self._classes = self._classes_global
+            self.models_c = self.models_c_global
+            self.models_t = self.models_t_global
+
+            return ate, ate_lower, ate_upper
 
     def bootstrap(self, X, treatment, y, size=10000):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""

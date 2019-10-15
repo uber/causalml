@@ -228,7 +228,8 @@ class BaseXLearner(object):
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, p, treatment, y):
+    def estimate_ate(self, X, p, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
+                    verbose=True):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
@@ -237,6 +238,10 @@ class BaseXLearner(object):
                                     or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
+            return_ci (bool): whether to return confidence intervals
+            n_bootstraps (int): number of bootstrap iterations
+            bootstrap_size (int): number of samples per bootstrap
+            verbose (str): whether to output progress logs
 
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
@@ -278,7 +283,37 @@ class BaseXLearner(object):
             ate_lb[i] = _ate_lb
             ate_ub[i] = _ate_ub
 
-        return ate, ate_lb, ate_ub
+        if not return_ci:
+            return ate, ate_lb, ate_ub
+        else:
+            start = pd.datetime.today()
+            self.t_groups_global = self.t_groups
+            self._classes_global = self._classes
+            self.models_mu_c_global = deepcopy(self.models_mu_c)
+            self.models_mu_t_global = deepcopy(self.models_mu_t)
+            self.models_tau_c_global = deepcopy(self.models_tau_c)
+            self.models_tau_t_global = deepcopy(self.models_tau_t)
+            ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
+
+            for n in range(n_bootstraps):
+                ate_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
+                ate_bootstraps[:, n] = ate_b.mean()
+                if verbose and n % 10 == 0 and n > 0:
+                    now = pd.datetime.today()
+                    lapsed = (now-start).seconds
+                    logger.info('{}/{} bootstraps completed. ({}s lapsed)'.format(n, n_bootstraps, lapsed))
+
+            ate_lower = np.percentile(ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
+            ate_upper = np.percentile(ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
+
+            # set member variables back to global (currently last bootstrapped outcome)
+            self.t_groups_global = self.t_groups
+            self._classes_global = self._classes
+            self.models_mu_c_global = deepcopy(self.models_mu_c)
+            self.models_mu_t_global = deepcopy(self.models_mu_t)
+            self.models_tau_c_global = deepcopy(self.models_tau_c)
+            self.models_tau_t_global = deepcopy(self.models_tau_t)
+            return ate, ate_lower, ate_upper
 
     def bootstrap(self, X, p, treatment, y, size=10000):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
