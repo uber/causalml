@@ -59,7 +59,7 @@ class BaseSLearner(object):
             learner (optional): a model to estimate the treatment effect
             control_name (str or int, optional): name of control group
         """
-        if learner:
+        if learner is not None:
             self.model = learner
         else:
             self.model = DummyRegressor()
@@ -205,91 +205,107 @@ class BaseSLearner(object):
         te_b = self.predict(X=X, treatment=treatment, verbose=False)
         return te_b
 
-    def get_importance(self, X=None, treatment=None, y=None, features=None, method='gini', normalize=True):
+    def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='gini', normalize=True):
         """
-        Calculates feature importances based on specified method.
+        Builds a model (using X to predict estimated/actual tau), and then calculates feature importances
+        based on a specified method.
+
         Currently supported methods include:
-            - gini (outputs feature importance, based on mean decrease in impurity)
-            - permutation (outputs feature importance, based on mean decrease in accuracy)
+            - gini (based on mean decrease in impurity; estimator must be tree-based)
+            - permutation (based on mean decrease in accuracy; estimator can be any form)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
+
         Args:
             X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
             method (str): gini, permutation
             normalize (bool): normalize by sum of importances if method=gini (defaults to True)
         """
-        explainer = Explainer(method=method, models=self.models, control_name=self.control_name, learner_type='S',
-                              X=X, treatment=treatment, y=y, features=features, normalize=normalize)
+        explainer = Explainer(method=method, control_name=self.control_name,
+                              X=X, tau=tau, model_tau=model_tau_feature,
+                              features=features, classes=self._classes, normalize=normalize)
         return explainer.get_importance()
 
-    def get_shap_values(self, X=None, treatment=None, y=None, features=None):
+    def get_shap_values(self, X=None, model_tau_feature=None, tau=None, features=None):
         """
-        Calculates shapley values for the outcome learner.
+        Builds a model (using X to predict estimated/actual tau), and then calculates shapley values.
         Args:
             X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
         """
-        explainer = Explainer(method='shapley', models=self.models, control_name=self.control_name, learner_type='S',
-                              X=X, treatment=treatment, y=y, features=features)
+        explainer = Explainer(method='shapley', control_name=self.control_name,
+                              X=X, tau=tau, model_tau=model_tau_feature,
+                              features=features, classes=self._classes)
         return explainer.get_shap_values()
 
-    def plot_importance(self, X=None, treatment=None, y=None, features=None, method='gini', normalize=True):
+    def plot_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='gini', normalize=True):
         """
-        Plots feature importances based on specified method.
+        Builds a model (using X to predict estimated/actual tau), and then plots feature importances
+        based on a specified method.
+
         Currently supported methods include:
-            - gini (outputs feature importance, based on mean decrease in impurity)
-            - permutation (outputs feature importance, based on mean decrease in accuracy)
+            - gini (based on mean decrease in impurity; estimator must be tree-based)
+            - permutation (based on mean decrease in accuracy; estimator can be any form)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
+
         Args:
             X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
             method (str): gini, permutation
             normalize (bool): normalize by sum of importances if method=gini (defaults to True)
         """
-        explainer = Explainer(method=method, models=self.models, control_name=self.control_name, learner_type='S',
-                              X=X, treatment=treatment, y=y, normalize=normalize, features=features)
-
+        explainer = Explainer(method=method, control_name=self.control_name,
+                              X=X, tau=tau, model_tau=model_tau_feature,
+                              features=features, classes=self._classes, normalize=normalize)
         explainer.plot_importance()
 
-    def plot_shap_values(self, X=None, treatment=None, y=None, features=None, shap_dict=None, **kwargs):
+    def plot_shap_values(self, X=None, tau=None, model_tau_feature=None, features=None, shap_dict=None, **kwargs):
         """
-        Plots distribution of shapley values for the outcome learner.
+        Plots distribution of shapley values.
+
+        If shapley values have been pre-computed, pass it through the shap_dict parameter.
+        If shap_dict is not provided, this builds a new model (using X to predict estimated/actual tau),
+        and then calculates shapley values.
+
         Args:
             X (np.matrix): a feature matrix. Required if shap_dict is None.
-            treatment (np.array): a treatment vector. Required if shap_dict is None.
-            y (np.array): an outcome vector. Required if shap_dict is None.
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
             shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
         """
         override_checks = False if shap_dict is None else True
-        explainer = Explainer(method='shapley', models=self.models, control_name=self.control_name, learner_type='S',
-                              X=X, treatment=treatment, y=y, features=features, override_checks=override_checks)
+        explainer = Explainer(method='shapley', control_name=self.control_name,
+                              X=X, tau=tau, model_tau=model_tau_feature,
+                              features=features, override_checks=override_checks, classes=self._classes)
         explainer.plot_shap_values(shap_dict=shap_dict)
 
-    def plot_shap_dependence(self, treatment_group, feature_idx, X, treatment, y=None, features=None, shap_dict=None,
-                             interaction_idx='auto', **kwargs):
+    def plot_shap_dependence(self, treatment_group, feature_idx, X, tau, model_tau_feature=None, features=None,
+                             shap_dict=None, interaction_idx='auto', **kwargs):
         """
-        Plots dependency of shapley values (outcome learner) for a specified feature, colored by an interaction feature.
+        Plots dependency of shapley values for a specified feature, colored by an interaction feature.
 
-        Plots the value of the feature on the x-axis and the SHAP value of the same feature
+        If shapley values have been pre-computed, pass it through the shap_dict parameter.
+        If shap_dict is not provided, this builds a new model (using X to predict estimated/actual tau),
+        and then calculates shapley values.
+
+        This plots the value of the feature on the x-axis and the SHAP value of the same feature
         on the y-axis. This shows how the model depends on the given feature, and is like a
         richer extenstion of the classical parital dependence plots. Vertical dispersion of the
         data points represents interaction effects.
-
-        If shapley values have been pre-computed, pass it through the shap_dict parameter.
 
         Args:
             treatment_group (str or int): name of treatment group to create dependency plot on
             feature_idx (str or int): feature index / name to create dependency plot on
             X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector. Must be provided if shap_dict is None.
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
             shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
             interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
@@ -298,8 +314,10 @@ class BaseSLearner(object):
                 the SHAP interaction values).
         """
         override_checks = False if shap_dict is None else True
-        explainer = Explainer(method='shapley', models=self.models, control_name=self.control_name, learner_type='S',
-                              X=X, treatment=treatment, y=y, features=features, override_checks=override_checks)
+        explainer = Explainer(method='shapley', control_name=self.control_name,
+                              X=X, tau=tau, model_tau=model_tau_feature,
+                              features=features, override_checks=override_checks,
+                              classes=self._classes)
         explainer.plot_shap_dependence(treatment_group=treatment_group,
                                        feature_idx=feature_idx,
                                        shap_dict=shap_dict,
