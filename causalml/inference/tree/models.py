@@ -25,7 +25,6 @@ from sklearn.base import clone
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.utils.testing import ignore_warnings
 
-
 class DecisionTree:
     """ Tree Node Class
 
@@ -405,7 +404,7 @@ class UpliftTreeClassifier:
         -------
         self : object
         """
-        assert len(X) == len(y) and len(X) != len(treatment), 'Data length must be equal for X, treatment, and y.'
+        assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
         rows = [list(X[i]) + [treatment[i]] + [y[i]] for i in range(len(X))]
         self.fillTree(rows, tree=self.fitted_uplift_tree)
@@ -1162,54 +1161,6 @@ class UpliftTreeClassifier:
         else:
             return classifyWithoutMissingData(observations, tree)
 
-
-def plot(decisionTree):
-    '''
-    Convert the tree to string for print.
-
-    Args
-    ----
-
-    decisionTree : object
-        object of DecisionTree class
-
-    Returns
-    -------
-    A string representation of the tree.
-    '''
-
-    def toString(decisionTree, indent=''):
-        '''
-        Convert the tree to string for print.
-
-        Args
-        ----
-
-        decisionTree : object
-            object of DecisionTree class
-
-        indent : string, optional (default = '')
-            indent to separate the string.
-
-        Returns
-        -------
-        A string representation of the tree.
-        '''
-        if decisionTree.results is not None:  # leaf node
-            return str(decisionTree.results)
-        else:
-            szCol = 'Column %s' % decisionTree.col
-            if (isinstance(decisionTree.value, int) or isinstance(decisionTree.value, float)):
-                decision = '%s >= %s?' % (szCol, decisionTree.value)
-            else:
-                decision = '%s == %s?' % (szCol, decisionTree.value)
-            trueBranch = (indent + 'yes -> ' + toString(decisionTree.trueBranch, indent + '\t\t'))
-            falseBranch = (indent + 'no  -> ' + toString(decisionTree.falseBranch, indent + '\t\t'))
-            return (decision + '\n' + trueBranch + '\n' + falseBranch)
-
-    print(toString(decisionTree))
-
-
 def cat_group(dfx, kpix, n_group=10):
     '''
     Category Reduction for Categorical Variables
@@ -1601,3 +1552,11 @@ class UpliftRandomForestClassifier:
         df_res['max_delta'] = df_res[delta_cols].max(axis=1)
 
         return y_pred_list
+
+    
+    
+    
+
+
+
+

@@ -10,3 +10,4 @@ seaborn
 Cython
 xgboost==0.82
 future
+pydotplus
