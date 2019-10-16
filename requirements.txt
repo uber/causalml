@@ -13,3 +13,4 @@ future
 eli5
 shap
 dill
+lightgbm
