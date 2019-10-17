@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from eli5.sklearn import PermutationImportance
 import shap
 import matplotlib.pyplot as plt
@@ -8,10 +7,31 @@ from copy import deepcopy
 
 VALID_METHODS = ('gini', 'permutation', 'shapley')
 
-
 class Explainer(object):
     def __init__(self, method, control_name, X, tau, classes, model_tau=None,
                  features=None, normalize=True, override_checks=False, r_learners=None):
+        """
+        The Explainer class handles all feature explanation/interpretation functions, including plotting
+        feature importances, shapley value distributions, and shapley value dependency plots.
+
+        Currently supported methods are:
+            - gini (calculates importance based on mean decrease in impurity; estimator must be tree-based)
+            - permutation (calculates importance based on mean decrease in accuracy; estimator can be any form)
+            - shapley (calculates shapley values; estimator must be tree-based)
+        Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
+
+        Args:
+            method (str): gini, permutation, shapley
+            control_name (str/int/float): name of control group
+            X (np.matrix): a feature matrix
+            tau (np.array): a treatment effect vector (estimated/actual)
+            classes (dict): a mapping of treatment names to indices (used for indexing tau array)
+            model_tau (sklearn/lightgbm/xgboost model object): a model object
+            features (np.array): list/array of feature names. If None, an enumerated list will be used.
+            normalize (bool): normalize by sum of importances if method=gini (defaults to True)
+            override_checks (bool): overrides self.check_conditions (e.g. if importance/shapley values are pre-computed)
+            r_learners (dict): a mapping of treatment group to fitted R Learners
+        """
         self.method = method
         self.control_name = control_name
         self.X = X
@@ -23,8 +43,6 @@ class Explainer(object):
         self.override_checks = override_checks
         self.r_learners = r_learners
 
-        self.importance_catalog = {'gini': self.gini_importance, 'permutation': self.perm_importance}
-
         if not self.override_checks:
             self.check_conditions()
             self.create_feature_names()
@@ -32,6 +50,12 @@ class Explainer(object):
                 self.build_new_tau_models()
 
     def check_conditions(self):
+        """
+        Checks for multiple conditions:
+            - method is valid
+            - X, tau, and classes are specified
+            - model_tau has feature_importances_ attribute after fitting
+        """
         assert self.method in VALID_METHODS, 'Current supported methods: {}'.format(', '.join(VALID_METHODS))
 
         assert all([obj is not None for obj in (self.X, self.tau, self.classes)]), \
@@ -43,23 +67,17 @@ class Explainer(object):
             "model_tau must have the feature_importances_ method (after fitting)"
 
     def create_feature_names(self):
+        """
+        Creates feature names (simple enumerated list) if not provided in __init__.
+        """
         if self.features is None:
             num_features = self.X.shape[1]
             self.features = ['Feature_{:03d}'.format(i) for i in range(num_features)]
-
-    def get_importance(self):
-        assert self.method in self.importance_catalog
-        importance_dict = self.importance_catalog[self.method]()
-
-        if self.features is None:
-            num_features = self.X.shape[1]
-            self.features = ['Feature_{:03d}'.format(i) for i in range(num_features)]
-
-        importance_dict = {group: pd.Series(array, index=self.features).sort_values(ascending=False)
-                           for group, array in importance_dict.items()}
-        return importance_dict
 
     def build_new_tau_models(self):
+        """
+        Builds tau models (using X to predict estimated/actual tau) for each treatment group.
+        """
         if self.r_learners is not None:
             self.models_tau = deepcopy(self.r_learners)
         else:
@@ -67,7 +85,21 @@ class Explainer(object):
             for group, idx in self.classes.items():
                 self.models_tau[group].fit(self.X, self.tau[:, idx])
 
+    def get_importance(self):
+        """
+        Calculates feature importances for each treatment group, based on specified method in __init__.
+        """
+        importance_catalog = {'gini': self.gini_importance, 'permutation': self.perm_importance}
+        importance_dict = importance_catalog[self.method]()
+
+        importance_dict = {group: pd.Series(array, index=self.features).sort_values(ascending=False)
+                           for group, array in importance_dict.items()}
+        return importance_dict
+
     def gini_importance(self):
+        """
+        Calculates feature importances for each treatment group, based on the gini method.
+        """
         importance_dict = {}
         for group, idx in self.classes.items():
             importance_dict[group] = self.models_tau[group].feature_importances_
@@ -77,6 +109,9 @@ class Explainer(object):
         return importance_dict
 
     def perm_importance(self):
+        """
+        Calculates feature importances for each treatment group, based on the permutation method.
+        """
         importance_dict = {}
         for group, idx in self.classes.items():
             if self.r_learners is None:
@@ -92,6 +127,9 @@ class Explainer(object):
         return importance_dict
 
     def get_shap_values(self):
+        """
+        Calculates shapley values for each treatment group.
+        """
         shap_dict = {}
         for group, mod in self.models_tau.items():
             explainer = shap.TreeExplainer(mod)
@@ -103,6 +141,10 @@ class Explainer(object):
         return shap_dict
 
     def plot_importance(self, importance_dict=None, title_prefix=''):
+        """
+        Calculates and plots feature importances for each treatment group, based on specified method in __init__.
+        Skips the calculation part if importance_dict is given.
+        """
         if importance_dict is None:
             importance_dict = self.get_importance()
         for group, series in importance_dict.items():
@@ -114,6 +156,10 @@ class Explainer(object):
             plt.title(title)
 
     def plot_shap_values(self, shap_dict=None):
+        """
+        Calculates and plots the distribution of shapley values of each feature, for each treatment group.
+        Skips the calculation part if shap_dict is given.
+        """
         if shap_dict is None:
             shap_dict = self.get_shap_values()
 
@@ -122,6 +168,24 @@ class Explainer(object):
             shap.summary_plot(values, feature_names=self.features)
 
     def plot_shap_dependence(self, treatment_group, feature_idx, shap_dict=None, interaction_idx='auto', **kwargs):
+        """
+        Plots dependency of shapley values for a specified feature, colored by an interaction feature.
+        Skips the calculation part if shap_dict is given.
+
+        This plots the value of the feature on the x-axis and the SHAP value of the same feature
+        on the y-axis. This shows how the model depends on the given feature, and is like a
+        richer extenstion of the classical parital dependence plots. Vertical dispersion of the
+        data points represents interaction effects.
+
+       Args:
+            treatment_group (str or int): name of treatment group to create dependency plot on
+            feature_idx (str or int): feature index / name to create dependency plot on
+            shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
+            interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
+                If "auto" then shap.common.approximate_interactions is used to pick what seems to be the
+                strongest interaction (note that to find to true stongest interaction you need to compute
+                the SHAP interaction values).
+        """
         if shap_dict is None:
             shap_dict = self.get_shap_values()
 
