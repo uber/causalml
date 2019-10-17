@@ -111,6 +111,9 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](./LICE
 
 # References
 
+## Documentation
+* [Causal ML API documentation](https://causalml.readthedocs.io/en/latest/about.html)
+
 ## Papers
 
 * Nicholas J Radcliffe and Patrick D Surry. Real-world uplift modelling with significance based uplift trees. White Paper TR-2011-1, Stochastic Solutions, 2011.
