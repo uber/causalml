@@ -7,6 +7,7 @@ from copy import deepcopy
 
 VALID_METHODS = ('gini', 'permutation', 'shapley')
 
+
 class Explainer(object):
     def __init__(self, method, control_name, X, tau, classes, model_tau=None,
                  features=None, normalize=True, override_checks=False, r_learners=None):
