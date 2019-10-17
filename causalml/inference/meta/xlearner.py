@@ -6,6 +6,7 @@ from copy import deepcopy
 import logging
 import pandas as pd
 import numpy as np
+from tqdm import tqdm
 from scipy.stats import norm
 
 from .utils import check_control_in_treatment, check_p_conditions
@@ -132,6 +133,7 @@ class BaseXLearner(object):
                                     or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array, optional): a treatment vector
             y (np.array, optional): an optional outcome vector
+            return_componets (bool, optional): whether to return outcome for treatment and control seperately
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -186,6 +188,7 @@ class BaseXLearner(object):
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
+            return_componets (bool, optional): whether to return outcome for treatment and control seperately
             verbose (str): whether to output progress logs
 
         Returns:
@@ -200,12 +203,12 @@ class BaseXLearner(object):
             return te
         else:
             start = pd.datetime.today()
-            self.t_groups_global = self.t_groups
-            self._classes_global = self._classes
-            self.models_mu_c_global = deepcopy(self.models_mu_c)
-            self.models_mu_t_global = deepcopy(self.models_mu_t)
-            self.models_tau_c_global = deepcopy(self.models_tau_c)
-            self.models_tau_t_global = deepcopy(self.models_tau_t)
+            t_groups_global = self.t_groups
+            _classes_global = self._classes
+            models_mu_c_global = deepcopy(self.models_mu_c)
+            models_mu_t_global = deepcopy(self.models_mu_t)
+            models_tau_c_global = deepcopy(self.models_tau_c)
+            models_tau_t_global = deepcopy(self.models_tau_t)
             te_bootstraps = np.zeros(shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps))
             for i in range(n_bootstraps):
                 te_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
@@ -219,17 +222,16 @@ class BaseXLearner(object):
             te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
 
             # set member variables back to global (currently last bootstrapped outcome)
-            self.t_groups = self.t_groups_global
-            self._classes = self._classes_global
-            self.models_mu_c = self.models_mu_c_global
-            self.models_mu_t = self.models_mu_t_global
-            self.models_tau_c = self.models_tau_c_global
-            self.models_tau_t = self.models_tau_t_global
+            self.t_groups = t_groups_global
+            self._classes = _classes_global
+            self.models_mu_c = deepcopy(models_mu_c_global)
+            self.models_mu_t = deepcopy(models_mu_t_global)
+            self.models_tau_c = deepcopy(models_tau_c_global)
+            self.models_tau_t = deepcopy(models_tau_t_global)
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, p, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
-                    verbose=True):
+    def estimate_ate(self, X, p, treatment, y, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
@@ -238,7 +240,7 @@ class BaseXLearner(object):
                                     or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
-            return_ci (bool): whether to return confidence intervals
+            bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
             verbose (str): whether to output progress logs
@@ -283,36 +285,33 @@ class BaseXLearner(object):
             ate_lb[i] = _ate_lb
             ate_ub[i] = _ate_ub
 
-        if not return_ci:
+        if not bootstrap_ci:
             return ate, ate_lb, ate_ub
         else:
-            start = pd.datetime.today()
-            self.t_groups_global = self.t_groups
-            self._classes_global = self._classes
-            self.models_mu_c_global = deepcopy(self.models_mu_c)
-            self.models_mu_t_global = deepcopy(self.models_mu_t)
-            self.models_tau_c_global = deepcopy(self.models_tau_c)
-            self.models_tau_t_global = deepcopy(self.models_tau_t)
+            t_groups_global = self.t_groups
+            _classes_global = self._classes
+            models_mu_c_global = deepcopy(self.models_mu_c)
+            models_mu_t_global = deepcopy(self.models_mu_t)
+            models_tau_c_global = deepcopy(self.models_tau_c)
+            models_tau_t_global = deepcopy(self.models_tau_t)
+
+            logger.info('Bootstrap Confidence Intervals for ATE')
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
-            for n in range(n_bootstraps):
-                ate_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
-                ate_bootstraps[:, n] = ate_b.mean()
-                if verbose and n % 10 == 0 and n > 0:
-                    now = pd.datetime.today()
-                    lapsed = (now-start).seconds
-                    logger.info('{}/{} bootstraps completed. ({}s lapsed)'.format(n, n_bootstraps, lapsed))
+            for n in tqdm(range(n_bootstraps)):
+                cate_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
+                ate_bootstraps[:, n] = cate_b.mean()
 
             ate_lower = np.percentile(ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
             ate_upper = np.percentile(ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
 
             # set member variables back to global (currently last bootstrapped outcome)
-            self.t_groups_global = self.t_groups
-            self._classes_global = self._classes
-            self.models_mu_c_global = deepcopy(self.models_mu_c)
-            self.models_mu_t_global = deepcopy(self.models_mu_t)
-            self.models_tau_c_global = deepcopy(self.models_tau_c)
-            self.models_tau_t_global = deepcopy(self.models_tau_t)
+            self.t_groups = t_groups_global
+            self._classes = _classes_global
+            self.models_mu_c = deepcopy(models_mu_c_global)
+            self.models_mu_t = deepcopy(models_mu_t_global)
+            self.models_tau_c = deepcopy(models_tau_c_global)
+            self.models_tau_t = deepcopy(models_tau_t_global)
             return ate, ate_lower, ate_upper
 
     def bootstrap(self, X, p, treatment, y, size=10000):
