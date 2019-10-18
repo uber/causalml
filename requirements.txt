@@ -10,8 +10,9 @@ seaborn
 Cython
 xgboost==0.82
 future
+pydotplus
+tqdm
 eli5
 shap
 dill
 lightgbm
-pydotplus
