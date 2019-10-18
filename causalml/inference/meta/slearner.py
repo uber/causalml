@@ -205,14 +205,17 @@ class BaseSLearner(object):
         te_b = self.predict(X=X, treatment=treatment, verbose=False)
         return te_b
 
-    def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='gini', normalize=True):
+    def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True):
         """
         Builds a model (using X to predict estimated/actual tau), and then calculates feature importances
         based on a specified method.
 
-        Currently supported methods include:
-            - gini (based on mean decrease in impurity; estimator must be tree-based)
-            - permutation (based on mean decrease in accuracy; estimator can be any form)
+        Currently supported methods are:
+            - auto (calculates importance based on estimator's default implementation of feature importance;
+                    estimator must be tree-based)
+                    Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
+                    importance type
+            - permutation (calculates importance based on mean decrease in accuracy; estimator can be any form)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
@@ -220,8 +223,8 @@ class BaseSLearner(object):
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
-            method (str): gini, permutation
-            normalize (bool): normalize by sum of importances if method=gini (defaults to True)
+            method (str): auto, permutation
+            normalize (bool): normalize by sum of importances if method=auto (defaults to True)
         """
         explainer = Explainer(method=method, control_name=self.control_name,
                               X=X, tau=tau, model_tau=model_tau_feature,
@@ -242,14 +245,17 @@ class BaseSLearner(object):
                               features=features, classes=self._classes)
         return explainer.get_shap_values()
 
-    def plot_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='gini', normalize=True):
+    def plot_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True):
         """
         Builds a model (using X to predict estimated/actual tau), and then plots feature importances
         based on a specified method.
 
-        Currently supported methods include:
-            - gini (based on mean decrease in impurity; estimator must be tree-based)
-            - permutation (based on mean decrease in accuracy; estimator can be any form)
+        Currently supported methods are:
+            - auto (calculates importance based on estimator's default implementation of feature importance;
+                    estimator must be tree-based)
+                    Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
+                    importance type
+            - permutation (calculates importance based on mean decrease in accuracy; estimator can be any form)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
@@ -257,8 +263,8 @@ class BaseSLearner(object):
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
-            method (str): gini, permutation
-            normalize (bool): normalize by sum of importances if method=gini (defaults to True)
+            method (str): auto, permutation
+            normalize (bool): normalize by sum of importances if method=auto (defaults to True)
         """
         explainer = Explainer(method=method, control_name=self.control_name,
                               X=X, tau=tau, model_tau=model_tau_feature,

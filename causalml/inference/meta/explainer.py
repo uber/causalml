@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from lightgbm import LGBMRegressor
 from copy import deepcopy
 
-VALID_METHODS = ('gini', 'permutation', 'shapley')
+VALID_METHODS = ('auto', 'permutation', 'shapley')
 
 
 class Explainer(object):
@@ -16,20 +16,23 @@ class Explainer(object):
         feature importances, shapley value distributions, and shapley value dependency plots.
 
         Currently supported methods are:
-            - gini (calculates importance based on mean decrease in impurity; estimator must be tree-based)
+            - auto (calculates importance based on estimator's default implementation of feature importance;
+                    estimator must be tree-based)
+                    Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
+                    importance type
             - permutation (calculates importance based on mean decrease in accuracy; estimator can be any form)
             - shapley (calculates shapley values; estimator must be tree-based)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
-            method (str): gini, permutation, shapley
+            method (str): auto, permutation, shapley
             control_name (str/int/float): name of control group
             X (np.matrix): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             classes (dict): a mapping of treatment names to indices (used for indexing tau array)
             model_tau (sklearn/lightgbm/xgboost model object): a model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
-            normalize (bool): normalize by sum of importances if method=gini (defaults to True)
+            normalize (bool): normalize by sum of importances if method=auto (defaults to True)
             override_checks (bool): overrides self.check_conditions (e.g. if importance/shapley values are pre-computed)
             r_learners (dict): a mapping of treatment group to fitted R Learners
         """
@@ -38,7 +41,7 @@ class Explainer(object):
         self.X = X
         self.tau = tau
         self.classes = classes
-        self.model_tau = LGBMRegressor() if model_tau is None else model_tau
+        self.model_tau = LGBMRegressor(importance_type='gain') if model_tau is None else model_tau
         self.features = features
         self.normalize = normalize
         self.override_checks = override_checks
@@ -47,7 +50,7 @@ class Explainer(object):
         if not self.override_checks:
             self.check_conditions()
             self.create_feature_names()
-            if self.method in ('gini', 'shapley'):
+            if self.method in ('auto', 'shapley'):
                 self.build_new_tau_models()
 
     def check_conditions(self):
@@ -90,18 +93,20 @@ class Explainer(object):
         """
         Calculates feature importances for each treatment group, based on specified method in __init__.
         """
-        importance_catalog = {'gini': self.gini_importance, 'permutation': self.perm_importance}
+        importance_catalog = {'auto': self.default_importance, 'permutation': self.perm_importance}
         importance_dict = importance_catalog[self.method]()
 
         importance_dict = {group: pd.Series(array, index=self.features).sort_values(ascending=False)
                            for group, array in importance_dict.items()}
         return importance_dict
 
-    def gini_importance(self):
+    def default_importance(self):
         """
-        Calculates feature importances for each treatment group, based on the gini method.
+        Calculates feature importances for each treatment group, based on the model_tau's default implementation.
         """
         importance_dict = {}
+        if self.r_learners is not None:
+            self.models_tau = deepcopy(self.r_learners)
         for group, idx in self.classes.items():
             importance_dict[group] = self.models_tau[group].feature_importances_
             if self.normalize:
