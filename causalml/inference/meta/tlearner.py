@@ -4,9 +4,8 @@ from __future__ import print_function
 from future.builtins import super
 from copy import deepcopy
 import logging
-import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.neural_network import MLPRegressor
@@ -91,6 +90,7 @@ class BaseTLearner(object):
             X (np.matrix): a feature matrix
             treatment (np.array, optional): a treatment vector
             y (np.array, optional): an optional outcome vector
+            return_componets (bool, optional): whether to return outcome for treatment and control seperately
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -137,6 +137,7 @@ class BaseTLearner(object):
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
+            return_componets (bool, optional): whether to return outcome for treatment and control seperately
             verbose (str): whether to output progress logs
 
         Returns:
@@ -150,38 +151,39 @@ class BaseTLearner(object):
         if not return_ci:
             return te
         else:
-            start = pd.datetime.today()
-            self.t_groups_global = self.t_groups
-            self._classes_global = self._classes
-            self.models_c_global = deepcopy(self.models_c)
-            self.models_t_global = deepcopy(self.models_t)
+            t_groups_global = self.t_groups
+            _classes_global = self._classes
+            models_c_global = deepcopy(self.models_c)
+            models_t_global = deepcopy(self.models_t)
             te_bootstraps = np.zeros(shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps))
-            for i in range(n_bootstraps):
+
+            logger.info('Bootstrap Confidence Intervals')
+            for i in tqdm(range(n_bootstraps)):
                 te_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
-                if verbose and i % 10 == 0 and i > 0:
-                    now = pd.datetime.today()
-                    lapsed = (now-start).seconds
-                    logger.info('{}/{} bootstraps completed. ({}s lapsed)'.format(i, n_bootstraps, lapsed))
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=2)
             te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
 
             # set member variables back to global (currently last bootstrapped outcome)
-            self.t_groups = self.t_groups_global
-            self._classes = self._classes_global
-            self.models_c = self.models_c_global
-            self.models_t = self.models_t_global
+            self.t_groups = t_groups_global
+            self._classes = _classes_global
+            self.models_c = deepcopy(models_c_global)
+            self.models_t = deepcopy(models_t_global)
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, treatment, y):
+    def estimate_ate(self, X, treatment, y, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
             X (np.matrix): a feature matrix
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
+            bootstrap_ci (bool): whether to return confidence intervals
+            n_bootstraps (int): number of bootstrap iterations
+            bootstrap_size (int): number of samples per bootstrap
+            verbose (str): whether to output progress logs
 
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
@@ -219,7 +221,31 @@ class BaseTLearner(object):
             ate_lb[i] = _ate_lb
             ate_ub[i] = _ate_ub
 
-        return ate, ate_lb, ate_ub
+        if not bootstrap_ci:
+            return ate, ate_lb, ate_ub
+        else:
+            t_groups_global = self.t_groups
+            _classes_global = self._classes
+            models_c_global = deepcopy(self.models_c)
+            models_t_global = deepcopy(self.models_t)
+
+            logger.info('Bootstrap Confidence Intervals for ATE')
+            ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
+
+            for n in tqdm(range(n_bootstraps)):
+                ate_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
+                ate_bootstraps[:, n] = ate_b.mean()
+
+            ate_lower = np.percentile(ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
+            ate_upper = np.percentile(ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
+
+            # set member variables back to global (currently last bootstrapped outcome)
+            self.t_groups = t_groups_global
+            self._classes = _classes_global
+            self.models_c = deepcopy(models_c_global)
+            self.models_t = deepcopy(models_t_global)
+
+            return ate, ate_lower, ate_upper
 
     def bootstrap(self, X, treatment, y, size=10000):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
