@@ -4,7 +4,6 @@ from __future__ import print_function
 from future.builtins import super
 from copy import deepcopy
 import logging
-import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
@@ -150,19 +149,16 @@ class BaseTLearner(object):
         if not return_ci:
             return te
         else:
-            start = pd.datetime.today()
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_c_global = deepcopy(self.models_c)
             models_t_global = deepcopy(self.models_t)
             te_bootstraps = np.zeros(shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps))
-            for i in range(n_bootstraps):
+
+            logger.info('Bootstrap Confidence Intervals')
+            for i in tqdm(range(n_bootstraps)):
                 te_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
-                if verbose and i % 10 == 0 and i > 0:
-                    now = pd.datetime.today()
-                    lapsed = (now-start).seconds
-                    logger.info('{}/{} bootstraps completed. ({}s lapsed)'.format(i, n_bootstraps, lapsed))
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=2)
             te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
