@@ -10,6 +10,7 @@ Contents:
     methodology
     installation
     examples
+    interpretation
     validation
     causalml
     references
