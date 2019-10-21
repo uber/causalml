@@ -2,13 +2,6 @@
 Methodology
 ===========
 
-Tree-Based Algorithms
----------------------
-
-Uplift Random Forests
-~~~~~~~~~~~~~~~~~~~~~
-
-
 Meta-Learner Algorithms
 -----------------------
 
@@ -102,6 +95,10 @@ R-learner :cite:`nie2017quasi` uses the cross-validation out-of-fold estimates o
 |   :math:`\hat{L}_n(\tau(x)) = \frac{1}{n} \sum^n_{i=1}\big(\big(Y_i - \hat{m}^{(-i)}(X_i)\big) - \big(W_i - \hat{e}^{(-i)}(X_i)\big)\tau(X_i)\big)^2`
 |
 | where :math:`e^{(-i)}(X_i)`, etc. denote the out-of-fold held-out predictions made without using the :math:`i`-th training sample.
+
+
+Tree-Based Algorithms
+---------------------
 
 Uplift Tree
 ~~~~~~~~~~~
