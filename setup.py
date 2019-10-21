@@ -2,6 +2,7 @@ from setuptools import setup, find_packages
 from setuptools.extension import Extension
 from Cython.Build import cythonize
 import numpy as np
+import causalml
 
 
 with open("README.md", "r") as f:
@@ -24,7 +25,7 @@ packages = find_packages()
 
 setup(
     name="causalml",
-    version="0.3.0",
+    version=causalml.__version__,
     author="Huigang Chen, Totte Harinen, Jeong-Yoon Lee, Mike Yung, Zhenyu Zhao",
     author_email="",
     description="Python Package for Uplift Modeling and Causal Inference with Machine Learning Algorithms",
