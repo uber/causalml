@@ -3,6 +3,13 @@
 Changelog
 =========
 
+0.4.0 (2019-10-21)
+------------------
+
+- Add `uplift_tree_plot()` to `inference.tree` to visualize `UpliftTreeClassifier` by @zhenyuz0500
+- Add the `Explainer` class to `inference.meta` to provide feature importances using `SHAP` and `eli5`'s `PermutationImportance` by @yungmsh
+- Add bootstrap confidence intervals for the average treatment effect estimates of meta learners by @ppstacy
+
 0.3.0 (2019-09-17)
 ------------------
 
