@@ -1,20 +1,17 @@
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
+from setuptools import dist
 import causalml
 try:
     from Cython.Build import cythonize
 except ImportError:
-    # create closure for deferred import
-    def cythonize(*args, ** kwargs):
-        from Cython.Build import cythonize
-        return cythonize(*args, ** kwargs)
+    dist.Distribution().fetch_build_eggs(['cython'])
+    from Cython.Build import cythonize
 try:
     from numpy import get_include as np_get_include
 except ImportError:
-    # create closure for deferred import
-    def np_get_include(*args, ** kwargs):
-        from numpy import get_include
-        return get_include(*args, ** kwargs)
+    dist.Distribution().fetch_build_eggs(['numpy'])
+    from numpy import get_include as np_get_include
 
 
 with open("README.md", "r") as f:
