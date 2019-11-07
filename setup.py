@@ -1,8 +1,17 @@
 from setuptools import setup, find_packages
 from setuptools.extension import Extension
-from Cython.Build import cythonize
-import numpy as np
+from setuptools import dist
 import causalml
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    dist.Distribution().fetch_build_eggs(['cython'])
+    from Cython.Build import cythonize
+try:
+    from numpy import get_include as np_get_include
+except ImportError:
+    dist.Distribution().fetch_build_eggs(['numpy'])
+    from numpy import get_include as np_get_include
 
 
 with open("README.md", "r") as f:
@@ -15,8 +24,8 @@ with open("requirements.txt") as f:
 extensions = [
     Extension("causalml.inference.tree.causaltree",
               ["causalml/inference/tree/causaltree.pyx"],
-              libraries = [],
-              include_dirs = [np.get_include()],
+              libraries=[],
+              include_dirs=[np_get_include()],
               extra_compile_args=["-O3"]
     )
 ]
@@ -39,7 +48,13 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
+    setup_requires=[
+        # Setuptools 18.0 properly handles Cython extensions.
+        'setuptools>=18.0',
+        'cython',
+        'numpy'
+    ],
     install_requires=requirements,
     ext_modules=cythonize(extensions),
-    include_dirs=[np.get_include()]
+    include_dirs=[np_get_include()]
 )
