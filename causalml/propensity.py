@@ -3,6 +3,7 @@ from __future__ import division
 from __future__ import print_function
 import logging
 import numpy as np
+from pygam import LogisticGAM, s
 from sklearn.metrics import roc_auc_score as auc
 from sklearn.linear_model import ElasticNetCV
 
@@ -11,8 +12,7 @@ logger = logging.getLogger('causalml')
 
 
 class ElasticNetPropensityModel(object):
-    """
-    Propensity regression model based on the ElasticNet algorithm.
+    """Propensity regression model based on the ElasticNet algorithm.
 
     Attributes:
         model (sklearn.linear_model.ElasticNetCV): a propensity model object
@@ -73,3 +73,21 @@ class ElasticNetPropensityModel(object):
         ps = self.predict(X)
         logger.info('AUC score: {:.6f}'.format(auc(y, ps)))
         return ps
+
+
+def calibrate(ps, treatment):
+    """Calibrate propensity scores with logistic GAM.
+
+    Ref: https://pygam.readthedocs.io/en/latest/api/logisticgam.html
+
+    Args:
+        ps (numpy.array): a propensity score vector
+        treatment (numpy.array): a binary treatment vector (0: control, 1: treated)
+
+    Returns:
+        (numpy.array): a calibrated propensity score vector
+    """
+
+    gam = LogisticGAM(s(0)).fit(ps, treatment)
+
+    return gam.predict_proba(ps)
