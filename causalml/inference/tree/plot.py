@@ -79,7 +79,7 @@ def uplift_tree_plot(decisionTree, x_names):
     dcNodes = defaultdict(list)
     """Plots the obtained decision tree. """
 
-    def toString(iSplit, decisionTree, bBranch, szParent="null", indent=''):
+    def toString(iSplit, decisionTree, bBranch, szParent="null", indent='', branchParent=None):
         if decisionTree.results != None:  # leaf node
             lsY = []
             for szX, n in decisionTree.results.items():
@@ -87,7 +87,8 @@ def uplift_tree_plot(decisionTree, x_names):
             dcY = {"name": "%s" % ', '.join(lsY), "parent": szParent}
             dcSummary = decisionTree.summary
             dcNodes[iSplit].append(['leaf', dcY['name'], szParent, bBranch, str(-round(float(decisionTree.summary['impurity']),3)),
-                                    dcSummary['samples'], dcSummary['group_size'], dcSummary['upliftScore'],dcSummary['matchScore']])
+                                    dcSummary['samples'], dcSummary['group_size'], dcSummary['upliftScore'], dcSummary['matchScore'],
+                                    branchParent])
             return dcY
         else:
             szCol = 'Column %s' % decisionTree.col
@@ -97,12 +98,12 @@ def uplift_tree_plot(decisionTree, x_names):
                 decision = '%s >= %s' % (szCol, decisionTree.value)
             else:
                 decision = '%s == %s' % (szCol, decisionTree.value)
-            trueBranch = toString(iSplit + 1, decisionTree.trueBranch, True, decision, indent + '\t\t')
-            falseBranch = toString(iSplit + 1, decisionTree.falseBranch, False, decision, indent + '\t\t')
+            toString(iSplit + 1, decisionTree.trueBranch, True, decision, indent + '\t\t', bBranch)
+            toString(iSplit + 1, decisionTree.falseBranch, False, decision, indent + '\t\t', bBranch)
             dcSummary = decisionTree.summary
             dcNodes[iSplit].append([iSplit + 1, decision, szParent, bBranch, str(-round(float(decisionTree.summary['impurity']),3)),
-                                    dcSummary['samples'],dcSummary['group_size'], dcSummary['upliftScore'],dcSummary['matchScore']])
-            return
+                                    dcSummary['samples'], dcSummary['group_size'], dcSummary['upliftScore'], dcSummary['matchScore'],
+                                    branchParent])
 
     toString(0, decisionTree, None)
     lsDot = ['digraph Tree {',
@@ -114,9 +115,9 @@ def uplift_tree_plot(decisionTree, x_names):
     for nSplit in range(len(dcNodes.items())):
         lsY = dcNodes[nSplit]
         for lsX in lsY:
-            iSplit, decision, szParent, bBranch, szImpurity, szSamples, szGroup, upliftScore, matchScore = lsX
+            iSplit, decision, szParent, bBranch, szImpurity, szSamples, szGroup, upliftScore, matchScore, branchParent = lsX
             if type(iSplit) == int:
-                szSplit = '%d-%s' % (iSplit, decision)
+                szSplit = '%d-%s-%s' % (iSplit, decision, str(bBranch))
                 dcParent[szSplit] = i_node
                 lsDot.append('%d [label=<%s<br/> impurity %s<br/> total_sample %s <br/>group_sample %s <br/> uplift score: %s <br/> uplift p_value %s <br/> validation uplift score %s>, fillcolor="#e5813900"] ;' % (i_node,
                                                                                                           decision.replace(
@@ -146,7 +147,7 @@ def uplift_tree_plot(decisionTree, x_names):
                 else:
                     szAngle = '-45'
                     szHeadLabel = 'False'
-                szSplit = '%d-%s' % (nSplit, szParent)
+                szSplit = '%d-%s-%s' % (nSplit, szParent, str(branchParent))
                 p_node = dcParent[szSplit]
                 if nSplit == 1:
                     lsDot.append('%d -> %d [labeldistance=2.5, labelangle=%s, headlabel="%s"] ;' % (p_node,
