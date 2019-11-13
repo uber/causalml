@@ -7,7 +7,6 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
-import shap
 
 from causalml.inference.meta.utils import check_control_in_treatment, check_p_conditions
 from causalml.inference.meta.explainer import Explainer
