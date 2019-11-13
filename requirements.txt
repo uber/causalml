@@ -16,3 +16,4 @@ eli5
 shap
 dill
 lightgbm
+pygam

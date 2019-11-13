@@ -9,11 +9,10 @@ from scipy.stats import norm
 from sklearn.dummy import DummyRegressor
 import statsmodels.api as sm
 from copy import deepcopy
-import matplotlib.pyplot as plt
 
 from causalml.inference.meta.explainer import Explainer
 from causalml.metrics import regression_metrics, classification_metrics
-import shap
+
 
 logger = logging.getLogger('causalml')
 

@@ -9,7 +9,6 @@ from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
-import shap
 
 from causalml.inference.meta.utils import check_control_in_treatment, check_p_conditions
 from causalml.inference.meta.explainer import Explainer
@@ -537,13 +536,17 @@ class XGBRRegressor(BaseRRegressor):
 
         Args:
             early_stopping: whether or not to use early stopping when fitting effect learner
-            test_size (float, optional): the proportion of the dataset to use as validation set when early stopping is enabled
-            early_stopping_rounds (int, optional): validation metric needs to improve at least once in every early_stopping_rounds round(s) to continue training
-            effect_learner_objective (str, optional): the learning objective for the efffect learner (default = 'rank:pairwise')
+            test_size (float, optional): the proportion of the dataset to use as validation set when early stopping is
+                                         enabled
+            early_stopping_rounds (int, optional): validation metric needs to improve at least once in every
+                                                   early_stopping_rounds round(s) to continue training
+            effect_learner_objective (str, optional): the learning objective for the efffect learner
+                                                      (default = 'rank:pairwise')
             effect_learner_n_estimators (int, optional): number of trees to fit for the effect learner (default = 500)
         """
 
-        assert (effect_learner_objective == 'rank:pairwise' or effect_learner_objective == 'reg:linear'), 'Effect learner objective has to be rank:pairwise or reg:linear'
+        assert (effect_learner_objective == 'rank:pairwise' or effect_learner_objective == 'reg:linear'), \
+            'Effect learner objective has to be rank:pairwise or reg:linear'
         assert isinstance(random_state, int), 'random_state should be int.'
 
         self.effect_learner_objective = effect_learner_objective
