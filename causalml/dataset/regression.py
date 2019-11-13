@@ -13,7 +13,7 @@ def synthetic_data(mode=1, n=1000, p=5, sigma=1.0):
 
     Args:
         mode (int, optional): mode of the simulation: \
-            1 for a difficult nuisance components and an easy treatment effect. \
+            1 for difficult nuisance components and an easy treatment effect. \
             2 for a randomized trial. \
             3 for an easy propensity and a difficult baseline. \
             4 for unrelated treatment and control groups.

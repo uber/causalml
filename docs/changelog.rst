@@ -3,6 +3,15 @@
 Changelog
 =========
 
+0.5.0 (unreleased)
+------------------
+
+- Add `TMLELearner`, targeted maximum likelihood estimator to `inference.meta` by @huigangchen
+- Fix incorrect edge connections in the uplift tree plot by @paulluo0106
+- Fix an installation error related to `Cython` and `numpy` by @FlorianWilhelm
+- Drop Python 2 support from `setup.py` by @jeongyoonlee
+- Update `causaltree.pyx` Cython code to be compatible with `scikit-learn>=0.21.0` by @jeongyoonlee
+
 0.4.0 (2019-10-21)
 ------------------
 
