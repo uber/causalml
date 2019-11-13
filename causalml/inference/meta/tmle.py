@@ -159,7 +159,7 @@ class TMLELearner(object):
                 _ate_ub = []
                 for s in sorted(segments):
                     logger.info('Training the TMLE learner for segment {}.'.format(s))
-                    filt = (segment == s) & (yhat_c >= 0) & (yhat_t >= 0) & (yhat_c < np.quantile(yhat_c, q=.99))
+                    filt = (segment == s) & (yhat_c < np.quantile(yhat_c, q=.99))
                     _ate_s, se = simple_tmle(y[filt], w_group[filt], yhat_c[filt], yhat_t[filt], p_group[filt])
                     _ate_lb_s = _ate_s - se * norm.ppf(1 - self.ate_alpha / 2)
                     _ate_ub_s = _ate_s + se * norm.ppf(1 - self.ate_alpha / 2)
