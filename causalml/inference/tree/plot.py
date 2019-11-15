@@ -113,29 +113,35 @@ def uplift_tree_plot(decisionTree, x_names):
              ]
     i_node = 0
     dcParent = {}
+    totalSample = -1
     for nSplit in range(len(dcNodes.items())):
         lsY = dcNodes[nSplit]
         indexOfLevel = 0
         for lsX in lsY:
             iSplit, decision, szParent, bBranch, szImpurity, szSamples, szGroup, upliftScore, matchScore, indexParent = lsX
+            if totalSample == -1:  # initialize the value with the total sample size at root
+                totalSample = int(szSamples)
+            sampleProportion = round(int(szSamples)*100./totalSample, 1)
             if type(iSplit) == int:
                 szSplit = '%d-%d' % (iSplit, indexOfLevel)
                 dcParent[szSplit] = i_node
-                lsDot.append('%d [label=<%s<br/> impurity %s<br/> total_sample %s <br/>group_sample %s <br/> uplift score: %s <br/> uplift p_value %s <br/> validation uplift score %s>, fillcolor="#e5813900"] ;' % (i_node,
+                lsDot.append('%d [label=<%s<br/> impurity %s<br/> total_sample %s (%s&#37;)<br/>group_sample %s <br/> uplift score: %s <br/> uplift p_value %s <br/> validation uplift score %s>, fillcolor="#e5813900"] ;' % (i_node,
                                                                                                           decision.replace(
                                                                                                               '>=',
                                                                                                               '&ge;').replace(
                                                                                                               '?', ''),
                                                                                                           szImpurity,
                                                                                                           szSamples,
+                                                                                                          str(sampleProportion),
                                                                                                           szGroup,
                                                                                                           str(upliftScore[0]), 
                                                                                                           str(upliftScore[1]),
                                                                                                           str(matchScore)))
             else:
-                lsDot.append('%d [label=< impurity %s<br/> total_sample %s <br/>group_sample %s <br/> uplift score: %s <br/> uplift p_value %s <br/> validation uplift score %s <br/> mean %s>, fillcolor="#e5813900"] ;' % (i_node,
+                lsDot.append('%d [label=< impurity %s<br/> total_sample %s (%s&#37;)<br/>group_sample %s <br/> uplift score: %s <br/> uplift p_value %s <br/> validation uplift score %s <br/> mean %s>, fillcolor="#e5813900"] ;' % (i_node,
                                                                                                                 szImpurity,
                                                                                                                 szSamples,
+                                                                                                                str(sampleProportion),
                                                                                                                 szGroup,
                                                                                                                 str(upliftScore[0]),
                                                                                                                 str(upliftScore[1]),
