@@ -113,14 +113,12 @@ def uplift_tree_plot(decisionTree, x_names):
              ]
     i_node = 0
     dcParent = {}
-    totalSample = -1
+    totalSample = decisionTree.summary.get('samples')  # initialize the value with the total sample size at root
     for nSplit in range(len(dcNodes.items())):
         lsY = dcNodes[nSplit]
         indexOfLevel = 0
         for lsX in lsY:
             iSplit, decision, szParent, bBranch, szImpurity, szSamples, szGroup, upliftScore, matchScore, indexParent = lsX
-            if totalSample == -1:  # initialize the value with the total sample size at root
-                totalSample = int(szSamples)
             sampleProportion = round(int(szSamples)*100./totalSample, 1)
             if type(iSplit) == int:
                 szSplit = '%d-%d' % (iSplit, indexOfLevel)
