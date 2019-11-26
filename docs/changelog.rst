@@ -3,11 +3,12 @@
 Changelog
 =========
 
-0.5.0 (unreleased)
+0.5.0 (2019-11-26)
 ------------------
 
 - Add `TMLELearner`, targeted maximum likelihood estimator to `inference.meta` by @huigangchen
-- Fix incorrect edge connections in the uplift tree plot by @paulluo0106
+- Add an option to DGPs for regression to simulate imbalanced propensity distrubition by @huigangchen
+- Fix incorrect edge connections, and add more information in the uplift tree plot by @paulluo0106
 - Fix an installation error related to `Cython` and `numpy` by @FlorianWilhelm
 - Drop Python 2 support from `setup.py` by @jeongyoonlee
 - Update `causaltree.pyx` Cython code to be compatible with `scikit-learn>=0.21.0` by @jeongyoonlee
