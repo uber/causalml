@@ -1,5 +1,6 @@
 from copy import deepcopy
 import logging
+import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
