@@ -4,6 +4,7 @@ from __future__ import print_function
 from future.builtins import super
 from copy import deepcopy
 import logging
+import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
@@ -84,7 +85,7 @@ class BaseRLearner(object):
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -158,7 +159,7 @@ class BaseRLearner(object):
         te = self.predict(X)
 
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -210,7 +211,7 @@ class BaseRLearner(object):
         te = self.fit_predict(X, p, treatment, y)
 
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -488,7 +489,7 @@ class BaseRClassifier(BaseRLearner):
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -595,7 +596,7 @@ class XGBRRegressor(BaseRRegressor):
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):

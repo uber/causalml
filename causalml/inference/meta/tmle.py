@@ -1,4 +1,5 @@
 import logging
+import pandas as pd
 import numpy as np
 from scipy.optimize import minimize
 from scipy.special import expit, logit
@@ -113,7 +114,7 @@ class TMLELearner(object):
         self.t_groups.sort()
 
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
