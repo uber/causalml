@@ -71,7 +71,7 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
     return preds_dict
 
 
-def get_synthetic_summary(synthetic_data_func, n=1000, k=1):
+def get_synthetic_summary(synthetic_data_func, n=1000, k=1, estimators={}):
     """Generate a summary for predictions on synthetic data using specified function
 
     Args:
@@ -82,7 +82,7 @@ def get_synthetic_summary(synthetic_data_func, n=1000, k=1):
     summaries = []
 
     for i in range(k):
-        synthetic_preds = get_synthetic_preds(synthetic_data_func, n=n)
+        synthetic_preds = get_synthetic_preds(synthetic_data_func, n=n, estimators=estimators)
         actuals = synthetic_preds[KEY_ACTUAL]
         synthetic_summary = pd.DataFrame({label: [preds.mean(), mse(preds, actuals)] for label, preds
                                           in synthetic_preds.items() if label != KEY_GENERATED_DATA},
