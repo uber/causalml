@@ -12,6 +12,7 @@ from causalml.inference.meta import BaseSLearner, BaseSRegressor, BaseSClassifie
 from causalml.inference.meta import BaseTLearner, BaseTRegressor, BaseTClassifier, XGBTRegressor, MLPTRegressor
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
 from causalml.inference.meta import BaseRLearner, BaseRClassifier, BaseRRegressor
+from causalml.inference.meta import TMLELearner
 from causalml.metrics import ape, gini, get_cumgain
 
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
@@ -200,6 +201,17 @@ def test_BaseRRegressor(generate_regression_data):
     assert gini(tau, cate_p.flatten()) > .5
 
 
+def test_TMLELearner(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = TMLELearner(learner=XGBRegressor())
+
+    # check the accuracy of the ATE estimation
+    ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+
 def test_BaseSClassifier(generate_classification_data):
 
     np.random.seed(RANDOM_SEED)
@@ -346,3 +358,37 @@ def test_BaseRClassifier(generate_classification_data):
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
     assert cumgain['y_pred'].sum() > cumgain['Random'].sum()
+
+
+def test_pandas_input(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+    # convert to pandas types
+    y = pd.Series(y)
+    X = pd.DataFrame(X)
+    treatment = pd.Series(treatment)
+
+    try:
+        learner = BaseSLearner(learner=LinearRegression())
+        ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True)
+    except AttributeError:
+        assert False
+    try:
+        learner = BaseTLearner(learner=LinearRegression())
+        ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
+    except AttributeError:
+        assert False
+    try:
+        learner = BaseXLearner(learner=LinearRegression())
+        ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+    except AttributeError:
+        assert False
+    try:
+        learner = BaseRLearner(learner=LinearRegression())
+        ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+    except AttributeError:
+        assert False
+    try:
+        learner = TMLELearner(learner=LinearRegression())
+        ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+    except AttributeError:
+        assert False
