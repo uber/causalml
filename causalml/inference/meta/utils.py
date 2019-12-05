@@ -3,12 +3,8 @@ import numpy as np
 
 
 def convert_pd_to_np(*args):
-    pd_types = (pd.DataFrame, pd.Series)
-    output = [obj.values if isinstance(obj, pd_types) else obj for obj in args]
-    if len(output) == 1:
-        return output[0]
-    else:
-        return output
+    output = [obj.to_numpy() if hasattr(obj, "to_numpy") else obj for obj in args]
+    return output if len(output) > 1 else output[0]
 
 
 def check_control_in_treatment(treatment, control_name):
