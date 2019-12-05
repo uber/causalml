@@ -13,7 +13,8 @@ def test_get_synthetic_preds():
 
 
 def test_get_synthetic_summary():
-    summary = get_synthetic_summary(synthetic_data_func=simulate_nuisance_and_easy_treatment)
+    summary = get_synthetic_summary(synthetic_data_func=simulate_nuisance_and_easy_treatment,
+                                    estimators={'S Learner (LR)': LRSRegressor(), 'T Learner (XGB)': XGBTRegressor()})
 
     print(summary)
 
