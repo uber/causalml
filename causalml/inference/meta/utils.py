@@ -1,4 +1,14 @@
+import pandas as pd
 import numpy as np
+
+
+def convert_pd_to_np(*args):
+    pd_types = (pd.DataFrame, pd.Series)
+    output = [obj.values if isinstance(obj, pd_types) else obj for obj in args]
+    if len(output) == 1:
+        return output[0]
+    else:
+        return output
 
 
 def check_control_in_treatment(treatment, control_name):
@@ -8,21 +18,8 @@ def check_control_in_treatment(treatment, control_name):
 
 
 def check_p_conditions(p, t_groups):
-    assert isinstance(p, (np.ndarray, dict)), \
-        'p must be an np.ndarray or dict type'
-    if isinstance(p, np.ndarray):
+    assert isinstance(p, (np.ndarray, pd.Series, dict)), \
+        'p must be an np.ndarray, pd.Series, or dict type'
+    if isinstance(p, (np.ndarray, pd.Series)):
         assert t_groups.shape[0] == 1, \
             'If p is passed as an np.ndarray, there must be only 1 unique non-control group in the treatment vector.'
-
-
-def check_explain_conditions(method, models, X=None, treatment=None, y=None):
-    valid_methods = ['gini', 'permutation', 'shapley']
-    assert method in valid_methods, 'Current supported methods: {}'.format(', '.join(valid_methods))
-
-    if method in ('gini', 'shapley'):
-        conds = [hasattr(mod, "feature_importances_") for mod in models]
-        assert all(conds), "Both models must have .feature_importances_ attribute if method = {}".format(method)
-
-    if method in ('permutation', 'shapley'):
-        assert all([arr is not None for arr in (X, treatment, y)]), \
-                "X, treatment, and y must be provided if method = {}".format(method)

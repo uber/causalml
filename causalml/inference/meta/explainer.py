@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from lightgbm import LGBMRegressor
 from copy import deepcopy
 
+from causalml.inference.meta.utils import convert_pd_to_np
+
 VALID_METHODS = ('auto', 'permutation', 'shapley')
 
 
@@ -38,8 +40,10 @@ class Explainer(object):
         """
         self.method = method
         self.control_name = control_name
-        self.X = X
-        self.tau = tau
+        self.X = convert_pd_to_np(X)
+        self.tau = convert_pd_to_np(tau)
+        if self.tau.ndim == 1:
+            self.tau = self.tau.reshape(-1, 1)
         self.classes = classes
         self.model_tau = LGBMRegressor(importance_type='gain') if model_tau is None else model_tau
         self.features = features
