@@ -1,7 +1,13 @@
+import pandas as pd
 import numpy as np
 
 from packaging import version
 from xgboost import __version__ as xgboost_version
+
+
+def convert_pd_to_np(*args):
+    output = [obj.to_numpy() if hasattr(obj, "to_numpy") else obj for obj in args]
+    return output if len(output) > 1 else output[0]
 
 
 def check_treatment_vector(treatment, control_name=None):
@@ -14,9 +20,9 @@ def check_treatment_vector(treatment, control_name=None):
 
 
 def check_p_conditions(p, t_groups):
-    assert isinstance(p, (np.ndarray, dict)), \
-        'p must be an np.ndarray or dict type'
-    if isinstance(p, np.ndarray):
+    assert isinstance(p, (np.ndarray, pd.Series, dict)), \
+        'p must be an np.ndarray, pd.Series, or dict type'
+    if isinstance(p, (np.ndarray, pd.Series)):
         assert t_groups.shape[0] == 1, \
             'If p is passed as an np.ndarray, there must be only 1 unique non-control group in the treatment vector.'
 
