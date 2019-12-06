@@ -20,7 +20,7 @@ def test_UpliftRandomForestClassifier(generate_classification_data):
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
 
-    # Train the UpLift Random Forest classifer
+    # Train the UpLift Random Forest classifier
     uplift_model = UpliftRandomForestClassifier(
         min_samples_leaf=50,
         control_name=TREATMENT_NAMES[0]
@@ -72,7 +72,7 @@ def test_UpliftTreeClassifier(generate_classification_data):
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
 
-    # Train the UpLift Random Forest classifer
+    # Train the UpLift Random Forest classifier
     uplift_model = UpliftTreeClassifier(control_name=TREATMENT_NAMES[0])
 
     uplift_model.fit(df_train[x_names].values,

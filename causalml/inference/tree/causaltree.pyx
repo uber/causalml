@@ -194,7 +194,7 @@ cdef class CausalMSE(RegressionCriterion):
 class CausalTreeRegressor(object):
     """A Causal Tree regressor class.
 
-    The Causal Tree is a decision tree regressor with a split criteria for treamt effects instead of
+    The Causal Tree is a decision tree regressor with a split criteria for treatment effects instead of
     outputs.
 
     Details are available at Athey and Imbens (2015) (https://arxiv.org/abs/1504.01132)
@@ -205,7 +205,7 @@ class CausalTreeRegressor(object):
 
         Args:
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
-            control_name (str or int, optional): name of control gropu
+            control_name (str or int, optional): name of control group
             max_depth (int, optional): the maximum depth of tree
             min_samples_leaf (int, optional): the minimum number of samples in leaves
             random_state (int or np.RandomState, optional): a random seed or a random state

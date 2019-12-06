@@ -42,7 +42,7 @@ def create_table_one(data, treatment_col, features):
 
     Args:
         data (pandas.DataFrame): total or matched sample data
-        treatmenet_col (str): the column name for the treatment
+        treatment_col (str): the column name for the treatment
         features (list of str): the column names of features
 
     Returns:
@@ -151,11 +151,11 @@ class NearestNeighborMatch(object):
                                          axis=0)
 
             cond = distances < sdcal
-            # Deduplicate the indices of the treatment gruop
+            # Deduplicate the indices of the treatment group
             t_idx_matched = list(set(
                 treatment_scaled.loc[cond].index.tolist()
             ))
-            # XXX: Should we dedulicate the indices of the control group too?
+            # XXX: Should we deduplicate the indices of the control group too?
             c_idx_matched = control_scaled.iloc[indices[cond]].index.tolist()
         else:
             assert len(score_cols) == 1, (

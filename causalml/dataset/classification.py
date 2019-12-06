@@ -43,7 +43,7 @@ def make_uplift_classification(n_samples=1000,
         Number of features for generating negative treatment effects for corresponding treatment group.
         Dictionary of {treatment_key: number_of_features_for_increase_uplift}.
     delta_uplift_increase_dict: dictionary, optional (default: {'treatment1': .02, 'treatment2': .05, 'treatment3': .1})
-        Positive teatment effect created by the positive uplift features on the base classification label.
+        Positive treatment effect created by the positive uplift features on the base classification label.
         Dictionary of {treatment_key: increase_delta}.
     delta_uplift_decrease_dict: dictionary, optional (default: {'treatment1': 0., 'treatment2': 0., 'treatment3': 0.})
         Negative treatment effect created by the negative uplift features on the base classification label.
