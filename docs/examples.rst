@@ -18,7 +18,7 @@ Propensity Score Matching
 
 .. code-block:: python
 
-    from causalml.match import NearestNeigoborMatch, create_table_one
+    from causalml.match import NearestNeighborMatch, create_table_one
 
     psm = NearestNeighborMatch(replace=False,
                                ratio=1,

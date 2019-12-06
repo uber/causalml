@@ -42,7 +42,7 @@ class BaseRLearner(object):
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
             n_fold (int, optional): the number of cross validation folds for outcome_learner
-            random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
+            random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
         """
         assert (learner is not None) or ((outcome_learner is not None) and (effect_learner is not None))
 
@@ -140,7 +140,7 @@ class BaseRLearner(object):
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            verbose (str): whether to output progress logs
+            verbose (bool): whether to output progress logs
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
@@ -360,7 +360,7 @@ class BaseRLearner(object):
 
         This plots the value of the feature on the x-axis and the SHAP value of the same feature
         on the y-axis. This shows how the model depends on the given feature, and is like a
-        richer extenstion of the classical parital dependence plots. Vertical dispersion of the
+        richer extension of the classical partial dependence plots. Vertical dispersion of the
         data points represents interaction effects.
 
         Args:
@@ -373,7 +373,7 @@ class BaseRLearner(object):
             shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
             interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
                 If "auto" then shap.common.approximate_interactions is used to pick what seems to be the
-                strongest interaction (note that to find to true stongest interaction you need to compute
+                strongest interaction (note that to find to true strongest interaction you need to compute
                 the SHAP interaction values).
         """
         override_checks = False if shap_dict is None else True
@@ -411,7 +411,7 @@ class BaseRRegressor(BaseRLearner):
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
             n_fold (int, optional): the number of cross validation folds for outcome_learner
-            random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
+            random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
         """
         super().__init__(
             learner=learner,
@@ -447,7 +447,7 @@ class BaseRClassifier(BaseRLearner):
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
             n_fold (int, optional): the number of cross validation folds for outcome_learner
-            random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
+            random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
         """
         super().__init__(
             learner=learner,
@@ -540,7 +540,7 @@ class XGBRRegressor(BaseRRegressor):
                                          enabled
             early_stopping_rounds (int, optional): validation metric needs to improve at least once in every
                                                    early_stopping_rounds round(s) to continue training
-            effect_learner_objective (str, optional): the learning objective for the efffect learner
+            effect_learner_objective (str, optional): the learning objective for the effect learner
                                                       (default = 'rank:pairwise')
             effect_learner_n_estimators (int, optional): number of trees to fit for the effect learner (default = 500)
         """
