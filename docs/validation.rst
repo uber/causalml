@@ -7,7 +7,7 @@ Estimation of the treatment effect cannot be validated the same way as regular M
 Validation with Multiple Estimates
 ----------------------------------
 
-We can validate the methodology by comparing the esimates with other approaches, checking the consistency of estimates across different levels and cohorts.
+We can validate the methodology by comparing the estimates with other approaches, checking the consistency of estimates across different levels and cohorts.
 
 Model Robustness for Meta Algorithms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

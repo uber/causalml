@@ -42,7 +42,7 @@ def synthetic_data(mode=1, n=1000, p=5, sigma=1.0, adj=0.):
 
 
 def simulate_nuisance_and_easy_treatment(n=1000, p=5, sigma=1.0, adj=0.):
-    ''' Synthetic data with a diffult nuisance components and an easy treatment effect
+    ''' Synthetic data with a difficult nuisance components and an easy treatment effect
         From Setup A in Nie X. and Wager S. (2018) 'Quasi-Oracle Estimation of Heterogeneous Treatment Effects'
 
     Args:

@@ -138,7 +138,6 @@ class OneHotEncoder(base.BaseEstimator):
 
         Args:
             min_obs (int): minimum number of observation to create a dummy variable
-            label_encoder (LabelEncoder): LabelEncoder that transofrm
         """
 
         self.min_obs = min_obs
