@@ -10,7 +10,8 @@ from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
 
-from causalml.inference.meta.utils import check_control_in_treatment, check_p_conditions
+from causalml.inference.meta.utils import (check_control_in_treatment, check_p_conditions,
+    clean_xgboost_objective)
 from causalml.inference.meta.explainer import Explainer
 
 logger = logging.getLogger('causalml')
@@ -544,16 +545,21 @@ class XGBRRegressor(BaseRRegressor):
                                                       (default = 'rank:pairwise')
             effect_learner_n_estimators (int, optional): number of trees to fit for the effect learner (default = 500)
         """
+        def clean_dict_keys(orig):
+            return {clean_xgboost_objective(k): v for (k, v) in orig.items()}
 
-        assert (effect_learner_objective == 'rank:pairwise' or effect_learner_objective == 'reg:linear'), \
-            'Effect learner objective has to be rank:pairwise or reg:linear'
+        metric_mapping = clean_dict_keys({
+            'rank:pairwise': 'auc',
+            'reg:squarederror': 'rmse',
+        })
+        assert (effect_learner_objective in metric_mapping), \
+            'Effect learner objective must be one of: ' + ", ".join(metric_mapping)
         assert isinstance(random_state, int), 'random_state should be int.'
 
+        effect_learner_objective = clean_xgboost_objective(effect_learner_objective)
+
         self.effect_learner_objective = effect_learner_objective
-        if self.effect_learner_objective == 'rank:pairwise':
-            self.effect_learner_eval_metric = 'auc'
-        if self.effect_learner_objective == 'reg:linear':
-            self.effect_learner_eval_metric = 'rmse'
+        self.effect_learner_eval_metric = metric_mapping[effect_learner_objective]
         self.effect_learner_n_estimators = effect_learner_n_estimators
         self.early_stopping = early_stopping
         if self.early_stopping:

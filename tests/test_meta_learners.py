@@ -12,6 +12,7 @@ from causalml.inference.meta import BaseSLearner, BaseSRegressor, BaseSClassifie
 from causalml.inference.meta import BaseTLearner, BaseTRegressor, BaseTClassifier, XGBTRegressor, MLPTRegressor
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
 from causalml.inference.meta import BaseRLearner, BaseRClassifier, BaseRRegressor
+from causalml.inference.meta.utils import xgb_with_valid_objective
 from causalml.metrics import ape, gini, get_cumgain
 
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
@@ -57,7 +58,7 @@ def test_BaseSLearner(generate_regression_data):
 def test_BaseSRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseSRegressor(learner=XGBRegressor())
+    learner = BaseSRegressor(learner=xgb_with_valid_objective(XGBRegressor))
 
     # check the accuracy of the ATE estimation
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
@@ -83,7 +84,7 @@ def test_LRSRegressor(generate_regression_data):
 def test_BaseTLearner(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseTLearner(learner=XGBRegressor())
+    learner = BaseTLearner(learner=xgb_with_valid_objective(XGBRegressor))
 
     # check the accuracy of the ATE estimation
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
@@ -98,7 +99,7 @@ def test_BaseTLearner(generate_regression_data):
 def test_BaseTRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseTRegressor(learner=XGBRegressor())
+    learner = BaseTRegressor(learner=xgb_with_valid_objective(XGBRegressor))
 
     # check the accuracy of the ATE estimation
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
@@ -128,7 +129,7 @@ def test_MLPTRegressor(generate_regression_data):
 def test_XGBTRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = XGBTRegressor()
+    learner = xgb_with_valid_objective(XGBTRegressor)
 
     # check the accuracy of the ATE estimation
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
@@ -143,7 +144,7 @@ def test_XGBTRegressor(generate_regression_data):
 def test_BaseXLearner(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseXLearner(learner=XGBRegressor())
+    learner = BaseXLearner(learner=xgb_with_valid_objective(XGBRegressor))
 
     # check the accuracy of the ATE estimation
     ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
@@ -158,7 +159,7 @@ def test_BaseXLearner(generate_regression_data):
 def test_BaseXRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseXRegressor(learner=XGBRegressor())
+    learner = BaseXRegressor(learner=xgb_with_valid_objective(XGBRegressor))
 
     # check the accuracy of the ATE estimation
     ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
@@ -173,7 +174,7 @@ def test_BaseXRegressor(generate_regression_data):
 def test_BaseRLearner(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseRLearner(learner=XGBRegressor())
+    learner = BaseRLearner(learner=xgb_with_valid_objective(XGBRegressor))
 
     # check the accuracy of the ATE estimation
     ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
@@ -188,7 +189,7 @@ def test_BaseRLearner(generate_regression_data):
 def test_BaseRRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseRRegressor(learner=XGBRegressor())
+    learner = BaseRRegressor(learner=xgb_with_valid_objective(XGBRegressor))
 
     # check the accuracy of the ATE estimation
     ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
@@ -285,9 +286,9 @@ def test_BaseXClassifier(generate_classification_data):
                                          random_state=RANDOM_SEED)
 
     uplift_model = BaseXClassifier(control_outcome_learner=XGBClassifier(),
-                                   control_effect_learner=XGBRegressor(),
+                                   control_effect_learner=xgb_with_valid_objective(XGBRegressor),
                                    treatment_outcome_learner=XGBClassifier(),
-                                   treatment_effect_learner=XGBRegressor())
+                                   treatment_effect_learner=xgb_with_valid_objective(XGBRegressor))
 
     uplift_model.fit(X=df_train[x_names].values,
                      treatment=df_train['treatment_group_key'].values,
@@ -326,7 +327,7 @@ def test_BaseRClassifier(generate_classification_data):
                                          random_state=RANDOM_SEED)
 
     uplift_model = BaseRClassifier(outcome_learner=XGBClassifier(),
-                                   effect_learner=XGBRegressor())
+                                   effect_learner=xgb_with_valid_objective(XGBRegressor))
 
     uplift_model.fit(X=df_train[x_names].values,
                      p=df_train['propensity_score'].values,
