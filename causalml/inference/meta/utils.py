@@ -57,16 +57,3 @@ def clean_xgboost_objective(objective):
         if objective in compat_v83_or_later:
             objective = compat_v83_or_later[objective]
     return objective
-
-
-def xgb_with_valid_objective(xgb_constructor=XGBRegressor):
-    """
-    Wrapper for xgboost constructors that avoids warnings from deprecated default arguments
-    that exist in some version 0.90.
-
-    Returns
-    -------
-    A new xgboost object
-    """
-    valid_objective = clean_xgboost_objective('reg:squarederror')
-    return xgb_constructor(objective=valid_objective)
