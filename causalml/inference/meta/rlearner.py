@@ -552,11 +552,12 @@ class XGBRRegressor(BaseRRegressor):
             'rank:pairwise': 'auc',
             'reg:squarederror': 'rmse',
         })
+
+        effect_learner_objective = clean_xgboost_objective(effect_learner_objective)
+
         assert (effect_learner_objective in metric_mapping), \
             'Effect learner objective must be one of: ' + ", ".join(metric_mapping)
         assert isinstance(random_state, int), 'random_state should be int.'
-
-        effect_learner_objective = clean_xgboost_objective(effect_learner_objective)
 
         self.effect_learner_objective = effect_learner_objective
         self.effect_learner_eval_metric = metric_mapping[effect_learner_objective]
