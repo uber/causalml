@@ -53,7 +53,7 @@ def uplift_tree_string(decisionTree, x_names):
 
 def uplift_tree_plot(decisionTree, x_names):
     '''
-    Convert the tree to dot gragh for plots.
+    Convert the tree to dot graph for plots.
 
     Args
     ----

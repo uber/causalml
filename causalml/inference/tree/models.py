@@ -7,7 +7,7 @@ The module structure is the following:
   variants of uplift models based on random forest, with 'fit' and 'predict'
   method.
 - The ``UpliftTreeClassifier`` base class implements the uplift trees (without
-  Bootstraping for random forest), this class is called within
+  Bootstrapping for random forest), this class is called within
   ``UpliftRandomForestClassifier`` for constructing random forest.
 """
 
@@ -43,7 +43,7 @@ class DecisionTree:
         The true branch tree node (feature > value).
 
     falseBranch : object of DecisionTree
-        The flase branch tree node (feature > value).
+        The false branch tree node (feature > value).
 
     results : dictionary
         The classification probability Pr(1) for each experiment group in the tree node.
@@ -55,14 +55,14 @@ class DecisionTree:
         The treatment name generating the maximum difference between treatment and control group.
 
     maxDiffSign : float
-        The sign of the maxium difference (1. or -1.).
+        The sign of the maximum difference (1. or -1.).
 
     nodeSummary : dictionary
         Summary statistics of the tree nodes {treatment: [y_mean, n]}, where y_mean stands for the target metric mean
         and n is the sample size.
 
     backupResults : dictionary
-        The conversion proabilities in each treatment in the parent node {treatment: y_mean}. The parent node
+        The conversion probabilities in each treatment in the parent node {treatment: y_mean}. The parent node
         information is served as a backup for the children node, in case no valid statistics can be calculated from the
         children node, the parent node information will be used in certain cases.
 
@@ -70,7 +70,7 @@ class DecisionTree:
         The treatment name providing the best uplift (treatment effect).
 
     upliftScore : list
-        The uplift score of this node: [max_Diff, p_value], where max_Diff stands for the maxium treatment effect, and
+        The uplift score of this node: [max_Diff, p_value], where max_Diff stands for the maximum treatment effect, and
         p_value stands for the p_value of the treatment effect.
 
     matchScore : float
@@ -107,7 +107,7 @@ class UpliftTreeClassifier:
     A uplift tree classifier estimates the individual treatment effect by modifying the loss function in the
     classification trees.
 
-    The uplift tree classifer is used in uplift random forest to construct the trees in the forest.
+    The uplift tree classifier is used in uplift random forest to construct the trees in the forest.
 
     Parameters
     ----------
@@ -278,7 +278,7 @@ class UpliftTreeClassifier:
                            evaluationFunction, notify, n_reg,
                            parentNodeSummary=currentNodeSummary)
 
-        # merge leaves (potentionally)
+        # merge leaves (potentially)
         if (tree.trueBranch.results is not None and
             tree.falseBranch.results is not None):
             if rule == 'maxAbsDiff':
@@ -1058,7 +1058,7 @@ class UpliftTreeClassifier:
 
     def classify(self, observations, tree, dataMissing=False):
         '''
-        Classifies (prediction) the observationss according to the tree.
+        Classifies (prediction) the observations according to the tree.
 
         Args
         ----
@@ -1077,7 +1077,7 @@ class UpliftTreeClassifier:
 
         def classifyWithoutMissingData(observations, tree):
             '''
-            Classifies (prediction) the observationss according to the tree, assuming without missing data.
+            Classifies (prediction) the observations according to the tree, assuming without missing data.
 
             Args
             ----
@@ -1109,7 +1109,7 @@ class UpliftTreeClassifier:
 
         def classifyWithMissingData(observations, tree):
             '''
-            Classifies (prediction) the observationss according to the tree, assuming with missing data.
+            Classifies (prediction) the observations according to the tree, assuming with missing data.
 
             Args
             ----

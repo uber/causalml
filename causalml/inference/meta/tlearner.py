@@ -360,7 +360,7 @@ class BaseTLearner(object):
 
         This plots the value of the feature on the x-axis and the SHAP value of the same feature
         on the y-axis. This shows how the model depends on the given feature, and is like a
-        richer extenstion of the classical parital dependence plots. Vertical dispersion of the
+        richer extension of the classical partial dependence plots. Vertical dispersion of the
         data points represents interaction effects.
 
         Args:
@@ -373,7 +373,7 @@ class BaseTLearner(object):
             shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
             interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
                 If "auto" then shap.common.approximate_interactions is used to pick what seems to be the
-                strongest interaction (note that to find to true stongest interaction you need to compute
+                strongest interaction (note that to find to true strongest interaction you need to compute
                 the SHAP interaction values).
         """
         override_checks = False if shap_dict is None else True
