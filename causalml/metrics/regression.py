@@ -112,7 +112,7 @@ def regression_metrics(y, p, w=None, metrics={'RMSE': rmse, 'sMAPE': smape, 'Gin
         p (numpy.array): prediction
         w (numpy.array, optional): a treatment vector (1 or True: treatment, 0 or False: control). If given, log
             metrics for the treatment and control group separately
-        metrics (dict, optional): a dictonary of the metric names and functions
+        metrics (dict, optional): a dictionary of the metric names and functions
     """
     assert metrics
     assert y.shape[0] == p.shape[0]

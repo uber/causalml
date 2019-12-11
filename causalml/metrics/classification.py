@@ -33,6 +33,6 @@ def classification_metrics(y, p, w=None, metrics={'AUC': roc_auc_score, 'Log Los
         p (numpy.array): prediction
         w (numpy.array, optional): a treatment vector (1 or True: treatment, 0 or False: control). If given, log
             metrics for the treatment and control group separately
-        metrics (dict, optional): a dictonary of the metric names and functions
+        metrics (dict, optional): a dictionary of the metric names and functions
     """
     regression_metrics(y=y, p=p, w=w, metrics=metrics)

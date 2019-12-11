@@ -31,7 +31,7 @@ class PolicyLearner(object):
             policy_learner (optional): a classification model to estimate treatment assignment. It needs to take `sample_weight` as an input argument for `fit()`
             clip_bounds (tuple, optional): lower and upper bounds for clipping propensity scores to avoid division by zero in PolicyLearner.fit()
             n_fold (int, optional): the number of cross validation folds for outcome_learner
-            random_state (int or RandomState, optional): a seed (int) or random number generater (RandomState)
+            random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
         """
         self.model_mu = outcome_learner
         self.model_pi = policy_learner

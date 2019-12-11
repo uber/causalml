@@ -7,7 +7,7 @@ Changelog
 ------------------
 
 - Add `TMLELearner`, targeted maximum likelihood estimator to `inference.meta` by @huigangchen
-- Add an option to DGPs for regression to simulate imbalanced propensity distrubition by @huigangchen
+- Add an option to DGPs for regression to simulate imbalanced propensity distribution by @huigangchen
 - Fix incorrect edge connections, and add more information in the uplift tree plot by @paulluo0106
 - Fix an installation error related to `Cython` and `numpy` by @FlorianWilhelm
 - Drop Python 2 support from `setup.py` by @jeongyoonlee
