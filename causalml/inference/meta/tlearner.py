@@ -14,6 +14,7 @@ from xgboost import XGBRegressor
 import shap
 
 from causalml.inference.meta.explainer import Explainer
+from causalml.inference.meta.utils import check_treatment_vector
 from causalml.metrics import regression_metrics, classification_metrics
 
 
