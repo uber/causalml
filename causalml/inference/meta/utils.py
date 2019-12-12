@@ -1,10 +1,13 @@
 import numpy as np
 
 
-def check_control_in_treatment(treatment, control_name):
-    if np.unique(treatment).shape[0] == 2:
+def check_treatment_vector(treatment, control_name=None):
+    n_unique_treatments = np.unique(treatment).shape[0]
+    assert n_unique_treatments > 1, \
+        'Treatment vector must have at least two levels.'
+    if control_name is not None:
         assert control_name in treatment, \
-            'If treatment vector has 2 unique values, one of them must be the control (specify in init step).'
+            'Control group level {} not found in treatment vector.'.format(control_name)
 
 
 def check_p_conditions(p, t_groups):
