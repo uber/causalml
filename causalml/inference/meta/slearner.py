@@ -77,6 +77,8 @@ class BaseSLearner(object):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
+
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
