@@ -11,6 +11,7 @@ import statsmodels.api as sm
 from copy import deepcopy
 
 from causalml.inference.meta.explainer import Explainer
+from causalml.inference.meta.utils import check_treatment_vector
 from causalml.metrics import regression_metrics, classification_metrics
 
 
