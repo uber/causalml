@@ -11,6 +11,7 @@ import statsmodels.api as sm
 from copy import deepcopy
 
 from causalml.inference.meta.explainer import Explainer
+from causalml.inference.meta.utils import check_treatment_vector
 from causalml.metrics import regression_metrics, classification_metrics
 
 
@@ -77,6 +78,8 @@ class BaseSLearner(object):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
+
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
