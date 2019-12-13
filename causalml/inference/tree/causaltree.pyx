@@ -88,6 +88,7 @@ cdef class CausalMSE(RegressionCriterion):
         cdef double tr_var
         cdef double ct_var
         cdef double one_over_eps = 1e5
+        cdef double big_number = 1e10
 
         for p in range(start, end):
             i = samples[p]
@@ -110,7 +111,7 @@ cdef class CausalMSE(RegressionCriterion):
         ct_var = ((node_sq_sum - node_tr_sq_sum) / node_ct -
                   (node_sum - node_tr_sum) * (node_sum - node_tr_sum) / (node_ct * node_ct))
 
-        return node_tau * node_tau - (tr_var / node_tr + ct_var / node_ct)
+        return big_number - (node_tau * node_tau - (tr_var / node_tr + ct_var / node_ct))
 
 
     cdef void children_impurity(self, double* impurity_left, double* impurity_right) nogil:
@@ -151,6 +152,7 @@ cdef class CausalMSE(RegressionCriterion):
         cdef double left_ct_var
 
         cdef double one_over_eps = 1e5
+        cdef double big_number = 1e10
 
         for p in range(start, end):
             i = samples[p]
@@ -187,8 +189,8 @@ cdef class CausalMSE(RegressionCriterion):
         left_ct_var = ((left_sq_sum - left_tr_sq_sum) / left_ct -
                         (left_sum - left_tr_sum) * (left_sum - left_tr_sum) / (left_ct * left_ct))
 
-        impurity_left[0] = left_tau * left_tau - (left_tr_var / left_tr + left_ct_var / left_ct)
-        impurity_right[0] = right_tau * right_tau - (right_tr_var / right_tr + right_ct_var / right_ct)
+        impurity_left[0] = big_number - (left_tau * left_tau - (left_tr_var / left_tr + left_ct_var / left_ct))
+        impurity_right[0] = big_number - (right_tau * right_tau - (right_tr_var / right_tr + right_ct_var / right_ct))
 
 
 class CausalTreeRegressor(object):
