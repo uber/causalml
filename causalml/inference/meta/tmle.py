@@ -5,7 +5,7 @@ from scipy.special import expit, logit
 from scipy.stats import norm
 from sklearn.preprocessing import MinMaxScaler
 
-from causalml.inference.meta.utils import check_control_in_treatment, check_p_conditions
+from causalml.inference.meta.utils import check_treatment_vector, check_p_conditions
 from causalml.propensity import calibrate
 
 
@@ -107,7 +107,7 @@ class TMLELearner(object):
         Returns:
             (tuple): The ATE and its confidence interval (LB, UB) for each treatment, t and segment, s
         """
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 

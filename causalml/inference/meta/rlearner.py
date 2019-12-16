@@ -10,7 +10,7 @@ from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
 
-from causalml.inference.meta.utils import (check_control_in_treatment, check_p_conditions,
+from causalml.inference.meta.utils import (check_treatment_vector, check_p_conditions,
     get_xgboost_objective_metric)
 from causalml.inference.meta.explainer import Explainer
 
@@ -79,7 +79,7 @@ class BaseRLearner(object):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
@@ -472,7 +472,7 @@ class BaseRClassifier(BaseRLearner):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
@@ -576,7 +576,7 @@ class XGBRRegressor(BaseRRegressor):
             treatment (np.array): a treatment vector
             y (np.array): an outcome vector
         """
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
