@@ -1,10 +1,7 @@
 import numpy as np
 
 from packaging import version
-from xgboost import (
-    __version__ as xgboost_version,
-    XGBRegressor
-)
+from xgboost import __version__ as xgboost_version
 
 
 def check_control_in_treatment(treatment, control_name):
@@ -57,3 +54,32 @@ def clean_xgboost_objective(objective):
         if objective in compat_v83_or_later:
             objective = compat_v83_or_later[objective]
     return objective
+
+
+def get_xgboost_objective_metric(objective):
+    """
+    Get the xgboost version-compatible objective and evaluation metric from a potentially version-incompatible input.
+
+    Args
+    ----
+
+    objective : string
+        An xgboost objective that may be incompatible with the installed version.
+
+    Returns
+    -------
+    A tuple with the translated objective and evaluation metric.
+    """
+    def clean_dict_keys(orig):
+        return {clean_xgboost_objective(k): v for (k, v) in orig.items()}
+
+    metric_mapping = clean_dict_keys({
+        'rank:pairwise': 'auc',
+        'reg:squarederror': 'rmse',
+    })
+
+    objective = clean_xgboost_objective(objective)
+
+    assert (objective in metric_mapping), \
+        'Effect learner objective must be one of: ' + ", ".join(metric_mapping)
+    return objective, metric_mapping[objective]
