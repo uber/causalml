@@ -13,6 +13,7 @@ from copy import deepcopy
 from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import check_treatment_vector
 from causalml.metrics import regression_metrics, classification_metrics
+from causalml.inference.meta.utils import check_control_in_treatment, convert_pd_to_np
 
 
 logger = logging.getLogger('causalml')
@@ -74,11 +75,11 @@ class BaseSLearner(object):
     def fit(self, X, treatment, y):
         """Fit the inference model
         Args:
-            X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            X (np.matrix, np.array, or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
         """
-
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
@@ -98,14 +99,15 @@ class BaseSLearner(object):
     def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
         Args:
-            X (np.matrix): a feature matrix
-            treatment (np.array, optional): a treatment vector
-            y (np.array, optional): an outcome vector
-            return_components (bool, optional): whether to return outcome for treatment and control separately
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series, optional): a treatment vector
+            y (np.array or pd.Series, optional): an outcome vector
+            return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         yhat_cs = {}
         yhat_ts = {}
 
@@ -148,13 +150,13 @@ class BaseSLearner(object):
                     return_components=False, verbose=True):
         """Fit the inference model of the S learner and predict treatment effects.
         Args:
-            X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            X (np.matrix, np.array, or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
             return_ci (bool, optional): whether to return confidence intervals
             n_bootstraps (int, optional): number of bootstrap iterations
             bootstrap_size (int, optional): number of samples per bootstrap
-            return_components (bool, optional): whether to return outcome for treatment and control separately
+            return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
@@ -192,9 +194,9 @@ class BaseSLearner(object):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
-            X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            X (np.matrix, np.array, or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
             return_ci (bool, optional): whether to return confidence intervals
             bootstrap_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
@@ -288,7 +290,7 @@ class BaseSLearner(object):
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -304,7 +306,7 @@ class BaseSLearner(object):
         """
         Builds a model (using X to predict estimated/actual tau), and then calculates shapley values.
         Args:
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -328,7 +330,7 @@ class BaseSLearner(object):
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -349,7 +351,7 @@ class BaseSLearner(object):
         and then calculates shapley values.
 
         Args:
-            X (np.matrix): a feature matrix. Required if shap_dict is None.
+            X (np.matrix, np.array, or pd.Dataframe): a feature matrix. Required if shap_dict is None.
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -378,7 +380,7 @@ class BaseSLearner(object):
         Args:
             treatment_group (str or int): name of treatment group to create dependency plot on
             feature_idx (str or int): feature index / name to create dependency plot on
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -437,12 +439,13 @@ class BaseSClassifier(BaseSLearner):
     def predict(self, X, treatment=None, y=None, verbose=True):
         """Predict treatment effects.
         Args:
-            X (np.matrix): a feature matrix
-            treatment (np.array, optional): a treatment vector
-            y (np.array, optional): an outcome vector
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series, optional): a treatment vector
+            y (np.array or pd.Series, optional): an outcome vector
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         yhat_cs = {}
         yhat_ts = {}
 
@@ -489,9 +492,9 @@ class LRSRegressor(BaseSRegressor):
     def estimate_ate(self, X, treatment, y):
         """Estimate the Average Treatment Effect (ATE).
         Args:
-            X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            X (np.matrix, np.array, or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """

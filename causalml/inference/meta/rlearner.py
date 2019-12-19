@@ -4,6 +4,7 @@ from __future__ import print_function
 from future.builtins import super
 from copy import deepcopy
 import logging
+import pandas as pd
 import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
@@ -11,7 +12,7 @@ from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
 
 from causalml.inference.meta.utils import (check_treatment_vector, check_p_conditions,
-    get_xgboost_objective_metric)
+    get_xgboost_objective_metric, convert_pd_to_np)
 from causalml.inference.meta.explainer import Explainer
 
 logger = logging.getLogger('causalml')
@@ -73,19 +74,22 @@ class BaseRLearner(object):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
-            X (np.matrix): a feature matrix
-            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
-                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
+                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
-            p = {treatment_name: p}
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
@@ -117,11 +121,12 @@ class BaseRLearner(object):
         """Predict treatment effects.
 
         Args:
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        X = convert_pd_to_np(X)
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             dhat = self.models_tau[group].predict(X)
@@ -134,10 +139,11 @@ class BaseRLearner(object):
         """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
 
         Args:
-            X (np.matrix): a feature matrix
-            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
-                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
-            y (np.array): an outcome vector
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
+                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -148,13 +154,16 @@ class BaseRLearner(object):
                 If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
                 UB [n_samples, n_treatment]
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.fit(X, p, treatment, y, verbose=verbose)
         te = self.predict(X)
 
         check_p_conditions(p, self.t_groups)
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
-            p = {treatment_name: p}
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
 
         if not return_ci:
             return te
@@ -185,11 +194,11 @@ class BaseRLearner(object):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
-            X (np.matrix): a feature matrix
-            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
-                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
+                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -198,12 +207,15 @@ class BaseRLearner(object):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         te = self.fit_predict(X, p, treatment, y)
 
         check_p_conditions(p, self.t_groups)
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
-            p = {treatment_name: p}
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -277,7 +289,7 @@ class BaseRLearner(object):
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -293,7 +305,7 @@ class BaseRLearner(object):
         """
         Builds a model (using X to predict estimated/actual tau), and then calculates shapley values.
         Args:
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -317,7 +329,7 @@ class BaseRLearner(object):
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -338,7 +350,7 @@ class BaseRLearner(object):
         and then calculates shapley values.
 
         Args:
-            X (np.matrix): a feature matrix. Required if shap_dict is None.
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix. Required if shap_dict is None.
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -367,7 +379,7 @@ class BaseRLearner(object):
         Args:
             treatment_group (str or int): name of treatment group to create dependency plot on
             feature_idx (str or int): feature index / name to create dependency plot on
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
@@ -466,19 +478,22 @@ class BaseRClassifier(BaseRLearner):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
-            X (np.matrix): a feature matrix
-            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
-                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
+                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
         """
         check_treatment_vector(treatment, self.control_name)
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
-            p = {treatment_name: p}
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
@@ -510,7 +525,7 @@ class BaseRClassifier(BaseRLearner):
         """Predict treatment effects.
 
         Args:
-            X (np.matrix): a feature matrix
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
 
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -570,19 +585,22 @@ class XGBRRegressor(BaseRRegressor):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
-            X (np.matrix): a feature matrix
-            p (np.ndarray or dict): an array of propensity scores of float (0,1) in the single-treatment case
-                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
-            treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
+                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
         """
         check_treatment_vector(treatment, self.control_name)
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
-            p = {treatment_name: p}
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
