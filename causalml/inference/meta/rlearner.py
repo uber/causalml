@@ -11,7 +11,8 @@ from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
 
-from causalml.inference.meta.utils import check_control_in_treatment, check_p_conditions, convert_pd_to_np
+from causalml.inference.meta.utils import (check_treatment_vector, check_p_conditions,
+    get_xgboost_objective_metric, convert_pd_to_np)
 from causalml.inference.meta.explainer import Explainer
 
 logger = logging.getLogger('causalml')
@@ -80,7 +81,7 @@ class BaseRLearner(object):
             y (np.array or pd.Series): an outcome vector
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         check_p_conditions(p, self.t_groups)
@@ -483,7 +484,7 @@ class BaseRClassifier(BaseRLearner):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
         """
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
@@ -560,15 +561,11 @@ class XGBRRegressor(BaseRRegressor):
             effect_learner_n_estimators (int, optional): number of trees to fit for the effect learner (default = 500)
         """
 
-        assert (effect_learner_objective == 'rank:pairwise' or effect_learner_objective == 'reg:linear'), \
-            'Effect learner objective has to be rank:pairwise or reg:linear'
         assert isinstance(random_state, int), 'random_state should be int.'
 
-        self.effect_learner_objective = effect_learner_objective
-        if self.effect_learner_objective == 'rank:pairwise':
-            self.effect_learner_eval_metric = 'auc'
-        if self.effect_learner_objective == 'reg:linear':
-            self.effect_learner_eval_metric = 'rmse'
+        objective, metric = get_xgboost_objective_metric(effect_learner_objective)
+        self.effect_learner_objective = objective
+        self.effect_learner_eval_metric = metric
         self.effect_learner_n_estimators = effect_learner_n_estimators
         self.early_stopping = early_stopping
         if self.early_stopping:
@@ -594,7 +591,7 @@ class XGBRRegressor(BaseRRegressor):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
         """
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()

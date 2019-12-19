@@ -9,7 +9,7 @@ import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
 
-from causalml.inference.meta.utils import check_control_in_treatment, check_p_conditions, convert_pd_to_np
+from causalml.inference.meta.utils import check_treatment_vector, check_p_conditions, convert_pd_to_np
 from causalml.inference.meta.explainer import Explainer
 from causalml.metrics import regression_metrics, classification_metrics
 
@@ -91,7 +91,7 @@ class BaseXLearner(object):
             y (np.array or pd.Series): an outcome vector
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
@@ -539,7 +539,7 @@ class BaseXClassifier(BaseXLearner):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
         """
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}

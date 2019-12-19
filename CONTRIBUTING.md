@@ -17,10 +17,16 @@ If you added a new inference method, add test code to the `tests/` folder.
 
 ## Prerequisites
 
-Causal ML uses `pytest` for tests. Install `pytest` and `pytest-cov`:
+Causal ML uses `pytest` for tests. Install `pytest` and `pytest-cov`, and the package dependencies:
 ```bash
-$ pip install pytest
-$ pip install pytest-cov
+$ pip install pytest pytest-cov -r requirements.txt
+```
+
+## Building Cython
+
+In order to run tests, you need to build the Cython modules
+```bash
+$ python setup.py build_ext --inplace
 ```
 
 ## Testing
