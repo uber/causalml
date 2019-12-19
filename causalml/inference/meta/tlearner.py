@@ -14,6 +14,7 @@ from xgboost import XGBRegressor
 import shap
 
 from causalml.inference.meta.explainer import Explainer
+from causalml.inference.meta.utils import check_treatment_vector
 from causalml.metrics import regression_metrics, classification_metrics
 from causalml.inference.meta.utils import check_control_in_treatment, convert_pd_to_np
 
@@ -69,7 +70,7 @@ class BaseTLearner(object):
             y (np.array or pd.Series): an outcome vector
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        check_control_in_treatment(treatment, self.control_name)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
