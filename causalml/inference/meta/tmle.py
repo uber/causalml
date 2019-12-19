@@ -1,11 +1,12 @@
 import logging
+import pandas as pd
 import numpy as np
 from scipy.optimize import minimize
 from scipy.special import expit, logit
 from scipy.stats import norm
 from sklearn.preprocessing import MinMaxScaler
 
-from causalml.inference.meta.utils import check_treatment_vector, check_p_conditions
+from causalml.inference.meta.utils import check_treatment_vector, check_p_conditions, convert_pd_to_np
 from causalml.propensity import calibrate
 
 
@@ -95,11 +96,11 @@ class TMLELearner(object):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
-            X (np.matrix): A feature matrix
-            p (np.ndarray or dict): An array of propensity scores of float (0,1) in the single-treatment case
-                                    or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
-            treatment (np.array): A treatment vector of int
-            y (np.array): an outcome vector
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
+                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
             segment (np.array, optional): An optional segment vector of int. If given, the ATE and its CI will be
                                           estimated for each segment.
             return_ci (bool, optional): Whether to return confidence intervals
@@ -108,13 +109,16 @@ class TMLELearner(object):
             (tuple): The ATE and its confidence interval (LB, UB) for each treatment, t and segment, s
         """
         check_treatment_vector(treatment, self.control_name)
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 
         check_p_conditions(p, self.t_groups)
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
-            p = {treatment_name: p}
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
 
         ate = []
         ate_lb = []
