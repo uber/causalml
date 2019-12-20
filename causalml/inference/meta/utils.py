@@ -25,6 +25,17 @@ def check_p_conditions(p, t_groups):
     if isinstance(p, (np.ndarray, pd.Series)):
         assert t_groups.shape[0] == 1, \
             'If p is passed as an np.ndarray, there must be only 1 unique non-control group in the treatment vector.'
+        assert len(np.unique(p)) > 2, \
+            'p should have more than two distinct values'
+        assert (0 < p).all() and (p < 1).all(), \
+            'The values of p should lie within the (0, 1) interval.'
+            
+    if isinstance(p, dict):
+        for t_name in t_groups:
+            assert len(np.unique(p[t_name])) > 2, \
+                'p should have more than two distinct values'
+            assert (0 < p[t_name]).all() and (p[t_name] < 1).all(), \
+                'The values of p should lie within the (0, 1) interval.'
 
 
 def check_explain_conditions(method, models, X=None, treatment=None, y=None):
