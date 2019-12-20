@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import pandas as pd
 from scipy.optimize import minimize
 from scipy.special import expit, logit
 from scipy.stats import norm

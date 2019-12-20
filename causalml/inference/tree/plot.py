@@ -3,7 +3,6 @@ Visualization functions for forest of trees-based ensemble methods for Uplift mo
 Problem.
 """
 
-from __future__ import print_function
 from collections import defaultdict
 import numpy as np
 import pydotplus

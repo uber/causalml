@@ -1,6 +1,7 @@
 from copy import deepcopy
 import logging
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
