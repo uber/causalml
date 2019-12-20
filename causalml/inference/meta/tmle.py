@@ -107,6 +107,7 @@ class TMLELearner(object):
         Returns:
             (tuple): The ATE and its confidence interval (LB, UB) for each treatment, t and segment, s
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
