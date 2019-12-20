@@ -440,6 +440,253 @@ class UpliftTreeClassifier:
             tree.results = self.uplift_classification_results(treatment, y)
         return self
 
+    # Prune Trees
+    def prune(self, X, treatment, y, minGain=0.0001, rule='maxAbsDiff'):
+        """ Prune the uplift model.
+        Args
+        ----
+        X : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to train the uplift model.
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
+        minGain : float, optional (default = 0.0001)
+            The minimum gain required to make a tree node split. The children
+            tree branches are trimmed if the actual split gain is less than
+            the minimum gain.
+        rule : string, optional (default = 'maxAbsDiff')
+            The prune rules. Supported values are 'maxAbsDiff' for optimizing
+            the maximum absolute difference, and 'bestUplift' for optimizing
+            the node-size weighted treatment effect.
+        Returns
+        -------
+        self : object
+        """
+        assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
+
+        self.pruneTree(X, treatment, y,
+                       tree=self.fitted_uplift_tree,
+                       rule=rule,
+                       minGain=minGain,
+                       evaluationFunction=self.evaluationFunction,
+                       notify=False,
+                       n_reg=self.n_reg,
+                       parentNodeSummary=None)
+        return self
+
+    def pruneTree(self, X, treatment, y, tree, rule='maxAbsDiff', minGain=0.,
+                  evaluationFunction=None, notify=False, n_reg=0,
+                  parentNodeSummary=None):
+        """Prune one single tree node in the uplift model.
+        Args
+        ----
+        X : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to train the uplift model.
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
+        minGain : float, optional (default = 0.0001)
+            The minimum gain required to make a tree node split. The children tree branches are trimmed if the actual
+            split gain is less than the minimum gain.
+        rule : string, optional (default = 'maxAbsDiff')
+            The prune rules. Supported values are 'maxAbsDiff' for optimizing the maximum absolute difference, and
+            'bestUplift' for optimizing the node-size weighted treatment effect.
+        Returns
+        -------
+        self : object
+        """
+        # Current Node Summary for Validation Data Set
+        currentNodeSummary = self.tree_node_summary(
+            treatment, y, min_samples_treatment=self.min_samples_treatment,
+            n_reg=n_reg, parentNodeSummary=parentNodeSummary
+        )
+        tree.nodeSummary = currentNodeSummary
+        # Divide sets for child nodes
+        X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment, y, tree.col, tree.value)
+
+        # recursive call for each branch
+        if tree.trueBranch.results is None:
+            self.pruneTree(X_l, w_l, y_l, tree.trueBranch, rule, minGain,
+                           evaluationFunction, notify, n_reg,
+                           parentNodeSummary=currentNodeSummary)
+        if tree.falseBranch.results is None:
+            self.pruneTree(X_r, w_r, y_r, tree.falseBranch, rule, minGain,
+                           evaluationFunction, notify, n_reg,
+                           parentNodeSummary=currentNodeSummary)
+
+        # merge leaves (potentially)
+        if (tree.trueBranch.results is not None and
+            tree.falseBranch.results is not None):
+            if rule == 'maxAbsDiff':
+                # Current D
+                if (tree.maxDiffTreatment in currentNodeSummary and
+                    self.control_name in currentNodeSummary):
+                    currentScoreD = tree.maxDiffSign * (currentNodeSummary[tree.maxDiffTreatment][0]
+                                                        - currentNodeSummary[self.control_name][0])
+                else:
+                    currentScoreD = 0
+
+                # trueBranch D
+                trueNodeSummary = self.tree_node_summary(
+                    w_l, y_l, min_samples_treatment=self.min_samples_treatment,
+                    n_reg=n_reg, parentNodeSummary=currentNodeSummary
+                )
+                if (tree.trueBranch.maxDiffTreatment in trueNodeSummary and
+                    self.control_name in trueNodeSummary):
+                    trueScoreD = tree.trueBranch.maxDiffSign * (trueNodeSummary[tree.trueBranch.maxDiffTreatment][0]
+                                                                - trueNodeSummary[self.control_name][0])
+                    trueScoreD = (
+                        trueScoreD
+                        * (trueNodeSummary[tree.trueBranch.maxDiffTreatment][1]
+                         + trueNodeSummary[self.control_name][1])
+                        / (currentNodeSummary[tree.trueBranch.maxDiffTreatment][1]
+                           + currentNodeSummary[self.control_name][1])
+                    )
+                else:
+                    trueScoreD = 0
+
+                # falseBranch D
+                falseNodeSummary = self.tree_node_summary(
+                    w_r, y_r, min_samples_treatment=self.min_samples_treatment,
+                    n_reg=n_reg, parentNodeSummary=currentNodeSummary
+                )
+                if (tree.falseBranch.maxDiffTreatment in falseNodeSummary and
+                    self.control_name in falseNodeSummary):
+                    falseScoreD = (
+                        tree.falseBranch.maxDiffSign *
+                        (falseNodeSummary[tree.falseBranch.maxDiffTreatment][0]
+                         - falseNodeSummary[self.control_name][0])
+                    )
+
+                    falseScoreD = (
+                        falseScoreD *
+                        (falseNodeSummary[tree.falseBranch.maxDiffTreatment][1]
+                         + falseNodeSummary[self.control_name][1])
+                        / (currentNodeSummary[tree.falseBranch.maxDiffTreatment][1]
+                           + currentNodeSummary[self.control_name][1])
+                    )
+                else:
+                    falseScoreD = 0
+
+                if ((trueScoreD + falseScoreD) - currentScoreD <= minGain or
+                    (trueScoreD + falseScoreD < 0.)):
+                    tree.trueBranch, tree.falseBranch = None, None
+                    tree.results = tree.backupResults
+
+            elif rule == 'bestUplift':
+                # Current D
+                if (tree.bestTreatment in currentNodeSummary and
+                    self.control_name in currentNodeSummary):
+                    currentScoreD = (
+                        currentNodeSummary[tree.bestTreatment][0]
+                        - currentNodeSummary[self.control_name][0]
+                    )
+                else:
+                    currentScoreD = 0
+
+                # trueBranch D
+                trueNodeSummary = self.tree_node_summary(
+                    w_l, y_l, min_samples_treatment=self.min_samples_treatment,
+                    n_reg=n_reg, parentNodeSummary=currentNodeSummary
+                )
+                if (tree.trueBranch.bestTreatment in trueNodeSummary and
+                    self.control_name in trueNodeSummary):
+                    trueScoreD = (
+                        trueNodeSummary[tree.trueBranch.bestTreatment][0]
+                        - trueNodeSummary[self.control_name][0]
+                    )
+                else:
+                    trueScoreD = 0
+
+                # falseBranch D
+                falseNodeSummary = self.tree_node_summary(
+                    w_r, y_r, min_samples_treatment=self.min_samples_treatment,
+                    n_reg=n_reg, parentNodeSummary=currentNodeSummary
+                )
+                if (tree.falseBranch.bestTreatment in falseNodeSummary and
+                    self.control_name in falseNodeSummary):
+                    falseScoreD = (
+                        falseNodeSummary[tree.falseBranch.bestTreatment][0]
+                        - falseNodeSummary[self.control_name][0]
+                    )
+                else:
+                    falseScoreD = 0
+                gain = ((1. * len(y_l) / len(y) * trueScoreD
+                         + 1. * len(y_r) / len(y) * falseScoreD)
+                        - currentScoreD)
+                if gain <= minGain or (trueScoreD + falseScoreD < 0.):
+                    tree.trueBranch, tree.falseBranch = None, None
+                    tree.results = tree.backupResults
+        return self
+
+    def fill(self, X, treatment, y):
+        """ Fill the data into an existing tree.
+        This is a higher-level function to transform the original data inputs
+        into lower level data inputs (list of list and tree).
+        Args
+        ----
+        X : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to train the uplift model.
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
+        Returns
+        -------
+        self : object
+        """
+        assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
+
+        self.fillTree(X, treatment, y, tree=self.fitted_uplift_tree)
+        return self
+
+    def fillTree(self, X, treatment, y, tree):
+        """ Fill the data into an existing tree.
+        This is a lower-level function to execute on the tree filling task.
+        Args
+        ----
+        rows : list of list
+            The internal data format for the training data (combining X, Y, treatment).
+        tree : object
+            object of DecisionTree class
+        Returns
+        -------
+        self : object
+        """
+        # Current Node Summary for Validation Data Set
+        currentNodeSummary = self.tree_node_summary(treatment, y,
+                                                    min_samples_treatment=0,
+                                                    n_reg=0,
+                                                    parentNodeSummary=None)
+        tree.nodeSummary = currentNodeSummary
+        # Divide sets for child nodes
+        X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment, y, tree.col, tree.value)
+
+        # recursive call for each branch
+        if tree.trueBranch is not None:
+            self.fillTree(X_l, w_l, y_l, tree.trueBranch)
+        if tree.falseBranch is not None:
+            self.fillTree(X_r, w_r, y_r, tree.falseBranch)
+
+        # Update Information
+
+        # matchScore
+        matchScore = (currentNodeSummary[tree.bestTreatment][0] - currentNodeSummary[self.control_name][0])
+        tree.matchScore = round(matchScore, 4)
+        tree.summary['matchScore'] = round(matchScore, 4)
+
+        # Samples, Group_size
+        tree.summary['samples'] = len(y)
+        tree.summary['group_size'] = ''
+        for treatment_group in currentNodeSummary:
+            tree.summary['group_size'] += ' ' + treatment_group + ': ' + str(currentNodeSummary[treatment_group][1])
+        # classProb
+        if tree.results is not None:
+            tree.results = self.uplift_classification_results(treatment, y)
+        return self
+
     def predict(self, X, full_output=False):
         '''
         Returns the recommended treatment group and predicted optimal
