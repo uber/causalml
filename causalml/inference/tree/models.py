@@ -175,13 +175,14 @@ class UpliftTreeClassifier:
         """
         assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
-        resTree = self.growDecisionTreeFrom(
+        self.treatment_group = list(set(treatment))
+
+        self.fitted_uplift_tree = self.growDecisionTreeFrom(
             X, treatment, y, evaluationFunction=self.evaluationFunction,
             max_depth=self.max_depth, min_samples_leaf=self.min_samples_leaf,
             depth=1, min_samples_treatment=self.min_samples_treatment,
             n_reg=self.n_reg, parentNodeSummary=None
         )
-        self.fitted_uplift_tree = resTree
         return self
 
     # Prune Trees
@@ -521,12 +522,11 @@ class UpliftTreeClassifier:
                 The control and treatment sample size.
         '''
         results = {}
-        for i in range(y.shape[0]):
-            # treatment group in the 2nd last column
-            r = treatment[i]
-            if r not in results:
-                results[r] = {0: 0, 1: 0}
-            results[r][y[i]] += 1
+        for t in self.treatment_group:
+            filt = treatment == t
+            n = filt.sum()
+            n_t = y[filt].sum()
+            results[t] = (n - n_t, n_t)
 
         return results
 
