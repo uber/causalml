@@ -26,12 +26,12 @@ def check_p_conditions(p, t_groups):
     if isinstance(p, (np.ndarray, pd.Series)):
         assert t_groups.shape[0] == 1, \
             'If p is passed as an np.ndarray, there must be only 1 unique non-control group in the treatment vector.'
-        assert (0 + eps < p).all() and (p < 1 + eps).all(), \
+        assert (0 + eps < p).all() and (p < 1 - eps).all(), \
             'The values of p should lie within the (0, 1) interval.'
 
     if isinstance(p, dict):
         for t_name in t_groups:
-            assert (0 + eps < p[t_name]).all() and (p[t_name] < 1 + eps).all(), \
+            assert (0 + eps < p[t_name]).all() and (p[t_name] < 1 - eps).all(), \
                 'The values of p should lie within the (0, 1) interval.'
 
 
