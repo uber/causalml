@@ -20,11 +20,19 @@ def check_treatment_vector(treatment, control_name=None):
 
 
 def check_p_conditions(p, t_groups):
+    eps = np.finfo(float).eps
     assert isinstance(p, (np.ndarray, pd.Series, dict)), \
         'p must be an np.ndarray, pd.Series, or dict type'
     if isinstance(p, (np.ndarray, pd.Series)):
         assert t_groups.shape[0] == 1, \
             'If p is passed as an np.ndarray, there must be only 1 unique non-control group in the treatment vector.'
+        assert (0 + eps < p).all() and (p < 1 - eps).all(), \
+            'The values of p should lie within the (0, 1) interval.'
+
+    if isinstance(p, dict):
+        for t_name in t_groups:
+            assert (0 + eps < p[t_name]).all() and (p[t_name] < 1 - eps).all(), \
+                'The values of p should lie within the (0, 1) interval.'
 
 
 def check_explain_conditions(method, models, X=None, treatment=None, y=None):
@@ -37,7 +45,7 @@ def check_explain_conditions(method, models, X=None, treatment=None, y=None):
 
     if method in ('permutation', 'shapley'):
         assert all([arr is not None for arr in (X, treatment, y)]), \
-                "X, treatment, and y must be provided if method = {}".format(method)
+            "X, treatment, and y must be provided if method = {}".format(method)
 
 
 def clean_xgboost_objective(objective):
