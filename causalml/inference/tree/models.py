@@ -370,6 +370,7 @@ class UpliftTreeClassifier:
         """ Fill the data into an existing tree.
         This is a higher-level function to transform the original data inputs
         into lower level data inputs (list of list and tree).
+
         Args
         ----
         X : ndarray, shape = [num_samples, num_features]
@@ -378,6 +379,7 @@ class UpliftTreeClassifier:
             An array containing the treatment group for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
+
         Returns
         -------
         self : object
@@ -390,12 +392,18 @@ class UpliftTreeClassifier:
     def fillTree(self, X, treatment, y, tree):
         """ Fill the data into an existing tree.
         This is a lower-level function to execute on the tree filling task.
+
         Args
         ----
-        rows : list of list
-            The internal data format for the training data (combining X, Y, treatment).
+        X : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to train the uplift model.
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
         tree : object
             object of DecisionTree class
+
         Returns
         -------
         self : object
@@ -483,20 +491,21 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
-        rows : list of list
-               The internal data format.
-
+        X : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to train the uplift model.
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
         column : int
                 The column used to split the data.
-
         value : float or int
                 The value in the column for splitting the data.
 
         Returns
         -------
-        (list1, list2) : list of list
-                The left node (list of data) and the right node (list of data).
+        (X_l, X_r, treatment_l, treatment_r, y_l, y_r) : list of ndarray
+                The covariates, treatments and outcomes of left node and the right node.
         '''
         # for int and float values
         if isinstance(value, int) or isinstance(value, float):
@@ -512,9 +521,10 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
-        rows : list of list
-               The internal data format.
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
 
         Returns
         -------
@@ -524,9 +534,8 @@ class UpliftTreeClassifier:
         results = {}
         for t in self.treatment_group:
             filt = treatment == t
-            n = filt.sum()
             n_t = y[filt].sum()
-            results[t] = (n - n_t, n_t)
+            results[t] = (filt.sum() - n_t, n_t)
 
         return results
 
@@ -539,10 +548,8 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
         pk : float
             The probability of 1 in one distribution.
-
         qk : float
             The probability of 1 in the other distribution.
 
@@ -564,7 +571,6 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
         nodeSummary : dictionary
             The tree node summary statistics, produced by tree_node_summary()
             method.
@@ -592,7 +598,6 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
         nodeSummary : dictionary
             The tree node summary statistics, produced by tree_node_summary()
             method.
@@ -620,7 +625,6 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
         nodeSummary : dictionary
             The tree node summary statistics, produced by tree_node_summary() method.
 
@@ -648,7 +652,6 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
         nodeSummary : dictionary
             The tree node summary statistics, produced by tree_node_summary() method.
 
@@ -674,7 +677,6 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
         p : float
             The probability used in the entropy calculation.
 
@@ -698,7 +700,6 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
         currentNodeSummary : dictionary
             The summary statistics of the current tree node.
 
@@ -761,18 +762,16 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
-        rows : list of list
-            The internal data format for the training data (combining X, Y, treatment).
-
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
         min_samples_treatment: int, optional (default=10)
             The minimum number of samples required of the experiment group t be split at a leaf node.
-
         n_reg :  int, optional (default=10)
             The regularization parameter defined in Rzepakowski et al. 2012,
             the weight (in terms of sample size) of the parent node influence
             on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
-
         parentNodeSummary : dictionary
             Node summary statistics of the parent tree node.
 
@@ -806,9 +805,10 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
-        rows : list of list
-            The internal data format for the training data (combining X, Y, treatment).
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
 
         Returns
         -------
@@ -831,30 +831,26 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
-        rows : list of list
-            The internal data format for the training data (combining X, Y, treatment).
-
+        X : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to train the uplift model.
+        treatment : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
         evaluationFunction : string
             Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
-
         max_depth: int, optional (default=10)
             The maximum depth of the tree.
-
         min_samples_leaf: int, optional (default=100)
             The minimum number of samples required to be split at a leaf node.
-
         depth : int, optional (default = 1)
             The current depth.
-
         min_samples_treatment: int, optional (default=10)
             The minimum number of samples required of the experiment group to be split at a leaf node.
-
         n_reg: int, optional (default=10)
             The regularization parameter defined in Rzepakowski et al. 2012,
             the weight (in terms of sample size) of the parent node influence
             on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
-
         parentNodeSummary : dictionary, optional (default = None)
             Node summary statistics of the parent tree node.
 
@@ -1038,7 +1034,6 @@ class UpliftTreeClassifier:
 
         Args
         ----
-
         observations : list of list
             The internal data format for the training data (combining X, Y, treatment).
 
@@ -1057,7 +1052,6 @@ class UpliftTreeClassifier:
 
             Args
             ----
-
             observations : list of list
                 The internal data format for the training data (combining X, Y, treatment).
 
@@ -1089,7 +1083,6 @@ class UpliftTreeClassifier:
 
             Args
             ----
-
             observations : list of list
                 The internal data format for the training data (combining X, Y, treatment).
 
