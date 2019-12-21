@@ -31,7 +31,8 @@ def check_p_conditions(p, t_groups):
 
     if isinstance(p, dict):
         for t_name in t_groups:
-            assert (0 + eps < p[t_name]).all() and (p[t_name] < 1 + eps).all(), 'The values of p should lie within the (0, 1) interval.'
+            assert (0 + eps < p[t_name]).all() and (p[t_name] < 1 + eps).all(), \
+                'The values of p should lie within the (0, 1) interval.'
 
 
 def check_explain_conditions(method, models, X=None, treatment=None, y=None):
