@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from future.builtins import super
 from copy import deepcopy
 import logging
 import numpy as np
@@ -11,12 +7,11 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.neural_network import MLPRegressor
 from sklearn.utils.testing import ignore_warnings
 from xgboost import XGBRegressor
-import shap
 
 from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import check_treatment_vector
 from causalml.metrics import regression_metrics, classification_metrics
-from causalml.inference.meta.utils import check_control_in_treatment, convert_pd_to_np
+from causalml.inference.meta.utils import convert_pd_to_np
 
 
 logger = logging.getLogger('causalml')

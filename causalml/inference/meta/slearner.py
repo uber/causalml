@@ -1,7 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from future.builtins import super
 import logging
 import numpy as np
 from tqdm import tqdm
@@ -13,7 +9,7 @@ from copy import deepcopy
 from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import check_treatment_vector
 from causalml.metrics import regression_metrics, classification_metrics
-from causalml.inference.meta.utils import check_control_in_treatment, convert_pd_to_np
+from causalml.inference.meta.utils import convert_pd_to_np
 
 
 logger = logging.getLogger('causalml')
