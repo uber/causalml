@@ -11,6 +11,7 @@ from xgboost import XGBRegressor
 from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import check_treatment_vector, convert_pd_to_np
 from causalml.metrics import regression_metrics, classification_metrics
+from causalml.inference.meta.utils import convert_pd_to_np
 
 
 logger = logging.getLogger('causalml')
