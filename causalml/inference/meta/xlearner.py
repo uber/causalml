@@ -137,7 +137,7 @@ class BaseXLearner(object):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):

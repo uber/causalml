@@ -110,7 +110,6 @@ class TMLELearner(object):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 
