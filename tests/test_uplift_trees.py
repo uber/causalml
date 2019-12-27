@@ -1,5 +1,7 @@
+import cProfile
 import numpy as np
 import pandas as pd
+import pstats
 from sklearn.model_selection import train_test_split
 
 from causalml.inference.tree import UpliftTreeClassifier
@@ -75,12 +77,19 @@ def test_UpliftTreeClassifier(generate_classification_data):
     # Train the UpLift Random Forest classifier
     uplift_model = UpliftTreeClassifier(control_name=TREATMENT_NAMES[0])
 
+    pr = cProfile.Profile(subcalls=True, builtins=True, timeunit=.001)
+    pr.enable()
     uplift_model.fit(df_train[x_names].values,
                      treatment=df_train['treatment_group_key'].values,
                      y=df_train[CONVERSION].values)
 
     _, _, _, y_pred = uplift_model.predict(df_test[x_names].values,
                                            full_output=True)
+    pr.disable()
+    with open('UpliftTreeClassifier.prof', 'w') as f:
+        ps = pstats.Stats(pr, stream=f).sort_stats('cumulative')
+        ps.print_stats()
+
     result = pd.DataFrame(y_pred)
     result.drop(CONTROL_NAME, axis=1, inplace=True)
 

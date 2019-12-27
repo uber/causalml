@@ -2,10 +2,7 @@
 Utility functions for uplift trees.
 """
 
-from __future__ import print_function
-from collections import defaultdict
 import numpy as np
-import scipy.stats as stats
 import pandas as pd
 
 
@@ -221,8 +218,3 @@ def kpi_transform(dfx, kpi_combo, kpi_combo_new):
                     dfx[kpi_combo[j]].values, granularity='High'
                 )
     return dfx
-
-
-
-
-
