@@ -8,6 +8,7 @@ from scipy.stats import norm
 from causalml.inference.meta.utils import check_treatment_vector, check_p_conditions, convert_pd_to_np
 from causalml.inference.meta.explainer import Explainer
 from causalml.metrics import regression_metrics, classification_metrics
+from causalml.propensity import ElasticNetPropensityModel, calibrate
 
 logger = logging.getLogger('causalml')
 
@@ -121,22 +122,38 @@ class BaseXLearner(object):
             self.models_tau_c[group].fit(X_filt[w == 0], d_c)
             self.models_tau_t[group].fit(X_filt[w == 1], d_t)
 
-    def predict(self, X, p, treatment=None, y=None, return_components=False, verbose=True):
+    def predict(self, X, treatment=None, y=None, p=None, return_components=False,
+                return_p_score=False, verbose=True):
         """Predict treatment effects.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             return_components (bool, optional): whether to return outcome for treatment and control seperately
-
+            return_p_score (bool, optional): wheteher to return propensity score
+            verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        check_p_conditions(p, self.t_groups)
+
+        if p is None:
+            logger.info('Generating propensity score')
+            p = dict()
+            for group in self.t_groups:
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                X_filt = X[mask]
+                w_filt = (treatment_filt == group).astype(int)
+                w = (treatment == group).astype(int)
+                p[group] = self.run_propensity_score(X=X_filt, treatment=w_filt, X_pred=X, treatment_pred=w)
+        else:
+            check_p_conditions(p, self.t_groups)
+
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
@@ -170,27 +187,32 @@ class BaseXLearner(object):
                 logger.info('Error metrics for group {}'.format(group))
                 regression_metrics(y_filt, yhat, w)
 
-        if not return_components:
+        if (not return_components) and (not return_p_score):
             return te
-        else:
+        elif (not return_components) and (return_p_score):
+            return te, p
+        elif (return_components) and (not return_p_score):
             return te, dhat_cs, dhat_ts
+        else:
+            return te, dhat_cs, dhat_ts, p
 
-    def fit_predict(self, X, p, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
-                    return_components=False, verbose=True):
+    def fit_predict(self, X, treatment, y, p=None, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
+                    return_components=False, return_p_score=False, verbose=True):
         """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
             return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_p_score (bool, optional): wheteher to return propensity score
             verbose (str): whether to output progress logs
-
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
                 If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
@@ -198,11 +220,14 @@ class BaseXLearner(object):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.fit(X, treatment, y)
-        te = self.predict(X, p, treatment=treatment, y=y, return_components=return_components)
 
-        if not return_ci:
-            return te
+        if p is None:
+            te, p = self.predict(X, treatment=treatment, y=y, p=p,
+                                return_components=return_components, return_p_score=True)
         else:
+            te = self.predict(X, treatment=treatment, y=y, p=p, return_components=return_components)
+
+        if return_ci:
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_mu_c_global = deepcopy(self.models_mu_c)
@@ -227,29 +252,40 @@ class BaseXLearner(object):
             self.models_tau_c = deepcopy(models_tau_c_global)
             self.models_tau_t = deepcopy(models_tau_t_global)
 
+        if (not return_ci) and (not return_p_score):
+            return te
+        elif (not return_ci) and (return_p_score):
+            return te, p
+        elif (return_ci) and (return_p_score):
+            return (te, te_lower, te_upper), p
+        else:
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, p, treatment, y, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
+    def estimate_ate(self, X, treatment, y, p=None, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            verbose (str): whether to output progress logs
-
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        te, dhat_cs, dhat_ts = self.fit_predict(X, p, treatment, y, return_components=True)
-
+        self.fit(X, treatment, y)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        check_p_conditions(p, self.t_groups)
+
+        if p is None:
+            te, dhat_cs, dhat_ts, p = self.predict(X, treatment, y, p, return_components=True, return_p_score=True)
+        else:
+            check_p_conditions(p, self.t_groups)
+            te, dhat_cs, dhat_ts = self.predict(X, treatment, y, p, return_components=True)
+
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
@@ -324,6 +360,63 @@ class BaseXLearner(object):
         self.fit(X=X_b, treatment=treatment_b, y=y_b)
         te_b = self.predict(X=X, p=p)
         return te_b
+
+    def run_propensity_score(self, X, treatment, X_pred=None, treatment_pred=None, cv=None,
+                             calibrate_propensity=True, return_model=False):
+        """Generate propensity score if user didn't provide
+
+        Args:
+            X (np.matrix): features for training
+            treatment (np.array or pd.Series): a treatment vector for training
+            X_pred (np.matrix), optional: features for prediction
+            treatment_pred (np.array or pd.Series): a treatment vector for prediciton
+            cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
+            calibrate_propensity (bool, optional): whether calibrate the propensity score
+            return_model (bool, optional): whether return the propensity model
+        Returns:
+            (numpy.ndarray or numpy.ndarray and dict): propensity score.
+                If return_model, returns propensity score and a dictionary of propensity model
+        """
+        if X_pred is None:
+            p = np.zeros_like(treatment, dtype=float)
+        else:
+            p = np.zeros_like(X_pred, dtype=float)
+
+        p_model = ElasticNetPropensityModel()
+        model_dict = dict()
+
+        if cv:
+            n_fold = 0
+            for i_fold, (i_trn, i_val) in enumerate(cv.split(X, treatment), 1):
+                logger.info('Training a propensity model for CV #{}'.format(i_fold))
+                p_model.fit(X[i_trn], treatment[i_trn])
+                model_dict[i_fold] = p_model
+                if X_pred is None:
+                    p[i_val] = p_model.predict(X[i_val])
+                else:
+                    p_fold = np.zeros_like(treatment_pred, dtype=float)
+                    p_fold += p_model.predict(X_pred)
+                    n_fold += 1
+            p = p_fold/n_fold
+        else:
+            p_model.fit(X, treatment)
+            model_dict['training'] = p_model
+            if X_pred is None:
+                p = p_model.predict(X)
+            else:
+                p = p_model.predict(X_pred)
+
+        if calibrate_propensity:
+            logger.info('Calibrating propensity scores.')
+            if X_pred is None:
+                p = calibrate(p, treatment)
+            else:
+                p = calibrate(p, treatment_pred)
+
+        if return_model:
+            return p, model_dict
+        else:
+            return p
 
     def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True):
         """
@@ -569,21 +662,38 @@ class BaseXClassifier(BaseXLearner):
             self.models_tau_c[group].fit(X_filt[w == 0], d_c)
             self.models_tau_t[group].fit(X_filt[w == 1], d_t)
 
-    def predict(self, X, p, treatment=None, y=None, return_components=False, verbose=True):
+    def predict(self, X, treatment=None, y=None, p=None, return_components=False,
+                return_p_score=False, verbose=True):
         """Predict treatment effects.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
-
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_p_score (bool, optional): wheteher to return propensity score
+            verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        check_p_conditions(p, self.t_groups)
+
+        if p is None:
+            logger.info('Generating propensity score')
+            p = dict()
+            for group in self.t_groups:
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                X_filt = X[mask]
+                w_filt = (treatment_filt == group).astype(int)
+                w = (treatment == group).astype(int)
+                p[group] = self.run_propensity_score(X=X_filt, treatment=w_filt, X_pred=X, treatment_pred=w)
+        else:
+            check_p_conditions(p, self.t_groups)
+
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
@@ -617,7 +727,11 @@ class BaseXClassifier(BaseXLearner):
                 logger.info('Error metrics for group {}'.format(group))
                 classification_metrics(y_filt, yhat, w)
 
-        if not return_components:
+        if (not return_components) and (not return_p_score):
             return te
-        else:
+        elif (not return_components) and (return_p_score):
+            return te, p
+        elif (return_components) and (not return_p_score):
             return te, dhat_cs, dhat_ts
+        else:
+            return te, dhat_cs, dhat_ts, p
