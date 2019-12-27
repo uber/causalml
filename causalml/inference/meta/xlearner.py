@@ -134,7 +134,7 @@ class BaseXLearner(object):
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             return_components (bool, optional): whether to return outcome for treatment and control seperately
-            return_p_score (bool, optional): wheteher to return propensity score
+            return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -211,7 +211,7 @@ class BaseXLearner(object):
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
             return_components (bool, optional): whether to return outcome for treatment and control seperately
-            return_p_score (bool, optional): wheteher to return propensity score
+            return_p_score (bool, optional): whether to return propensity score
             verbose (str): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
@@ -368,8 +368,8 @@ class BaseXLearner(object):
         Args:
             X (np.matrix): features for training
             treatment (np.array or pd.Series): a treatment vector for training
-            X_pred (np.matrix), optional: features for prediction
-            treatment_pred (np.array or pd.Series): a treatment vector for prediciton
+            X_pred (np.matrix, optional): features for prediction
+            treatment_pred (np.array or pd.Series, optional): a treatment vector for prediciton
             cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
             calibrate_propensity (bool, optional): whether calibrate the propensity score
             return_model (bool, optional): whether return the propensity model
@@ -674,7 +674,7 @@ class BaseXClassifier(BaseXLearner):
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             return_components (bool, optional): whether to return outcome for treatment and control seperately
-            return_p_score (bool, optional): wheteher to return propensity score
+            return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.

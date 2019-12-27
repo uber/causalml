@@ -76,7 +76,7 @@ class BaseRLearner(object):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            return_p_score (bool, optional): wheteher to return propensity score
+            return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
@@ -163,7 +163,7 @@ class BaseRLearner(object):
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            return_p_score (bool, optional): wheteher to return propensity score
+            return_p_score (bool, optional): whether to return propensity score
             verbose (bool): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
@@ -310,8 +310,8 @@ class BaseRLearner(object):
         Args:
             X (np.matrix): features for training
             treatment (np.array or pd.Series): a treatment vector for training
-            X_pred (np.matrix), optional: features for prediction
-            treatment_pred (np.array or pd.Series): a treatment vector for prediciton
+            X_pred (np.matrix, optional): features for prediction
+            treatment_pred (np.array or pd.Series, optional): a treatment vector for prediciton
             cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
             calibrate_propensity (bool, optional): whether calibrate the propensity score
             return_model (bool, optional): whether return the propensity model
@@ -569,7 +569,7 @@ class BaseRClassifier(BaseRLearner):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            return_p_score (bool, optional): wheteher to return propensity score
+            return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         """
         check_treatment_vector(treatment, self.control_name)
@@ -694,7 +694,7 @@ class XGBRRegressor(BaseRRegressor):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            return_p_score (bool, optional): wheteher to return propensity score
+            return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         """
         check_treatment_vector(treatment, self.control_name)
