@@ -1,6 +1,3 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
 import logging
 from sklearn.metrics import log_loss, roc_auc_score
 

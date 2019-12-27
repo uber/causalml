@@ -1,6 +1,7 @@
 from copy import deepcopy
 import logging
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
@@ -97,7 +98,7 @@ class BaseRLearner(object):
         else:
             check_p_conditions(p, self.t_groups)
 
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -180,7 +181,7 @@ class BaseRLearner(object):
         te = self.predict(X)
 
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -238,8 +239,8 @@ class BaseRLearner(object):
         else:
             te = self.fit_predict(X, treatment, y, p)
             check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, np.ndarray):
+            
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -572,11 +573,11 @@ class BaseRClassifier(BaseRLearner):
             return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         """
-        check_treatment_vector(treatment, self.control_name)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
-
+        
         if p is None:
             logger.info('Generating propensity score')
             p = dict()
@@ -589,8 +590,8 @@ class BaseRClassifier(BaseRLearner):
                 p[group] = self.run_propensity_score(X=X_filt, treatment=w_filt, X_pred=X, treatment_pred=w, cv=self.cv)
         else:
             check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, np.ndarray):
+            
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -697,8 +698,8 @@ class XGBRRegressor(BaseRRegressor):
             return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         """
-        check_treatment_vector(treatment, self.control_name)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 
@@ -715,7 +716,7 @@ class XGBRRegressor(BaseRRegressor):
         else:
             check_p_conditions(p, self.t_groups)
 
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
