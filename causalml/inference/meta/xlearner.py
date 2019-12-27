@@ -1,7 +1,7 @@
-from future.builtins import super
 from copy import deepcopy
 import logging
 import numpy as np
+import pandas as pd
 from tqdm import tqdm
 from scipy.stats import norm
 
@@ -137,7 +137,7 @@ class BaseXLearner(object):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -250,7 +250,7 @@ class BaseXLearner(object):
 
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -535,6 +535,7 @@ class BaseXClassifier(BaseXLearner):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
@@ -584,7 +585,7 @@ class BaseXClassifier(BaseXLearner):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):

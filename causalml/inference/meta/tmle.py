@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+import pandas as pd
 from scipy.optimize import minimize
 from scipy.special import expit, logit
 from scipy.stats import norm
@@ -107,13 +108,13 @@ class TMLELearner(object):
         Returns:
             (tuple): The ATE and its confidence interval (LB, UB) for each treatment, t and segment, s
         """
-        check_treatment_vector(treatment, self.control_name)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
+        check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 
         check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
+        if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
