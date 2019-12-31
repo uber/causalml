@@ -2,18 +2,22 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 
+
+import logging
+import numbers
+import numpy as np
+import pandas as pd
+
+from math import ceil
+from scipy.sparse import issparse
+from scipy.stats import norm
 from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 from sklearn.tree._splitter import BestSplitter
-from sklearn.tree._tree import DepthFirstTreeBuilder, DTYPE, Tree
-from sklearn.utils import check_array
+from sklearn.tree._tree import DepthFirstTreeBuilder, DOUBLE, DTYPE, Tree
+from sklearn.utils import check_array, check_random_state
 
-import logging
-import numpy as np
-import pandas as pd
-from scipy.sparse import issparse
-from scipy.stats import norm
-
+from causalml.inference.meta.utils import check_treatment_vector
 
 logger = logging.getLogger('causalml')
 
@@ -238,15 +242,15 @@ class CausalTreeRegressor(object):
         Returns:
             self (CausalTree object)
         """
+        check_treatment_vector(treatment, self.control_name)
         is_treatment = treatment != self.control_name
         w = is_treatment.astype(int)
-        n_features = X.shape[1]
-        n_outputs = y.shape[1]
 
         t_groups = np.unique(treatment[is_treatment])
         self._classes[t_groups[0]] = 0
 
-        ## input checking replicated from BaseDecisionTree.fit()
+        # input checking replicated from BaseDecisionTree.fit()
+        random_state = check_random_state(self.random_state)
         X = check_array(X, dtype=DTYPE, accept_sparse="csc")
         y = check_array(y, ensure_2d=False, dtype=None)
         if issparse(X):
@@ -255,6 +259,27 @@ class CausalTreeRegressor(object):
             if X.indices.dtype != np.intc or X.indptr.dtype != np.intc:
                 raise ValueError("No support for np.int64 index based "
                                  "sparse matrices")
+
+        y = np.atleast_1d(y)
+        if y.ndim == 1:
+            y = np.reshape(y, (-1, 1))
+        if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
+            y = np.ascontiguousarray(y, dtype=DOUBLE)
+        n_samples, n_features = X.shape
+        n_outputs = y.shape[1]
+
+        if isinstance(self.min_samples_leaf, numbers.Integral):
+            if not 1 <= self.min_samples_leaf:
+                raise ValueError("min_samples_leaf must be at least 1 "
+                                 "or in (0, 0.5], got %s"
+                                 % self.min_samples_leaf)
+            min_samples_leaf = self.min_samples_leaf
+        else:  # float
+            if not 0. < self.min_samples_leaf <= 0.5:
+                raise ValueError("min_samples_leaf must be at least 1 "
+                                 "or in (0, 0.5], got %s"
+                                 % self.min_samples_leaf)
+            min_samples_leaf = int(ceil(self.min_samples_leaf * n_samples))
 
         self.tree = Tree(
             n_features = n_features,
