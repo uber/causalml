@@ -2,9 +2,11 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 
-from sklearn.tree import DecisionTreeRegressor
 from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
+from sklearn.tree._splitter import BestSplitter
+from sklearn.tree._tree import DepthFirstTreeBuilder, Tree
+
 import logging
 import numpy as np
 import pandas as pd
@@ -219,7 +221,7 @@ class CausalTreeRegressor(object):
         self.random_state = random_state
 
         self._classes = {}
-        self.model = None
+        self.tree = None
 
         self.eps = 1e-5
 
@@ -240,13 +242,35 @@ class CausalTreeRegressor(object):
         t_groups = np.unique(treatment[is_treatment])
         self._classes[t_groups[0]] = 0
 
-        self.model = DecisionTreeRegressor(criterion=CausalMSE(1, X.shape[0]),
-                                           max_depth=self.max_depth,
-                                           min_samples_leaf=self.min_samples_leaf,
-                                           random_state=self.random_state)
-
-        # sample_weight is used to pass the treatment flag
-        self.model.fit(X, y, sample_weight=1 + self.eps * w)
+        n_features = X.shape[1]
+        n_outputs = y.shape[1]
+        self.tree = Tree(
+            n_features = n_features,
+            # line below is taken from DecisionTreeRegressor.fit method source
+            #   which comments that the tree shouldn't need the n_classes parameter
+            #   but it apparently does
+            n_classes = np.array([1] * n_outputs, dtype=np.intp),
+            n_outputs = n_outputs)
+        splitter = BestSplitter(criterion = CausalMSE(1, X.shape[0]),
+            max_features = n_features,
+            min_samples_leaf = self.min_samples_leaf,
+            min_weight_leaf = 0, # from DecisionTreeRegressor default
+            random_state = self.random_state)
+        # hardcoded values below come from defaults values in
+        #   sklearn.tree._classes.DecisionTreeRegressor
+        builder = DepthFirstTreeBuilder(
+            splitter = splitter,
+            min_samples_split = 2,
+            min_samples_leaf = self.min_samples_leaf,
+            min_weight_leaf = 0,
+            max_depth = self.max_depth,
+            min_impurity_decrease = 0,
+            min_impurity_split = float("-inf"))
+        builder.build(
+            self.tree,
+            X = X,
+            y = y,
+            sample_weight = 1 + self.eps * w)
 
         return self
 
@@ -259,7 +283,7 @@ class CausalTreeRegressor(object):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        return self.model.predict(X).reshape((-1, 1))
+        return self.tree.predict(X).reshape((-1, 1))
 
     def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=False):
         """Fit the Causal Tree model and predict treatment effects.
