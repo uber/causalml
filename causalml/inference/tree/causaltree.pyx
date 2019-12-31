@@ -5,11 +5,13 @@
 from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 from sklearn.tree._splitter import BestSplitter
-from sklearn.tree._tree import DepthFirstTreeBuilder, Tree
+from sklearn.tree._tree import DepthFirstTreeBuilder, DTYPE, Tree
+from sklearn.utils import check_array
 
 import logging
 import numpy as np
 import pandas as pd
+from scipy.sparse import issparse
 from scipy.stats import norm
 
 
@@ -238,12 +240,22 @@ class CausalTreeRegressor(object):
         """
         is_treatment = treatment != self.control_name
         w = is_treatment.astype(int)
+        n_features = X.shape[1]
+        n_outputs = y.shape[1]
 
         t_groups = np.unique(treatment[is_treatment])
         self._classes[t_groups[0]] = 0
 
-        n_features = X.shape[1]
-        n_outputs = y.shape[1]
+        ## input checking replicated from BaseDecisionTree.fit()
+        X = check_array(X, dtype=DTYPE, accept_sparse="csc")
+        y = check_array(y, ensure_2d=False, dtype=None)
+        if issparse(X):
+            X.sort_indices()
+
+            if X.indices.dtype != np.intc or X.indptr.dtype != np.intc:
+                raise ValueError("No support for np.int64 index based "
+                                 "sparse matrices")
+
         self.tree = Tree(
             n_features = n_features,
             # line below is taken from DecisionTreeRegressor.fit method source
