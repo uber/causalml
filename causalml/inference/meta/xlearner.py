@@ -69,6 +69,9 @@ class BaseXLearner(object):
         self.ate_alpha = ate_alpha
         self.control_name = control_name
 
+        self.propensity = None
+        self.propensity_model = None
+
     def __repr__(self):
         return ('{}(control_outcome_learner={},\n'
                 '\ttreatment_outcome_learner={},\n'
@@ -123,7 +126,7 @@ class BaseXLearner(object):
             self.models_tau_t[group].fit(X_filt[w == 1], d_t)
 
     def predict(self, X, treatment=None, y=None, p=None, return_components=False,
-                return_p_score=False, verbose=True):
+                verbose=True):
         """Predict treatment effects.
 
         Args:
@@ -134,23 +137,26 @@ class BaseXLearner(object):
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             return_components (bool, optional): whether to return outcome for treatment and control seperately
-            return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        
+
         if p is None:
             logger.info('Generating propensity score')
             p = dict()
+            p_model = dict()
             for group in self.t_groups:
                 mask = (treatment == group) | (treatment == self.control_name)
                 treatment_filt = treatment[mask]
                 X_filt = X[mask]
                 w_filt = (treatment_filt == group).astype(int)
                 w = (treatment == group).astype(int)
-                p[group] = self.run_propensity_score(X=X_filt, treatment=w_filt, X_pred=X, treatment_pred=w)
+                p[group], p_model[group] = self.compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                         X_pred=X, treatment_pred=w)
+            self.propensity_model = p_model
+            self.propensity = p
         else:
             check_p_conditions(p, self.t_groups)
 
@@ -187,17 +193,13 @@ class BaseXLearner(object):
                 logger.info('Error metrics for group {}'.format(group))
                 regression_metrics(y_filt, yhat, w)
 
-        if (not return_components) and (not return_p_score):
+        if not return_components:
             return te
-        elif (not return_components) and (return_p_score):
-            return te, p
-        elif (return_components) and (not return_p_score):
-            return te, dhat_cs, dhat_ts
         else:
-            return te, dhat_cs, dhat_ts, p
+            return te, dhat_cs, dhat_ts
 
     def fit_predict(self, X, treatment, y, p=None, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
-                    return_components=False, return_p_score=False, verbose=True):
+                    return_components=False, verbose=True):
         """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
 
         Args:
@@ -211,7 +213,6 @@ class BaseXLearner(object):
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
             return_components (bool, optional): whether to return outcome for treatment and control seperately
-            return_p_score (bool, optional): whether to return propensity score
             verbose (str): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
@@ -220,14 +221,21 @@ class BaseXLearner(object):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.fit(X, treatment, y)
+        te = self.predict(X, treatment=treatment, y=y, p=p, return_components=return_components)
 
         if p is None:
-            te, p = self.predict(X, treatment=treatment, y=y, p=p,
-                                return_components=return_components, return_p_score=True)
-        else:
-            te = self.predict(X, treatment=treatment, y=y, p=p, return_components=return_components)
+            p = self.propensity
 
-        if return_ci:
+        check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
+            treatment_name = self.t_groups[0]
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+
+        if not return_ci:
+            return te
+        else:
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_mu_c_global = deepcopy(self.models_mu_c)
@@ -252,13 +260,6 @@ class BaseXLearner(object):
             self.models_tau_c = deepcopy(models_tau_c_global)
             self.models_tau_t = deepcopy(models_tau_t_global)
 
-        if (not return_ci) and (not return_p_score):
-            return te
-        elif (not return_ci) and (return_p_score):
-            return te, p
-        elif (return_ci) and (return_p_score):
-            return (te, te_lower, te_upper), p
-        else:
             return (te, te_lower, te_upper)
 
     def estimate_ate(self, X, treatment, y, p=None, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
@@ -279,14 +280,13 @@ class BaseXLearner(object):
         """
         self.fit(X, treatment, y)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
+        te, dhat_cs, dhat_ts = self.predict(X, treatment, y, p, return_components=True)
 
         if p is None:
-            te, dhat_cs, dhat_ts, p = self.predict(X, treatment, y, p, return_components=True, return_p_score=True)
-        else:
-            check_p_conditions(p, self.t_groups)
-            te, dhat_cs, dhat_ts = self.predict(X, treatment, y, p, return_components=True)
+            p = self.propensity
 
-        if isinstance(p, (np.ndarray, pd.Series)):
+        check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -361,8 +361,7 @@ class BaseXLearner(object):
         te_b = self.predict(X=X, p=p)
         return te_b
 
-    def run_propensity_score(self, X, treatment, X_pred=None, treatment_pred=None, cv=None,
-                             calibrate_propensity=True, return_model=False):
+    def compute_propensity_score(self, X, treatment, X_pred=None, treatment_pred=None, cv=None, calibrate_p=True):
         """Generate propensity score if user didn't provide
 
         Args:
@@ -371,52 +370,46 @@ class BaseXLearner(object):
             X_pred (np.matrix, optional): features for prediction
             treatment_pred (np.array or pd.Series, optional): a treatment vector for prediciton
             cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
-            calibrate_propensity (bool, optional): whether calibrate the propensity score
-            return_model (bool, optional): whether return the propensity model
-        Returns:
-            (numpy.ndarray or numpy.ndarray and dict): propensity score.
-                If return_model, returns propensity score and a dictionary of propensity model
-        """
-        if X_pred is None:
-            p = np.zeros_like(treatment, dtype=float)
-        else:
-            p = np.zeros_like(X_pred, dtype=float)
+            calibrate_p (bool, optional): whether calibrate the propensity score
 
+        Returns:
+            (tuple)
+                - p (numpy.ndarray): propensity score
+                - p_model_dict (dict): dictionary of propensity model
+        """
+        if treatment_pred is None:
+            treatment_pred = treatment.copy()
+
+        p = np.zeros_like(treatment_pred, dtype=float)
         p_model = ElasticNetPropensityModel()
-        model_dict = dict()
+        p_model_dict = dict()
 
         if cv:
-            n_fold = 0
             for i_fold, (i_trn, i_val) in enumerate(cv.split(X, treatment), 1):
                 logger.info('Training a propensity model for CV #{}'.format(i_fold))
                 p_model.fit(X[i_trn], treatment[i_trn])
-                model_dict[i_fold] = p_model
+                p_model_dict[i_fold] = p_model
                 if X_pred is None:
                     p[i_val] = p_model.predict(X[i_val])
                 else:
                     p_fold = np.zeros_like(treatment_pred, dtype=float)
                     p_fold += p_model.predict(X_pred)
-                    n_fold += 1
-            p = p_fold/n_fold
+
+            if X_pred is not None:
+                p = p_fold/cv.get_n_splits()
         else:
             p_model.fit(X, treatment)
-            model_dict['training'] = p_model
+            p_model_dict['all training'] = p_model
             if X_pred is None:
-                p = p_model.predict(X)
+                p = p_model.predict(X_pred)
             else:
                 p = p_model.predict(X_pred)
 
-        if calibrate_propensity:
+        if calibrate_p:
             logger.info('Calibrating propensity scores.')
-            if X_pred is None:
-                p = calibrate(p, treatment)
-            else:
-                p = calibrate(p, treatment_pred)
+            p = calibrate(p, treatment_pred)
 
-        if return_model:
-            return p, model_dict
-        else:
-            return p
+        return p, p_model_dict
 
     def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True):
         """
@@ -685,13 +678,17 @@ class BaseXClassifier(BaseXLearner):
         if p is None:
             logger.info('Generating propensity score')
             p = dict()
+            p_model = dict()
             for group in self.t_groups:
                 mask = (treatment == group) | (treatment == self.control_name)
                 treatment_filt = treatment[mask]
                 X_filt = X[mask]
                 w_filt = (treatment_filt == group).astype(int)
                 w = (treatment == group).astype(int)
-                p[group] = self.run_propensity_score(X=X_filt, treatment=w_filt, X_pred=X, treatment_pred=w)
+                p[group], p_model[group] = self.compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                         X_pred=X, treatment_pred=w)
+            self.propensity_model = p_model
+            self.propensity = p
         else:
             check_p_conditions(p, self.t_groups)
 
