@@ -10,7 +10,7 @@ from xgboost import XGBRegressor
 from causalml.inference.meta.utils import (check_treatment_vector, check_p_conditions,
     get_xgboost_objective_metric, convert_pd_to_np)
 from causalml.inference.meta.explainer import Explainer
-from causalml.propensity import ElasticNetPropensityModel, calibrate
+from causalml.propensity import compute_propensity_score
 
 logger = logging.getLogger('causalml')
 
@@ -97,8 +97,8 @@ class BaseRLearner(object):
                 X_filt = X[mask]
                 w_filt = (treatment_filt == group).astype(int)
                 w = (treatment == group).astype(int)
-                p[group], p_model[group] = self.compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                         X_pred=X, treatment_pred=w, cv=self.cv)
+                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
             self.propensity_model = p_model
             self.propensity = p
         else:
@@ -298,56 +298,6 @@ class BaseRLearner(object):
         self.fit(X=X_b, p=p_b, treatment=treatment_b, y=y_b, verbose=False)
         te_b = self.predict(X=X)
         return te_b
-
-    def compute_propensity_score(self, X, treatment, X_pred=None, treatment_pred=None, cv=None, calibrate_p=True):
-        """Generate propensity score if user didn't provide
-
-        Args:
-            X (np.matrix): features for training
-            treatment (np.array or pd.Series): a treatment vector for training
-            X_pred (np.matrix, optional): features for prediction
-            treatment_pred (np.array or pd.Series, optional): a treatment vector for prediciton
-            cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
-            calibrate_p (bool, optional): whether calibrate the propensity score
-
-        Returns:
-            (tuple)
-                - p (numpy.ndarray): propensity score
-                - p_model_dict (dict): dictionary of propensity model
-        """
-        if treatment_pred is None:
-            treatment_pred = treatment.copy()
-
-        p = np.zeros_like(treatment_pred, dtype=float)
-        p_model = ElasticNetPropensityModel()
-        p_model_dict = dict()
-
-        if cv:
-            for i_fold, (i_trn, i_val) in enumerate(cv.split(X, treatment), 1):
-                logger.info('Training a propensity model for CV #{}'.format(i_fold))
-                p_model.fit(X[i_trn], treatment[i_trn])
-                p_model_dict[i_fold] = p_model
-                if X_pred is None:
-                    p[i_val] = p_model.predict(X[i_val])
-                else:
-                    p_fold = np.zeros_like(treatment_pred, dtype=float)
-                    p_fold += p_model.predict(X_pred)
-
-            if X_pred is not None:
-                p = p_fold/cv.get_n_splits()
-        else:
-            p_model.fit(X, treatment)
-            p_model_dict['all training'] = p_model
-            if X_pred is None:
-                p = p_model.predict(X_pred)
-            else:
-                p = p_model.predict(X_pred)
-
-        if calibrate_p:
-            logger.info('Calibrating propensity scores.')
-            p = calibrate(p, treatment_pred)
-
-        return p, p_model_dict
 
     def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True):
         """
@@ -575,8 +525,8 @@ class BaseRClassifier(BaseRLearner):
                 X_filt = X[mask]
                 w_filt = (treatment_filt == group).astype(int)
                 w = (treatment == group).astype(int)
-                p[group], p_model[group] = self.compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                         X_pred=X, treatment_pred=w, cv=self.cv)
+                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
             self.propensity_model = p_model
             self.propensity = p
         else:
@@ -700,8 +650,8 @@ class XGBRRegressor(BaseRRegressor):
                 X_filt = X[mask]
                 w_filt = (treatment_filt == group).astype(int)
                 w = (treatment == group).astype(int)
-                p[group], p_model[group] = self.compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                         X_pred=X, treatment_pred=w, cv=self.cv)
+                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
             self.propensity_model = p_model
             self.propensity = p
         else:
