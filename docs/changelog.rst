@@ -3,8 +3,18 @@
 Changelog
 =========
 
+0.6.0 (2019-12-31)
+------------------
+Special thanks to our new community contributors, Fritz (`@fritzo <https://github.com/fritzo>`_), Peter (`@peterfoley <https://github.com/peterfoley>`_) and Tomasz (`@TomaszZamacinski <https://github.com/TomaszZamacinski>`_)!
+
+- Improve `UpliftTreeClassifier`'s speed by 4 times by @jeongyoonlee
+- Fix impurity computation in `CausalTreeRegressor` by @TomaszZamacinski
+- Fix XGBoost related warnings by @peterfoley
+- Fix typos and improve documentation by @peterfoley and @fritzo
+
 0.5.0 (2019-11-26)
 ------------------
+Special thanks to our new community contributors, Paul (`@paullo0106 <https://github.com/paullo0106>`_) and Florian (`@FlorianWilhelm <https://github.com/FlorianWilhelm>`_)!
 
 - Add `TMLELearner`, targeted maximum likelihood estimator to `inference.meta` by @huigangchen
 - Add an option to DGPs for regression to simulate imbalanced propensity distribution by @huigangchen
