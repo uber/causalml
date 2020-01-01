@@ -38,7 +38,7 @@ setup(
     description="Python Package for Uplift Modeling and Causal Inference with Machine Learning Algorithms",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/uber-common/causalml",
+    url="https://github.com/uber/causalml",
     packages=packages,
     python_requires=">=3.6",
     classifiers=[
