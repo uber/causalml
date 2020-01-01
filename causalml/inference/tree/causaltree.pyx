@@ -278,6 +278,8 @@ class CausalTreeRegressor(object):
                                  "or in (0, 0.5], got %s"
                                  % self.min_samples_leaf)
             min_samples_leaf = int(ceil(self.min_samples_leaf * n_samples))
+        max_depth = (np.iinfo(np.int32).max if self.max_depth is None
+                     else self.max_depth)
 
         self.tree = Tree(
             n_features = n_features,
@@ -288,17 +290,17 @@ class CausalTreeRegressor(object):
             n_outputs = n_outputs)
         splitter = BestSplitter(criterion = CausalMSE(1, X.shape[0]),
             max_features = n_features,
-            min_samples_leaf = self.min_samples_leaf,
+            min_samples_leaf = min_samples_leaf,
             min_weight_leaf = 0, # from DecisionTreeRegressor default
-            random_state = self.random_state)
+            random_state = random_state)
         # hardcoded values below come from defaults values in
         #   sklearn.tree._classes.DecisionTreeRegressor
         builder = DepthFirstTreeBuilder(
             splitter = splitter,
             min_samples_split = 2,
-            min_samples_leaf = self.min_samples_leaf,
+            min_samples_leaf = min_samples_leaf,
             min_weight_leaf = 0,
-            max_depth = self.max_depth,
+            max_depth = max_depth,
             min_impurity_decrease = 0,
             min_impurity_split = float("-inf"))
         builder.build(
@@ -318,6 +320,7 @@ class CausalTreeRegressor(object):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        X = check_array(X, dtype=DTYPE, accept_sparse="csr")
         return self.tree.predict(X).reshape((-1, 1))
 
     def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=False):
