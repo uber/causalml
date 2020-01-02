@@ -11,6 +11,7 @@ Contents:
     installation
     examples
     validation
+    visualization
     causalml
     references
     changelog
