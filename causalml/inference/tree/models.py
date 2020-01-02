@@ -70,7 +70,7 @@ class DecisionTree:
         The treatment name providing the best uplift (treatment effect).
 
     upliftScore : list
-        The uplift score of this node: [max_Diff, p_value], where max_Diff stands for the maxium treatment effect, and
+        The uplift score of this node: [max_Diff, p_value], where max_Diff stands for the maximum treatment effect, and
         p_value stands for the p_value of the treatment effect.
 
     matchScore : float
