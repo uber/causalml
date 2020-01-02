@@ -2,14 +2,22 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.tree._criterion cimport RegressionCriterion
-from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
+
 import logging
+import numbers
 import numpy as np
 import pandas as pd
-from scipy.stats import norm
 
+from math import ceil
+from scipy.sparse import issparse
+from scipy.stats import norm
+from sklearn.tree._criterion cimport RegressionCriterion
+from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
+from sklearn.tree._splitter import BestSplitter
+from sklearn.tree._tree import DepthFirstTreeBuilder, DOUBLE, DTYPE, Tree
+from sklearn.utils import check_array, check_random_state
+
+from causalml.inference.meta.utils import check_treatment_vector
 
 logger = logging.getLogger('causalml')
 
@@ -88,7 +96,6 @@ cdef class CausalMSE(RegressionCriterion):
         cdef double tr_var
         cdef double ct_var
         cdef double one_over_eps = 1e5
-        cdef double big_number = 1e10
 
         for p in range(start, end):
             i = samples[p]
@@ -111,7 +118,7 @@ cdef class CausalMSE(RegressionCriterion):
         ct_var = ((node_sq_sum - node_tr_sq_sum) / node_ct -
                   (node_sum - node_tr_sum) * (node_sum - node_tr_sum) / (node_ct * node_ct))
 
-        return big_number - (node_tau * node_tau - (tr_var / node_tr + ct_var / node_ct))
+        return  (tr_var / node_tr + ct_var / node_ct) - node_tau * node_tau
 
 
     cdef void children_impurity(self, double* impurity_left, double* impurity_right) nogil:
@@ -152,7 +159,6 @@ cdef class CausalMSE(RegressionCriterion):
         cdef double left_ct_var
 
         cdef double one_over_eps = 1e5
-        cdef double big_number = 1e10
 
         for p in range(start, end):
             i = samples[p]
@@ -189,8 +195,8 @@ cdef class CausalMSE(RegressionCriterion):
         left_ct_var = ((left_sq_sum - left_tr_sq_sum) / left_ct -
                         (left_sum - left_tr_sum) * (left_sum - left_tr_sum) / (left_ct * left_ct))
 
-        impurity_left[0] = big_number - (left_tau * left_tau - (left_tr_var / left_tr + left_ct_var / left_ct))
-        impurity_right[0] = big_number - (right_tau * right_tau - (right_tr_var / right_tr + right_ct_var / right_ct))
+        impurity_left[0] = (left_tr_var / left_tr + left_ct_var / left_ct) - left_tau * left_tau
+        impurity_right[0] = (right_tr_var / right_tr + right_ct_var / right_ct) - right_tau * right_tau
 
 
 class CausalTreeRegressor(object):
@@ -219,7 +225,7 @@ class CausalTreeRegressor(object):
         self.random_state = random_state
 
         self._classes = {}
-        self.model = None
+        self.tree = None
 
         self.eps = 1e-5
 
@@ -234,19 +240,74 @@ class CausalTreeRegressor(object):
         Returns:
             self (CausalTree object)
         """
+        check_treatment_vector(treatment, self.control_name)
         is_treatment = treatment != self.control_name
         w = is_treatment.astype(int)
 
         t_groups = np.unique(treatment[is_treatment])
         self._classes[t_groups[0]] = 0
 
-        self.model = DecisionTreeRegressor(criterion=CausalMSE(1, X.shape[0]),
-                                           max_depth=self.max_depth,
-                                           min_samples_leaf=self.min_samples_leaf,
-                                           random_state=self.random_state)
+        # input checking replicated from BaseDecisionTree.fit()
+        random_state = check_random_state(self.random_state)
+        X = check_array(X, dtype=DTYPE, accept_sparse="csc")
+        y = check_array(y, ensure_2d=False, dtype=None)
+        if issparse(X):
+            X.sort_indices()
 
-        # sample_weight is used to pass the treatment flag
-        self.model.fit(X, y, sample_weight=1 + self.eps * w)
+            if X.indices.dtype != np.intc or X.indptr.dtype != np.intc:
+                raise ValueError("No support for np.int64 index based "
+                                 "sparse matrices")
+
+        y = np.atleast_1d(y)
+        if y.ndim == 1:
+            y = np.reshape(y, (-1, 1))
+        if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
+            y = np.ascontiguousarray(y, dtype=DOUBLE)
+        n_samples, n_features = X.shape
+        n_outputs = y.shape[1]
+
+        if isinstance(self.min_samples_leaf, numbers.Integral):
+            if not 1 <= self.min_samples_leaf:
+                raise ValueError("min_samples_leaf must be at least 1 "
+                                 "or in (0, 0.5], got %s"
+                                 % self.min_samples_leaf)
+            min_samples_leaf = self.min_samples_leaf
+        else:  # float
+            if not 0. < self.min_samples_leaf <= 0.5:
+                raise ValueError("min_samples_leaf must be at least 1 "
+                                 "or in (0, 0.5], got %s"
+                                 % self.min_samples_leaf)
+            min_samples_leaf = int(ceil(self.min_samples_leaf * n_samples))
+        max_depth = (np.iinfo(np.int32).max if self.max_depth is None
+                     else self.max_depth)
+
+        self.tree = Tree(
+            n_features = n_features,
+            # line below is taken from DecisionTreeRegressor.fit method source
+            #   which comments that the tree shouldn't need the n_classes parameter
+            #   but it apparently does
+            n_classes = np.array([1] * n_outputs, dtype=np.intp),
+            n_outputs = n_outputs)
+        splitter = BestSplitter(criterion = CausalMSE(1, X.shape[0]),
+            max_features = n_features,
+            min_samples_leaf = min_samples_leaf,
+            min_weight_leaf = 0, # from DecisionTreeRegressor default
+            random_state = random_state)
+        # hardcoded values below come from defaults values in
+        #   sklearn.tree._classes.DecisionTreeRegressor
+        builder = DepthFirstTreeBuilder(
+            splitter = splitter,
+            min_samples_split = 2,
+            min_samples_leaf = min_samples_leaf,
+            min_weight_leaf = 0,
+            max_depth = max_depth,
+            min_impurity_decrease = 0,
+            min_impurity_split = float("-inf"))
+        builder.build(
+            self.tree,
+            X = X,
+            y = y,
+            sample_weight = 1 + self.eps * w)
 
         return self
 
@@ -259,7 +320,8 @@ class CausalTreeRegressor(object):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        return self.model.predict(X).reshape((-1, 1))
+        X = check_array(X, dtype=DTYPE, accept_sparse="csr")
+        return self.tree.predict(X).reshape((-1, 1))
 
     def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000, verbose=False):
         """Fit the Causal Tree model and predict treatment effects.
