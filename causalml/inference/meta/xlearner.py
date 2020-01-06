@@ -171,7 +171,11 @@ class BaseXLearner(object):
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         if p is None:
-            p = self.propensity
+            logger.info('Generating propensity score')
+            p = dict()
+            for group in self.t_groups:
+                p_model = self.propensity_model[group]['all training']
+                p[group] = p_model.predict(X)
         else:
             check_p_conditions(p, self.t_groups)
 
@@ -236,7 +240,6 @@ class BaseXLearner(object):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.fit(X, treatment, y)
-        te = self.predict(X, treatment=treatment, y=y, p=p, return_components=return_components)
 
         if p is None:
             p = self.propensity
@@ -247,6 +250,8 @@ class BaseXLearner(object):
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
             p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+
+        te = self.predict(X, treatment=treatment, y=y, p=p, return_components=return_components)
 
         if not return_ci:
             return te
@@ -295,17 +300,18 @@ class BaseXLearner(object):
         """
         self.fit(X, treatment, y, p)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        te, dhat_cs, dhat_ts = self.predict(X, treatment, y, p, return_components=True)
 
         if p is None:
             p = self.propensity
-
-        check_p_conditions(p, self.t_groups)
+        else:
+            check_p_conditions(p, self.t_groups)
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
             p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+
+        te, dhat_cs, dhat_ts = self.predict(X, treatment, y, p, return_components=True)
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])

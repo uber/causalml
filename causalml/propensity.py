@@ -110,6 +110,7 @@ def compute_propensity_score(X, treatment, X_pred=None, treatment_pred=None, cv=
         treatment_pred = treatment.copy()
 
     p = np.zeros_like(treatment_pred, dtype=float)
+    p_fold = np.zeros_like(treatment_pred, dtype=float)
     p_model = ElasticNetPropensityModel()
     p_model_dict = dict()
 
@@ -118,14 +119,16 @@ def compute_propensity_score(X, treatment, X_pred=None, treatment_pred=None, cv=
             logger.info('Training a propensity model for CV #{}'.format(i_fold))
             p_model.fit(X[i_trn], treatment[i_trn])
             p_model_dict[i_fold] = p_model
+
             if X_pred is None:
                 p[i_val] = p_model.predict(X[i_val])
             else:
-                p_fold = np.zeros_like(treatment_pred, dtype=float)
-                p_fold += p_model.predict(X_pred)
+                i_rest = ~np.isin(X_pred, X[i_trn])
+                X_rest = X_pred[i_rest]
+                p_fold[i_rest] += p_model.predict(X_rest)
 
         if X_pred is not None:
-            p = p_fold/cv.get_n_splits()
+            p = p_fold/(cv.get_n_splits() - 1)
     else:
         p_model.fit(X, treatment)
         p_model_dict['all training'] = p_model
