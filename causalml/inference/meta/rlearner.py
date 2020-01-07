@@ -179,8 +179,9 @@ class BaseRLearner(object):
 
         if p is None:
             p = self.propensity
+        else:
+            check_p_conditions(p, self.t_groups)
 
-        check_p_conditions(p, self.t_groups)
         if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
@@ -233,8 +234,9 @@ class BaseRLearner(object):
 
         if p is None:
             p = self.propensity
+        else:
+            check_p_conditions(p, self.t_groups)
 
-        check_p_conditions(p, self.t_groups)
         if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
@@ -295,7 +297,7 @@ class BaseRLearner(object):
         p_b = {group: _p[idxs] for group, _p in p.items()}
         treatment_b = treatment[idxs]
         y_b = y[idxs]
-        self.fit(X=X_b, p=p_b, treatment=treatment_b, y=y_b, verbose=False)
+        self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b, verbose=False)
         te_b = self.predict(X=X)
         return te_b
 

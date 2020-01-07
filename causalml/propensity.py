@@ -124,6 +124,7 @@ def compute_propensity_score(X, treatment, X_pred=None, treatment_pred=None, cv=
                 p[i_val] = p_model.predict(X[i_val])
             else:
                 i_rest = ~np.isin(X_pred, X[i_trn])
+                i_rest = i_rest[:, 0]
                 X_rest = X_pred[i_rest]
                 p_fold[i_rest] += p_model.predict(X_rest)
 
@@ -140,5 +141,10 @@ def compute_propensity_score(X, treatment, X_pred=None, treatment_pred=None, cv=
     if calibrate_p:
         logger.info('Calibrating propensity scores.')
         p = calibrate(p, treatment_pred)
+
+    # force the p values within the range
+    eps = np.finfo(float).eps
+    p = np.where(p < 0 + eps, 0 + eps*1.001, p)
+    p = np.where(p > 1 - eps, 1 - eps*1.001, p)
 
     return p, p_model_dict
