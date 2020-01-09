@@ -298,8 +298,18 @@ class BaseXLearner(object):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         te, dhat_cs, dhat_ts = self.fit_predict(X, treatment, y, p, return_components=True)
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
+
+        if p is None:
+            p = self.propensity
+        else:
+            check_p_conditions(p, self.t_groups)
+        if isinstance(p, np.ndarray):
+            treatment_name = self.t_groups[0]
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
