@@ -298,20 +298,8 @@ class BaseXLearner(object):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        self.fit(X, treatment, y, p)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-
-        if p is None:
-            p = self.propensity
-        else:
-            check_p_conditions(p, self.t_groups)
-        if isinstance(p, np.ndarray):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
-
-        te, dhat_cs, dhat_ts = self.predict(X, treatment, y, p, return_components=True)
+        te, dhat_cs, dhat_ts = self.fit_predict(X, treatment, y, p, return_components=True)
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -656,7 +644,7 @@ class BaseXClassifier(BaseXLearner):
             self.models_tau_t[group].fit(X_filt[w == 1], d_t)
 
     def predict(self, X, treatment=None, y=None, p=None, return_components=False,
-                return_p_score=False, verbose=True):
+                verbose=True):
         """Predict treatment effects.
 
         Args:
@@ -675,7 +663,11 @@ class BaseXClassifier(BaseXLearner):
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         if p is None:
-            p = self.propensity
+            logger.info('Generating propensity score')
+            p = dict()
+            for group in self.t_groups:
+                p_model = self.propensity_model[group]['all training']
+                p[group] = p_model.predict(X)
         else:
             check_p_conditions(p, self.t_groups)
 
@@ -712,11 +704,7 @@ class BaseXClassifier(BaseXLearner):
                 logger.info('Error metrics for group {}'.format(group))
                 classification_metrics(y_filt, yhat, w)
 
-        if (not return_components) and (not return_p_score):
+        if not return_components:
             return te
-        elif (not return_components) and (return_p_score):
-            return te, p
-        elif (return_components) and (not return_p_score):
-            return te, dhat_cs, dhat_ts
         else:
-            return te, dhat_cs, dhat_ts, p
+            return te, dhat_cs, dhat_ts
