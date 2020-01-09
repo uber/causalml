@@ -1,8 +1,9 @@
 import pandas as pd
-from eli5.sklearn import PermutationImportance
 import shap
 import matplotlib.pyplot as plt
 from lightgbm import LGBMRegressor
+from sklearn.inspection import permutation_importance
+from sklearn.model_selection import train_test_split
 from copy import deepcopy
 
 from causalml.inference.meta.utils import convert_pd_to_np
@@ -12,7 +13,7 @@ VALID_METHODS = ('auto', 'permutation', 'shapley')
 
 class Explainer(object):
     def __init__(self, method, control_name, X, tau, classes, model_tau=None,
-                 features=None, normalize=True, override_checks=False, r_learners=None):
+                 features=None, normalize=True, test_size=0.3, random_state=None, override_checks=False, r_learners=None):
         """
         The Explainer class handles all feature explanation/interpretation functions, including plotting
         feature importances, shapley value distributions, and shapley value dependency plots.
@@ -22,7 +23,7 @@ class Explainer(object):
                     estimator must be tree-based)
                     Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
                     importance type
-            - permutation (calculates importance based on mean decrease in accuracy; estimator can be any form)
+            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted; estimator can be any form)
             - shapley (calculates shapley values; estimator must be tree-based)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
@@ -35,6 +36,8 @@ class Explainer(object):
             model_tau (sklearn/lightgbm/xgboost model object): a model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
             normalize (bool): normalize by sum of importances if method=auto (defaults to True)
+            test_size (float/int): if float, represents the proportion of the dataset to include in the test split. If int, represents the absolute number of test samples (used for estimating permutation importance)
+            random_state (int/RandomState instance/None): random state used in permutation importance estimation
             override_checks (bool): overrides self.check_conditions (e.g. if importance/shapley values are pre-computed)
             r_learners (dict): a mapping of treatment group to fitted R Learners
         """
@@ -48,14 +51,15 @@ class Explainer(object):
         self.model_tau = LGBMRegressor(importance_type='gain') if model_tau is None else model_tau
         self.features = features
         self.normalize = normalize
+        self.test_size = test_size
+        self.random_state = random_state
         self.override_checks = override_checks
         self.r_learners = r_learners
 
         if not self.override_checks:
             self.check_conditions()
             self.create_feature_names()
-            if self.method in ('auto', 'shapley'):
-                self.build_new_tau_models()
+            self.build_new_tau_models()
 
     def check_conditions(self):
         """
@@ -86,12 +90,17 @@ class Explainer(object):
         """
         Builds tau models (using X to predict estimated/actual tau) for each treatment group.
         """
+        if self.method in ('permutation'):
+            self.X_train, self.X_test, self.tau_train, self.tau_test = train_test_split(self.X, self.tau, test_size=self.test_size, random_state=self.random_state)
+        else:
+            self.X_train, self.tau_train = self.X, self.tau
+
         if self.r_learners is not None:
             self.models_tau = deepcopy(self.r_learners)
         else:
             self.models_tau = {group: deepcopy(self.model_tau) for group in self.classes}
             for group, idx in self.classes.items():
-                self.models_tau[group].fit(self.X, self.tau[:, idx])
+                self.models_tau[group].fit(self.X_train, self.tau_train[:, idx])
 
     def get_importance(self):
         """
@@ -123,16 +132,12 @@ class Explainer(object):
         Calculates feature importances for each treatment group, based on the permutation method.
         """
         importance_dict = {}
+        if self.r_learners is not None:
+            self.models_tau = deepcopy(self.r_learners)
+            self.X_test, self.tau_test = self.X, self.tau
         for group, idx in self.classes.items():
-            if self.r_learners is None:
-                perm_estimator = self.model_tau
-                cv = 3
-            else:
-                perm_estimator = self.r_learners[group]
-                cv = 'prefit'
-            perm_fitter = PermutationImportance(perm_estimator, cv=cv)
-            perm_fitter.fit(self.X, self.tau[:, idx])
-            importance_dict[group] = perm_fitter.feature_importances_
+            perm_estimator = self.models_tau[group]
+            importance_dict[group] = permutation_importance(estimator=perm_estimator, X=self.X_test, y=self.tau_test[:, idx], random_state=self.random_state).importances_mean
 
         return importance_dict
 
