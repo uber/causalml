@@ -42,7 +42,7 @@ class Explainer(object):
         self.control_name = control_name
         self.X = convert_pd_to_np(X)
         self.tau = convert_pd_to_np(tau)
-        if self.tau.ndim == 1:
+        if self.tau is not None and self.tau.ndim == 1:
             self.tau = self.tau.reshape(-1, 1)
         self.classes = classes
         self.model_tau = LGBMRegressor(importance_type='gain') if model_tau is None else model_tau
