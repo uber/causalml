@@ -89,7 +89,7 @@ class BaseTLearner(object):
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
             return_components (bool, optional): whether to return outcome for treatment and control seperately
-
+            verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
@@ -138,7 +138,6 @@ class BaseTLearner(object):
             bootstrap_size (int): number of samples per bootstrap
             return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (str): whether to output progress logs
-
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
                 If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
@@ -183,8 +182,6 @@ class BaseTLearner(object):
             bootstrap_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            verbose (str): whether to output progress logs
-
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
@@ -451,7 +448,7 @@ class BaseTClassifier(BaseTLearner):
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
-
+            verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """

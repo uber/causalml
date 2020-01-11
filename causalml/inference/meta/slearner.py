@@ -196,8 +196,6 @@ class BaseSLearner(object):
             bootstrap_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            verbose (str): whether to output progress logs
-
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
@@ -443,6 +441,7 @@ class BaseSClassifier(BaseSLearner):
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
+            verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """

@@ -147,12 +147,12 @@ def test_BaseXLearner(generate_regression_data):
     learner = BaseXLearner(learner=XGBRegressor())
 
     # check the accuracy of the ATE estimation
-    ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
     # check the accuracy of the CATE estimation with the bootstrap CI
-    cate_p, _, _ = learner.fit_predict(X=X, p=e, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
     assert gini(tau, cate_p.flatten()) > .5
 
 
@@ -162,12 +162,42 @@ def test_BaseXRegressor(generate_regression_data):
     learner = BaseXRegressor(learner=XGBRegressor())
 
     # check the accuracy of the ATE estimation
-    ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
     # check the accuracy of the CATE estimation with the bootstrap CI
-    cate_p, _, _ = learner.fit_predict(X=X, p=e, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
+    assert gini(tau, cate_p.flatten()) > .5
+
+
+def test_BaseXLearner_without_p(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseXLearner(learner=XGBRegressor())
+
+    # check the accuracy of the ATE estimation
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check the accuracy of the CATE estimation with the bootstrap CI
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
+    assert gini(tau, cate_p.flatten()) > .5
+
+
+def test_BaseXRegressor_without_p(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseXRegressor(learner=XGBRegressor())
+
+    # check the accuracy of the ATE estimation
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check the accuracy of the CATE estimation with the bootstrap CI
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
     assert gini(tau, cate_p.flatten()) > .5
 
 
@@ -177,12 +207,12 @@ def test_BaseRLearner(generate_regression_data):
     learner = BaseRLearner(learner=XGBRegressor())
 
     # check the accuracy of the ATE estimation
-    ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
     # check the accuracy of the CATE estimation with the bootstrap CI
-    cate_p, _, _ = learner.fit_predict(X=X, p=e, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
     assert gini(tau, cate_p.flatten()) > .5
 
 
@@ -192,12 +222,42 @@ def test_BaseRRegressor(generate_regression_data):
     learner = BaseRRegressor(learner=XGBRegressor())
 
     # check the accuracy of the ATE estimation
-    ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
     # check the accuracy of the CATE estimation with the bootstrap CI
-    cate_p, _, _ = learner.fit_predict(X=X, p=e, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
+    assert gini(tau, cate_p.flatten()) > .5
+
+
+def test_BaseRLearner_without_p(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(learner=XGBRegressor())
+
+    # check the accuracy of the ATE estimation
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check the accuracy of the CATE estimation with the bootstrap CI
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
+    assert gini(tau, cate_p.flatten()) > .5
+
+
+def test_BaseRRegressor_without_p(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRRegressor(learner=XGBRegressor())
+
+    # check the accuracy of the ATE estimation
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check the accuracy of the CATE estimation with the bootstrap CI
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
     assert gini(tau, cate_p.flatten()) > .5
 
 
@@ -379,16 +439,16 @@ def test_pandas_input(generate_regression_data):
         assert False
     try:
         learner = BaseXLearner(learner=LinearRegression())
-        ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+        ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     except AttributeError:
         assert False
     try:
         learner = BaseRLearner(learner=LinearRegression())
-        ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+        ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     except AttributeError:
         assert False
     try:
         learner = TMLELearner(learner=LinearRegression())
-        ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
+        ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     except AttributeError:
         assert False

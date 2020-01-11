@@ -10,6 +10,7 @@ from xgboost import XGBRegressor
 from causalml.inference.meta.utils import (check_treatment_vector, check_p_conditions,
     get_xgboost_objective_metric, convert_pd_to_np)
 from causalml.inference.meta.explainer import Explainer
+from causalml.propensity import compute_propensity_score
 
 logger = logging.getLogger('causalml')
 
@@ -60,27 +61,49 @@ class BaseRLearner(object):
         self.random_state = random_state
         self.cv = KFold(n_splits=n_fold, shuffle=True, random_state=random_state)
 
+        self.propensity = None
+        self.propensity_model = None
+
     def __repr__(self):
         return ('{}(model_mu={},\n'
                 '\tmodel_tau={})'.format(self.__class__.__name__,
                                          self.model_mu.__repr__(),
                                          self.model_tau.__repr__()))
 
-    def fit(self, X, p, treatment, y, verbose=True):
+    def fit(self, X, treatment, y, p=None, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            verbose (bool, optional): whether to output progress logs
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
-        check_p_conditions(p, self.t_groups)
+
+        if p is None:
+            logger.info('Generating propensity score')
+            p = dict()
+            p_model = dict()
+            for group in self.t_groups:
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                X_filt = X[mask]
+                w_filt = (treatment_filt == group).astype(int)
+                w = (treatment == group).astype(int)
+                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
+            self.propensity_model = p_model
+            self.propensity = p
+        else:
+            check_p_conditions(p, self.t_groups)
+
         if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
@@ -130,31 +153,35 @@ class BaseRLearner(object):
 
         return te
 
-    def fit_predict(self, X, p, treatment, y, return_ci=False,
+    def fit_predict(self, X, treatment, y, p=None, return_ci=False,
                     n_bootstraps=1000, bootstrap_size=10000, verbose=True):
         """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
             verbose (bool): whether to output progress logs
-
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
                 If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
                 UB [n_samples, n_treatment]
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        self.fit(X, p, treatment, y, verbose=verbose)
+        self.fit(X, treatment, y, p, verbose=verbose)
         te = self.predict(X)
 
-        check_p_conditions(p, self.t_groups)
+        if p is None:
+            p = self.propensity
+        else:
+            check_p_conditions(p, self.t_groups)
+
         if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
@@ -172,7 +199,7 @@ class BaseRLearner(object):
 
             logger.info('Bootstrap Confidence Intervals')
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
+                te_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -186,28 +213,31 @@ class BaseRLearner(object):
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, p, treatment, y, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
+    def estimate_ate(self, X, treatment, y, p=None, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            verbose (str): whether to output progress logs
-
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        te = self.fit_predict(X, p, treatment, y)
+        te = self.fit_predict(X, treatment, y, p)
 
-        check_p_conditions(p, self.t_groups)
-        if isinstance(p, (np.ndarray, pd.Series)):
+        if p is None:
+            p = self.propensity
+        else:
+            check_p_conditions(p, self.t_groups)
+
+        if isinstance(p, np.ndarray):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
@@ -246,7 +276,7 @@ class BaseRLearner(object):
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
             for n in tqdm(range(n_bootstraps)):
-                cate_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
+                cate_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size)
                 ate_bootstraps[:, n] = cate_b.mean()
 
             ate_lower = np.percentile(ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
@@ -259,7 +289,7 @@ class BaseRLearner(object):
             self.models_tau = deepcopy(models_tau_global)
             return ate, ate_lower, ate_upper
 
-    def bootstrap(self, X, p, treatment, y, size=10000):
+    def bootstrap(self, X, treatment, y, p, size=10000):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
 
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
@@ -267,7 +297,7 @@ class BaseRLearner(object):
         p_b = {group: _p[idxs] for group, _p in p.items()}
         treatment_b = treatment[idxs]
         y_b = y[idxs]
-        self.fit(X=X_b, p=p_b, treatment=treatment_b, y=y_b, verbose=False)
+        self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b, verbose=False)
         te_b = self.predict(X=X)
         return te_b
 
@@ -476,21 +506,40 @@ class BaseRClassifier(BaseRLearner):
         if (outcome_learner is None) and (effect_learner is None):
             raise ValueError("Either the outcome learner or the effect learner must be specified.")
 
-    def fit(self, X, p, treatment, y, verbose=True):
+    def fit(self, X, treatment, y, p=None, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            verbose (bool, optional): whether to output progress logs
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
-        check_p_conditions(p, self.t_groups)
+
+        if p is None:
+            logger.info('Generating propensity score')
+            p = dict()
+            p_model = dict()
+            for group in self.t_groups:
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                X_filt = X[mask]
+                w_filt = (treatment_filt == group).astype(int)
+                w = (treatment == group).astype(int)
+                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
+            self.propensity_model = p_model
+            self.propensity = p
+        else:
+            check_p_conditions(p, self.t_groups)
+
         if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
@@ -583,21 +632,39 @@ class XGBRRegressor(BaseRRegressor):
                                         **kwargs)
         )
 
-    def fit(self, X, p, treatment, y, verbose=True):
+    def fit(self, X, treatment, y, p=None, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
-            treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            verbose (bool, optional): whether to output progress logs
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
-        check_p_conditions(p, self.t_groups)
+
+        if p is None:
+            logger.info('Generating propensity score')
+            p = dict()
+            p_model = dict()
+            for group in self.t_groups:
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                X_filt = X[mask]
+                w_filt = (treatment_filt == group).astype(int)
+                w = (treatment == group).astype(int)
+                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
+            self.propensity_model = p_model
+            self.propensity = p
+        else:
+            check_p_conditions(p, self.t_groups)
+
         if isinstance(p, (np.ndarray, pd.Series)):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}

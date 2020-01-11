@@ -51,7 +51,7 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
     if estimators:
         for name, learner in estimators.items():
             try:
-                preds_dict[name] = learner.fit_predict(X=X, p=p_hat, treatment=w, y=y).flatten()
+                preds_dict[name] = learner.fit_predict(X=X, treatment=w, y=y, p=p_hat).flatten()
             except TypeError:
                 preds_dict[name] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
     else:
@@ -61,7 +61,7 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
                 learner = base_learner(model())
                 model_name = '{} Learner ({})'.format(label_l, label_m)
                 try:
-                    preds_dict[model_name] = learner.fit_predict(X=X, p=p_hat, treatment=w, y=y).flatten()
+                    preds_dict[model_name] = learner.fit_predict(X=X, treatment=w, y=y, p=p_hat).flatten()
                 except TypeError:
                     preds_dict[model_name] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
 
