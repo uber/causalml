@@ -199,7 +199,7 @@ class BaseRLearner(object):
 
             logger.info('Bootstrap Confidence Intervals')
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
+                te_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -276,7 +276,7 @@ class BaseRLearner(object):
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
             for n in tqdm(range(n_bootstraps)):
-                cate_b = self.bootstrap(X, p, treatment, y, size=bootstrap_size)
+                cate_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size)
                 ate_bootstraps[:, n] = cate_b.mean()
 
             ate_lower = np.percentile(ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
@@ -289,7 +289,7 @@ class BaseRLearner(object):
             self.models_tau = deepcopy(models_tau_global)
             return ate, ate_lower, ate_upper
 
-    def bootstrap(self, X, p, treatment, y, size=10000):
+    def bootstrap(self, X, treatment, y, p, size=10000):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
 
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)

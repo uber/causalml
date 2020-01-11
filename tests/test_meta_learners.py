@@ -170,6 +170,7 @@ def test_BaseXRegressor(generate_regression_data):
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
     assert gini(tau, cate_p.flatten()) > .5
 
+
 def test_BaseXLearner_without_p(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
@@ -197,7 +198,7 @@ def test_BaseXRegressor_without_p(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5    
+    assert gini(tau, cate_p.flatten()) > .5
 
 
 def test_BaseRLearner(generate_regression_data):
@@ -229,6 +230,7 @@ def test_BaseRRegressor(generate_regression_data):
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
     assert gini(tau, cate_p.flatten()) > .5
 
+
 def test_BaseRLearner_without_p(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
@@ -257,6 +259,7 @@ def test_BaseRRegressor_without_p(generate_regression_data):
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
     assert gini(tau, cate_p.flatten()) > .5
+
 
 def test_TMLELearner(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
