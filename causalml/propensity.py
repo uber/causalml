@@ -2,8 +2,8 @@ import logging
 import numpy as np
 from pygam import LogisticGAM, s
 from sklearn.metrics import roc_auc_score as auc
-from sklearn.linear_model import ElasticNetCV
-
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.model_selection import StratifiedKFold
 
 logger = logging.getLogger('causalml')
 
@@ -27,7 +27,8 @@ class ElasticNetPropensityModel(object):
         Returns:
             None
         """
-        self.model = ElasticNetCV(cv=n_fold, random_state=random_state)
+        cv = StratifiedKFold(n_splits=n_fold, shuffle=True, random_state=random_state)
+        self.model = LogisticRegressionCV(cv=cv, random_state=random_state)
         self.clip_bounds = clip_bounds
 
     def __repr__(self):
@@ -53,7 +54,7 @@ class ElasticNetPropensityModel(object):
         Returns:
             (numpy.ndarray): Propensity scores between 0 and 1.
         """
-        ps = np.clip(self.model.predict(X), *self.clip_bounds)
+        ps = np.clip(self.model.predict_proba(X)[:, 1], *self.clip_bounds)
         return ps
 
     def fit_predict(self, X, y):
