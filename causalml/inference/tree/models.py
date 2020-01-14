@@ -917,7 +917,7 @@ class UpliftTreeClassifier:
             max_features = columnCount
 
         for col in list(np.random.choice(a=range(columnCount), size=max_features, replace=False)):
-            columnValues = X[col]
+            columnValues = X[:, col]
             # unique values
             lsUnique = np.unique(columnValues)
 
