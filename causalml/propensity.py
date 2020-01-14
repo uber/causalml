@@ -15,7 +15,7 @@ class ElasticNetPropensityModel(object):
         model (sklearn.linear_model.ElasticNetCV): a propensity model object
     """
 
-    def __init__(self, n_fold=5, clip_bounds=(1e-3, 1 - 1e-3), l1_ratios=np.linspace(0,1,5), random_state=None):
+    def __init__(self, n_fold=5, clip_bounds=(1e-3, 1 - 1e-3), l1_ratios=np.linspace(0,1,5), cv=None, random_state=None):
         """Initialize a propensity model object.
 
         Args:
@@ -28,9 +28,12 @@ class ElasticNetPropensityModel(object):
         Returns:
             None
         """
-        cv = StratifiedKFold(n_splits=n_fold, shuffle=True, random_state=random_state)
+        if cv is None:
+            self.cv = StratifiedKFold(n_splits=n_fold, shuffle=True, random_state=random_state)
+        else:
+            self.cv = cv
         self.model = LogisticRegressionCV(penalty='elasticnet', solver='saga', l1_ratios=l1_ratios,
-                                          cv=cv, random_state=random_state)
+                                          cv=self.cv, random_state=random_state)
         self.clip_bounds = clip_bounds
 
     def __repr__(self):
