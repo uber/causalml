@@ -16,12 +16,14 @@ jobs:
           name: test
           script: pytest -sv
         - stage: fossa
+          # FOSSA_API_KEY unavailable for pull requests
+          # https://docs.travis-ci.com/user/pull-requests/#pull-requests-and-security-restrictions
+          if: fork = false
           name: fossa
           script:
               # NOTE: before running `fossa` make sure to save your FOSSA_API_KEY in your
               # environment variable in Travis see below.
               - fossa init
               - fossa analyze
-
 after_success:
-    - cd <SOURCE_DIR> && fossa test
+    - cd causalml && fossa test
