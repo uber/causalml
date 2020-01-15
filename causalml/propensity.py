@@ -2,8 +2,8 @@ import logging
 import numpy as np
 from pygam import LogisticGAM, s
 from sklearn.metrics import roc_auc_score as auc
-from sklearn.linear_model import ElasticNetCV
-
+from sklearn.linear_model import LogisticRegressionCV
+from sklearn.model_selection import StratifiedKFold
 
 logger = logging.getLogger('causalml')
 
@@ -15,19 +15,25 @@ class ElasticNetPropensityModel(object):
         model (sklearn.linear_model.ElasticNetCV): a propensity model object
     """
 
-    def __init__(self, n_fold=5, clip_bounds=(1e-3, 1 - 1e-3), random_state=None):
+    def __init__(self, n_fold=5, clip_bounds=(1e-3, 1 - 1e-3), l1_ratios=np.linspace(0,1,5), cv=None, random_state=None):
         """Initialize a propensity model object.
 
         Args:
             n_fold (int): the number of cross-validation fold
             clip_bounds (tuple): lower and upper bounds for clipping propensity scores. Bounds should be implemented
                 such that: 0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
+            l1_ratios (array-like): array of l1 ratios (0 <= value <= 1) to iterate through in CV estimator
             random_state (numpy.random.RandomState or int): RandomState or an int seed
 
         Returns:
             None
         """
-        self.model = ElasticNetCV(cv=n_fold, random_state=random_state)
+        if cv is None:
+            self.cv = StratifiedKFold(n_splits=n_fold, shuffle=True, random_state=random_state)
+        else:
+            self.cv = cv
+        self.model = LogisticRegressionCV(penalty='elasticnet', solver='saga', l1_ratios=l1_ratios,
+                                          cv=self.cv, random_state=random_state)
         self.clip_bounds = clip_bounds
 
     def __repr__(self):
@@ -53,7 +59,7 @@ class ElasticNetPropensityModel(object):
         Returns:
             (numpy.ndarray): Propensity scores between 0 and 1.
         """
-        ps = np.clip(self.model.predict(X), *self.clip_bounds)
+        ps = np.clip(self.model.predict_proba(X)[:, 1], *self.clip_bounds)
         return ps
 
     def fit_predict(self, X, y):
