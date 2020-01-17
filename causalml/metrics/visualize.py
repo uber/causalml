@@ -139,7 +139,7 @@ def get_cumgain(df, outcome_col='y', treatment_col='w', treatment_effect_col='ta
     gain = lift.mul(lift.index.values, axis=0)
 
     if normalize:
-        gain = gain.div(gain.iloc[-1, :], axis=1)
+        gain = gain.div(np.abs(gain.iloc[-1, :]), axis=1)
 
     return gain
 
@@ -214,7 +214,7 @@ def get_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
     qini.drop(random_cols, axis=1, inplace=True)
 
     if normalize:
-        qini = qini.div(qini.iloc[-1, :], axis=1)
+        qini = qini.div(np.abs(qini.iloc[-1, :]), axis=1)
 
     return qini
 
