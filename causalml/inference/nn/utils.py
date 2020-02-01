@@ -5,6 +5,17 @@ from keras.metrics import binary_accuracy
 
 
 def binary_classification_loss(concat_true, concat_pred):
+    """
+    Implements a classification (binary cross-entropy) loss function for DragonNet architecture.
+
+    Args:
+        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+                                   Each row in concat_true is comprised of (y, treatment)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+                                   Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
+    Returns:
+        - (float): binary cross-entropy loss
+    """
     t_true = concat_true[:, 1]
     t_pred = concat_pred[:, 2]
     t_pred = (t_pred + 0.001) / 1.002
@@ -14,6 +25,17 @@ def binary_classification_loss(concat_true, concat_pred):
 
 
 def regression_loss(concat_true, concat_pred):
+    """
+    Implements a regression (squared error) loss function for DragonNet architecture.
+
+    Args:
+        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+                                   Each row in concat_true is comprised of (y, treatment)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+                                   Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
+    Returns:
+        - (float): aggregated regression loss
+    """
     y_true = concat_true[:, 0]
     t_true = concat_true[:, 1]
 
@@ -26,34 +48,68 @@ def regression_loss(concat_true, concat_pred):
     return loss0 + loss1
 
 
-def ned_loss(concat_true, concat_pred):
-    t_true = concat_true[:, 1]
-
-    t_pred = concat_pred[:, 1]
-    return tf.reduce_sum(K.binary_crossentropy(t_true, t_pred))
-
-
-def dead_loss(concat_true, concat_pred):
-    return regression_loss(concat_true, concat_pred)
-
-
 def dragonnet_loss_binarycross(concat_true, concat_pred):
+    """
+    Implements regression + classification loss in one wrapper function.
+
+    Args:
+        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+                                   Each row in concat_true is comprised of (y, treatment)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+                                   Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
+    Returns:
+        - (float): aggregated regression + classification loss
+    """
     return regression_loss(concat_true, concat_pred) + binary_classification_loss(concat_true, concat_pred)
 
 
 def treatment_accuracy(concat_true, concat_pred):
+    """
+    Returns keras' binary_accuracy between treatment and prediction of propensity.
+
+    Args:
+        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+                                   Each row in concat_true is comprised of (y, treatment)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+                                   Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
+    Returns:
+        - (float): binary accuracy
+    """
     t_true = concat_true[:, 1]
     t_pred = concat_pred[:, 2]
     return binary_accuracy(t_true, t_pred)
 
 
 def track_epsilon(concat_true, concat_pred):
+    """
+    Tracks the mean absolute value of epsilon.
+
+    Args:
+        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+                                   Each row in concat_true is comprised of (y, treatment)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+                                   Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
+    Returns:
+        - (float): mean absolute value of epsilon
+    """
     epsilons = concat_pred[:, 3]
     return tf.abs(tf.reduce_mean(epsilons))
 
 
 def make_tarreg_loss(ratio=1., dragonnet_loss=dragonnet_loss_binarycross):
+    """
+    Given a specified loss function, returns the same loss function with targeted regularization.
+
+    Args:
+        ratio (float): weight assigned to the targeted regularization loss component
+        dragonnet_loss (function): a loss function
+    Returns:
+        (function): loss function with targeted regularization, weighted by specified ratio
+    """
     def tarreg_ATE_unbounded_domain_loss(concat_true, concat_pred):
+        """
+        Returns the loss function (specified in outer function) with targeted regularization.
+        """
         vanilla_loss = dragonnet_loss(concat_true, concat_pred)
 
         y_true = concat_true[:, 0]
@@ -82,16 +138,24 @@ def make_tarreg_loss(ratio=1., dragonnet_loss=dragonnet_loss_binarycross):
 
 
 class EpsilonLayer(Layer):
+    """
+    Custom keras layer to allow epsilon to be learned during training process.
+    """
     def __init__(self):
+        """
+        Inherits keras' Layer object.
+        """
         super(EpsilonLayer, self).__init__()
 
     def build(self, input_shape):
-        # Create a trainable weight variable for this layer.
+        """
+        Creates a trainable weight variable for this layer.
+        """
         self.epsilon = self.add_weight(name='epsilon',
                                        shape=[1, 1],
                                        initializer='RandomNormal',
                                        trainable=True)
-        super(EpsilonLayer, self).build(input_shape)  # Be sure to call this at the end
+        super(EpsilonLayer, self).build(input_shape)
 
     def call(self, inputs, **kwargs):
         return self.epsilon * tf.ones_like(inputs)[:, 0:1]
