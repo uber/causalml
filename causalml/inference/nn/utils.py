@@ -9,9 +9,9 @@ def binary_classification_loss(concat_true, concat_pred):
     Implements a classification (binary cross-entropy) loss function for DragonNet architecture.
 
     Args:
-        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+        - concat_true (tf.tensor): tensor of true samples, with shape (n_samples, 2)
                                    Each row in concat_true is comprised of (y, treatment)
-        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (n_samples, 4)
                                    Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
     Returns:
         - (float): binary cross-entropy loss
@@ -29,9 +29,9 @@ def regression_loss(concat_true, concat_pred):
     Implements a regression (squared error) loss function for DragonNet architecture.
 
     Args:
-        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+        - concat_true (tf.tensor): tensor of true samples, with shape (n_samples, 2)
                                    Each row in concat_true is comprised of (y, treatment)
-        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (n_samples, 4)
                                    Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
     Returns:
         - (float): aggregated regression loss
@@ -53,9 +53,9 @@ def dragonnet_loss_binarycross(concat_true, concat_pred):
     Implements regression + classification loss in one wrapper function.
 
     Args:
-        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+        - concat_true (tf.tensor): tensor of true samples, with shape (n_samples, 2)
                                    Each row in concat_true is comprised of (y, treatment)
-        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (n_samples, 4)
                                    Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
     Returns:
         - (float): aggregated regression + classification loss
@@ -68,9 +68,9 @@ def treatment_accuracy(concat_true, concat_pred):
     Returns keras' binary_accuracy between treatment and prediction of propensity.
 
     Args:
-        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+        - concat_true (tf.tensor): tensor of true samples, with shape (n_samples, 2)
                                    Each row in concat_true is comprised of (y, treatment)
-        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (n_samples, 4)
                                    Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
     Returns:
         - (float): binary accuracy
@@ -85,9 +85,9 @@ def track_epsilon(concat_true, concat_pred):
     Tracks the mean absolute value of epsilon.
 
     Args:
-        - concat_true (tf.tensor): tensor of true samples, with shape (2, n_samples)
+        - concat_true (tf.tensor): tensor of true samples, with shape (n_samples, 2)
                                    Each row in concat_true is comprised of (y, treatment)
-        - concat_pred (tf.tensor): tensor of predictions, with shape (4, n_samples)
+        - concat_pred (tf.tensor): tensor of predictions, with shape (n_samples, 4)
                                    Each row in concat_pred is comprised of (y0, y1, propensity, epsilon)
     Returns:
         - (float): mean absolute value of epsilon
