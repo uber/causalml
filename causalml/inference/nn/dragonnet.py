@@ -22,7 +22,7 @@ from keras.layers import Dense, Concatenate
 from keras import regularizers
 from keras.optimizers import SGD, Adam
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN
-from utils import (
+from causalml.inference.nn.utils import (
     dragonnet_loss_binarycross, EpsilonLayer, regression_loss, binary_classification_loss,
     treatment_accuracy, track_epsilon, make_tarreg_loss)
 from causalml.inference.meta.utils import convert_pd_to_np
