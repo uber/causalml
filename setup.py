@@ -19,6 +19,12 @@ with open("README.md", "r") as f:
 
 with open("requirements.txt") as f:
     requirements = f.readlines()
+# workaround to avoid installing xgboost if already installed
+try:
+    import xgboost
+    requirements = [r for r in requirements if not r.startswith("xgboost")]
+except ModuleNotFoundError:
+    pass
 
 extensions = [
     Extension("causalml.inference.tree.causaltree",
