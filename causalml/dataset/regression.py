@@ -37,7 +37,7 @@ def synthetic_data(mode=1, n=1000, p=5, sigma=1.0, adj=0.):
                2: simulate_randomized_trial,
                3: simulate_easy_propensity_difficult_baseline,
                4: simulate_unrelated_treatment_control,
-               5: simulate_hidden_counfounder}
+               5: simulate_hidden_confounder}
 
     assert mode in catalog, 'Invalid mode {}. Should be one of {}'.format(mode, set(catalog))
     return catalog[mode](n, p, sigma, adj)
