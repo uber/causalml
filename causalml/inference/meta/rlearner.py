@@ -301,7 +301,8 @@ class BaseRLearner(object):
         te_b = self.predict(X=X)
         return te_b
 
-    def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True, test_size=0.3, random_state=None):
+    def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True,
+                       test_size=0.3, random_state=None):
         """
         Builds a model (using X to predict estimated/actual tau), and then calculates feature importances
         based on a specified method.
@@ -311,7 +312,8 @@ class BaseRLearner(object):
                     estimator must be tree-based)
                     Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
                     importance type
-            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted; estimator can be any form)
+            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted;
+                           estimator can be any form)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
@@ -321,7 +323,9 @@ class BaseRLearner(object):
             features (np.array): list/array of feature names. If None, an enumerated list will be used
             method (str): auto, permutation
             normalize (bool): normalize by sum of importances if method=gini (defaults to True)
-            test_size (float/int): if float, represents the proportion of the dataset to include in the test split. If int, represents the absolute number of test samples (used for estimating permutation importance)
+            test_size (float/int): if float, represents the proportion of the dataset to include in the test split.
+                                   If int, represents the absolute number of test samples (used for estimating
+                                   permutation importance)
             random_state (int/RandomState instance/None): random state used in permutation importance estimation
         """
         explainer = Explainer(method=method, control_name=self.control_name,
@@ -344,7 +348,8 @@ class BaseRLearner(object):
                               features=features, classes=self._classes)
         return explainer.get_shap_values()
 
-    def plot_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True, test_size=0.3, random_state=None):
+    def plot_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True,
+                        test_size=0.3, random_state=None):
         """
         Builds a model (using X to predict estimated/actual tau), and then plots feature importances
         based on a specified method.
@@ -354,7 +359,8 @@ class BaseRLearner(object):
                     estimator must be tree-based)
                     Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
                     importance type
-            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted; estimator can be any form)
+            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted;
+                           estimator can be any form)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
         Args:
@@ -364,7 +370,9 @@ class BaseRLearner(object):
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used
             method (str): auto, permutation
             normalize (bool): normalize by sum of importances if method=gini (defaults to True)
-            test_size (float/int): if float, represents the proportion of the dataset to include in the test split. If int, represents the absolute number of test samples (used for estimating permutation importance)
+            test_size (float/int): if float, represents the proportion of the dataset to include in the test split.
+                                   If int, represents the absolute number of test samples (used for estimating
+                                   permutation importance)
             random_state (int/RandomState instance/None): random state used in permutation importance estimation
         """
         explainer = Explainer(method=method, control_name=self.control_name,
