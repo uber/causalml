@@ -13,7 +13,8 @@ VALID_METHODS = ('auto', 'permutation', 'shapley')
 
 class Explainer(object):
     def __init__(self, method, control_name, X, tau, classes, model_tau=None,
-                 features=None, normalize=True, test_size=0.3, random_state=None, override_checks=False, r_learners=None):
+                 features=None, normalize=True, test_size=0.3, random_state=None, override_checks=False,
+                 r_learners=None):
         """
         The Explainer class handles all feature explanation/interpretation functions, including plotting
         feature importances, shapley value distributions, and shapley value dependency plots.
@@ -23,7 +24,8 @@ class Explainer(object):
                     estimator must be tree-based)
                     Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
                     importance type
-            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted; estimator can be any form)
+            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted;
+                           estimator can be any form)
             - shapley (calculates shapley values; estimator must be tree-based)
         Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
 
@@ -36,7 +38,9 @@ class Explainer(object):
             model_tau (sklearn/lightgbm/xgboost model object): a model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
             normalize (bool): normalize by sum of importances if method=auto (defaults to True)
-            test_size (float/int): if float, represents the proportion of the dataset to include in the test split. If int, represents the absolute number of test samples (used for estimating permutation importance)
+            test_size (float/int): if float, represents the proportion of the dataset to include in the test split.
+                                   If int, represents the absolute number of test samples (used for estimating
+                                   permutation importance)
             random_state (int/RandomState instance/None): random state used in permutation importance estimation
             override_checks (bool): overrides self.check_conditions (e.g. if importance/shapley values are pre-computed)
             r_learners (dict): a mapping of treatment group to fitted R Learners
@@ -91,7 +95,10 @@ class Explainer(object):
         Builds tau models (using X to predict estimated/actual tau) for each treatment group.
         """
         if self.method in ('permutation'):
-            self.X_train, self.X_test, self.tau_train, self.tau_test = train_test_split(self.X, self.tau, test_size=self.test_size, random_state=self.random_state)
+            self.X_train, self.X_test, self.tau_train, self.tau_test = train_test_split(self.X,
+                                                                                        self.tau,
+                                                                                        test_size=self.test_size,
+                                                                                        random_state=self.random_state)
         else:
             self.X_train, self.tau_train = self.X, self.tau
 
@@ -137,7 +144,10 @@ class Explainer(object):
             self.X_test, self.tau_test = self.X, self.tau
         for group, idx in self.classes.items():
             perm_estimator = self.models_tau[group]
-            importance_dict[group] = permutation_importance(estimator=perm_estimator, X=self.X_test, y=self.tau_test[:, idx], random_state=self.random_state).importances_mean
+            importance_dict[group] = permutation_importance(estimator=perm_estimator,
+                                                            X=self.X_test,
+                                                            y=self.tau_test[:, idx],
+                                                            random_state=self.random_state).importances_mean
 
         return importance_dict
 
