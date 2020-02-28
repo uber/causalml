@@ -3,6 +3,24 @@
 Changelog
 =========
 
+0.7.0 (2020-02-28)
+------------------
+Special thanks to our new community contributor, Steve (`@steveyang90 <https://github.com/steveyang90>`_)!
+
+Major Updates
+~~~~~~~~~~~~~
+- Add a new `nn` inference submodule with `DragonNet` implementation by @yungmsh
+- Add a new `feature selection` submodule with filter feature selection methods by @zhenyuz0500
+
+Minor Updates
+~~~~~~~~~~~~~
+- Make propensity scores optional in all meta-learners by @ppstacy
+- Replace `eli5` permutation importance with `sklearn`'s by @yluogit
+- Replace `ElasticNetCV` with `LogisticRegressionCV` in `propensity.py` by @yungmsh
+- Fix the normalized uplift curve plot with negative ATE by @jeongyoonlee
+- Fix the TravisCI FOSSA error for PRs from forked repo by @steveyang90
+- Add documentation about tree visualization by @zhenyuz0500
+
 0.6.0 (2019-12-31)
 ------------------
 Special thanks to our new community contributors, Fritz (`@fritzo <https://github.com/fritzo>`_), Peter (`@peterfoley <https://github.com/peterfoley>`_) and Tomasz (`@TomaszZamacinski <https://github.com/TomaszZamacinski>`_)!

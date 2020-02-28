@@ -13,7 +13,7 @@ from causalml.inference.meta import BaseTLearner, BaseTRegressor, BaseTClassifie
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
 from causalml.inference.meta import BaseRLearner, BaseRClassifier, BaseRRegressor
 from causalml.inference.meta import TMLELearner
-from causalml.metrics import ape, gini, get_cumgain
+from causalml.metrics import ape, get_cumgain
 
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
 
@@ -67,7 +67,20 @@ def test_BaseSRegressor(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_LRSRegressor(generate_regression_data):
@@ -93,7 +106,20 @@ def test_BaseTLearner(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseTRegressor(generate_regression_data):
@@ -108,7 +134,20 @@ def test_BaseTRegressor(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_MLPTRegressor(generate_regression_data):
@@ -123,7 +162,20 @@ def test_MLPTRegressor(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_XGBTRegressor(generate_regression_data):
@@ -138,7 +190,20 @@ def test_XGBTRegressor(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseXLearner(generate_regression_data):
@@ -153,7 +218,20 @@ def test_BaseXLearner(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseXRegressor(generate_regression_data):
@@ -168,7 +246,20 @@ def test_BaseXRegressor(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseXLearner_without_p(generate_regression_data):
@@ -183,7 +274,20 @@ def test_BaseXLearner_without_p(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseXRegressor_without_p(generate_regression_data):
@@ -198,7 +302,20 @@ def test_BaseXRegressor_without_p(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseRLearner(generate_regression_data):
@@ -213,7 +330,20 @@ def test_BaseRLearner(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseRRegressor(generate_regression_data):
@@ -228,7 +358,20 @@ def test_BaseRRegressor(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseRLearner_without_p(generate_regression_data):
@@ -243,7 +386,20 @@ def test_BaseRLearner_without_p(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseRRegressor_without_p(generate_regression_data):
@@ -258,7 +414,20 @@ def test_BaseRRegressor_without_p(generate_regression_data):
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10)
-    assert gini(tau, cate_p.flatten()) > .5
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
 
 def test_TMLELearner(generate_regression_data):
@@ -290,20 +459,22 @@ def test_BaseSClassifier(generate_classification_data):
                      treatment=df_train['treatment_group_key'].values,
                      y=df_train[CONVERSION].values)
 
-    y_pred = uplift_model.predict(X=df_test[x_names].values,
-                                  treatment=df_test['treatment_group_key'].values)
+    tau_pred = uplift_model.predict(X=df_test[x_names].values,
+                                    treatment=df_test['treatment_group_key'].values)
 
-    auuc_metrics = pd.DataFrame(
-        np.c_[y_pred, df_test['treatment_group_key'].values, df_test[CONVERSION].values],
-        columns=['y_pred', 'W', CONVERSION])
+    auuc_metrics = pd.DataFrame({'tau_pred': tau_pred.flatten(),
+                                 'W': df_test['treatment_group_key'].values,
+                                 CONVERSION: df_test[CONVERSION].values,
+                                 'treatment_effect_col': df_test['treatment_effect'].values})
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          treatment_effect_col='treatment_effect_col')
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
-    assert cumgain['y_pred'].sum() > cumgain['Random'].sum()
+    assert cumgain['tau_pred'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseTClassifier(generate_classification_data):
@@ -324,20 +495,22 @@ def test_BaseTClassifier(generate_classification_data):
                      treatment=df_train['treatment_group_key'].values,
                      y=df_train[CONVERSION].values)
 
-    y_pred = uplift_model.predict(X=df_test[x_names].values,
+    tau_pred = uplift_model.predict(X=df_test[x_names].values,
                                   treatment=df_test['treatment_group_key'].values)
 
-    auuc_metrics = pd.DataFrame(
-        np.c_[y_pred, df_test['treatment_group_key'].values, df_test[CONVERSION].values],
-        columns=['y_pred', 'W', CONVERSION])
+    auuc_metrics = pd.DataFrame({'tau_pred': tau_pred.flatten(),
+                                 'W': df_test['treatment_group_key'].values,
+                                 CONVERSION: df_test[CONVERSION].values,
+                                 'treatment_effect_col': df_test['treatment_effect'].values})
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          treatment_effect_col='treatment_effect_col')
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
-    assert cumgain['y_pred'].sum() > cumgain['Random'].sum()
+    assert cumgain['tau_pred'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseXClassifier(generate_classification_data):
@@ -365,20 +538,22 @@ def test_BaseXClassifier(generate_classification_data):
                      treatment=df_train['treatment_group_key'].values,
                      y=df_train[CONVERSION].values)
 
-    y_pred = uplift_model.predict(X=df_test[x_names].values,
+    tau_pred = uplift_model.predict(X=df_test[x_names].values,
                                   p=df_test['propensity_score'].values)
 
-    auuc_metrics = pd.DataFrame(
-        np.c_[y_pred, df_test['treatment_group_key'].values, df_test[CONVERSION].values],
-        columns=['y_pred', 'W', CONVERSION])
+    auuc_metrics = pd.DataFrame({'tau_pred': tau_pred.flatten(),
+                                 'W': df_test['treatment_group_key'].values,
+                                 CONVERSION: df_test[CONVERSION].values,
+                                 'treatment_effect_col': df_test['treatment_effect'].values})
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          treatment_effect_col='treatment_effect_col')
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
-    assert cumgain['y_pred'].sum() > cumgain['Random'].sum()
+    assert cumgain['tau_pred'].sum() > cumgain['Random'].sum()
 
 
 def test_BaseRClassifier(generate_classification_data):
@@ -405,19 +580,21 @@ def test_BaseRClassifier(generate_classification_data):
                      treatment=df_train['treatment_group_key'].values,
                      y=df_train[CONVERSION].values)
 
-    y_pred = uplift_model.predict(X=df_test[x_names].values)
+    tau_pred = uplift_model.predict(X=df_test[x_names].values)
 
-    auuc_metrics = pd.DataFrame(
-        np.c_[y_pred, df_test['treatment_group_key'].values, df_test[CONVERSION].values],
-        columns=['y_pred', 'W', CONVERSION])
+    auuc_metrics = pd.DataFrame({'tau_pred': tau_pred.flatten(),
+                                 'W': df_test['treatment_group_key'].values,
+                                 CONVERSION: df_test[CONVERSION].values,
+                                 'treatment_effect_col': df_test['treatment_effect'].values})
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
-                          treatment_col='W')
+                          treatment_col='W',
+                          treatment_effect_col='treatment_effect_col')
 
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
-    assert cumgain['y_pred'].sum() > cumgain['Random'].sum()
+    assert cumgain['tau_pred'].sum() > cumgain['Random'].sum()
 
 
 def test_pandas_input(generate_regression_data):
