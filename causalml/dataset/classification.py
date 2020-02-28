@@ -120,6 +120,11 @@ def make_uplift_classification(n_samples=1000,
         x_name.append(x_name_i)
         df_res[x_name_i] = np.random.normal(0, 1, n_all)
 
+    # default treatment effects
+    Y = Y1.copy()
+    Y_increase = np.zeros_like(Y1)
+    Y_decrease = np.zeros_like(Y1)
+
     # generate uplift (positive)
     for treatment_key_i in treatment_name:
         treatment_index = df_res.index[df_res['treatment_group_key'] == treatment_key_i].tolist()
@@ -137,7 +142,7 @@ def make_uplift_classification(n_samples=1000,
                 x_name.append(x_name_i)
                 x_uplift_increase_name.append(x_name_i)
                 df_res[x_name_i] = X_increase[:, xi]
-            Y1[treatment_index] = Y1[treatment_index] + Y_increase[treatment_index]
+            Y[treatment_index] = Y[treatment_index] + Y_increase[treatment_index]
             if n_uplift_increase_mix_informative_dict[treatment_key_i] > 0:
                 for xi in range(n_uplift_increase_mix_informative_dict[treatment_key_i]):
                     x_name_i = 'x' + str(len(x_name)+1) + '_increase_mix'
@@ -162,15 +167,17 @@ def make_uplift_classification(n_samples=1000,
                 x_name.append(x_name_i)
                 x_uplift_decrease_name.append(x_name_i)
                 df_res[x_name_i] = X_decrease[:, xi]
-            Y1[treatment_index] = Y1[treatment_index] - Y_decrease[treatment_index]
+            Y[treatment_index] = Y[treatment_index] - Y_decrease[treatment_index]
             if n_uplift_decrease_mix_informative_dict[treatment_key_i] > 0:
                 for xi in range(n_uplift_decrease_mix_informative_dict[treatment_key_i]):
                     x_name_i = 'x' + str(len(x_name)+1) + '_decrease_mix'
                     x_name.append(x_name_i)
                     df_res[x_name_i] = (np.random.uniform(-1, 1) * df_res[np.random.choice(x_informative_name)]
                                         + np.random.uniform(-1, 1) * df_res[np.random.choice(x_uplift_decrease_name)])
+
     # truncate Y
-    for i in range(len(Y1)):
-        Y1[i] = max(min(Y1[i], 1), 0)
-    df_res[y_name] = Y1
+    Y = np.clip(Y, 0, 1)
+
+    df_res[y_name] = Y
+    df_res['treatment_effect'] = Y - Y1
     return df_res, x_name

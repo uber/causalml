@@ -1,5 +1,7 @@
 *.egg-info/
 env_docs/
+.idea
+.pytest_cache
 .vscode
 *.DS_Store
 __pycache__
