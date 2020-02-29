@@ -192,6 +192,23 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](./LICE
 ## Documentation
 * [Causal ML API documentation](https://causalml.readthedocs.io/en/latest/about.html)
 
+## Citation
+To cite CausalML in publications, you can refer to the following sources:
+
+Whitepaper:
+[CausalML: Python Package for Causal Machine Learning](https://arxiv.org/abs/2002.11631)
+
+Bibtex:
+> @misc{chen2020causalml,
+>    title={CausalML: Python Package for Causal Machine Learning},
+>    author={Huigang Chen and Totte Harinen and Jeong-Yoon Lee and Mike Yung and Zhenyu Zhao},
+>    year={2020},
+>    eprint={2002.11631},
+>    archivePrefix={arXiv},
+>    primaryClass={cs.CY}
+>}
+
+
 ## Papers
 
 * Nicholas J Radcliffe and Patrick D Surry. Real-world uplift modelling with significance based uplift trees. White Paper TR-2011-1, Stochastic Solutions, 2011.
