@@ -77,8 +77,7 @@ Single Simulation
 
 .. code-block:: python
 
-  from causalml.dataset.synthetic import *
-  from causalml.metrics.synthetic import *
+  from causalml.dataset import *
 
   # Generate synthetic data for single simulation
   y, X, treatment, tau, b, e = synthetic_data(mode=1)
@@ -98,8 +97,7 @@ Multiple Simulations
 
 .. code-block:: python
 
-  from causalml.dataset.synthetic import *
-  from causalml.metrics.synthetic import *
+  from causalml.dataset import *
 
   # Generalize performance summary over k simulations
   num_simulations = 12
