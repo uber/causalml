@@ -69,7 +69,7 @@ X-learner :cite:`kunzel2019metalearners` is an extension of T-learner, and consi
 | Impute the user level treatment effects, :math:`D^1_i` and :math:`D^0_j` for user :math:`i` in the treatment group based on :math:`\mu_0(x)`, and user :math:`j` in the control groups based on :math:`\mu_1(x)`:
 |
 |   :math:`D^1_i = Y^1_i - \hat\mu_0(X^1_i)`, and
-|   :math:`D^0_i = \hat\mu_1(X^0_i)` - Y^0_i
+|   :math:`D^0_i = \hat\mu_1(X^0_i) - Y^0_i`
 |
 | then estimate :math:`\tau_1(x) = E[D^1|X=x]`, and :math:`\tau_0(x) = E[D^0|X=x]` using machine learning models.
 |
@@ -94,7 +94,7 @@ R-learner :cite:`nie2017quasi` uses the cross-validation out-of-fold estimates o
 |
 |   :math:`\hat{L}_n(\tau(x)) = \frac{1}{n} \sum^n_{i=1}\big(\big(Y_i - \hat{m}^{(-i)}(X_i)\big) - \big(W_i - \hat{e}^{(-i)}(X_i)\big)\tau(X_i)\big)^2`
 |
-| where :math:`e^{(-i)}(X_i)`, etc. denote the out-of-fold held-out predictions made without using the :math:`i`-th training sample.
+| where :math:`\hat{e}^{(-i)}(X_i)`, etc. denote the out-of-fold held-out predictions made without using the :math:`i`-th training sample.
 
 
 Tree-Based Algorithms
@@ -105,7 +105,7 @@ Uplift Tree
 
 The Uplift Tree approach consists of a set of methods that use a tree-based algorithm where the splitting criterion is based on differences in uplift. :cite:`Rzepakowski2012-br` proposed three different ways to quantify the gain in divergence as the result of splitting :cite:`Gutierrez2016-co`:
 
-   :math:`D_{gain} = D_{after_split} (P^T, P^C) - D_{before_split}(P^T, P^C)`
+   :math:`D_{gain} = D_{after_{split}} (P^T, P^C) - D_{before_{split}}(P^T, P^C)`
 
 where :math:`D` measures the divergence and :math:`P^T` and :math:`P^C` refer to the probability distribution of the outcome of interest in the treatment and control groups, respectively. Three different ways to quantify the divergence, KL, ED and Chi, are implemented in the package.
 
@@ -115,7 +115,7 @@ The Kullback-Leibler (KL) divergence is given by:
 
    :math:`KL(P : Q) = \sum_{k=left, right}p_klog\frac{p_k}{q_k}`
 
-where :math:`p` is the sample mean in the treatmet group, :math:`q` is the sample mean in the control group and :math:`k` indicates the leaf in which :math:`p` and :math:`q` are computed :cite:`Gutierrez2016-co`
+where :math:`p` is the sample mean in the treatment group, :math:`q` is the sample mean in the control group and :math:`k` indicates the leaf in which :math:`p` and :math:`q` are computed :cite:`Gutierrez2016-co`
 
 ED
 ~~~
