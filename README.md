@@ -99,7 +99,7 @@ te, lb, ub =  rl.estimate_ate(X=X, p=e, treatment=treatment, y=y)
 print('Average Treatment Effect (BaseRRegressor using XGBoost): {:.2f} ({:.2f}, {:.2f})'.format(te[0], lb[0], ub[0]))
 ```
 
-See the [Meta-learner example notebook](./examples/meta_learners_with_synthetic_data.ipynb) for details.
+See the [Meta-learner example notebook](https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data.ipynb) for details.
 
 
 ## Interpretable Causal ML
@@ -146,7 +146,7 @@ slearner.plot_shap_dependence(treatment_group='treatment_A',
   <img width="629px" height="618px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/shap_vis.png">
 </div>
 
-See the [feature interpretations example notebook](./examples/feature_interpretations_example.ipynb) for details.
+See the [feature interpretations example notebook](https://github.com/uber/causalml/blob/master/examples/feature_interpretations_example.ipynb) for details.
 
 ### Uplift Tree Visualization
 
@@ -169,22 +169,22 @@ Image(graph.create_png())
   <img width="800px" height="479px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/uplift_tree_vis.png">
 </div>
 
-See the [Uplift Tree visualization example notebook](./examples/uplift_tree_visualization.ipynb) for details.
+See the [Uplift Tree visualization example notebook](https://github.com/uber/causalml/blob/master/examples/uplift_tree_visualization.ipynb) for details.
 
 
 # Contributing
 
-We welcome community contributors to the project. Before you start, please read our [code of conduct](./CODE_OF_CONDUCT.md) and check out [contributing guidelines](./CONTRIBUTING.md) first.
+We welcome community contributors to the project. Before you start, please read our [code of conduct](https://github.com/uber/causalml/blob/master/CODE_OF_CONDUCT.md) and check out [contributing guidelines](./CONTRIBUTING.md) first.
 
 
 # Versioning
 
-We document versions and changes in our [changelog](./docs/changelog.rst).
+We document versions and changes in our [changelog](https://github.com/uber/causalml/blob/master/docs/changelog.rst).
 
 
 # License
 
-This project is licensed under the Apache 2.0 License - see the [LICENSE](./LICENSE) file for details.
+This project is licensed under the Apache 2.0 License - see the [LICENSE](https://github.com/uber/causalml/blob/master/LICENSE) file for details.
 
 
 # References
