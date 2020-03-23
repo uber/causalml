@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from pygam import LogisticGAM, s
 from sklearn.metrics import roc_auc_score as auc
-from sklearn.linear_model import LogisticRegressionCV
+from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from sklearn.model_selection import StratifiedKFold
 
 logger = logging.getLogger('causalml')
@@ -15,14 +15,19 @@ class ElasticNetPropensityModel(object):
         model (sklearn.linear_model.ElasticNetCV): a propensity model object
     """
 
-    def __init__(self, n_fold=5, clip_bounds=(1e-3, 1 - 1e-3), l1_ratios=np.linspace(0,1,5), cv=None, random_state=None):
+    def __init__(self, n_fold=3, Cs=np.logspace(1e-3, 1 - 1e-3, 4), l1_ratios=np.linspace(1e-3, 1 - 1e-3, 4),
+                 clip_bounds=(1e-3, 1 - 1e-3), cv=None, random_state=None):
         """Initialize a propensity model object.
 
         Args:
             n_fold (int): the number of cross-validation fold
+            Cs (int or array-like): Each of the values in Cs describes the inverse of regularization strength.
+                If Cs is as an int, then a grid of Cs values are chosen in a logarithmic scale between 1e-4 and 1e4.
+            l1_ratios (array-like): array of l1 ratios (0 <= value <= 1) to iterate through in CV estimator
             clip_bounds (tuple): lower and upper bounds for clipping propensity scores. Bounds should be implemented
                 such that: 0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
-            l1_ratios (array-like): array of l1 ratios (0 <= value <= 1) to iterate through in CV estimator
+            cv (int or cross-validation generator): The default cross-validation generator used is Stratified K-Folds.
+                If an integer is provided, then it is the number of folds used.
             random_state (numpy.random.RandomState or int): RandomState or an int seed
 
         Returns:
@@ -32,7 +37,7 @@ class ElasticNetPropensityModel(object):
             self.cv = StratifiedKFold(n_splits=n_fold, shuffle=True, random_state=random_state)
         else:
             self.cv = cv
-        self.model = LogisticRegressionCV(penalty='elasticnet', solver='saga', l1_ratios=l1_ratios,
+        self.model = LogisticRegressionCV(penalty='elasticnet', solver='saga', Cs=Cs, l1_ratios=l1_ratios,
                                           cv=self.cv, random_state=random_state)
         self.clip_bounds = clip_bounds
 
@@ -47,6 +52,9 @@ class ElasticNetPropensityModel(object):
             X (numpy.ndarray): a feature matrix
             y (numpy.ndarray): a binary target vector
         """
+        if self.check_if_randomized(X, y):
+            logger.warning('Propensity AUC close to 0.5. This may suggest your data is already randomized.')
+            self.model = LogisticRegression()
         self.model.fit(X, y)
 
     def predict(self, X):
@@ -77,6 +85,15 @@ class ElasticNetPropensityModel(object):
         logger.info('AUC score: {:.6f}'.format(auc(y, ps)))
         return ps
 
+    def check_if_randomized(self, X, y, max_auc=0.51):
+        """Checks if the underlying data is already randomized by fitting a single LogisticRegression.
+        """
+        lr = LogisticRegression()
+        lr.fit(X, y)
+        score = auc(y, lr.predict_proba(X)[:, 1])
+        if score < max_auc:
+            return True
+        return False
 
 def calibrate(ps, treatment):
     """Calibrate propensity scores with logistic GAM.
@@ -120,29 +137,12 @@ def compute_propensity_score(X, treatment, X_pred=None, treatment_pred=None, cv=
     p_model = ElasticNetPropensityModel()
     p_model_dict = dict()
 
-    if cv:
-        for i_fold, (i_trn, i_val) in enumerate(cv.split(X, treatment), 1):
-            logger.info('Training a propensity model for CV #{}'.format(i_fold))
-            p_model.fit(X[i_trn], treatment[i_trn])
-            p_model_dict[i_fold] = p_model
-
-            if X_pred is None:
-                p[i_val] = p_model.predict(X[i_val])
-            else:
-                i_rest = ~np.isin(X_pred, X[i_trn])
-                i_rest = i_rest[:, 0]
-                X_rest = X_pred[i_rest]
-                p_fold[i_rest] += p_model.predict(X_rest)
-
-        if X_pred is not None:
-            p = p_fold/(cv.get_n_splits() - 1)
+    p_model.fit(X, treatment)
+    p_model_dict['all training'] = p_model
+    if X_pred is None:
+        p = p_model.predict(X)
     else:
-        p_model.fit(X, treatment)
-        p_model_dict['all training'] = p_model
-        if X_pred is None:
-            p = p_model.predict(X)
-        else:
-            p = p_model.predict(X_pred)
+        p = p_model.predict(X_pred)
 
     if calibrate_p:
         logger.info('Calibrating propensity scores.')
