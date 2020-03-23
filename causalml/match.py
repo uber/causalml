@@ -148,13 +148,11 @@ class NearestNeighborMatch(object):
             treatment_scaled = pd.concat([treatment_scaled] * self.ratio,
                                          axis=0)
 
-            cond = distances < sdcal
+            cond = (distances / np.square(len(score_cols)) ) < sdcal
             # Deduplicate the indices of the treatment group
-            t_idx_matched = list(set(
-                treatment_scaled.loc[cond].index.tolist()
-            ))
+            t_idx_matched = np.array(treatment_scaled.loc[cond].index)
             # XXX: Should we deduplicate the indices of the control group too?
-            c_idx_matched = control_scaled.iloc[indices[cond]].index.tolist()
+            c_idx_matched = np.array(control_scaled.iloc[indices[cond]].index)
         else:
             assert len(score_cols) == 1, (
                 'Matching on multiple columns is only supported using the '
