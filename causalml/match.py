@@ -148,7 +148,7 @@ class NearestNeighborMatch(object):
             treatment_scaled = pd.concat([treatment_scaled] * self.ratio,
                                          axis=0)
 
-            cond = (distances / np.square(len(score_cols)) ) < sdcal
+            cond = (distances / len(score_cols) ) < sdcal
             # Deduplicate the indices of the treatment group
             t_idx_matched = np.array(treatment_scaled.loc[cond].index)
             # XXX: Should we deduplicate the indices of the control group too?
