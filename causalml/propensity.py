@@ -52,9 +52,6 @@ class ElasticNetPropensityModel(object):
             X (numpy.ndarray): a feature matrix
             y (numpy.ndarray): a binary target vector
         """
-        if self.check_if_randomized(X, y):
-            logger.warning('Propensity AUC close to 0.5. This may suggest your data is already randomized.')
-            self.model = LogisticRegression()
         self.model.fit(X, y)
 
     def predict(self, X):
@@ -84,16 +81,6 @@ class ElasticNetPropensityModel(object):
         ps = self.predict(X)
         logger.info('AUC score: {:.6f}'.format(auc(y, ps)))
         return ps
-
-    def check_if_randomized(self, X, y, max_auc=0.51):
-        """Checks if the underlying data is already randomized by fitting a single LogisticRegression.
-        """
-        lr = LogisticRegression()
-        lr.fit(X, y)
-        score = auc(y, lr.predict_proba(X)[:, 1])
-        if score < max_auc:
-            return True
-        return False
 
 def calibrate(ps, treatment):
     """Calibrate propensity scores with logistic GAM.
@@ -134,7 +121,7 @@ def compute_propensity_score(X, treatment, X_pred=None, treatment_pred=None, cv=
 
     p = np.zeros_like(treatment_pred, dtype=float)
     p_fold = np.zeros_like(treatment_pred, dtype=float)
-    p_model = ElasticNetPropensityModel()
+    p_model = ElasticNetPropensityModel(cv=cv)
     p_model_dict = dict()
 
     p_model.fit(X, treatment)
