@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from ..inference.meta.tmle import TMLELearner
 
 
 plt.style.use('fivethirtyeight')
@@ -9,11 +10,11 @@ sns.set_palette("Paired")
 RANDOM_COL = 'Random'
 
 
-def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
+def plot(df, kind='gain', n=100, figsize=(8, 8), ci=False, *args, **kwarg):
     """Plot one of the lift/gain/Qini charts of model estimates.
 
-    A factory method for `plot_lift()`, `plot_gain()` and `plot_qini()`. For details, pleas see docstrings of each
-    function.
+    A factory method for `plot_lift()`, `plot_gain()`, `plot_qini()` and `plot_tmlelift()`.
+    For details, pleas see docstrings of each function.
 
     Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns.
@@ -22,18 +23,24 @@ def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
     """
     catalog = {'lift': get_cumlift,
                'gain': get_cumgain,
-               'qini': get_qini}
+               'qini': get_qini,
+               'tmlelift': get_tmlelift}
 
     assert kind in catalog.keys(), '{} plot is not implemented. Select one of {}'.format(kind, catalog.keys())
 
-    df = catalog[kind](df, *args, **kwarg)
+    # temproray solution, probably a better way to do it
+    if kind == 'tmlelift' and ci:
+        plot_tmlelift(df, ci=True, *args, **kwarg)
 
-    if (n is not None) and (n < df.shape[0]):
-        df = df.iloc[np.linspace(0, df.index[-1], n, endpoint=True)]
+    else:
+        df = catalog[kind](df, *args, **kwarg)
 
-    df.plot(figsize=figsize)
-    plt.xlabel('Population')
-    plt.ylabel('{}'.format(kind.title()))
+        if (n is not None) and (n < df.shape[0]):
+            df = df.iloc[np.linspace(0, df.index[-1], n, endpoint=True)]
+
+        df.plot(figsize=figsize)
+        plt.xlabel('Population')
+        plt.ylabel('{}'.format(kind.title()))
 
 
 def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
@@ -194,6 +201,7 @@ def get_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
             # When treatment_effect_col is given, use it to calculate the average treatment effects
             # of cumulative population.
             l = df[treatment_effect_col].cumsum() / df.index * df['cumsum_tr']
+            df[treatment_effect_col].cumsum() / df.index
         else:
             # When treatment_effect_col is not given, use outcome_col and treatment_col
             # to calculate the average treatment_effects of cumulative population.
@@ -215,6 +223,148 @@ def get_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
 
     if normalize:
         qini = qini.div(np.abs(qini.iloc[-1, :]), axis=1)
+
+    return qini
+
+
+def get_tmlelift(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='p',
+                 n_segment=5, cv=None, calibrate_propensity=True, ci=False):
+    """Get TMLE based average uplifts of model estimates of segments.
+
+    Args:
+        df (pandas.DataFrame): a data frame with model estimates and actual data as columns
+        learner: a model used by TMLE to estimate the outcome
+        inferenece_col (list of str): a list of columns that used in learner for inference
+        outcome_col (str, optional): the column name for the actual outcome
+        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
+        p_col (str, optional): the column name for propensity score
+        n_segment (int, optional): number of segment that TMLE will estimated for each
+        cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
+        calibrate_propensity (bool, optional): whether calibrate propensity score or not
+        ci (bool, optional): whether return confidence intervals for ATE or not
+    Returns:
+        (pandas.DataFrame): cumulative gains of model estimates based of TMLE
+    """
+    assert ((outcome_col in df.columns) and (treatment_col in df.columns) or
+            p_col in df.columns)
+
+    inference_col = [x for x in inference_col if x in df.columns]
+
+    # Initialize TMLE
+    tmle = TMLELearner(learner, cv=cv, calibrate_propensity=calibrate_propensity)
+    ate_all, ate_all_lb, ate_all_ub = tmle.estimate_ate(X=df[inference_col],
+                                                        p=df[p_col],
+                                                        treatment=df[treatment_col],
+                                                        y=df[outcome_col])
+
+    df = df.copy()
+    model_names = [x for x in df.columns if x not in [outcome_col, treatment_col, p_col] + inference_col]
+
+    lift = []
+    lift_lb = []
+    lift_ub = []
+
+    for col in model_names:
+        ate_model, ate_model_lb, ate_model_ub = tmle.estimate_ate(X=df[inference_col],
+                                                                  p=df[p_col],
+                                                                  treatment=df[treatment_col],
+                                                                  y=df[outcome_col],
+                                                                  segment=pd.qcut(df[col], n_segment, labels=False))
+        lift_model = [0.] * (n_segment + 1)
+        lift_model[n_segment] = ate_all[0]
+        for i in range(1, n_segment):
+            lift_model[i] = ate_model[0][n_segment - i] * (1/n_segment) + lift_model[i - 1]
+        lift.append(lift_model)
+
+        if ci:
+            lift_lb_model = [0.] * (n_segment + 1)
+            lift_lb_model[n_segment] = ate_all_lb[0]
+
+            lift_ub_model = [0.] * (n_segment + 1)
+            lift_ub_model[n_segment] = ate_all_ub[0]
+            for i in range(1, n_segment):
+                lift_lb_model[i] = ate_model_lb[0][n_segment - i] * (1/n_segment) + lift_lb_model[i - 1]
+                lift_ub_model[i] = ate_model_ub[0][n_segment - i] * (1/n_segment) + lift_ub_model[i - 1]
+
+            lift_lb.append(lift_lb_model)
+            lift_ub.append(lift_ub_model)
+
+    lift = pd.DataFrame(lift).T
+    lift.columns = model_names
+
+    if ci:
+        lift_lb = pd.DataFrame(lift_lb).T
+        lift_lb.columns = [x + " LB" for x in model_names]
+
+        lift_ub = pd.DataFrame(lift_ub).T
+        lift_ub.columns = [x + " UB" for x in model_names]
+        lift = pd.concat([lift, lift_lb, lift_ub], axis=1)
+
+    lift.index = lift.index/n_segment
+    lift[RANDOM_COL] = np.linspace(0, 1, n_segment + 1)*ate_all[0]
+
+    return lift
+
+
+def get_tmleqini(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='p',
+                 n_segment=5, cv=None, calibrate_propensity=True):
+    """Get TMLE based Qini of model estimates by segments.
+
+    Args:
+        df (pandas.DataFrame): a data frame with model estimates and actual data as columns
+        learner: a model used by TMLE to estimate the outcome
+        inferenece_col (list of str): a list of columns that used in learner for inference
+        outcome_col (str, optional): the column name for the actual outcome
+        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
+        p_col (str, optional): the column name for propensity score
+        n_segment (int, optional): number of segment that TMLE will estimated for each
+        cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
+        calibrate_propensity (bool, optional): whether calibrate propensity score or not
+    Returns:
+        (pandas.DataFrame): cumulative gains of model estimates based of TMLE
+    """
+    assert ((outcome_col in df.columns) and (treatment_col in df.columns) or
+            p_col in df.columns)
+
+    inference_col = [x for x in inference_col if x in df.columns]
+
+    # Initialize TMLE
+    tmle = TMLELearner(learner, cv=cv, calibrate_propensity=calibrate_propensity)
+    ate_all, ate_all_lb, ate_all_ub = tmle.estimate_ate(X=df[inference_col],
+                                                        p=df[p_col],
+                                                        treatment=df[treatment_col],
+                                                        y=df[outcome_col])
+    qini_tmle = [ate_all[0] * (1/n_segment)] * (n_segment)
+    qini_tmle[n_segment - 1] = ate_all[0]
+    for i in range(1, n_segment - 1):
+        qini_tmle[i] = ate_all[0] * (1/n_segment) + qini_tmle[i - 1]
+
+    qini_tmle = [np.asarray(qini_tmle)]
+    df = df.copy()
+    model_names = [x for x in df.columns if x not in [outcome_col, treatment_col, p_col] + inference_col]
+
+    for col in model_names:
+        ate_model, ate_model_lb, ate_model_ub = tmle.estimate_ate(X=df[inference_col],
+                                                                  p=df[p_col],
+                                                                  treatment=df[treatment_col],
+                                                                  y=df[outcome_col],
+                                                                  segment=pd.qcut(df[col], n_segment, labels=False))
+
+        qini_tmle.append(ate_model[0])
+
+    qini_tmle = pd.DataFrame(qini_tmle).T
+    qini_tmle.columns = ['tau'] + model_names
+    qini_tmle.index = qini_tmle.index + 1
+
+    qini = []
+    for col in model_names:
+        l = qini_tmle['tau'].cumsum()/qini_tmle.index * qini_tmle[col]
+        qini.append(l)
+
+    qini = pd.DataFrame(qini).T
+    qini.columns = model_names
+    qini.loc[0] = np.zeros((qini.shape[1], ))
+    qini = qini.sort_index().interpolate()
 
     return qini
 
@@ -305,6 +455,55 @@ def plot_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'
          treatment_effect_col=treatment_effect_col, normalize=normalize, random_seed=random_seed)
 
 
+def plot_tmlelift(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='tau',
+             n_segment=5, cv=None, calibrate_propensity=True, ci=False, figsize=(8, 8)):
+    """Plot the lift chart based of TMLE estimation
+
+    Args:
+        df (pandas.DataFrame): a data frame with model estimates and actual data as columns
+        learner: a model used by TMLE to estimate the outcome
+        inferenece_col (list of str): a list of columns that used in learner for inference
+        outcome_col (str, optional): the column name for the actual outcome
+        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
+        p_col (str, optional): the column name for propensity score
+        n_segment (int, optional): number of segment that TMLE will estimated for each
+        cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
+        calibrate_propensity (bool, optional): whether calibrate propensity score or not
+    """
+    if ci:
+        plot_df = get_tmlelift(df, learner=learner, inference_col=inference_col, outcome_col=outcome_col,
+                           treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
+                           calibrate_propensity=calibrate_propensity, ci=ci)
+
+        model_names = [x.replace(" LB", "") for x in plot_df.columns]
+        model_names = list(set([x.replace(" UB", "") for x in model_names]))
+
+        fig, ax = plt.subplots(figsize=figsize)
+        cmap = plt.get_cmap("tab10")
+        cindex = 0
+
+        for col in model_names:
+            lb_col = col + " LB"
+            up_col = col + " UB"
+
+            if col != 'Random':
+                ax.plot(plot_df.index, plot_df[col], color=cmap(cindex))
+                ax.fill_between(plot_df.index, plot_df[lb_col], plot_df[up_col], color=cmap(cindex), alpha=0.25)
+            else:
+                ax.plot(plot_df.index, plot_df[col], color=cmap(cindex))
+            cindex += 1
+
+        ax.legend()
+        plt.xlabel('Population')
+        plt.ylabel('Lift')
+        plt.show()
+
+    else:
+        plot(df, kind='tmlelift', figsize=figsize, learner=learner, inference_col=inference_col,
+             outcome_col=outcome_col, treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
+             calibrate_propensity=calibrate_propensity, ci=ci)
+
+
 def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau', normalize=True):
     """Calculate the AUUC (Area Under the Uplift Curve) score.
 
@@ -341,3 +540,30 @@ def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
 
     qini = get_qini(df, outcome_col, treatment_col, treatment_effect_col, normalize)
     return (qini.sum(axis=0) - qini[RANDOM_COL].sum()) / qini.shape[0]
+
+
+def auuc_score_tmle(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='tau',
+                    n_segment=5, cv=None, calibrate_propensity=True, ci=False,):
+    """Calculate the tmle based AUUC (Area Under the Uplift Curve) score.
+
+     Args:
+        df (pandas.DataFrame): a data frame with model estimates and actual data as columns
+        learner: a model used by TMLE to estimate the outcome
+        inferenece_col (list of str): a list of columns that used in learner for inference
+        outcome_col (str, optional): the column name for the actual outcome
+        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
+        p_col (str, optional): the column name for propensity score
+        n_segment (int, optional): number of segment that TMLE will estimated for each
+        cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
+        calibrate_propensity (bool, optional): whether calibrate propensity score or not
+        ci (bool, optional): whether return confidence intervals for ATE or not
+
+    Returns:
+        (float): the AUUC score
+    """
+    tmle_lift = get_tmlelift(df, learner=learner, inference_col=inference_col,
+                             outcome_col=outcome_col, treatment_col=treatment_col, p_col=p_col, n_segment=n_segment,
+                             cv=cv, calibrate_propensity=calibrate_propensity, ci=ci)
+    cumgain = tmle_lift.mul(tmle_lift.index.values, axis=0)
+
+    return cumgain.sum() / cumgain.shape[0]
