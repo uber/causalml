@@ -213,6 +213,15 @@ def make_uplift_classification_logistic(
         The proportion of positive label (1) in the control group, or the mean of outcome variable for control group.
     random_seed : int, optional (default = 20200101)
         The random seed to be used in the data generation process.
+    feature_association_list : list, optional (default = ['linear','quadratic','cubic','relu','sin','cos'])
+        List of uplift feature association patterns to the treatment effect. For example, if the feature pattern is 'quadratic', then the treatment effect will increase or decrease quadratically with the feature.
+        The values in the list must be one of ('linear','quadratic','cubic','relu','sin','cos'). However, the same value can appear multiple times in the list. 
+    random_select_association : boolean, optional (default = True)
+        How the feature patterns are selected from the feature_association_list to be applied in the data generation process.
+        If random_select_association = True, then for every uplift feature, a random feature association pattern is selected from the list.
+        If random_select_association = False, then the feature association pattern is selected from the list in turns to be applied to each feature one by one.
+    error_std : float, optional (default = 0.05)
+        Standard deviation to be used in the error term of the logistic regression. The error is drawn from a normal distribution with mean 0 and standard deviation specified in this argument.
 
     Returns
     -------
