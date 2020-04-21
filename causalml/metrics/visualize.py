@@ -13,7 +13,7 @@ RANDOM_COL = 'Random'
 def plot(df, kind='gain', n=100, figsize=(8, 8), ci=False, *args, **kwarg):
     """Plot one of the lift/gain/Qini charts of model estimates.
 
-    A factory method for `plot_lift()`, `plot_gain()`, `plot_qini()`, `plot_tmlelift()` and `plot_tmleqini()`.
+    A factory method for `plot_lift()`, `plot_gain()`, `plot_qini()`, `plot_tmlegain()` and `plot_tmleqini()`.
     For details, pleas see docstrings of each function.
 
     Args:
@@ -24,16 +24,15 @@ def plot(df, kind='gain', n=100, figsize=(8, 8), ci=False, *args, **kwarg):
     catalog = {'lift': get_cumlift,
                'gain': get_cumgain,
                'qini': get_qini,
-               'tmlelift': get_tmlelift,
+               'tmlegain': get_tmlegain,
                'tmleqini': get_tmleqini}
 
     assert kind in catalog.keys(), '{} plot is not implemented. Select one of {}'.format(kind, catalog.keys())
 
-    # temproray solution, probably a better way to do it
-    if kind == 'tmlelift' and ci:
-        plot_tmlelift(df, ci=True, *args, **kwarg)
-    elif kind == 'tmleqini' and ci:
-        plot_tmleqini(df, ci=True, *args, **kwarg)
+    if ci in kwarg:
+        ci_catalog = {'tmlegain': plot_tmlegain,
+                      'tmleqini': plot_tmleqini}
+        ci_catalog[kind](df, *args, **kwarg)
     else:
         df = catalog[kind](df, *args, **kwarg)
 
@@ -229,7 +228,7 @@ def get_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
     return qini
 
 
-def get_tmlelift(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='p',
+def get_tmlegain(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='p',
                  n_segment=5, cv=None, calibrate_propensity=True, ci=False):
     """Get TMLE based average uplifts of model estimates of segments.
 
@@ -475,7 +474,7 @@ def plot_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'
          treatment_effect_col=treatment_effect_col, normalize=normalize, random_seed=random_seed)
 
 
-def plot_tmlelift(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='tau',
+def plot_tmlegain(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='tau',
              n_segment=5, cv=None, calibrate_propensity=True, ci=False, figsize=(8, 8)):
     """Plot the lift chart based of TMLE estimation
 
@@ -492,7 +491,7 @@ def plot_tmlelift(df, learner, inference_col, outcome_col='y', treatment_col='w'
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
     if ci:
-        plot_df = get_tmlelift(df, learner=learner, inference_col=inference_col, outcome_col=outcome_col,
+        plot_df = get_tmlegain(df, learner=learner, inference_col=inference_col, outcome_col=outcome_col,
                            treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
                            calibrate_propensity=calibrate_propensity, ci=ci)
 
@@ -520,7 +519,7 @@ def plot_tmlelift(df, learner, inference_col, outcome_col='y', treatment_col='w'
         plt.show()
 
     else:
-        plot(df, kind='tmlelift', figsize=figsize, learner=learner, inference_col=inference_col,
+        plot(df, kind='tmlegain', figsize=figsize, learner=learner, inference_col=inference_col,
              outcome_col=outcome_col, treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
              calibrate_propensity=calibrate_propensity, ci=ci)
 
@@ -632,7 +631,7 @@ def auuc_score_tmle(df, learner, inference_col, outcome_col='y', treatment_col='
     Returns:
         (float): the AUUC score
     """
-    tmle_gain = get_tmlelift(df, learner=learner, inference_col=inference_col,
+    tmle_gain = get_tmlegain(df, learner=learner, inference_col=inference_col,
                              outcome_col=outcome_col, treatment_col=treatment_col, p_col=p_col, n_segment=n_segment,
                              cv=cv, calibrate_propensity=calibrate_propensity, ci=ci)
 
