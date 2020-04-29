@@ -11,7 +11,7 @@ sns.set_palette("Paired")
 RANDOM_COL = 'Random'
 
 
-def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
+def plot(df, kind='gain', tmle=False, n=100, figsize=(8, 8), *args, **kwarg):
     """Plot one of the lift/gain/Qini charts of model estimates.
 
     A factory method for `plot_lift()`, `plot_gain()`, `plot_qini()`, `plot_tmlegain()` and `plot_tmleqini()`.
@@ -24,15 +24,15 @@ def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
     """
     catalog = {'lift': get_cumlift,
                'gain': get_cumgain,
-               'qini': get_qini,
-               'tmlegain': get_tmlegain,
-               'tmleqini': get_tmleqini}
+               'qini': get_qini}
 
     assert kind in catalog.keys(), '{} plot is not implemented. Select one of {}'.format(kind, catalog.keys())
 
-    if 'ci' in kwarg and kwarg['ci']:
-        ci_catalog = {'tmlegain': plot_tmlegain,
-                      'tmleqini': plot_tmleqini}
+    if tmle:
+        ci_catalog = {'gain': plot_tmlegain,
+                      'qini': plot_tmleqini}
+        assert kind in ci_catalog.keys(), '{} plot is not implemented. Select one of {}'.format(kind, ci_catalog.keys())
+
         ci_catalog[kind](df, *args, **kwarg)
     else:
         df = catalog[kind](df, *args, **kwarg)
@@ -494,11 +494,10 @@ def plot_tmlegain(df, inference_col, learner=LGBMRegressor(num_leaves=64, learni
         calibrate_propensity (bool, optional): whether calibrate propensity score or not
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
-    if ci:
-        plot_df = get_tmlegain(df, learner=learner, inference_col=inference_col, outcome_col=outcome_col,
+    plot_df = get_tmlegain(df, learner=learner, inference_col=inference_col, outcome_col=outcome_col,
                            treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
                            calibrate_propensity=calibrate_propensity, ci=ci)
-
+    if ci:
         model_names = [x.replace(" LB", "") for x in plot_df.columns]
         model_names = list(set([x.replace(" UB", "") for x in model_names]))
 
@@ -519,13 +518,14 @@ def plot_tmlegain(df, inference_col, learner=LGBMRegressor(num_leaves=64, learni
 
         ax.legend()
         plt.xlabel('Population')
-        plt.ylabel('TMLE Lift')
+        plt.ylabel('Gain')
         plt.show()
 
     else:
-        plot(df, kind='tmlegain', figsize=figsize, learner=learner, inference_col=inference_col,
-             outcome_col=outcome_col, treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
-             calibrate_propensity=calibrate_propensity, ci=ci)
+        plot_df.plot(figsize=figsize)
+        plt.xlabel('Population')
+        plt.ylabel('Gain')
+        plt.show()
 
 
 def plot_tmleqini(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
@@ -545,11 +545,10 @@ def plot_tmleqini(df, inference_col, learner=LGBMRegressor(num_leaves=64, learni
         calibrate_propensity (bool, optional): whether calibrate propensity score or not
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
+    plot_df = get_tmleqini(df, learner=learner, inference_col=inference_col, outcome_col=outcome_col,
+                           treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
+                           calibrate_propensity=calibrate_propensity, ci=ci)
     if ci:
-        plot_df = get_tmleqini(df, learner=learner, inference_col=inference_col, outcome_col=outcome_col,
-                               treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
-                               calibrate_propensity=calibrate_propensity, ci=ci)
-
         model_names = [x.replace(" LB", "") for x in plot_df.columns]
         model_names = list(set([x.replace(" UB", "") for x in model_names]))
 
@@ -570,13 +569,14 @@ def plot_tmleqini(df, inference_col, learner=LGBMRegressor(num_leaves=64, learni
 
         ax.legend()
         plt.xlabel('Population')
-        plt.ylabel('TMLE Qini')
+        plt.ylabel('Qini')
         plt.show()
 
     else:
-        plot(df, kind='tmleqini', figsize=figsize, learner=learner, inference_col=inference_col,
-             outcome_col=outcome_col, treatment_col=treatment_col, p_col=p_col, n_segment=n_segment, cv=cv,
-             calibrate_propensity=calibrate_propensity, ci=ci)
+        plot_df.plot(figsize=figsize)
+        plt.xlabel('Population')
+        plt.ylabel('Qini')
+        plt.show()
 
 
 def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau', normalize=True):
