@@ -2,6 +2,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from lightgbm import LGBMRegressor
 from ..inference.meta.tmle import TMLELearner
 
 
@@ -10,7 +11,7 @@ sns.set_palette("Paired")
 RANDOM_COL = 'Random'
 
 
-def plot(df, kind='gain', n=100, figsize=(8, 8), ci=False, *args, **kwarg):
+def plot(df, kind='gain', n=100, figsize=(8, 8), *args, **kwarg):
     """Plot one of the lift/gain/Qini charts of model estimates.
 
     A factory method for `plot_lift()`, `plot_gain()`, `plot_qini()`, `plot_tmlegain()` and `plot_tmleqini()`.
@@ -29,7 +30,7 @@ def plot(df, kind='gain', n=100, figsize=(8, 8), ci=False, *args, **kwarg):
 
     assert kind in catalog.keys(), '{} plot is not implemented. Select one of {}'.format(kind, catalog.keys())
 
-    if ci in kwarg:
+    if 'ci' in kwarg and kwarg['ci']:
         ci_catalog = {'tmlegain': plot_tmlegain,
                       'tmleqini': plot_tmleqini}
         ci_catalog[kind](df, *args, **kwarg)
@@ -202,7 +203,6 @@ def get_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
             # When treatment_effect_col is given, use it to calculate the average treatment effects
             # of cumulative population.
             l = df[treatment_effect_col].cumsum() / df.index * df['cumsum_tr']
-            df[treatment_effect_col].cumsum() / df.index
         else:
             # When treatment_effect_col is not given, use outcome_col and treatment_col
             # to calculate the average treatment_effects of cumulative population.
@@ -228,14 +228,15 @@ def get_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau',
     return qini
 
 
-def get_tmlegain(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='p',
-                 n_segment=5, cv=None, calibrate_propensity=True, ci=False):
+def get_tmlegain(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
+                 outcome_col='y', treatment_col='w', p_col='p', n_segment=5, cv=None,
+                 calibrate_propensity=True, ci=False):
     """Get TMLE based average uplifts of model estimates of segments.
 
     Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns
-        learner: a model used by TMLE to estimate the outcome
         inferenece_col (list of str): a list of columns that used in learner for inference
+        learner (optional): a model used by TMLE to estimate the outcome
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         p_col (str, optional): the column name for propensity score
@@ -307,14 +308,15 @@ def get_tmlegain(df, learner, inference_col, outcome_col='y', treatment_col='w',
     return lift
 
 
-def get_tmleqini(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='p',
-                 n_segment=5, cv=None, calibrate_propensity=True, ci=False):
+def get_tmleqini(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
+                 outcome_col='y', treatment_col='w', p_col='p', n_segment=5, cv=None,
+                 calibrate_propensity=True, ci=False, normalize=False):
     """Get TMLE based Qini of model estimates by segments.
 
     Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns
-        learner: a model used by TMLE to estimate the outcome
         inferenece_col (list of str): a list of columns that used in learner for inference
+        learner(optional): a model used by TMLE to estimate the outcome
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         p_col (str, optional): the column name for propensity score
@@ -383,6 +385,7 @@ def get_tmleqini(df, learner, inference_col, outcome_col='y', treatment_col='w',
     qini = qini.cumsum()
     qini.loc[n_segment] = ate_all[0] * df[treatment_col].sum()
     qini[RANDOM_COL] = np.linspace(0, 1, n_segment + 1) * ate_all[0] * df[treatment_col].sum()
+    qini.index = np.linspace(0, 1, n_segment + 1) * df.shape[0]
 
     return qini
 
@@ -474,14 +477,15 @@ def plot_qini(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau'
          treatment_effect_col=treatment_effect_col, normalize=normalize, random_seed=random_seed)
 
 
-def plot_tmlegain(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='tau',
-             n_segment=5, cv=None, calibrate_propensity=True, ci=False, figsize=(8, 8)):
+def plot_tmlegain(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
+                  outcome_col='y', treatment_col='w', p_col='tau', n_segment=5, cv=None,
+                  calibrate_propensity=True, ci=False, figsize=(8, 8)):
     """Plot the lift chart based of TMLE estimation
 
     Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns
-        learner: a model used by TMLE to estimate the outcome
         inferenece_col (list of str): a list of columns that used in learner for inference
+        learner (optional): a model used by TMLE to estimate the outcome
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         p_col (str, optional): the column name for propensity score
@@ -524,14 +528,15 @@ def plot_tmlegain(df, learner, inference_col, outcome_col='y', treatment_col='w'
              calibrate_propensity=calibrate_propensity, ci=ci)
 
 
-def plot_tmleqini(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='tau',
-             n_segment=5, cv=None, calibrate_propensity=True, ci=False, figsize=(8, 8)):
+def plot_tmleqini(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
+                  outcome_col='y', treatment_col='w', p_col='tau', n_segment=5, cv=None,
+                  calibrate_propensity=True, ci=False, figsize=(8, 8)):
     """Plot the qini chart based of TMLE estimation
 
     Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns
-        learner: a model used by TMLE to estimate the outcome
         inferenece_col (list of str): a list of columns that used in learner for inference
+        learner (optional): a model used by TMLE to estimate the outcome
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         p_col (str, optional): the column name for propensity score
@@ -612,14 +617,15 @@ def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
     return (qini.sum(axis=0) - qini[RANDOM_COL].sum()) / qini.shape[0]
 
 
-def auuc_score_tmle(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='tau',
-                    n_segment=5, cv=None, calibrate_propensity=True, ci=False,):
+def auuc_score_tmle(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
+                    outcome_col='y', treatment_col='w', p_col='tau', n_segment=5, cv=None,
+                    calibrate_propensity=True, ci=False):
     """Calculate the tmle based AUUC (Area Under the Uplift Curve) score.
 
      Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns
-        learner: a model used by TMLE to estimate the outcome
         inferenece_col (list of str): a list of columns that used in learner for inference
+        learner (optional): a model used by TMLE to estimate the outcome
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         p_col (str, optional): the column name for propensity score
@@ -638,14 +644,15 @@ def auuc_score_tmle(df, learner, inference_col, outcome_col='y', treatment_col='
     return tmle_gain.sum() / tmle_gain.shape[0]
 
 
-def qini_score_tmle(df, learner, inference_col, outcome_col='y', treatment_col='w', p_col='tau',
-                    n_segment=5, cv=None, calibrate_propensity=True, ci=False,):
+def qini_score_tmle(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
+                    outcome_col='y', treatment_col='w', p_col='tau',n_segment=5, cv=None, 
+                    calibrate_propensity=True, ci=False):
     """Calculate the tmle based Qini score: the area between the Qini curves of a model and random.
 
      Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns
-        learner: a model used by TMLE to estimate the outcome
         inferenece_col (list of str): a list of columns that used in learner for inference
+        learner (optional): a model used by TMLE to estimate the outcome
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         p_col (str, optional): the column name for propensity score
