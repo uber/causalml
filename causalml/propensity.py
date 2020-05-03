@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from pygam import LogisticGAM, s
 from sklearn.metrics import roc_auc_score as auc
-from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
+from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import StratifiedKFold
 
 logger = logging.getLogger('causalml')
@@ -82,6 +82,7 @@ class ElasticNetPropensityModel(object):
         logger.info('AUC score: {:.6f}'.format(auc(y, ps)))
         return ps
 
+
 def calibrate(ps, treatment):
     """Calibrate propensity scores with logistic GAM.
 
@@ -120,12 +121,9 @@ def compute_propensity_score(X, treatment, X_pred=None, treatment_pred=None, cv=
         treatment_pred = treatment.copy()
 
     p = np.zeros_like(treatment_pred, dtype=float)
-    p_fold = np.zeros_like(treatment_pred, dtype=float)
     p_model = ElasticNetPropensityModel(cv=cv)
-    p_model_dict = dict()
 
     p_model.fit(X, treatment)
-    p_model_dict['all training'] = p_model
     if X_pred is None:
         p = p_model.predict(X)
     else:
@@ -140,4 +138,4 @@ def compute_propensity_score(X, treatment, X_pred=None, treatment_pred=None, cv=
     p = np.where(p < 0 + eps, 0 + eps*1.001, p)
     p = np.where(p > 1 - eps, 1 - eps*1.001, p)
 
-    return p, p_model_dict
+    return p, p_model
