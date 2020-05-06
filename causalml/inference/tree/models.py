@@ -558,11 +558,17 @@ class UpliftTreeClassifier:
         S : float
             The KL divergence.
         '''
-        if qk < 0.1**6:
-            qk = 0.1**6
-        elif qk > 1-0.1**6:
-            qk = 1-0.1**6
-        S = pk * np.log(pk / qk) + (1-pk) * np.log((1-pk) / (1-qk))
+
+        eps = 1e-6
+        qk = np.clip(qk, eps, 1 - eps)
+
+        if pk == 0:
+            S = -np.log(1 - qk)
+        elif pk == 1:
+            S = -np.log(qk)
+        else:
+            S = pk * np.log(pk / qk) + (1 - pk) * np.log((1 - pk) / (1 - qk))
+
         return S
 
     def evaluate_KL(self, nodeSummary, control_name):
