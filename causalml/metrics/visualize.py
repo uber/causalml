@@ -517,15 +517,12 @@ def plot_tmlegain(df, inference_col, learner=LGBMRegressor(num_leaves=64, learni
             cindex += 1
 
         ax.legend()
-        plt.xlabel('Population')
-        plt.ylabel('Gain')
-        plt.show()
-
     else:
         plot_df.plot(figsize=figsize)
-        plt.xlabel('Population')
-        plt.ylabel('Gain')
-        plt.show()
+
+    plt.xlabel('Population')
+    plt.ylabel('Gain')
+    plt.show()
 
 
 def plot_tmleqini(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
@@ -568,18 +565,16 @@ def plot_tmleqini(df, inference_col, learner=LGBMRegressor(num_leaves=64, learni
             cindex += 1
 
         ax.legend()
-        plt.xlabel('Population')
-        plt.ylabel('Qini')
-        plt.show()
-
     else:
         plot_df.plot(figsize=figsize)
-        plt.xlabel('Population')
-        plt.ylabel('Qini')
-        plt.show()
+
+    plt.xlabel('Population')
+    plt.ylabel('Qini')
+    plt.show()
 
 
-def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau', normalize=True):
+def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau', normalize=True,
+               tmle=False, *args, **kwarg):
     """Calculate the AUUC (Area Under the Uplift Curve) score.
 
      Args:
@@ -592,11 +587,16 @@ def auuc_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
     Returns:
         (float): the AUUC score
     """
-    cumgain = get_cumgain(df, outcome_col, treatment_col, treatment_effect_col, normalize)
+
+    if not tmle:
+        cumgain = get_cumgain(df, outcome_col, treatment_col, treatment_effect_col, normalize)
+    else:
+        cumgain = get_tmlegain(df, outcome_col=outcome_col, treatment_col=treatment_col, *args, **kwarg)
     return cumgain.sum() / cumgain.shape[0]
 
 
-def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau', normalize=True):
+def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau', normalize=True,
+               tmle=False, *args, **kwarg):
     """Calculate the Qini score: the area between the Qini curves of a model and random.
 
     For details, see Radcliffe (2007), `Using Control Group to Target on Predicted Lift:
@@ -613,59 +613,8 @@ def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
         (float): the Qini score
     """
 
-    qini = get_qini(df, outcome_col, treatment_col, treatment_effect_col, normalize)
-    return (qini.sum(axis=0) - qini[RANDOM_COL].sum()) / qini.shape[0]
-
-
-def auuc_score_tmle(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
-                    outcome_col='y', treatment_col='w', p_col='tau', n_segment=5, cv=None,
-                    calibrate_propensity=True, ci=False):
-    """Calculate the tmle based AUUC (Area Under the Uplift Curve) score.
-
-     Args:
-        df (pandas.DataFrame): a data frame with model estimates and actual data as columns
-        inferenece_col (list of str): a list of columns that used in learner for inference
-        learner (optional): a model used by TMLE to estimate the outcome
-        outcome_col (str, optional): the column name for the actual outcome
-        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
-        p_col (str, optional): the column name for propensity score
-        n_segment (int, optional): number of segment that TMLE will estimated for each
-        cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
-        calibrate_propensity (bool, optional): whether calibrate propensity score or not
-        ci (bool, optional): whether return confidence intervals for ATE or not
-
-    Returns:
-        (float): the AUUC score
-    """
-    tmle_gain = get_tmlegain(df, learner=learner, inference_col=inference_col,
-                             outcome_col=outcome_col, treatment_col=treatment_col, p_col=p_col, n_segment=n_segment,
-                             cv=cv, calibrate_propensity=calibrate_propensity, ci=ci)
-
-    return tmle_gain.sum() / tmle_gain.shape[0]
-
-
-def qini_score_tmle(df, inference_col, learner=LGBMRegressor(num_leaves=64, learning_rate=.05, n_estimators=300),
-                    outcome_col='y', treatment_col='w', p_col='tau',n_segment=5, cv=None, 
-                    calibrate_propensity=True, ci=False):
-    """Calculate the tmle based Qini score: the area between the Qini curves of a model and random.
-
-     Args:
-        df (pandas.DataFrame): a data frame with model estimates and actual data as columns
-        inferenece_col (list of str): a list of columns that used in learner for inference
-        learner (optional): a model used by TMLE to estimate the outcome
-        outcome_col (str, optional): the column name for the actual outcome
-        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
-        p_col (str, optional): the column name for propensity score
-        n_segment (int, optional): number of segment that TMLE will estimated for each
-        cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
-        calibrate_propensity (bool, optional): whether calibrate propensity score or not
-        ci (bool, optional): whether return confidence intervals for ATE or not
-
-    Returns:
-        (float): the AUUC score
-    """
-    qini = get_tmleqini(df, learner=learner, inference_col=inference_col,
-                        outcome_col=outcome_col, treatment_col=treatment_col, p_col=p_col, n_segment=n_segment,
-                        cv=cv, calibrate_propensity=calibrate_propensity, ci=ci)
-
+    if not tmle:
+        qini = get_qini(df, outcome_col, treatment_col, treatment_effect_col, normalize)
+    else:
+        qini = get_tmleqini(df, outcome_col=outcome_col, treatment_col=treatment_col, *args, **kwarg)
     return (qini.sum(axis=0) - qini[RANDOM_COL].sum()) / qini.shape[0]
