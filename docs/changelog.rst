@@ -3,6 +3,22 @@
 Changelog
 =========
 
+0.7.1 (2020-05-07)
+------------------
+Special thanks to our new community contributor, Katherine (`@khof312 <https://github.com/khof312>`_)!
+
+Major Updates
+~~~~~~~~~~~~~
+- Adjust matching distances by a factor of the number of matching columns in propensity score matching by @yungmsh (`#157 <https://github.com/uber/causalml/pull/157>`_)
+- Add TMLE-based AUUC/Qini/lift calculation and plotting by @ppstacy (`#165 <https://github.com/uber/causalml/pull/165>`_)
+
+Minor Updates
+~~~~~~~~~~~~~
+- Fix typos and update documents by @paulluo0106, @khof312, @jeongyoonlee (`#150 <https://github.com/uber/causalml/pull/150>`_, `#151 <https://github.com/uber/causalml/pull/151>`_, `#155 <https://github.com/uber/causalml/pull/155>`_, `#163 <https://github.com/uber/causalml/pull/163>`_)
+- Fix error in `UpliftTreeClassifier.kl_divergence()` for `pk == 1 or 0` by @jeongyoonlee (`#169 <https://github.com/uber/causalml/pull/169>`_)
+- Fix error in `BaseRRegressor.fit()` without propensity score input by @jeongyoonlee (`#170 <https://github.com/uber/causalml/pull/170>`_)
+
+
 0.7.0 (2020-02-28)
 ------------------
 Special thanks to our new community contributor, Steve (`@steveyang90 <https://github.com/steveyang90>`_)!
