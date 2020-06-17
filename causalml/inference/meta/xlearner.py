@@ -174,7 +174,7 @@ class BaseXLearner(object):
             logger.info('Generating propensity score')
             p = dict()
             for group in self.t_groups:
-                p_model = self.propensity_model[group]['all training']
+                p_model = self.propensity_model[group]
                 p[group] = p_model.predict(X)
         else:
             check_p_conditions(p, self.t_groups)

@@ -98,7 +98,7 @@ class BaseRLearner(object):
                 w_filt = (treatment_filt == group).astype(int)
                 w = (treatment == group).astype(int)
                 p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
+                                                                    X_pred=X, treatment_pred=w)
             self.propensity_model = p_model
             self.propensity = p
         else:
@@ -542,7 +542,7 @@ class BaseRClassifier(BaseRLearner):
                 w_filt = (treatment_filt == group).astype(int)
                 w = (treatment == group).astype(int)
                 p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
+                                                                    X_pred=X, treatment_pred=w)
             self.propensity_model = p_model
             self.propensity = p
         else:
@@ -667,7 +667,7 @@ class XGBRRegressor(BaseRRegressor):
                 w_filt = (treatment_filt == group).astype(int)
                 w = (treatment == group).astype(int)
                 p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                    X_pred=X, treatment_pred=w, cv=self.cv)
+                                                                    X_pred=X, treatment_pred=w)
             self.propensity_model = p_model
             self.propensity = p
         else:
