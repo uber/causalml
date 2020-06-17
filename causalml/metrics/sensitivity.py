@@ -62,6 +62,7 @@ class Sensitivity(object):
             outcome_col (str): column name of outcome
             learner (model): a model to estimate outcomes and treatment effects
         """
+
         self.df = df
         self.inference_features = inference_features
         self.p_col = p_col
@@ -80,6 +81,7 @@ class Sensitivity(object):
         Returns:
             (numpy.ndarray): Predictions of treatment effects
         """
+
         learner = self.learner
         try:
             preds = learner.fit_predict(X=X, p=p, treatment=treatment, y=y).flatten()
@@ -98,6 +100,7 @@ class Sensitivity(object):
         Returns:
             (numpy.ndarray): Mean and confidence interval (LB, UB) of the ATE estimate.
         """
+
         learner = self.learner
         if isinstance(learner, BaseTLearner):
             ate, ate_lower, ate_upper = learner.estimate_ate(X=X, treatment=treatment, y=y)
@@ -115,6 +118,7 @@ class Sensitivity(object):
         Returns:
             (class): Sensitivy Class
         """
+
         method_list = ['Placebo Treatment', 'Random Cause', 'Subset Data', 'Random Replace', 'Selection Bias']
         class_name = 'Sensitivity' + method_name.replace(' ', '')
 
@@ -141,6 +145,7 @@ class Sensitivity(object):
             treatment (np.array): a treatment vector (1 if treated, otherwise 0)
             y (np.array): an outcome vector
         """
+
         if alpha_range is None:
             y = self.df[self.outcome_col]
             iqr = y.quantile(.75) - y.quantile(.25)
@@ -195,6 +200,8 @@ class Sensitivity(object):
 
 
 class SensitivityPlaceboTreatment(Sensitivity):
+    """Replaces the treatment variable with a new variable randomly generated.
+    """
 
     def __init__(self, *args, **kwargs):
         super(SensitivityPlaceboTreatment, self).__init__(*args, **kwargs)
@@ -219,6 +226,8 @@ class SensitivityPlaceboTreatment(Sensitivity):
 
 
 class SensitivityRandomCause(Sensitivity):
+    """Adds an irrelevant random covariate to the dataframe.
+    """
 
     def __init__(self, *args, **kwargs):
         super(SensitivityRandomCause, self).__init__(*args, **kwargs)
@@ -238,6 +247,8 @@ class SensitivityRandomCause(Sensitivity):
 
 
 class SensitivityRandomReplace(Sensitivity):
+    """Replaces a random covariate with an irrelevant variable.
+    """
 
     def __init__(self, *args, **kwargs):
         super(SensitivityRandomReplace, self).__init__(*args, **kwargs)
@@ -248,9 +259,9 @@ class SensitivityRandomReplace(Sensitivity):
             self.replaced_feature = kwargs["replaced_feature"]
 
     def sensitivity_estimate(self):
-        '''
-        Replaces a random covariate with an irrelevant variable.
-        '''
+        """Replaces a random covariate with an irrelevant variable.
+        """
+
         logger.info('Replace feature {} with an random irrelevant variable'.format(self.replaced_feature))
         df_new = self.df.copy()
         num_rows = self.df.shape[0]
@@ -266,6 +277,8 @@ class SensitivityRandomReplace(Sensitivity):
 
 
 class SensitivitySubsetData(Sensitivity):
+    """Takes a random subset of size sample_size of the data.
+    """
 
     def __init__(self, *args, **kwargs):
         super(SensitivitySubsetData, self).__init__(*args, **kwargs)
@@ -285,8 +298,7 @@ class SensitivitySubsetData(Sensitivity):
 
 
 class SensitivitySelectionBias(Sensitivity):
-    """
-    Reference:
+    """Reference:
 
     [1] Blackwell, Matthew. "A selection bias approach to sensitivity analysis
     for causal effects." Political Analysis 22.2 (2014): 169-182.
@@ -296,6 +308,7 @@ class SensitivitySelectionBias(Sensitivity):
     https://github.com/mattblackwell/causalsens/blob/master/R/causalsens.R
 
     """
+
     def __init__(self, *args, confound=ConfoundingFunction().one_sided, alpha_range=None,
                  sensitivity_features=None, **kwargs):
         super(SensitivitySelectionBias, self).__init__(*args, **kwargs)
@@ -306,6 +319,7 @@ class SensitivitySelectionBias(Sensitivity):
             alpha_range (np.array): a parameter to pass the confounding function
             sensitivity_features (list of str): ): a list of columns that to check each individual partial r-square
         """
+
         logger.info('Only works for linear outcome models right now. Check back soon.')
         self.confound = confound
 
@@ -373,6 +387,7 @@ class SensitivitySelectionBias(Sensitivity):
         Returns:
             (pd.DataFrame): a summary dataframe
         """
+
         method_name = method
         sensitivity_summary = self.causalsens()[0]
         sensitivity_summary['Method'] = [method_name + ' (alpha@' + str(round(i, 5)) + ', with r-sqaure:'
@@ -390,6 +405,7 @@ class SensitivitySelectionBias(Sensitivity):
             ci (bool, optional): whether plot confidence intervals
             partial_rsqs (bool, optional): whether plot partial rsquare results
          """
+
         if type == 'raw' and not ci:
             fig, ax = plt.subplots()
             y_max = round(sens_df['New ATE UB'].max()*1.1, 4)
@@ -441,6 +457,7 @@ class SensitivitySelectionBias(Sensitivity):
 
         Return: min and max value of confounding amount
         """
+
         rsqs_dict = []
         for i in sens_df.rsqs:
             if partial_rsqs_value - partial_rsqs_value*range < i < partial_rsqs_value + partial_rsqs_value*range:
