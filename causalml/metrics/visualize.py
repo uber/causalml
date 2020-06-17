@@ -618,3 +618,67 @@ def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
     else:
         qini = get_tmleqini(df, outcome_col=outcome_col, treatment_col=treatment_col, *args, **kwarg)
     return (qini.sum(axis=0) - qini[RANDOM_COL].sum()) / qini.shape[0]
+
+
+def plot_ps_diagnostics(df, covariate_col, treatment_col='w', p_col='p'):
+    """Plot covariate balances (standardized differences between the treatment and the control)
+    before and after weighting the sample using the inverse probability of treatment weights.
+
+     Args:
+        df (pandas.DataFrame): a data frame containing the covariates and treatment indicator
+        covariate_col (list of str): a list of columns that are used a covariates
+        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
+        p_col (str, optional): the column name for propensity score
+    """
+    X = df[covariate_col]
+    W = df[treatment_col]
+    PS = df[p_col]
+
+    IPTW = get_simple_iptw(W, PS)
+
+    diffs_pre = get_std_diffs(X, W, IPTW, weighted=False)
+    num_unbal_pre = (np.abs(diffs_pre) > 0.1).sum()[0]
+
+    diffs_post = get_std_diffs(X, W, IPTW, weighted=True)
+    num_unbal_post = (np.abs(diffs_post) > 0.1).sum()[0]
+
+    diff_plot = _plot_std_diffs(diffs_pre,
+                                num_unbal_pre,
+                                diffs_post,
+                                num_unbal_post)
+
+    return diff_plot
+
+
+def _plot_std_diffs(diffs_pre, num_unbal_pre, diffs_post, num_unbal_post):
+    fig, (ax1, ax2) = plt.subplots(
+        1, 2, figsize=(15, 10), sharex=True, sharey=True)
+
+    color = '#EA2566'
+
+    sns.stripplot(diffs_pre.iloc[:, 0], diffs_pre.index, ax=ax1)
+    ax1.set_xlabel("Before. Number of unbalanced covariates: {num_unbal}".format(
+        num_unbal=num_unbal_pre), fontsize=14)
+    ax1.axvline(x=-0.1, ymin=0, ymax=1, color=color, linestyle='--')
+    ax1.axvline(x=0.1, ymin=0, ymax=1, color=color, linestyle='--')
+
+    sns.stripplot(diffs_post.iloc[:, 0], diffs_post.index, ax=ax2)
+    ax2.set_xlabel("After. Number of unbalanced covariates: {num_unbal}".format(
+        num_unbal=num_unbal_post), fontsize=14)
+    ax2.axvline(x=-0.1, ymin=0, ymax=1, color=color, linestyle='--')
+    ax2.axvline(x=0.1, ymin=0, ymax=1, color=color, linestyle='--')
+
+    fig.suptitle('Standardized differences in means', fontsize=16)
+
+    return fig
+
+
+def get_std_diffs(X, W, weight, weighted=False):
+    pass
+
+
+def get_simple_iptw(W, propensity_score):
+    IPTW = (W / propensity_score) + \
+        (1 - W) / (1 - propensity_score)
+
+    return IPTW
