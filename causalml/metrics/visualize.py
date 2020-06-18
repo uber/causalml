@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt
+import logging
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -9,6 +10,8 @@ from ..inference.meta.tmle import TMLELearner
 plt.style.use('fivethirtyeight')
 sns.set_palette("Paired")
 RANDOM_COL = 'Random'
+
+logger = logging.getLogger('causalml')
 
 
 def plot(df, kind='gain', tmle=False, n=100, figsize=(8, 8), *args, **kwarg):
@@ -673,12 +676,119 @@ def _plot_std_diffs(diffs_pre, num_unbal_pre, diffs_post, num_unbal_post):
     return fig
 
 
-def get_std_diffs(X, W, weight, weighted=False):
-    pass
-
-
 def get_simple_iptw(W, propensity_score):
     IPTW = (W / propensity_score) + \
         (1 - W) / (1 - propensity_score)
 
     return IPTW
+
+
+def get_std_diffs(X, W, weight, weighted=False):
+    """Calculate the inverse probability of treatment weighted standardized
+    differences in covariate means between the treatment and the control.
+    If weighting is set to 'False', calculate unweighted standardized
+    differences. Accepts only continuous and binary numerical variables.
+    """
+
+    cont_cols, prop_cols = _get_numeric_vars(X)
+    cols = cont_cols + prop_cols
+
+    if len(cols) == 0:
+        raise ValueError(
+            "No variable passed the test for continuous or binary variables.")
+
+    treat = (W == 1)
+    contr = (W == 0)
+
+    X_1 = X.loc[treat, cols]
+    X_0 = X.loc[contr, cols]
+
+    cont_index = np.array([col in cont_cols for col in cols])
+    prop_index = np.array([col in prop_cols for col in cols])
+
+    std_diffs_cont = np.empty(sum(cont_index))
+    std_diffs_prop = np.empty(sum(prop_index))
+
+    if weighted:
+
+        weight_1 = weight[treat]
+        weight_0 = weight[contr]
+
+        X_1_mean, X_1_var = np.apply_along_axis(
+            lambda x: _get_wmean_wvar(x, weight_1), 0, X_1)
+        X_0_mean, X_0_var = np.apply_along_axis(
+            lambda x: _get_wmean_wvar(x, weight_0), 0, X_0)
+
+    elif weighted == False:
+
+        X_1_mean, X_1_var = np.apply_along_axis(
+            lambda x: _get_mean_var(x), 0, X_1)
+        X_0_mean, X_0_var = np.apply_along_axis(
+            lambda x: _get_mean_var(x), 0, X_0)
+
+    X_1_mean_cont, X_1_var_cont = X_1_mean[cont_index], X_1_var[cont_index]
+    X_0_mean_cont, X_0_var_cont = X_0_mean[cont_index], X_0_var[cont_index]
+
+    std_diffs_cont = ((X_1_mean_cont - X_0_mean_cont) /
+                      np.sqrt((X_1_var_cont + X_0_var_cont) / 2))
+
+    X_1_mean_prop = X_1_mean[prop_index]
+    X_0_mean_prop = X_0_mean[prop_index]
+
+    std_diffs_prop = ((X_1_mean_prop - X_0_mean_prop) /
+                      np.sqrt(((X_1_mean_prop * (1 - X_1_mean_prop)) + (X_0_mean_prop * (1 - X_0_mean_prop))) / 2))
+
+    std_diffs = np.concatenate([std_diffs_cont, std_diffs_prop], axis=0)
+    std_diffs_df = pd.DataFrame(std_diffs, index=cols)
+
+    return std_diffs_df
+
+
+def _get_numeric_vars(X):
+    """Attempt to determine which variables are numeric and which
+    are categorical. The threshold for a 'continuous' variable
+    is set to 6.
+    """
+
+    cont = [(not hasattr(X.iloc[:, i], 'cat')) & (
+        X.iloc[:, i].nunique() >= 5) for i in range(X.shape[1])]
+
+    prop = [X.iloc[:, i].nunique(
+    ) == 2 for i in range(X.shape[1])]
+
+    cont_cols = list(X.loc[:, cont].columns)
+    prop_cols = list(X.loc[:, prop].columns)
+
+    dropped = set(X.columns) - set(cont_cols + prop_cols)
+
+    if dropped != set():
+        logger.info('Some non-binary variables were dropped because they had fewer than 5 unique values or were of the dtype 'cat'. The dropped variables are: {}'.format(dropped))
+
+    return cont_cols, prop_cols
+
+
+def _get_mean_var(X):
+    """Calculate the mean and variance of a variable.
+    """
+    mean = X.mean()
+    var = X.var()
+
+    return [mean, var]
+
+
+def _get_wmean_wvar(X, weight):
+    '''
+    Calculate the weighted mean of a variable given an arbitrary
+    sample weight. Formulas from:
+
+    Austin, Peter C., and Elizabeth A. Stuart. 2015. Moving towards Best
+    Practice When Using Inverse Probability of Treatment Weighting (IPTW)
+    Using the Propensity Score to Estimate Causal Treatment Effects in
+    Observational Studies.
+    Statistics in Medicine 34 (28): 3661 79. https://doi.org/10.1002/sim.6607.
+    '''
+    weighted_mean = np.sum(weight * X) / np.sum(weight)
+    weighted_var = (np.sum(weight) / (np.power(np.sum(weight), 2) - np.sum(
+        np.power(weight, 2)))) * (np.sum(weight * np.power((X - weighted_mean), 2)))
+
+    return [weighted_mean, weighted_var]
