@@ -4,7 +4,7 @@ import pandas as pd
 from collections import defaultdict
 import matplotlib.pyplot as plt
 from importlib import import_module
-from causalml.inference.meta import BaseTLearner
+from ..inference.meta.tlearner import BaseTLearner
 
 logger = logging.getLogger('sensitivity')
 
@@ -123,8 +123,8 @@ class Sensitivity(object):
         class_name = 'Sensitivity' + method_name.replace(' ', '')
 
         try:
-            getattr(import_module('nboe.sensitivity'), class_name)
-            return getattr(import_module('nboe.sensitivity'), class_name)
+            getattr(import_module('causalml.metrics.sensitivity'), class_name)
+            return getattr(import_module('causalml.metrics.sensitivity'), class_name)
         except AttributeError:
             raise AttributeError('{} is not an existing method for sensitiviy analysis.'.format(method_name) +
                               ' Select one of {}'.format(method_list))
@@ -204,7 +204,7 @@ class SensitivityPlaceboTreatment(Sensitivity):
     """
 
     def __init__(self, *args, **kwargs):
-        super(SensitivityPlaceboTreatment, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def sensitivity_estimate(self):
         """Summary report
@@ -230,7 +230,7 @@ class SensitivityRandomCause(Sensitivity):
     """
 
     def __init__(self, *args, **kwargs):
-        super(SensitivityRandomCause, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def sensitivity_estimate(self):
         num_rows = self.df.shape[0]
@@ -251,7 +251,7 @@ class SensitivityRandomReplace(Sensitivity):
     """
 
     def __init__(self, *args, **kwargs):
-        super(SensitivityRandomReplace, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         if 'replaced_feature' not in kwargs:
             replaced_feature_index = np.random.randint(len(self.inference_features))
             self.replaced_feature = self.inference_features[replaced_feature_index]
@@ -281,7 +281,7 @@ class SensitivitySubsetData(Sensitivity):
     """
 
     def __init__(self, *args, **kwargs):
-        super(SensitivitySubsetData, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.sample_size = kwargs["sample_size"]
         assert (self.sample_size is not None)
 
@@ -311,7 +311,7 @@ class SensitivitySelectionBias(Sensitivity):
 
     def __init__(self, *args, confound=ConfoundingFunction().one_sided, alpha_range=None,
                  sensitivity_features=None, **kwargs):
-        super(SensitivitySelectionBias, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         """Initialize.
 
         Args:
