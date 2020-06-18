@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt
+import logging
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -9,6 +10,8 @@ from ..inference.meta.tmle import TMLELearner
 plt.style.use('fivethirtyeight')
 sns.set_palette("Paired")
 RANDOM_COL = 'Random'
+
+logger = logging.getLogger('causalml')
 
 
 def plot(df, kind='gain', tmle=False, n=100, figsize=(8, 8), *args, **kwarg):
@@ -618,3 +621,173 @@ def qini_score(df, outcome_col='y', treatment_col='w', treatment_effect_col='tau
     else:
         qini = get_tmleqini(df, outcome_col=outcome_col, treatment_col=treatment_col, *args, **kwarg)
     return (qini.sum(axis=0) - qini[RANDOM_COL].sum()) / qini.shape[0]
+
+
+def plot_ps_diagnostics(df, covariate_col, treatment_col='w', p_col='p'):
+    """Plot covariate balances (standardized differences between the treatment and the control)
+    before and after weighting the sample using the inverse probability of treatment weights.
+
+     Args:
+        df (pandas.DataFrame): a data frame containing the covariates and treatment indicator
+        covariate_col (list of str): a list of columns that are used a covariates
+        treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
+        p_col (str, optional): the column name for propensity score
+    """
+    X = df[covariate_col]
+    W = df[treatment_col]
+    PS = df[p_col]
+
+    IPTW = get_simple_iptw(W, PS)
+
+    diffs_pre = get_std_diffs(X, W, weighted=False)
+    num_unbal_pre = (np.abs(diffs_pre) > 0.1).sum()[0]
+
+    diffs_post = get_std_diffs(X, W, IPTW, weighted=True)
+    num_unbal_post = (np.abs(diffs_post) > 0.1).sum()[0]
+
+    diff_plot = _plot_std_diffs(diffs_pre,
+                                num_unbal_pre,
+                                diffs_post,
+                                num_unbal_post)
+
+    return diff_plot
+
+
+def _plot_std_diffs(diffs_pre, num_unbal_pre, diffs_post, num_unbal_post):
+    fig, (ax1, ax2) = plt.subplots(
+        1, 2, figsize=(15, 10), sharex=True, sharey=True)
+
+    color = '#EA2566'
+
+    sns.stripplot(diffs_pre.iloc[:, 0], diffs_pre.index, ax=ax1)
+    ax1.set_xlabel("Before. Number of unbalanced covariates: {num_unbal}".format(
+        num_unbal=num_unbal_pre), fontsize=14)
+    ax1.axvline(x=-0.1, ymin=0, ymax=1, color=color, linestyle='--')
+    ax1.axvline(x=0.1, ymin=0, ymax=1, color=color, linestyle='--')
+
+    sns.stripplot(diffs_post.iloc[:, 0], diffs_post.index, ax=ax2)
+    ax2.set_xlabel("After. Number of unbalanced covariates: {num_unbal}".format(
+        num_unbal=num_unbal_post), fontsize=14)
+    ax2.axvline(x=-0.1, ymin=0, ymax=1, color=color, linestyle='--')
+    ax2.axvline(x=0.1, ymin=0, ymax=1, color=color, linestyle='--')
+
+    fig.suptitle('Standardized differences in means', fontsize=16)
+
+    return fig
+
+
+def get_simple_iptw(W, propensity_score):
+    IPTW = (W / propensity_score) + \
+        (1 - W) / (1 - propensity_score)
+
+    return IPTW
+
+
+def get_std_diffs(X, W, weight=None, weighted=False, numeric_threshold=5):
+    """Calculate the inverse probability of treatment weighted standardized
+    differences in covariate means between the treatment and the control.
+    If weighting is set to 'False', calculate unweighted standardized
+    differences. Accepts only continuous and binary numerical variables.
+    """
+    cont_cols, prop_cols = _get_numeric_vars(X, threshold=numeric_threshold)
+    cols = cont_cols + prop_cols
+
+    if len(cols) == 0:
+        raise ValueError(
+            "No variable passed the test for continuous or binary variables.")
+
+    treat = (W == 1)
+    contr = (W == 0)
+
+    X_1 = X.loc[treat, cols]
+    X_0 = X.loc[contr, cols]
+
+    cont_index = np.array([col in cont_cols for col in cols])
+    prop_index = np.array([col in prop_cols for col in cols])
+
+    std_diffs_cont = np.empty(sum(cont_index))
+    std_diffs_prop = np.empty(sum(prop_index))
+
+    if weighted:
+        assert weight is not None, 'weight should be provided when weighting is set to "True"'
+
+        weight_1 = weight[treat]
+        weight_0 = weight[contr]
+
+        X_1_mean, X_1_var = np.apply_along_axis(
+            lambda x: _get_wmean_wvar(x, weight_1), 0, X_1)
+        X_0_mean, X_0_var = np.apply_along_axis(
+            lambda x: _get_wmean_wvar(x, weight_0), 0, X_0)
+
+    elif not weighted:
+        X_1_mean, X_1_var = np.apply_along_axis(
+            lambda x: _get_mean_var(x), 0, X_1)
+        X_0_mean, X_0_var = np.apply_along_axis(
+            lambda x: _get_mean_var(x), 0, X_0)
+
+    X_1_mean_cont, X_1_var_cont = X_1_mean[cont_index], X_1_var[cont_index]
+    X_0_mean_cont, X_0_var_cont = X_0_mean[cont_index], X_0_var[cont_index]
+
+    std_diffs_cont = ((X_1_mean_cont - X_0_mean_cont) /
+                      np.sqrt((X_1_var_cont + X_0_var_cont) / 2))
+
+    X_1_mean_prop = X_1_mean[prop_index]
+    X_0_mean_prop = X_0_mean[prop_index]
+
+    std_diffs_prop = ((X_1_mean_prop - X_0_mean_prop) /
+                      np.sqrt(((X_1_mean_prop * (1 - X_1_mean_prop)) + (X_0_mean_prop * (1 - X_0_mean_prop))) / 2))
+
+    std_diffs = np.concatenate([std_diffs_cont, std_diffs_prop], axis=0)
+    std_diffs_df = pd.DataFrame(std_diffs, index=cols)
+
+    return std_diffs_df
+
+
+def _get_numeric_vars(X, threshold=5):
+    """Attempt to determine which variables are numeric and which
+    are categorical. The threshold for a 'continuous' variable
+    is set to 5 by default.
+    """
+
+    cont = [(not hasattr(X.iloc[:, i], 'cat')) and (
+        X.iloc[:, i].nunique() >= threshold) for i in range(X.shape[1])]
+
+    prop = [X.iloc[:, i].nunique(
+    ) == 2 for i in range(X.shape[1])]
+
+    cont_cols = list(X.loc[:, cont].columns)
+    prop_cols = list(X.loc[:, prop].columns)
+
+    dropped = set(X.columns) - set(cont_cols + prop_cols)
+
+    if dropped:
+        logger.info('Some non-binary variables were dropped because they had fewer than {} unique values or were of the dtype "cat". The dropped variables are: {}'.format(threshold, dropped))
+
+    return cont_cols, prop_cols
+
+
+def _get_mean_var(X):
+    """Calculate the mean and variance of a variable.
+    """
+    mean = X.mean()
+    var = X.var()
+
+    return [mean, var]
+
+
+def _get_wmean_wvar(X, weight):
+    '''
+    Calculate the weighted mean of a variable given an arbitrary
+    sample weight. Formulas from:
+
+    Austin, Peter C., and Elizabeth A. Stuart. 2015. Moving towards Best
+    Practice When Using Inverse Probability of Treatment Weighting (IPTW)
+    Using the Propensity Score to Estimate Causal Treatment Effects in
+    Observational Studies.
+    Statistics in Medicine 34 (28): 3661 79. https://doi.org/10.1002/sim.6607.
+    '''
+    weighted_mean = np.sum(weight * X) / np.sum(weight)
+    weighted_var = (np.sum(weight) / (np.power(np.sum(weight), 2) - np.sum(
+        np.power(weight, 2)))) * (np.sum(weight * np.power((X - weighted_mean), 2)))
+
+    return [weighted_mean, weighted_var]
