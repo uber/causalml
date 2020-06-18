@@ -639,7 +639,7 @@ def plot_ps_diagnostics(df, covariate_col, treatment_col='w', p_col='p'):
 
     IPTW = get_simple_iptw(W, PS)
 
-    diffs_pre = get_std_diffs(X, W, IPTW, weighted=False)
+    diffs_pre = get_std_diffs(X, W, weighted=False)
     num_unbal_pre = (np.abs(diffs_pre) > 0.1).sum()[0]
 
     diffs_post = get_std_diffs(X, W, IPTW, weighted=True)
@@ -683,14 +683,13 @@ def get_simple_iptw(W, propensity_score):
     return IPTW
 
 
-def get_std_diffs(X, W, weight, weighted=False):
+def get_std_diffs(X, W, weight=None, weighted=False, numeric_threshold=5):
     """Calculate the inverse probability of treatment weighted standardized
     differences in covariate means between the treatment and the control.
     If weighting is set to 'False', calculate unweighted standardized
     differences. Accepts only continuous and binary numerical variables.
     """
-
-    cont_cols, prop_cols = _get_numeric_vars(X)
+    cont_cols, prop_cols = _get_numeric_vars(X, threshold=numeric_threshold)
     cols = cont_cols + prop_cols
 
     if len(cols) == 0:
@@ -710,6 +709,7 @@ def get_std_diffs(X, W, weight, weighted=False):
     std_diffs_prop = np.empty(sum(prop_index))
 
     if weighted:
+        assert weight is not None, 'weight should be provided when weighting is set to "True"'
 
         weight_1 = weight[treat]
         weight_0 = weight[contr]
@@ -719,8 +719,7 @@ def get_std_diffs(X, W, weight, weighted=False):
         X_0_mean, X_0_var = np.apply_along_axis(
             lambda x: _get_wmean_wvar(x, weight_0), 0, X_0)
 
-    elif weighted == False:
-
+    elif not weighted:
         X_1_mean, X_1_var = np.apply_along_axis(
             lambda x: _get_mean_var(x), 0, X_1)
         X_0_mean, X_0_var = np.apply_along_axis(
@@ -744,14 +743,14 @@ def get_std_diffs(X, W, weight, weighted=False):
     return std_diffs_df
 
 
-def _get_numeric_vars(X):
+def _get_numeric_vars(X, threshold=5):
     """Attempt to determine which variables are numeric and which
     are categorical. The threshold for a 'continuous' variable
-    is set to 6.
+    is set to 5 by default.
     """
 
-    cont = [(not hasattr(X.iloc[:, i], 'cat')) & (
-        X.iloc[:, i].nunique() >= 5) for i in range(X.shape[1])]
+    cont = [(not hasattr(X.iloc[:, i], 'cat')) and (
+        X.iloc[:, i].nunique() >= threshold) for i in range(X.shape[1])]
 
     prop = [X.iloc[:, i].nunique(
     ) == 2 for i in range(X.shape[1])]
@@ -761,8 +760,8 @@ def _get_numeric_vars(X):
 
     dropped = set(X.columns) - set(cont_cols + prop_cols)
 
-    if dropped != set():
-        logger.info('Some non-binary variables were dropped because they had fewer than 5 unique values or were of the dtype 'cat'. The dropped variables are: {}'.format(dropped))
+    if dropped:
+        logger.info('Some non-binary variables were dropped because they had fewer than {} unique values or were of the dtype "cat". The dropped variables are: {}'.format(threshold, dropped))
 
     return cont_cols, prop_cols
 
