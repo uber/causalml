@@ -4,43 +4,78 @@ import pandas as pd
 from collections import defaultdict
 import matplotlib.pyplot as plt
 from importlib import import_module
-from ..inference.meta.tlearner import BaseTLearner
 
 logger = logging.getLogger('sensitivity')
 
 
-class ConfoundingFunction(object):
-    """ Confounding functions
+def one_sided(alpha, p, treatment):
+    """One sided confounding function.
+    Reference:  Blackwell, Matthew. "A selection bias approach to sensitivity analysis
+    for causal effects." Political Analysis 22.2 (2014): 169-182.
+    https://www.mattblackwell.org/files/papers/causalsens.pdf
+
+    Args:
+        alpha (np.array): a confounding values vector
+        p (np.array): a propensity score vector between 0 and 1
+        treatment (np.array): a treatment vector (1 if treated, otherwise 0)
+    """
+    assert p.shape[0] == treatment.shape[0]
+    adj = alpha * (1 - p) * treatment - alpha * p * (1 - treatment)
+    return adj
+
+
+def alignment(alpha, p, treatment):
+    """Alignment confounding function.
+    Reference:  Blackwell, Matthew. "A selection bias approach to sensitivity analysis
+    for causal effects." Political Analysis 22.2 (2014): 169-182.
+    https://www.mattblackwell.org/files/papers/causalsens.pdf
+
+    Args:
+        alpha (np.array): a confounding values vector
+        p (np.array): a propensity score vector between 0 and 1
+        treatment (np.array): a treatment vector (1 if treated, otherwise 0)
     """
 
-    def __init__(self):
-        """Initialize.
+    assert p.shape[0] == treatment.shape[0]
+    adj = alpha * (1 - p) * treatment + alpha * p * (1 - treatment)
+    return adj
 
-        Args:
-            alpha (np.array): a confounding values vector
-            p (np.array): a propensity score vector between 0 and 1
-            treatment (np.array): a treatment vector (1 if treated, otherwise 0)
-        """
 
-    def one_sided(self, alpha, p, treatment):
-        assert p.shape[0] == treatment.shape[0]
-        adj = alpha * (1 - p) * treatment - alpha * p * (1 - treatment)
-        return adj
+def one_sided_att(alpha, p, treatment):
+    """One sided confounding function for the average effect of the treatment among the treated units (ATT)
 
-    def alignment(self, alpha, p, treatment):
-        assert p.shape[0] == treatment.shape[0]
-        adj = alpha * (1 - p) * treatment + alpha * p * (1 - treatment)
-        return adj
+    Reference:  Blackwell, Matthew. "A selection bias approach to sensitivity analysis
+    for causal effects." Political Analysis 22.2 (2014): 169-182.
+    https://www.mattblackwell.org/files/papers/causalsens.pdf
 
-    def one_sided_att(self, alpha, p, treatment):
-        assert p.shape[0] == treatment.shape[0]
-        adj = alpha * (1 - treatment)
-        return adj
+    Args:
+        alpha (np.array): a confounding values vector
+        p (np.array): a propensity score vector between 0 and 1
+        treatment (np.array): a treatment vector (1 if treated, otherwise 0)
+    """
+    assert p.shape[0] == treatment.shape[0]
+    adj = alpha * (1 - treatment)
+    return adj
 
-    def alignment_att(self, alpha, p, treatment):
-        assert p.shape[0] == treatment.shape[0]
-        adj = alpha * (1 - treatment)
-        return adj
+
+def alignment_att(alpha, p, treatment):
+    """Alignment confounding function for the average effect of the treatment among the treated units (ATT)
+
+    Reference:  Blackwell, Matthew. "A selection bias approach to sensitivity analysis
+    for causal effects." Political Analysis 22.2 (2014): 169-182.
+    https://www.mattblackwell.org/files/papers/causalsens.pdf
+
+    Args:
+        alpha (np.array): a confounding values vector
+        p (np.array): a propensity score vector between 0 and 1
+        treatment (np.array): a treatment vector (1 if treated, otherwise 0)
+    """
+    assert p.shape[0] == treatment.shape[0]
+    adj = alpha * (1 - treatment)
+    return adj
+
+
+from ..inference.meta.tlearner import BaseTLearner
 
 
 class Sensitivity(object):
@@ -130,13 +165,13 @@ class Sensitivity(object):
                               ' Select one of {}'.format(method_list))
 
     def sensitivity_analysis(self, methods, sample_size=None,
-                             confound=ConfoundingFunction().one_sided, alpha_range=None):
+                             confound='one_sided', alpha_range=None):
         """Return the sensitivity data by different method
 
         Args:
             method (list of str): a list of sensitivity analysis method
             sample_size (float, optional): ratio for subset the original data
-            confound (functinon, optional): a confouding function
+            confound (string, optional): the name of confouding function
             alpha_range (np.array, optional): a parameter to pass the confounding function
 
         Returns:
@@ -145,7 +180,6 @@ class Sensitivity(object):
             treatment (np.array): a treatment vector (1 if treated, otherwise 0)
             y (np.array): an outcome vector
         """
-
         if alpha_range is None:
             y = self.df[self.outcome_col]
             iqr = y.quantile(.75) - y.quantile(.25)
@@ -309,19 +343,30 @@ class SensitivitySelectionBias(Sensitivity):
 
     """
 
-    def __init__(self, *args, confound=ConfoundingFunction().one_sided, alpha_range=None,
+    def __init__(self, *args, confound='one_sided', alpha_range=None,
                  sensitivity_features=None, **kwargs):
         super().__init__(*args, **kwargs)
         """Initialize.
 
         Args:
-            confound (functinon): a confouding function
+            confound (string): the name of confouding function
             alpha_range (np.array): a parameter to pass the confounding function
             sensitivity_features (list of str): ): a list of columns that to check each individual partial r-square
         """
 
         logger.info('Only works for linear outcome models right now. Check back soon.')
-        self.confound = confound
+        confounding_functions = {'one_sided': one_sided,
+                                 'alignment': alignment,
+                                 'one_sided_att': one_sided_att,
+                                 'alignment_att': alignment_att}
+
+        try:
+            confound_func = confounding_functions[confound]
+        except KeyError:
+            raise NotImplementedError(f'Confounding function, {confound} is not implemented. \
+                                        Use one of {confounding_functions.keys()}')
+
+        self.confound = confound_func
 
         if sensitivity_features is None:
             self.sensitivity_features = self.inference_features
