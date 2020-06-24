@@ -111,10 +111,10 @@ class UpliftTreeClassifier:
     evaluationFunction : string
         Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
 
-    max_features: int, optional (default=10)
+    max_features: int, optional (default=None)
         The number of features to consider when looking for the best split.
 
-    max_depth: int, optional (default=5)
+    max_depth: int, optional (default=3)
         The maximum depth of the tree.
 
     min_samples_leaf: int, optional (default=100)
@@ -123,7 +123,7 @@ class UpliftTreeClassifier:
     min_samples_treatment: int, optional (default=10)
         The minimum number of samples required of the experiment group to be split at a leaf node.
 
-    n_reg: int, optional (default=10)
+    n_reg: int, optional (default=100)
         The regularization parameter defined in Rzepakowski et al. 2012, the weight (in terms of sample size) of the
         parent node influence on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
@@ -232,12 +232,20 @@ class UpliftTreeClassifier:
             An array containing the treatment group for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
-        minGain : float, optional (default = 0.0001)
-            The minimum gain required to make a tree node split. The children tree branches are trimmed if the actual
-            split gain is less than the minimum gain.
         rule : string, optional (default = 'maxAbsDiff')
             The prune rules. Supported values are 'maxAbsDiff' for optimizing the maximum absolute difference, and
             'bestUplift' for optimizing the node-size weighted treatment effect.
+        minGain : float, optional (default = 0.)
+            The minimum gain required to make a tree node split. The children tree branches are trimmed if the actual
+            split gain is less than the minimum gain.
+        evaluationFunction : string, optional (default = None)
+            Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
+        notify: bool, optional (default = False)
+        n_reg: int, optional (default=0)
+            The regularization parameter defined in Rzepakowski et al. 2012, the weight (in terms of sample size) of the
+        parent node influence on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
+        parentNodeSummary : dictionary, optional (default = None)
+            Node summary statistics of the parent tree node.
         Returns
         -------
         self : object
