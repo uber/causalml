@@ -688,6 +688,7 @@ class BaseXClassifier(BaseXLearner):
 
         if p is None:
             logger.info('Generating propensity score')
+            p = dict()
             for group in self.t_groups:
                 p_model = self.propensity_model[group]
                 p[group] = p_model.predict(X)
