@@ -761,7 +761,8 @@ def _get_numeric_vars(X, threshold=5):
     dropped = set(X.columns) - set(cont_cols + prop_cols)
 
     if dropped:
-        logger.info('Some non-binary variables were dropped because they had fewer than {} unique values or were of the dtype "cat". The dropped variables are: {}'.format(threshold, dropped))
+        logger.info('Some non-binary variables were dropped because they had fewer than {} unique values or were of the \
+                     dtype "cat". The dropped variables are: {}'.format(threshold, dropped))
 
     return cont_cols, prop_cols
 
