@@ -35,6 +35,8 @@ The package currently supports the following methods
     * T-learner
     * X-learner
     * R-learner
+* **Instrumental variables algorithms**
+    * 2-Stage Least Squares (2SLS)
 
 
 # Installation
