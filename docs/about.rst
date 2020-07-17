@@ -20,3 +20,5 @@ The package currently supports the following methods:
     - :ref:`T-learner`
     - :ref:`X-learner`
     - :ref:`R-learner`
+- Instrumental variables algorithm
+    - 2-Stage Least Squares (2SLS)

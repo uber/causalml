@@ -33,7 +33,7 @@ packages = find_packages()
 setup(
     name="causalml",
     version=causalml.__version__,
-    author="Huigang Chen, Totte Harinen, Jeong-Yoon Lee, Mike Yung, Zhenyu Zhao",
+    author="Huigang Chen, Totte Harinen, Jeong-Yoon Lee, Yuchen Luo, Jing Pan, Mike Yung, Zhenyu Zhao",
     author_email="",
     description="Python Package for Uplift Modeling and Causal Inference with Machine Learning Algorithms",
     long_description=long_description,

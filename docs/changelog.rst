@@ -3,6 +3,27 @@
 Changelog
 =========
 
+0.8.0 (2020-07-17)
+------------------
+CausalML surpassed `100,000 downloads <https://pepy.tech/project/causalml>`_! Thanks for the support.
+
+Major Updates
+~~~~~~~~~~~~~
+- Add value optimization to `optimize` by @t-tte (`#183 <https://github.com/uber/causalml/pull/183>`_)
+- Add counterfactual unit selection to `optimize` by @t-tte (`#184 <https://github.com/uber/causalml/pull/184>`_)
+- Add sensitivity analysis to `metrics` by @ppstacy (`#195 <https://github.com/uber/causalml/pull/195>`_, `#212 <https://github.com/uber/causalml/pull/212>`_)
+- Add the `iv` estimator submodule and add 2SLS model to it by @huigangchen (`#201 <https://github.com/uber/causalml/pull/201>`_)
+
+Minor Updates
+~~~~~~~~~~~~~
+- Add `GradientBoostedPropensityModel` by @yungmsh (`#193 <https://github.com/uber/causalml/pull/193>`_)
+- Add covariate balance visualization by @yluogit (`#200 <https://github.com/uber/causalml/pull/200>`_)
+- Fix bug in the X learner propensity model by @ppstacy (`#209 <https://github.com/uber/causalml/pull/209>`_)
+- Update package dependencies by @jeongyoonlee (`#195 <https://github.com/uber/causalml/pull/195>`_, `#197 <https://github.com/uber/causalml/pull/197>`_)
+- Update documentation by @jeongyoonlee, @ppstacy and @yluogit (`#181 <https://github.com/uber/causalml/pull/181>`_, `#202 <https://github.com/uber/causalml/pull/202>`_, `#205 <https://github.com/uber/causalml/pull/205>`_)
+
+
+
 0.7.1 (2020-05-07)
 ------------------
 Special thanks to our new community contributor, Katherine (`@khof312 <https://github.com/khof312>`_)!
