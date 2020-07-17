@@ -119,7 +119,7 @@ def test_SensitivitySelectionBias():
 def test_one_sided():
     y, X, treatment, tau, b, e = synthetic_data(mode=1, n=100000, p=NUM_FEATURES, sigma=1.0)
     alpha = np.quantile(y, 0.25)
-    adj = one_sided(alpha, b, treatment)
+    adj = one_sided(alpha, e, treatment)
 
     assert y.shape == adj.shape
 
@@ -127,7 +127,7 @@ def test_one_sided():
 def test_alignment():
     y, X, treatment, tau, b, e = synthetic_data(mode=1, n=100000, p=NUM_FEATURES, sigma=1.0)
     alpha = np.quantile(y, 0.25)
-    adj = alignment(alpha, b, treatment)
+    adj = alignment(alpha, e, treatment)
 
     assert y.shape == adj.shape
 
@@ -135,7 +135,7 @@ def test_alignment():
 def test_one_sided_att():
     y, X, treatment, tau, b, e = synthetic_data(mode=1, n=100000, p=NUM_FEATURES, sigma=1.0)
     alpha = np.quantile(y, 0.25)
-    adj = one_sided_att(alpha, b, treatment)
+    adj = one_sided_att(alpha, e, treatment)
 
     assert y.shape == adj.shape
 
@@ -143,6 +143,6 @@ def test_one_sided_att():
 def test_alignment_att():
     y, X, treatment, tau, b, e = synthetic_data(mode=1, n=100000, p=NUM_FEATURES, sigma=1.0)
     alpha = np.quantile(y, 0.25)
-    adj = alignment_att(alpha, b, treatment)
+    adj = alignment_att(alpha, e, treatment)
 
     assert y.shape == adj.shape
