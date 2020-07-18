@@ -13,6 +13,7 @@ def test_elasticnet_propensity_model(generate_regression_data):
 
     assert roc_auc_score(treatment, ps) > .5
 
+
 def test_gradientboosted_propensity_model(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
@@ -20,6 +21,7 @@ def test_gradientboosted_propensity_model(generate_regression_data):
     ps = pm.fit_predict(X, treatment)
 
     assert roc_auc_score(treatment, ps) > .5
+
 
 def test_gradientboosted_propensity_model_earlystopping(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()

@@ -17,7 +17,7 @@ In meta-algorithms we can assess the quality of user-level treatment effect esti
 User Level/Segment Level/Cohort Level Consistency
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We can also evaluate user-level/segment level/cohort level (as in `CeViChE <https://docs.google.com/presentation/d/1WaXgwIwFsgBmrjz0-awk6TS5kIpVgCJxPg9Wm8mzcmg/edit#slide=id.g4dec088d29_0_141>`_) estimation consistency by conducting T-test.
+We can also evaluate user-level/segment level/cohort level estimation consistency by conducting T-test.
 
 Stability between Cohorts
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -85,3 +85,40 @@ Mechanism 4
 |
 |   :math:`y_i = \frac{1}{2}\big(max(X_{i1} + X_{i2} + X_{i3}, 0) + max(X_{i4} + X_{i5}, 0)\big) + (W_i - 0.5)(max(X_{i1} + X_{i2} + X_{i3}, 0) - max(X_{i4}, X_{i5}, 0))`
 |
+
+Validation with Sensitivy Analysis
+----------------------------------
+Sensitivy analysis aim to check the robustness of the unconfoundeness assumption. If there is hidden bias (unobserved confounders), it detemineds how severe whould have to be to change conclusion by examine the average treatment effect estimation.
+
+We implemented the following methods to conduct sensitivity analysis:
+
+Placebo Treatment
+~~~~~~~~~~~~~~~~~
+
+| Replace treatment with a random variable.
+
+Irrelevant Additional Confounder
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+| Add a random common cause variable.
+
+Subset validation
+~~~~~~~~~~~~~~~~~
+
+| Remove a random subset of the data.
+
+Random Replace
+~~~~~~~~~~~~~~
+
+| Random replace a covariate with an irrelevant variable.
+
+Selection Bias
+~~~~~~~~~~~~~~
+
+| `Blackwell(2013) <https://www.mattblackwell.org/files/papers/sens.pdf>` introduced an approach to sensitivity analysis for causal effects that directly models confounding or selection bias.
+| 
+| One Sided Confounding Function: here as the name implies, this function can detect sensitivity to one-sided selection bias, but it would fail to detect other deviations from ignobility. That is, it can only determine the bias resulting from the treatment group being on average better off or the control group being on average better off. 
+| 
+| Alignment Confounding Function: this type of bias is likely to occur when units select into treatment and control based on their predicted treatment effects
+| 
+| The sensitivity analysis is rigid in this way because the confounding function is not identified from the data, so that the causal model in the last section is only identified conditional on a specific choice of that function. The goal of the sensitivity analysis is not to choose the “correct” confounding function, since we have no way of evaluating this correctness. By its very nature, unmeasured confounding is unmeasured. Rather, the goal is to identify plausible deviations from ignobility and test sensitivity to those deviations. The main harm that results from the incorrect specification of the confounding function is that hidden biases remain hidden.
