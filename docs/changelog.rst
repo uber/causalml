@@ -11,7 +11,7 @@ Major Updates
 ~~~~~~~~~~~~~
 - Add value optimization to `optimize` by @t-tte (`#183 <https://github.com/uber/causalml/pull/183>`_)
 - Add counterfactual unit selection to `optimize` by @t-tte (`#184 <https://github.com/uber/causalml/pull/184>`_)
-- Add sensitivity analysis to `metrics` by @ppstacy (`#195 <https://github.com/uber/causalml/pull/195>`_, `#212 <https://github.com/uber/causalml/pull/212>`_)
+- Add sensitivity analysis to `metrics` by @ppstacy (`#199 <https://github.com/uber/causalml/pull/199>`_, `#212 <https://github.com/uber/causalml/pull/212>`_)
 - Add the `iv` estimator submodule and add 2SLS model to it by @huigangchen (`#201 <https://github.com/uber/causalml/pull/201>`_)
 
 Minor Updates
