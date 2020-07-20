@@ -75,9 +75,6 @@ def alignment_att(alpha, p, treatment):
     return adj
 
 
-from ..inference.meta.tlearner import BaseTLearner
-
-
 class Sensitivity(object):
     """ A Sensitivity Check class to support Placebo Treatment, Irrelevant Additional Confounder
     and Subset validation refutation methods to verify causal inference.
@@ -137,6 +134,7 @@ class Sensitivity(object):
         """
 
         learner = self.learner
+        from ..inference.meta.tlearner import BaseTLearner
         if isinstance(learner, BaseTLearner):
             ate, ate_lower, ate_upper = learner.estimate_ate(X=X, treatment=treatment, y=y)
         else:
