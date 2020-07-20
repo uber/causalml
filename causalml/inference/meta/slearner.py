@@ -139,8 +139,6 @@ class BaseSLearner(object):
         else:
             return te, yhat_cs, yhat_ts
 
-        return te
-
     def fit_predict(self, X, treatment, y, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
                     return_components=False, verbose=True):
         """Fit the inference model of the S learner and predict treatment effects.
@@ -443,12 +441,13 @@ class BaseSClassifier(BaseSLearner):
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-    def predict(self, X, treatment=None, y=None, verbose=True):
+    def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
+            return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -485,7 +484,10 @@ class BaseSClassifier(BaseSLearner):
         for i, group in enumerate(self.t_groups):
             te[:, i] = yhat_ts[group] - yhat_cs[group]
 
-        return te
+        if not return_components:
+            return te
+        else:
+            return te, yhat_cs, yhat_ts
 
 
 class LRSRegressor(BaseSRegressor):
