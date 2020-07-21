@@ -529,6 +529,7 @@ def test_BaseXClassifier(generate_classification_data):
                                          test_size=0.2,
                                          random_state=RANDOM_SEED)
 
+    # specify all 4 learners
     uplift_model = BaseXClassifier(control_outcome_learner=XGBClassifier(),
                                    control_effect_learner=XGBRegressor(),
                                    treatment_outcome_learner=XGBClassifier(),
@@ -541,6 +542,18 @@ def test_BaseXClassifier(generate_classification_data):
     tau_pred = uplift_model.predict(X=df_test[x_names].values,
                                   p=df_test['propensity_score'].values)
 
+    # specify 2 learners
+    uplift_model = BaseXClassifier(outcome_learner=XGBClassifier(),
+                                   effect_learner=XGBRegressor())
+
+    uplift_model.fit(X=df_train[x_names].values,
+                     treatment=df_train['treatment_group_key'].values,
+                     y=df_train[CONVERSION].values)
+
+    tau_pred = uplift_model.predict(X=df_test[x_names].values,
+                                  p=df_test['propensity_score'].values)
+
+    # calculate metrics
     auuc_metrics = pd.DataFrame({'tau_pred': tau_pred.flatten(),
                                  'W': df_test['treatment_group_key'].values,
                                  CONVERSION: df_test[CONVERSION].values,
