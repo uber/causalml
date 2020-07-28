@@ -19,7 +19,7 @@ import numpy as np
 import scipy.stats as stats
 import pandas as pd
 from sklearn.utils.testing import ignore_warnings
-
+from collections import defaultdict
 
 class DecisionTree:
     """ Tree Node Class
@@ -176,6 +176,7 @@ class UpliftTreeClassifier:
         assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
         self.treatment_group = list(set(treatment))
+        self.feature_imp_dict = defaultdict(float)
 
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
             X, treatment, y, evaluationFunction=self.evaluationFunction,
@@ -183,7 +184,11 @@ class UpliftTreeClassifier:
             depth=1, min_samples_treatment=self.min_samples_treatment,
             n_reg=self.n_reg, parentNodeSummary=None
         )
-        return self
+
+        self.feature_importances_ = np.zeros(X.shape[1])
+        for col, imp in self.feature_imp_dict.items():
+            self.feature_importances_[col] = imp
+        self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
     # Prune Trees
     def prune(self, X, treatment, y, minGain=0.0001, rule='maxAbsDiff'):
@@ -976,12 +981,14 @@ class UpliftTreeClassifier:
                     leftScore1 = evaluationFunction(leftNodeSummary)
                     rightScore2 = evaluationFunction(rightNodeSummary)
                     gain = (currentScore - p * leftScore1 - (1 - p) * rightScore2)
+                    gain_for_imp = (len(X) * currentScore - len(X_l) * leftScore1 - len(X_r) * rightScore2)
                 else:
                     if (self.control_name in leftNodeSummary and
                         self.control_name in rightNodeSummary):
                         leftScore1 = evaluationFunction(leftNodeSummary, control_name=self.control_name)
                         rightScore2 = evaluationFunction(rightNodeSummary, control_name=self.control_name)
                         gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)
+                        gain_for_imp = (len(X_l) * leftScore1 + len(X_r) * rightScore2 - len(X) * currentScore)
                         if self.normalization:
                             norm_factor = self.normI(currentNodeSummary,
                                                      leftNodeSummary,
@@ -998,6 +1005,7 @@ class UpliftTreeClassifier:
                     bestAttribute = (col, value)
                     best_set_left = [X_l, w_l, y_l]
                     best_set_right = [X_r, w_r, y_r]
+                    self.feature_imp_dict[bestAttribute[0]] += gain_for_imp
 
         dcY = {'impurity': '%.3f' % currentScore, 'samples': '%d' % len(X)}
         # Add treatment size
@@ -1261,6 +1269,10 @@ class UpliftRandomForestClassifier:
             y_train_bt = y[bt_index]
             treatment_train_bt = treatment[bt_index]
             self.uplift_forest[tree_i].fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
+
+        all_importances = [tree.feature_importances_ for tree in self.uplift_forest]
+        self.feature_importances_ = np.mean(all_importances, axis=0)
+        self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
     @ignore_warnings(category=FutureWarning)
     def predict(self, X, full_output=False):
