@@ -20,6 +20,8 @@ import scipy.stats as stats
 import pandas as pd
 from sklearn.utils.testing import ignore_warnings
 from collections import defaultdict
+from joblib import Parallel, delayed
+import multiprocessing as mp
 
 class DecisionTree:
     """ Tree Node Class
@@ -1208,7 +1210,8 @@ class UpliftRandomForestClassifier:
                  n_reg=10,
                  evaluationFunction=None,
                  control_name=None,
-                 normalization=True):
+                 normalization=True,
+                 n_jobs=-1):
         """
         Initialize the UpliftRandomForestClassifier class.
         """
@@ -1222,6 +1225,7 @@ class UpliftRandomForestClassifier:
         self.n_reg = n_reg
         self.evaluationFunction = evaluationFunction
         self.control_name = control_name
+        self.n_jobs = n_jobs
 
         # Create forest
         self.uplift_forest = []
@@ -1236,6 +1240,9 @@ class UpliftRandomForestClassifier:
                 normalization=normalization)
 
             self.uplift_forest.append(uplift_tree)
+
+        if self.n_jobs == -1:
+            self.n_jobs = mp.cpu_count()
 
     def fit(self, X, treatment, y):
         """
@@ -1262,17 +1269,22 @@ class UpliftRandomForestClassifier:
         for i, treatment_group_key in enumerate(treatment_group_keys):
             self.classes_[treatment_group_key] = i
 
-        # Bootstrap
-        for tree_i in range(len(self.uplift_forest)):
-            bt_index = np.random.choice(len(X), len(X))
-            x_train_bt = X[bt_index]
-            y_train_bt = y[bt_index]
-            treatment_train_bt = treatment[bt_index]
-            self.uplift_forest[tree_i].fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
+        self.uplift_forest = (
+            Parallel(n_jobs=self.n_jobs)
+            (delayed(self.bootstrap)(X, treatment, y, tree) for tree in self.uplift_forest)
+        )
 
         all_importances = [tree.feature_importances_ for tree in self.uplift_forest]
         self.feature_importances_ = np.mean(all_importances, axis=0)
         self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
+
+    def bootstrap(self, X, treatment, y, tree):
+        bt_index = np.random.choice(len(X), len(X))
+        x_train_bt = X[bt_index]
+        y_train_bt = y[bt_index]
+        treatment_train_bt = treatment[bt_index]
+        tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
+        return tree
 
     @ignore_warnings(category=FutureWarning)
     def predict(self, X, full_output=False):
