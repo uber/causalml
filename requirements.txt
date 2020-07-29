@@ -1,6 +1,6 @@
 setuptools>=41.0.0
 pip>=10.0
-numpy>=0.16.0
+numpy>=0.16.0,<1.19.0
 scipy==1.4.1
 matplotlib
 pandas>=0.24.1
