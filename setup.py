@@ -13,7 +13,7 @@ except ImportError:
     from numpy import get_include as np_get_include
 
 
-with open("README.md", "r") as f:
+with open("README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
 
 
