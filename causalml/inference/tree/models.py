@@ -1270,7 +1270,7 @@ class UpliftRandomForestClassifier:
             self.classes_[treatment_group_key] = i
 
         self.uplift_forest = (
-            Parallel(n_jobs=self.n_jobs)
+            Parallel(n_jobs=1)
             (delayed(self.bootstrap)(X, treatment, y, tree) for tree in self.uplift_forest)
         )
 
@@ -1303,8 +1303,12 @@ class UpliftRandomForestClassifier:
 
         Returns
         -------
+        y_pred_list : ndarray, shape = (num_samples, num_treatments])
+            An ndarray  containing the predicted delta in each treatment group,
+            the best treatment group and the maximum delta.
+        
         df_res : DataFrame, shape = [num_samples, (num_treatments + 1)]
-            A DataFrame containing the predicted delta in each treatment group,
+            If full_output, a DataFrame containing the predicted delta in each treatment group,
             the best treatment group and the maximum delta.
 
         '''
@@ -1345,4 +1349,7 @@ class UpliftRandomForestClassifier:
                 y_pred_list[:, self.classes_[treatment_group]] = df_res['delta_%s' % (treatment_group)].values
         df_res['max_delta'] = df_res[delta_cols].max(axis=1)
 
-        return y_pred_list
+        if full_output:
+            return df_res
+        else:
+            return y_pred_list
