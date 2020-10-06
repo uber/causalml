@@ -1270,7 +1270,7 @@ class UpliftRandomForestClassifier:
             self.classes_[treatment_group_key] = i
 
         self.uplift_forest = (
-            Parallel(n_jobs=1)
+            Parallel(n_jobs=self.n_jobs)
             (delayed(self.bootstrap)(X, treatment, y, tree) for tree in self.uplift_forest)
         )
 
