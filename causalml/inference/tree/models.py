@@ -966,7 +966,7 @@ class UpliftTreeClassifier:
                 rightNodeSummary = self.tree_node_summary(w_r, y_r,
                                                           min_samples_treatment=min_samples_treatment,
                                                           n_reg=n_reg,
-                                                          parentNodeSummary=parentNodeSummary)
+                                                          parentNodeSummary=currentNodeSummary)
 
                 # check the split validity on min_samples_treatment
                 if set(leftNodeSummary.keys()) != set(rightNodeSummary.keys()):
