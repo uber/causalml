@@ -15,10 +15,9 @@ class PropensityModel(metaclass=ABCMeta):
     def __init__(self, clip_bounds=(1e-3, 1 - 1e-3), **model_kwargs):
         """
         Args:
-
-        clip_bounds (tuple): lower and upper bounds for clipping propensity scores. Bounds should be implemented
-                such that: 0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
-        model_kwargs: Keyword arguments to be passed to the underlying classification model.
+            clip_bounds (tuple): lower and upper bounds for clipping propensity scores. Bounds should be implemented
+                    such that: 0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
+            model_kwargs: Keyword arguments to be passed to the underlying classification model.
         """
         self.clip_bounds = clip_bounds
         self.model_kwargs = model_kwargs
