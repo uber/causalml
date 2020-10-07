@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractproperty
+from abc import ABCMeta, abstractmethod
 import logging
 import numpy as np
 from pygam import LogisticGAM, s
@@ -24,7 +24,8 @@ class PropensityModel(metaclass=ABCMeta):
         self.model_kwargs = model_kwargs
         self.model = self._model
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def _model(self):
         pass
 
