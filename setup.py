@@ -40,6 +40,9 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/uber/causalml",
     packages=packages,
+    extras_require={
+        "tensorflow": ["tensorflow>=1.15.2"],
+    },
     python_requires=">=3.6",
     classifiers=[
         "Programming Language :: Python",
