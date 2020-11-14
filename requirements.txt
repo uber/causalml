@@ -17,4 +17,3 @@ lightgbm
 pygam
 packaging
 keras
-tensorflow>=1.15.2
