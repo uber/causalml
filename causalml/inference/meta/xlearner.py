@@ -115,12 +115,6 @@ class BaseXLearner(object):
         else:
             check_p_conditions(p, self.t_groups)
 
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
-
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
         self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
