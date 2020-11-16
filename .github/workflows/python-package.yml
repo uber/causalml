@@ -55,4 +55,5 @@ jobs:
         upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps 
         asset_path: dist/*-manylinux*.whl
         asset_name: causalml-${{ github.ref }}-cp37-cp37m-manylinux_x86_64.whl
+        asset_content_type: application/whl
 
