@@ -26,7 +26,7 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install flake8 pytest cmake numpy
+        pip install flake8 pytest cmake numpy wheel
         if [ -f requirements-test.txt ]; then pip install -r requirements-test.txt; fi
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Build extensions
