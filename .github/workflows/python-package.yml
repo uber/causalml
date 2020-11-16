@@ -41,7 +41,6 @@ jobs:
       with:
         python-versions: 'cp37-cp37m'
     - name: Create Release
-      id: create release
       uses: actions/create-release@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
