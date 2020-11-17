@@ -115,12 +115,6 @@ class BaseXLearner(object):
         else:
             check_p_conditions(p, self.t_groups)
 
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
-
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
         self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
@@ -574,17 +568,17 @@ class BaseXClassifier(BaseXLearner):
 
         Args:
             outcome_learner (optional): a model to estimate outcomes in both the control and treatment groups.
-                Should be a regressor.
+                Should be a classifier.
             effect_learner (optional): a model to estimate treatment effects in both the control and treatment groups.
-                Should be a classifier.
+                Should be a regressor.
             control_outcome_learner (optional): a model to estimate outcomes in the control group.
-                Should be a regressor.
+                Should be a classifier.
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group.
-                Should be a regressor.
+                Should be a classifier.
             control_effect_learner (optional): a model to estimate treatment effects in the control group.
-                Should be a classifier.
+                Should be a regressor.
             treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
-                Should be a classifier.
+                Should be a regressor.
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
@@ -640,12 +634,6 @@ class BaseXClassifier(BaseXLearner):
             self.propensity = p
         else:
             check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
