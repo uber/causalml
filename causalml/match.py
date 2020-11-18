@@ -306,7 +306,7 @@ class MatchOptimizer(object):
 
         # check if passes all criteria
         self.pass_all = ((num_users_per_group > self.min_users_per_group) and (num_cols_over_smd == 0) and
-                         all([dev < self.max_deviation for dev in deviations]))
+                         all(dev < self.max_deviation for dev in deviations))
 
     def match_and_check(self, score_cols, pihat_threshold, caliper):
         if self.verbose:
