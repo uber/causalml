@@ -44,7 +44,7 @@ def check_explain_conditions(method, models, X=None, treatment=None, y=None):
         assert all(conds), "Both models must have .feature_importances_ attribute if method = {}".format(method)
 
     if method in ('permutation', 'shapley'):
-        assert all([arr is not None for arr in (X, treatment, y)]), \
+        assert all(arr is not None for arr in (X, treatment, y)), \
             "X, treatment, and y must be provided if method = {}".format(method)
 
 

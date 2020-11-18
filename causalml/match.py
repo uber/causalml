@@ -119,7 +119,7 @@ class NearestNeighborMatch(object):
             (pandas.DataFrame): The subset of data consisting of matched
                 treatment and control group data.
         """
-        assert type(score_cols) == list, 'score_cols must be a list'
+        assert type(score_cols) is list, 'score_cols must be a list'
         treatment = data.loc[data[treatment_col] == 1, score_cols]
         control = data.loc[data[treatment_col] == 0, score_cols]
 
@@ -306,7 +306,7 @@ class MatchOptimizer(object):
 
         # check if passes all criteria
         self.pass_all = ((num_users_per_group > self.min_users_per_group) and (num_cols_over_smd == 0) and
-                         all([dev < self.max_deviation for dev in deviations]))
+                         all(dev < self.max_deviation for dev in deviations))
 
     def match_and_check(self, score_cols, pihat_threshold, caliper):
         if self.verbose:
