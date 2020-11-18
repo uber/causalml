@@ -514,5 +514,5 @@ class SensitivitySelectionBias(Sensitivity):
                         feature_name, partial_rsqs_value, confounding_min, confounding_max))
             return [confounding_min, confounding_max]
         else:
-            logger.info('Cannot find correponding rsquare value within the range for input, please edit confounding' +
-                        'values vector or use a larger range and try again')
+            logger.info('Cannot find correponding rsquare value within the range for input, please edit confounding', 'values vector or use a larger range and try again')
+
