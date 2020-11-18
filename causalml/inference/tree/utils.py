@@ -205,7 +205,7 @@ def kpi_transform(dfx, kpi_combo, kpi_combo_new):
         Updated DataFrame containing the new features.
     '''
     for j in range(len(kpi_combo)):
-        if type(dfx[kpi_combo[j]].values[0]) == str:
+        if type(dfx[kpi_combo[j]].values[0]) is str:
             dfx[kpi_combo_new[j]] = dfx[kpi_combo[j]].values
             dfx[kpi_combo_new[j]] = cat_group(dfx=dfx, kpix=kpi_combo_new[j])
         else:

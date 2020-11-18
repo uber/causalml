@@ -74,7 +74,7 @@ class Explainer(object):
         """
         assert self.method in VALID_METHODS, 'Current supported methods: {}'.format(', '.join(VALID_METHODS))
 
-        assert all([obj is not None for obj in (self.X, self.tau, self.classes)]), \
+        assert all(obj is not None for obj in (self.X, self.tau, self.classes)), \
             "X, tau, and classes must be provided."
 
         model_test = deepcopy(self.model_tau)

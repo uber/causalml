@@ -147,7 +147,7 @@ def uplift_tree_plot(decisionTree, x_names):
                 upliftScore, matchScore, indexParent = lsX
 
             sampleProportion = round(int(szSamples)*100./totalSample, 1)
-            if type(iSplit) == int:
+            if type(iSplit) is int:
                 szSplit = '%d-%d' % (iSplit, indexOfLevel)
                 dcParent[szSplit] = i_node
                 lsDot.append('%d [label=<%s<br/> impurity %s<br/> total_sample %s (%s&#37;)<br/>group_sample %s <br/> '
