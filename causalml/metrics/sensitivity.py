@@ -144,7 +144,8 @@ class Sensitivity(object):
                 ate, ate_lower, ate_upper = learner.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True)
         return ate[0], ate_lower[0], ate_upper[0]
 
-    def get_class_object(self, method_name, *args, **kwargs):
+    @staticmethod
+    def get_class_object(method_name, *args, **kwargs):
         """Return class object based on input method
         Args:
             method_name (list of str): a list of sensitivity analysis method
@@ -439,7 +440,8 @@ class SensitivitySelectionBias(Sensitivity):
         sensitivity_summary['ATE'] = sensitivity_summary[sensitivity_summary.alpha == 0]['New ATE']
         return sensitivity_summary[['Method', 'ATE', 'New ATE', 'New ATE LB', 'New ATE UB']]
 
-    def plot(self, sens_df, partial_rsqs_df=None, type='raw', ci=False, partial_rsqs=False):
+    @staticmethod
+    def plot(sens_df, partial_rsqs_df=None, type='raw', ci=False, partial_rsqs=False):
         """Plot the results of a sensitivity analysis against unmeasured
         Args:
             sens_df (pandas.DataFrame): a data frame output from causalsens
@@ -490,7 +492,8 @@ class SensitivitySelectionBias(Sensitivity):
                         list(sens_df[sens_df.alpha == 0]['New ATE']) * partial_rsqs_df.shape[0],
                         marker='x', color="red", linewidth=10)
 
-    def partial_rsqs_confounding(self, sens_df, feature_name, partial_rsqs_value, range=0.01):
+    @staticmethod
+    def partial_rsqs_confounding(sens_df, feature_name, partial_rsqs_value, range=0.01):
         """Check partial rsqs values of feature corresponding confounding amonunt of ATE
         Args:
             sens_df (pandas.DataFrame): a data frame output from causalsens

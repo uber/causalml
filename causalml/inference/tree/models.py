@@ -500,7 +500,8 @@ class UpliftTreeClassifier:
         else:
             return treatment_optimal, p_hat_optimal
 
-    def divideSet(self, X, treatment, y, column, value):
+    @staticmethod
+    def divideSet(X, treatment, y, column, value):
         '''
         Tree node split.
 
@@ -1052,7 +1053,8 @@ class UpliftTreeClassifier:
                     bestTreatment=bestTreatment, upliftScore=upliftScore
                 )
 
-    def classify(self, observations, tree, dataMissing=False):
+    @staticmethod
+    def classify(observations, tree, dataMissing=False):
         '''
         Classifies (prediction) the observations according to the tree.
 
@@ -1278,7 +1280,8 @@ class UpliftRandomForestClassifier:
         self.feature_importances_ = np.mean(all_importances, axis=0)
         self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
-    def bootstrap(self, X, treatment, y, tree):
+    @staticmethod
+    def bootstrap(X, treatment, y, tree):
         bt_index = np.random.choice(len(X), len(X))
         x_train_bt = X[bt_index]
         y_train_bt = y[bt_index]

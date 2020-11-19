@@ -102,7 +102,8 @@ class CounterfactualUnitSelector:
         return self.complier_payoff + self.defier_payoff == \
             self.alwaystaker_payoff + self.nevertaker_payoff
 
-    def _make_segments(self, data, treatment, outcome):
+    @staticmethod
+    def _make_segments(data, treatment, outcome):
         '''
         Constructs the following segments:
 
