@@ -179,11 +179,13 @@ Image(graph.create_png())
 
 See the [Uplift Tree visualization example notebook](https://github.com/uber/causalml/blob/master/examples/uplift_tree_visualization.ipynb) for details.
 
-
 # Contributing
 
 We welcome community contributors to the project. Before you start, please read our [code of conduct](https://github.com/uber/causalml/blob/master/CODE_OF_CONDUCT.md) and check out [contributing guidelines](./CONTRIBUTING.md) first.
 
+## Contributors
+
+[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/0)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/0)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/1)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/1)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/2)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/2)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/3)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/3)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/4)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/4)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/5)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/5)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/6)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/6)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/7)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/7)
 
 # Versioning
 
