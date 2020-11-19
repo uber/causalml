@@ -16,7 +16,8 @@ class FilterSelect:
     def __init__(self):
         return
 
-    def _filter_F_one_feature(self, data, treatment_indicator, feature_name, y_name): 
+    @staticmethod
+    def _filter_F_one_feature(data, treatment_indicator, feature_name, y_name):
         """
         Conduct F-test of the interaction between treatment and one feature.
 
@@ -79,7 +80,8 @@ class FilterSelect:
         return all_result
 
 
-    def _filter_LR_one_feature(self, data, treatment_indicator, feature_name, y_name, disp=True): 
+    @staticmethod
+    def _filter_LR_one_feature(data, treatment_indicator, feature_name, y_name, disp=True):  
         """
         Conduct LR (Likelihood Ratio) test of the interaction between treatment and one feature.
 
@@ -152,7 +154,8 @@ class FilterSelect:
 
 
     # Get node summary - a function 
-    def _GetNodeSummary(self, data, 
+    @staticmethod
+    def _GetNodeSummary(data,
                         experiment_group_column='treatment_group_key', 
                         y_name='conversion'):
         """
@@ -202,7 +205,8 @@ class FilterSelect:
         return results, nodeSummary 
 
     # Divergence-related functions, from upliftpy
-    def _kl_divergence(self, pk, qk):
+    @staticmethod
+    def _kl_divergence(pk, qk):
         """
         Calculate KL Divergence for binary classification.
 
@@ -241,7 +245,8 @@ class FilterSelect:
                 d_res += self._kl_divergence(nodeSummary[treatment_group][0], pc)
         return d_res
 
-    def _evaluate_ED(self, nodeSummary, control_group='control'):
+    @staticmethod
+    def _evaluate_ED(nodeSummary, control_group='control'):
         """
         Calculate the multi-treatment unconditional D (one node)
         with Euclidean Distance as split Evaluation function.
@@ -260,7 +265,8 @@ class FilterSelect:
                 d_res += 2 * (nodeSummary[treatment_group][0] - pc)**2
         return d_res
 
-    def _evaluate_Chi(self, nodeSummary, control_group='control'):
+    @staticmethod
+    def _evaluate_Chi(nodeSummary, control_group='control'):
         """
         Calculate the multi-treatment unconditional D (one node)
         with Chi-Square as split Evaluation function.
