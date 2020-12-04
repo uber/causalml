@@ -1196,6 +1196,9 @@ class UpliftRandomForestClassifier:
         The normalization factor defined in Rzepakowski et al. 2012,
         correcting for tests with large number of splits and imbalanced
         treatment and control splits
+    
+    n_jobs: int, optional (default=-1)
+        The parallelization parameter to define how many parallel jobs need to be created. This is passed on to joblib library for parallelizing uplift-tree creation.
 
     Outputs
     ----------
