@@ -1,0 +1,344 @@
+         447606 function calls (429096 primitive calls) in 1.449 seconds
+
+   Ordered by: cumulative time
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    1.433    1.433 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:160(fit)
+      7/1    0.055    0.008    1.433    1.433 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:847(growDecisionTreeFrom)
+37866/21000    0.036    0.000    0.537    0.000 {built-in method numpy.core._multiarray_umath.implement_array_function}
+     1527    0.051    0.000    0.410    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:781(tree_node_summary)
+      760    0.108    0.000    0.405    0.001 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:719(normI)
+     7621    0.081    0.000    0.390    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:558(kl_divergence)
+     1534    0.284    0.000    0.361    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:534(group_uniqueCounts)
+     7621    0.010    0.000    0.309    0.000 <__array_function__ internals>:2(clip)
+     7621    0.012    0.000    0.284    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2021(clip)
+     7901    0.009    0.000    0.273    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:55(_wrapfunc)
+     7621    0.014    0.000    0.260    0.000 {method 'clip' of 'numpy.generic' objects}
+     1527    0.014    0.000    0.248    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:590(evaluate_KL)
+     7621    0.037    0.000    0.246    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_methods.py:97(_clip)
+     1463    0.160    0.000    0.161    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:503(divideSet)
+    15242    0.068    0.000    0.155    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_methods.py:63(_clip_dep_is_scalar_nan)
+    13067    0.045    0.000    0.145    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:73(_wrapreduction)
+    25350    0.133    0.000    0.133    0.000 {method 'reduce' of 'numpy.ufunc' objects}
+     6840    0.009    0.000    0.114    0.000 <__array_function__ internals>:2(sum)
+     6840    0.015    0.000    0.096    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2092(sum)
+     6080    0.007    0.000    0.087    0.000 <__array_function__ internals>:2(amin)
+    15242    0.016    0.000    0.087    0.000 <__array_function__ internals>:2(ndim)
+    12275    0.010    0.000    0.077    0.000 {method 'sum' of 'numpy.ndarray' objects}
+     6080    0.010    0.000    0.073    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2676(amin)
+    12275    0.008    0.000    0.066    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_methods.py:36(_sum)
+    15242    0.031    0.000    0.058    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:3037(ndim)
+      133    0.000    0.000    0.041    0.000 <__array_function__ internals>:2(percentile)
+      133    0.002    0.000    0.040    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:3562(percentile)
+     7621    0.039    0.000    0.039    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_methods.py:78(_clip_dep_invoke_with_casting)
+      133    0.000    0.000    0.036    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:3821(_quantile_unchecked)
+      133    0.001    0.000    0.036    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:3352(_ureduce)
+      133    0.007    0.000    0.035    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:3846(_quantile_ureduce_func)
+    15446    0.009    0.000    0.028    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_asarray.py:16(asarray)
+     6080    0.026    0.000    0.026    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:693(entropyH)
+    16406    0.019    0.000    0.019    0.000 {built-in method numpy.array}
+      266    0.000    0.000    0.019    0.000 <__array_function__ internals>:2(unique)
+      266    0.001    0.000    0.018    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/arraysetops.py:151(unique)
+      266    0.003    0.000    0.016    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/arraysetops.py:298(_unique1d)
+    13067    0.015    0.000    0.015    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:74(<dictcomp>)
+    15242    0.012    0.000    0.015    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_methods.py:73(_clip_dep_is_byte_swapped)
+      665    0.001    0.000    0.013    0.000 <__array_function__ internals>:2(moveaxis)
+        1    0.005    0.005    0.012    0.012 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:458(predict)
+      665    0.004    0.000    0.012    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numeric.py:1340(moveaxis)
+      266    0.011    0.000    0.011    0.000 {method 'sort' of 'numpy.ndarray' objects}
+    21185    0.010    0.000    0.010    0.000 {built-in method builtins.getattr}
+    29112    0.006    0.000    0.006    0.000 {built-in method builtins.isinstance}
+      133    0.006    0.000    0.006    0.000 {method 'partition' of 'numpy.ndarray' objects}
+     1330    0.004    0.000    0.006    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numeric.py:1277(normalize_axis_tuple)
+      800    0.001    0.000    0.006    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:1056(classify)
+ 2400/800    0.004    0.000    0.005    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:1075(classifyWithoutMissingData)
+    15242    0.004    0.000    0.004    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:3033(_ndim_dispatcher)
+        4    0.000    0.000    0.004    0.001 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/frame.py:2767(__getitem__)
+     7621    0.003    0.000    0.003    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2017(_clip_dispatcher)
+        7    0.000    0.000    0.003    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:824(uplift_classification_results)
+11942/11908    0.002    0.000    0.002    0.000 {built-in method builtins.len}
+     6840    0.002    0.000    0.002    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2087(_sum_dispatcher)
+      140    0.000    0.000    0.002    0.000 <__array_function__ internals>:2(any)
+      273    0.000    0.000    0.002    0.000 <__array_function__ internals>:2(take)
+    13070    0.002    0.000    0.002    0.000 {method 'items' of 'dict' objects}
+      133    0.001    0.000    0.002    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:3833(_quantile_is_valid)
+        2    0.000    0.000    0.002    0.001 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexing.py:1503(_get_listlike_indexer)
+      140    0.000    0.000    0.002    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2236(any)
+     6080    0.002    0.000    0.002    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2671(_amin_dispatcher)
+        7    0.000    0.000    0.002    0.000 /opt/anaconda3/lib/python3.8/site-packages/scipy/stats/_distn_infrastructure.py:1797(cdf)
+        2    0.000    0.000    0.002    0.001 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:3399(_take_with_is_copy)
+      280    0.001    0.000    0.002    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numerictypes.py:365(issubdtype)
+        2    0.000    0.000    0.002    0.001 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:3300(take)
+        2    0.000    0.000    0.001    0.001 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:1373(take)
+     1330    0.001    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numeric.py:1327(<listcomp>)
+      273    0.000    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:97(take)
+      266    0.000    0.000    0.001    0.000 <__array_function__ internals>:2(concatenate)
+       12    0.000    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:5294(ensure_index)
+      399    0.001    0.000    0.001    0.000 {method 'flatten' of 'numpy.ndarray' objects}
+        2    0.000    0.000    0.001    0.001 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:1224(reindex_indexer)
+    10165    0.001    0.000    0.001    0.000 {method 'append' of 'list' objects}
+      8/4    0.000    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:276(__new__)
+        2    0.000    0.000    0.001    0.001 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:1274(_slice_take_blocks_ax0)
+        4    0.000    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:2706(get_indexer)
+      266    0.000    0.000    0.001    0.000 <__array_function__ internals>:2(count_nonzero)
+      823    0.001    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_asarray.py:88(asanyarray)
+      800    0.001    0.000    0.001    0.000 {built-in method builtins.max}
+      560    0.001    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numerictypes.py:293(issubclass_)
+        2    0.000    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:4489(get_indexer_for)
+        6    0.000    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/algorithms.py:1565(take_nd)
+        2    0.000    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:3101(reindex)
+      275    0.001    0.000    0.001    0.000 {method 'take' of 'numpy.ndarray' objects}
+      278    0.001    0.000    0.001    0.000 {built-in method numpy.empty}
+        2    0.000    0.000    0.001    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:1277(take_nd)
+      667    0.000    0.000    0.000    0.000 {method 'transpose' of 'numpy.ndarray' objects}
+     1330    0.000    0.000    0.000    0.000 {built-in method numpy.core._multiarray_umath.normalize_axis_index}
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/scipy/stats/_distn_infrastructure.py:520(argsreduce)
+        7    0.000    0.000    0.000    0.000 {method 'choice' of 'numpy.random.mtrand.RandomState' objects}
+      665    0.000    0.000    0.000    0.000 {built-in method builtins.sorted}
+       49    0.000    0.000    0.000    0.000 {built-in method builtins.round}
+      266    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numeric.py:402(count_nonzero)
+      665    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numeric.py:1403(<listcomp>)
+        2    0.000    0.000    0.000    0.000 {pandas._libs.algos.take_2d_axis0_float64_float64}
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/scipy/stats/_distn_infrastructure.py:545(<listcomp>)
+     1030    0.000    0.000    0.000    0.000 {built-in method builtins.issubclass}
+      266    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/arraysetops.py:138(_unpack_tuple)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numerictypes.py:602(find_common_type)
+     1520    0.000    0.000    0.000    0.000 {method 'keys' of 'dict' objects}
+        7    0.000    0.000    0.000    0.000 <__array_function__ internals>:2(extract)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:1628(extract)
+       14    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numerictypes.py:578(_can_coerce_all)
+     1330    0.000    0.000    0.000    0.000 {built-in method _operator.index}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:122(__init__)
+       70    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:1708(_is_dtype_type)
+       52    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/base.py:247(is_dtype)
+       25    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_dtype.py:333(_name_get)
+      133    0.000    0.000    0.000    0.000 {method 'astype' of 'numpy.ndarray' objects}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:3581(_get_item_cache)
+      665    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numeric.py:1336(_moveaxis_dispatcher)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/algorithms.py:1436(_get_take_nd_function)
+        7    0.000    0.000    0.000    0.000 <__array_function__ internals>:2(prod)
+      266    0.000    0.000    0.000    0.000 {built-in method numpy.core._multiarray_umath.count_nonzero}
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/cast.py:347(maybe_promote)
+       21    0.000    0.000    0.000    0.000 <__array_function__ internals>:2(place)
+       46    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:1565(is_extension_array_dtype)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:4047(equals)
+      665    0.000    0.000    0.000    0.000 {method 'insert' of 'list' objects}
+      228    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/generic.py:10(_check)
+       16    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:987(is_datetime64_any_dtype)
+       10    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/common.py:219(asarray_tuplesafe)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2843(prod)
+        9    0.000    0.000    0.000    0.000 {pandas._libs.lib.infer_dtype}
+       14    0.000    0.000    0.000    0.000 <__array_function__ internals>:2(ravel)
+      266    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/multiarray.py:145(concatenate)
+        2    0.000    0.000    0.000    0.000 {pandas._libs.lib.clean_index_list}
+        7    0.000    0.000    0.000    0.000 <__array_function__ internals>:2(atleast_1d)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:212(_rebuild_blknos_and_blklocs)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:5464(_maybe_cast_data_without_dtype)
+      273    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:93(_take_dispatcher)
+      266    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/arraysetops.py:146(_unique_dispatcher)
+       25    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_dtype.py:319(_name_includes_bit_suffix)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:950(get)
+       15    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_methods.py:44(_any)
+        8    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:1435(is_bool_dtype)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:5412(values)
+        5    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:1730(inferred_type)
+      266    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numeric.py:398(_count_nonzero_dispatcher)
+       21    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:1684(place)
+       16    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:506(is_interval_dtype)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:1667(is_boolean)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/frame.py:3066(_box_item_values)
+       16    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:403(is_datetime64tz_dtype)
+       10    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:222(is_object_dtype)
+       16    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:472(is_period_dtype)
+       46    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/dtypes.py:75(find)
+       16    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:441(is_timedelta64_dtype)
+       12    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:372(is_datetime64_dtype)
+       14    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:1693(ravel)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/shape_base.py:25(atleast_1d)
+        4    0.000    0.000    0.000    0.000 {method 'get_indexer' of 'pandas._libs.index.IndexEngine' objects}
+       12    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/dtypes.py:1124(is_dtype)
+       10    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:163(shape)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:2967(_convert_listlike_indexer)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/common.py:99(is_bool_indexer)
+        7    0.000    0.000    0.000    0.000 {method 'any' of 'numpy.generic' objects}
+       16    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:542(is_categorical_dtype)
+       12    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/dtypes.py:917(is_dtype)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:744(take)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:275(make_block_same_class)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:798(as_array)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexing.py:1600(_validate_read_indexer)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:979(iget)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:655(_consolidate_check)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/frame.py:3073(_box_col_values)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:3004(_convert_arr_indexer)
+      133    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:3557(_percentile_dispatcher)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:3033(make_block)
+       98    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numerictypes.py:587(<listcomp>)
+      140    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2232(_any_dispatcher)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:656(<listcomp>)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/series.py:183(__init__)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexers.py:173(maybe_convert_indices)
+       21    0.000    0.000    0.000    0.000 {built-in method numpy.core._multiarray_umath._insert}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:343(ftype)
+        7    0.000    0.000    0.000    0.000 <__array_function__ internals>:2(nonzero)
+        8    0.000    0.000    0.000    0.000 {method 'any' of 'numpy.ndarray' objects}
+      153    0.000    0.000    0.000    0.000 {method 'get' of 'dict' objects}
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:472(_simple_new)
+       30    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:165(<genexpr>)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:5410(_maybe_cast_with_dtype)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/scipy/stats/_continuous_distns.py:244(_cdf)
+       32    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:1844(pandas_dtype)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:199(_is_single_block)
+       12    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:5276(__setattr__)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:526(_shallow_copy)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/scipy/stats/_distn_infrastructure.py:901(_open_support_mask)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:5341(_consolidate_inplace)
+       20    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:1672(_get_dtype)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:329(_verify_integrity)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/cast.py:503(_ensure_dtype_type)
+       12    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:1401(is_float_dtype)
+        7    0.000    0.000    0.000    0.000 <__array_function__ internals>:2(shape)
+        7    0.000    0.000    0.000    0.000 /Users/manoj.j/personal/causalml/causalml/inference/tree/models.py:79(__init__)
+        8    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:422(_get_axis)
+        8    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:5394(maybe_extract_name)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/scipy/stats/_continuous_distns.py:187(_norm_cdf)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:5331(_protect_consolidate)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_dtype.py:46(__str__)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:118(__init__)
+       50    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:208(<lambda>)
+       76    0.000    0.000    0.000    0.000 {built-in method builtins.hasattr}
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:1804(nonzero)
+       19    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:3639(values)
+        8    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:830(is_signed_integer_dtype)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/frame.py:414(__init__)
+        8    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:887(is_unsigned_integer_dtype)
+        4    0.000    0.000    0.000    0.000 {pandas._libs.algos.take_1d_int64_int64}
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/base.py:853(_ndarray_values)
+        8    0.000    0.000    0.000    0.000 {pandas._libs.lib.values_from_object}
+       12    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_internal.py:830(npy_ctypes_check)
+        4    0.000    0.000    0.000    0.000 <frozen importlib._bootstrap>:1017(_handle_fromlist)
+       30    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:615(__len__)
+        7    0.000    0.000    0.000    0.000 {method 'reshape' of 'numpy.ndarray' objects}
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:5344(f)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/construction.py:337(extract_array)
+       14    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/inference.py:358(is_hashable)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/cast.py:1458(construct_1d_object_array_from_listlike)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:685(is_dtype_equal)
+        4    0.000    0.000    0.000    0.000 <__array_function__ internals>:2(can_cast)
+       50    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:206(classes)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/missing.py:410(array_equivalent)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/missing.py:49(isna)
+        8    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:409(_get_axis_name)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/inference.py:220(is_array_like)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:4506(_maybe_promote)
+        4    0.000    0.000    0.000    0.000 {pandas._libs.lib.is_list_like}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:1970(_preprocess_slice_or_indexer)
+       14    0.000    0.000    0.000    0.000 {method 'ravel' of 'numpy.ndarray' objects}
+        8    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:3701(_internal_get_values)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:2637(get_loc)
+       25    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/_dtype.py:36(_kind_name)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/missing.py:132(_isna_new)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numerictypes.py:654(<listcomp>)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:775(is_integer_dtype)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:190(__init__)
+       20    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:216(<lambda>)
+       14    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/scipy/stats/_distn_infrastructure.py:876(_get_support)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:396(_get_axis_number)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:1467(__init__)
+       19    0.000    0.000    0.000    0.000 {method 'view' of 'numpy.ndarray' objects}
+        1    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:2597(__init__)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/inference.py:96(is_iterator)
+        8    0.000    0.000    0.000    0.000 {built-in method numpy.zeros}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/series.py:376(_set_axis)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:314(__len__)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:225(get_values)
+       14    0.000    0.000    0.000    0.000 {method 'format' of 'str' objects}
+        7    0.000    0.000    0.000    0.000 {method 'nonzero' of 'numpy.ndarray' objects}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:3912(__getitem__)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/series.py:428(name)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/abc.py:96(__instancecheck__)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:505(_get_attributes_dict)
+       21    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:1680(_place_dispatcher)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:3627(_set_is_copy)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:128(<listcomp>)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:766(_assert_take_fillable)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/series.py:438(values)
+        4    0.000    0.000    0.000    0.000 {method 'get_loc' of 'pandas._libs.index.IndexEngine' objects}
+       34    0.000    0.000    0.000    0.000 {built-in method builtins.abs}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:426(_get_block_manager_axis)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:1903(shape)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexing.py:2261(convert_to_index_sliceable)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:3227(_set_as_cached)
+        2    0.000    0.000    0.000    0.000 {built-in method builtins.sum}
+       10    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:167(ndim)
+       20    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/dtypes/common.py:211(classes_and_not_datetimelike)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/missing.py:601(clean_reindex_fill_method)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:219(_init_mgr)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:927(consolidate)
+        2    0.000    0.000    0.000    0.000 {built-in method numpy.arange}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:5235(__finalize__)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:251(mgr_locs)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/common.py:330(apply_if_callable)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/scipy/stats/_distn_infrastructure.py:864(_argcheck)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:1562(external_values)
+       16    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:247(mgr_locs)
+        4    0.000    0.000    0.000    0.000 {built-in method _abc._abc_instancecheck}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/series.py:432(name)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:5257(__getattr__)
+       16    0.000    0.000    0.000    0.000 {built-in method builtins.hash}
+        8    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:647(is_consolidated)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:943(_consolidate_inplace)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:509(<dictcomp>)
+        2    0.000    0.000    0.000    0.000 {pandas._libs.internals.get_blkno_placements}
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:331(<genexpr>)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:573(is_)
+       14    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:1689(_ravel_dispatcher)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:592(_reset_identity)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:3898(__contains__)
+        4    0.000    0.000    0.000    0.000 {method 'fill' of 'numpy.ndarray' objects}
+       10    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:232(items)
+        6    0.000    0.000    0.000    0.000 {built-in method pandas._libs.missing.checknull}
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:129(_check_ndim)
+       12    0.000    0.000    0.000    0.000 {pandas._libs.lib.is_scalar}
+        7    0.000    0.000    0.000    0.000 <string>:2(_parse_args)
+        6    0.000    0.000    0.000    0.000 {pandas._libs.algos.ensure_int64}
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:638(dtype)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/numerictypes.py:655(<listcomp>)
+        6    0.000    0.000    0.000    0.000 {built-in method __new__ of type object at 0x10d26f808}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/series.py:403(_set_subtyp)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/lib/function_base.py:1624(_extract_dispatcher)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:5361(_ensure_has_len)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:3044(_convert_list_indexer)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:365(iget)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:1899(_shape_dispatcher)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:2838(_prod_dispatcher)
+        8    0.000    0.000    0.000    0.000 {pandas._libs.algos.ensure_platform_int}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexing.py:231(loc)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/common.py:151(cast_scalar_indexer)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/missing.py:73(clean_fill_method)
+        6    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:1182(name)
+        1    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:1656(is_unique)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:339(dtype)
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/shape_base.py:21(_atleast_1d_dispatcher)
+        4    0.000    0.000    0.000    0.000 {pandas._libs.lib.item_from_zerodim}
+        7    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/fromnumeric.py:1800(_nonzero_dispatcher)
+        8    0.000    0.000    0.000    0.000 {pandas._libs.lib.is_integer}
+        5    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:3671(_values)
+        6    0.000    0.000    0.000    0.000 {pandas._libs.lib.is_float}
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/numpy/core/multiarray.py:469(can_cast)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/compat/numpy/function.py:42(__call__)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:335(shape)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:243(fill_value)
+        4    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/base.py:1383(nlevels)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/generic.py:238(attrs)
+        2    0.000    0.000    0.000    0.000 {method 'update' of 'dict' objects}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/managers.py:1520(_block)
+        4    0.000    0.000    0.000    0.000 {built-in method builtins.callable}
+        4    0.000    0.000    0.000    0.000 {pandas._libs.lib.is_bool}
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexes/numeric.py:155(is_all_dates)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/internals/blocks.py:202(external_values)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/frame.py:399(_constructor)
+        2    0.000    0.000    0.000    0.000 /opt/anaconda3/lib/python3.8/site-packages/pandas/core/indexing.py:1344(_convert_for_reindex)
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+
+
