@@ -190,7 +190,7 @@ class Explainer(object):
 
         for group, values in shap_dict.items():
             plt.title(group)
-            shap.summary_plot(values, feature_names=self.features)
+            shap.summary_plot(values, features=self.X, feature_names=self.features)
 
     def plot_shap_dependence(self, treatment_group, feature_idx, shap_dict=None, interaction_idx='auto', **kwargs):
         """

@@ -33,7 +33,7 @@ Meta-Learner Feature Importances
     slearner.plot_shap_values(X=X, tau=slearner_tau)
 
     # Plot shap values WITH specifying shap_dict
-    slearner.plot_shap_values(shap_dict=shap_slearner)
+    slearner.plot_shap_values(X=X, shap_dict=shap_slearner)
 
     # interaction_idx set to 'auto' (searches for feature with greatest approximate interaction)
     slearner.plot_shap_dependence(treatment_group='treatment_A',
