@@ -324,6 +324,8 @@ class FilterSelect:
             evaluationFunction = self._evaluate_Chi
 
         totalSize = len(data.index)
+
+        # drop duplicate edges in pq.cut result to avoid issues
         x_bin = pd.qcut(data[feature_name].values, n_bins, labels=False, 
                         duplicates='drop')
         d_children = 0
