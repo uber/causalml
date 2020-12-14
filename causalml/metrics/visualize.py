@@ -90,22 +90,22 @@ def get_cumlift(df, outcome_col='y', treatment_col='w', treatment_effect_col='ta
 
     lift = []
     for i, col in enumerate(model_names):
-        df = df.sort_values(col, ascending=False).reset_index(drop=True)
-        df.index = df.index + 1
+        sorted_df = df.sort_values(col, ascending=False).reset_index(drop=True)
+        sorted_df.index = sorted_df.index + 1
 
-        if treatment_effect_col in df.columns:
+        if treatment_effect_col in sorted_df.columns:
             # When treatment_effect_col is given, use it to calculate the average treatment effects
             # of cumulative population.
-            lift.append(df[treatment_effect_col].cumsum() / df.index)
+            lift.append(sorted_df[treatment_effect_col].cumsum() / sorted_df.index)
         else:
             # When treatment_effect_col is not given, use outcome_col and treatment_col
             # to calculate the average treatment_effects of cumulative population.
-            df['cumsum_tr'] = df[treatment_col].cumsum()
-            df['cumsum_ct'] = df.index.values - df['cumsum_tr']
-            df['cumsum_y_tr'] = (df[outcome_col] * df[treatment_col]).cumsum()
-            df['cumsum_y_ct'] = (df[outcome_col] * (1 - df[treatment_col])).cumsum()
+            sorted_df['cumsum_tr'] = sorted_df[treatment_col].cumsum()
+            sorted_df['cumsum_ct'] = sorted_df.index.values - sorted_df['cumsum_tr']
+            sorted_df['cumsum_y_tr'] = (sorted_df[outcome_col] * sorted_df[treatment_col]).cumsum()
+            sorted_df['cumsum_y_ct'] = (sorted_df[outcome_col] * (1 - sorted_df[treatment_col])).cumsum()
 
-            lift.append(df['cumsum_y_tr'] / df['cumsum_tr'] - df['cumsum_y_ct'] / df['cumsum_ct'])
+            lift.append(sorted_df['cumsum_y_tr'] / sorted_df['cumsum_tr'] - sorted_df['cumsum_y_ct'] / sorted_df['cumsum_ct'])
 
     lift = pd.concat(lift, join='inner', axis=1)
     lift.loc[0] = np.zeros((lift.shape[1], ))
