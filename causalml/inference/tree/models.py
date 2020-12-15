@@ -1288,8 +1288,7 @@ class UpliftRandomForestClassifier:
         self.feature_importances_ = np.mean(all_importances, axis=0)
         self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
-    @staticmethod
-    def bootstrap(X, treatment, y, tree):
+    def bootstrap(self, X, treatment, y, tree):
         np.random.seed(self.random_state)
         bt_index = np.random.choice(len(X), len(X))
         x_train_bt = X[bt_index]
