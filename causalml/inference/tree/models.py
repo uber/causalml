@@ -1270,7 +1270,6 @@ class UpliftRandomForestClassifier:
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         """
-        np.random.seed(self.random_state)
 
         # Get treatment group keys
         treatment_group_keys = list(set(treatment))
