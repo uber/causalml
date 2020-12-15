@@ -1286,6 +1286,7 @@ class UpliftRandomForestClassifier:
 
     @staticmethod
     def bootstrap(X, treatment, y, tree):
+        np.random.seed(self.random_state)
         bt_index = np.random.choice(len(X), len(X))
         x_train_bt = X[bt_index]
         y_train_bt = y[bt_index]
