@@ -136,10 +136,12 @@ class UpliftTreeClassifier:
         The normalization factor defined in Rzepakowski et al. 2012, correcting for tests with large number of splits
         and imbalanced treatment and control splits
 
+    random_state: int, optional (default=2019)
+        The seed used by the random number generator.
     """
     def __init__(self, max_features=None, max_depth=3, min_samples_leaf=100,
                  min_samples_treatment=10, n_reg=100, evaluationFunction='KL',
-                 control_name=None, normalization=True):
+                 control_name=None, normalization=True, random_state=2019):
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
@@ -156,6 +158,7 @@ class UpliftTreeClassifier:
         self.fitted_uplift_tree = None
         self.control_name = control_name
         self.normalization = normalization
+        self.random_state = random_state
 
     def fit(self, X, treatment, y):
         """ Fit the uplift model.
@@ -938,6 +941,7 @@ class UpliftTreeClassifier:
         else:
             max_features = columnCount
 
+        np.random.seed(self.random_state)
         for col in list(np.random.choice(a=range(columnCount), size=max_features, replace=False)):
             columnValues = X[:, col]
             # unique values
@@ -1243,7 +1247,8 @@ class UpliftRandomForestClassifier:
                 n_reg=self.n_reg,
                 evaluationFunction=self.evaluationFunction,
                 control_name=self.control_name,
-                normalization=normalization)
+                normalization=normalization,
+                random_state=self.random_state)
 
             self.uplift_forest.append(uplift_tree)
 
