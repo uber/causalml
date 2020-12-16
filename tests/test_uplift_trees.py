@@ -65,7 +65,7 @@ def test_UpliftRandomForestClassifier(generate_classification_data):
 
     # Check if the cumulative gain of UpLift Random Forest is higher than
     # random
-    assert cumgain['uplift_tree'].sum() > cumgain['Random'].sum()
+    assert cumgain['uplift_tree'].max() > cumgain['Random'].max()
 
 
 def test_UpliftTreeClassifier(generate_classification_data):
