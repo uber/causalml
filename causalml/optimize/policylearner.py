@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.model_selection import cross_val_predict, KFold
 from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
 from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
 
 
 logger = logging.getLogger('causalml')
@@ -57,7 +58,7 @@ class PolicyLearner(object):
         self._y_pred = np.zeros(len(y))
         self._tau_pred = np.zeros(len(y))
 
-        for train_index, test_index in self.kf.split(y):
+        for train_index, test_index in self.cv.split(y):
             X_train, X_test = X[train_index, :], X[test_index, :]
             w_train, w_test = w[train_index], w[test_index]
             y_train, y_test = y[train_index], y[test_index]
@@ -90,8 +91,8 @@ class PolicyLearner(object):
             X (np.matrix): a feature matrix
             treatment (np.array): a treatment vector (1 if treated, otherwise 0)
             y (np.array): an outcome vector
-            p (np.array): user provided propensity score vector between 0 and 1
-            dhat (np.array): user provided predicted treatment effect vector
+            p (optional, np.array): user provided propensity score vector between 0 and 1
+            dhat (optinal, np.array): user provided predicted treatment effect vector
 
         Returns:
             self: returns an instance of self.
@@ -110,11 +111,11 @@ class PolicyLearner(object):
 
         # Doubly Robust Modification
         self._dr_score = self._tau_pred + (
-            w - self._w_pred) / self._w_pred / (1 - self._w_pred) * (
+            treatment - self._w_pred) / self._w_pred / (1 - self._w_pred) * (
                 y - self._y_pred)
 
         target = self._dr_score.copy()
-        target = np.sign(self.target)
+        target = np.sign(target)
 
         logger.info('training the treatment assignment model, {}'.format(self.model_pi))
         self.model_pi.fit(X, target, sample_weight=abs(self._dr_score))
@@ -129,6 +130,18 @@ class PolicyLearner(object):
 
         Returns:
             (numpy.ndarray): predictions of treatment assignment.
+        """
+
+        return self.model_pi.predict(X)
+
+    def predict_proba(self, X):
+        """Predict treatment assignment score that optimizes the outcome.
+
+        Args:
+            X (np.matrix): a feature matrix
+
+        Returns:
+            (numpy.ndarray): predictions of treatment assignment score.
         """
 
         pi_hat = self.model_pi.predict_proba(X)[:, 1]
