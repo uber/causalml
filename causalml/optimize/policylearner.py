@@ -1,12 +1,13 @@
 import logging
+
 import numpy as np
-from sklearn.model_selection import cross_val_predict, KFold
+from causalml.propensity import compute_propensity_score
 from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
+from sklearn.model_selection import cross_val_predict, KFold
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.linear_model import LogisticRegression
 
 
-logger = logging.getLogger('causalml')
+logger = logging.getLogger("causalml")
 
 
 class PolicyLearner(object):
@@ -18,14 +19,16 @@ class PolicyLearner(object):
 
     """
 
-    def __init__(self,
-                 outcome_learner=GradientBoostingRegressor(),
-                 treatment_learner=GradientBoostingClassifier(),
-                 policy_learner=DecisionTreeClassifier(),
-                 clip_bounds=(1e-3, 1 - 1e-3),
-                 n_fold=5,
-                 random_state=None,
-                 calibration=False):
+    def __init__(
+        self,
+        outcome_learner=GradientBoostingRegressor(),
+        treatment_learner=GradientBoostingClassifier(),
+        policy_learner=DecisionTreeClassifier(),
+        clip_bounds=(1e-3, 1 - 1e-3),
+        n_fold=5,
+        random_state=None,
+        calibration=False,
+    ):
         """Initialize a treatment assignment policy learner.
 
         Args:
@@ -44,45 +47,64 @@ class PolicyLearner(object):
         self.cv = KFold(n_splits=n_fold, shuffle=True, random_state=random_state)
         self.calibration = calibration
 
-        self._y_pred, self._tau_pred, self._w_pred, self._dr_score = None, None, None, None
+        self._y_pred, self._tau_pred, self._w_pred, self._dr_score = (
+            None,
+            None,
+            None,
+            None,
+        )
 
     def __repr__(self):
-        return ('{}(model_mu={},\n'
-                '\tmodel_w={},\n'
-                '\model_pi={})'.format(self.__class__.__name__,
-                                        self.model_mu.__repr__(),
-                                        self.model_w.__repr__(),
-                                        self.model_pi.__repr__()))
+        return (
+            "{}(model_mu={},\n"
+            "\tmodel_w={},\n"
+            "\model_pi={})".format(
+                self.__class__.__name__,
+                self.model_mu.__repr__(),
+                self.model_w.__repr__(),
+                self.model_pi.__repr__(),
+            )
+        )
 
     def _outcome_estimate(self, X, w, y):
         self._y_pred = np.zeros(len(y))
         self._tau_pred = np.zeros(len(y))
 
         for train_index, test_index in self.cv.split(y):
-            X_train, X_test = X[train_index, :], X[test_index, :]
+            X_train, X_test = X[train_index], X[test_index]
             w_train, w_test = w[train_index], w[test_index]
             y_train, y_test = y[train_index], y[test_index]
 
             self.model_mu.fit(
-                np.concatenate([X_train, w_train.reshape(-1, 1)], axis=1),
-                y_train)
+                np.concatenate([X_train, w_train.reshape(-1, 1)], axis=1), y_train
+            )
             self._y_pred[test_index] = self.model_mu.predict(
-                np.concatenate([X_test, w_test.reshape(-1, 1)], axis=1))
+                np.concatenate([X_test, w_test.reshape(-1, 1)], axis=1)
+            )
             self._tau_pred[test_index] = self.model_mu.predict(
-                np.concatenate([X_test, np.ones(
-                    (len(w_test), 1))], axis=1)) - self.model_mu.predict(
-                        np.concatenate(
-                            [X_test, np.zeros((len(w_test), 1))], axis=1))
+                np.concatenate([X_test, np.ones((len(w_test), 1))], axis=1)
+            ) - self.model_mu.predict(
+                np.concatenate([X_test, np.zeros((len(w_test), 1))], axis=1)
+            )
 
     def _treatment_estimate(self, X, w):
-        self._w_pred = cross_val_predict(self.model_w, X, w, cv=self.cv, method='predict_proba')[:, 1]
+        self._w_pred = np.zeros(len(y))
 
-        if self.calibration:
-            self._w_pred = LogisticRegression(C=np.sqrt(len(w))).fit(
-                self._w_pred.reshape(-1, 1), w).predict_proba(
-                    self._w_pred.reshape(-1, 1))[:, 1]
+        for train_index, test_index in self.cv.split(y):
+            X_train, X_test = X[train_index], X[test_index]
+            w_train, w_test = w[train_index], w[test_index]
+
+            self._w_pred[test_index], _ = compute_propensity_score(
+                X=X_train,
+                treatment=w_train,
+                X_pred=X_test,
+                treatment_pred=w_test,
+                calibrate_p=self.calibration,
+            )
+
         self._w_pred = np.clip(
-            self._w_pred, a_min=self.clip_bounds[0], a_max=self.clip_bounds[1])
+            self._w_pred, a_min=self.clip_bounds[0], a_max=self.clip_bounds[1]
+        )
 
     def fit(self, X, treatment, y, p=None, dhat=None):
         """Fit the treatment assignment policy learner.
@@ -98,7 +120,9 @@ class PolicyLearner(object):
             self: returns an instance of self.
         """
 
-        logger.info('generating out-of-fold CV outcome estimates with {}'.format(self.model_mu))
+        logger.info(
+            "generating out-of-fold CV outcome estimates with {}".format(self.model_mu)
+        )
         self._outcome_estimate(X, treatment, y)
 
         if dhat is not None:
@@ -110,14 +134,14 @@ class PolicyLearner(object):
             self._w_pred = np.clip(p, self.clip_bounds[0], self.clip_bounds[1])
 
         # Doubly Robust Modification
-        self._dr_score = self._tau_pred + (
-            treatment - self._w_pred) / self._w_pred / (1 - self._w_pred) * (
-                y - self._y_pred)
+        self._dr_score = self._tau_pred + (treatment - self._w_pred) / self._w_pred / (
+            1 - self._w_pred
+        ) * (y - self._y_pred)
 
         target = self._dr_score.copy()
         target = np.sign(target)
 
-        logger.info('training the treatment assignment model, {}'.format(self.model_pi))
+        logger.info("training the treatment assignment model, {}".format(self.model_pi))
         self.model_pi.fit(X, target, sample_weight=abs(self._dr_score))
 
         return self
