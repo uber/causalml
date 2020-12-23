@@ -88,9 +88,9 @@ class PolicyLearner(object):
             )
 
     def _treatment_estimate(self, X, w):
-        self._w_pred = np.zeros(len(y))
+        self._w_pred = np.zeros(len(w))
 
-        for train_index, test_index in self.cv.split(y):
+        for train_index, test_index in self.cv.split(w):
             X_train, X_test = X[train_index], X[test_index]
             w_train, w_test = w[train_index], w[test_index]
 

@@ -102,13 +102,13 @@ class BaseDRLearner(object):
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
-        cv = KFold(n_splits=3, shuffle=True, random_state=random_state)
+        cv = KFold(n_splits=3, shuffle=True, random_state=seed)
         split_indices = [index for _, index in cv.split(y)]
 
         self.models_mu_c = [
-            deepycopy(self.model_mu_c),
-            deepycopy(self.model_mu_c),
-            deepycopy(self.model_mu_c),
+            deepcopy(self.model_mu_c),
+            deepcopy(self.model_mu_c),
+            deepcopy(self.model_mu_c),
         ]
         self.models_mu_t = {
             group: [
@@ -140,7 +140,7 @@ class BaseDRLearner(object):
                 treatment[tau_idx],
             )
             y_out, y_tau = y[outcome_idx], y[tau_idx]
-            X_treat, X_out, X_tau = X[treatment_ix], X[outcome_idx], X[tau_idx]
+            X_treat, X_out, X_tau = X[treatment_idx], X[outcome_idx], X[tau_idx]
 
             if p is None:
                 logger.info("Generating propensity score")
@@ -217,10 +217,10 @@ class BaseDRLearner(object):
 
         for i, group in enumerate(self.t_groups):
             models_tau = self.models_tau[group]
-            _te = np._r[[model.predict(X) for model in models_tau]].mean(axis=0)
+            _te = np.r_[[model.predict(X) for model in models_tau]].mean(axis=0)
             te[:, i] = np.ravel(_te)
-            yhat_cs[group] = np._r[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
-            yhat_ts[group] = np._r[[model.predict(X) for model in self.models_mu_t[group]]].mean(axis=0)
+            yhat_cs[group] = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
+            yhat_ts[group] = np.r_[[model.predict(X) for model in self.models_mu_t[group]]].mean(axis=0)
 
             if (y is not None) and (treatment is not None) and verbose:
                 mask = (treatment == group) | (treatment == self.control_name)
@@ -307,7 +307,7 @@ class BaseDRLearner(object):
 
             logger.info("Bootstrap Confidence Intervals")
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size, seed)
+                te_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size, seed=seed)
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -429,14 +429,14 @@ class BaseDRLearner(object):
             self.models_tau = deepcopy(models_tau_global)
             return ate, ate_lower, ate_upper
 
-    def bootstrap(self, X, treatment, y, p, size=10000, seed):
+    def bootstrap(self, X, treatment, y, p, size=10000, seed=None):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
         p_b = {group: _p[idxs] for group, _p in p.items()}
         treatment_b = treatment[idxs]
         y_b = y[idxs]
-        self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b, seed)
+        self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b, seed=seed)
         te_b = self.predict(X=X)
         return te_b
 
@@ -663,8 +663,7 @@ class BaseDRRegressor(BaseDRLearner):
                  treatment_outcome_learner=None,
                  treatment_effect_learner=None,
                  ate_alpha=.05,
-                 control_name=0,
-                 seed=None):
+                 control_name=0):
         """Initialize an DR-learner regressor.
 
         Args:
@@ -683,8 +682,7 @@ class BaseDRRegressor(BaseDRLearner):
             treatment_outcome_learner=treatment_outcome_learner,
             treatment_effect_learner=treatment_effect_learner,
             ate_alpha=ate_alpha,
-            control_name=control_name,
-            seed=seed)
+            control_name=control_name)
 
 class XGBTDRRegressor(BaseDRRegressor):
     def __init__(self, ate_alpha=.05, control_name=0, *args, **kwargs):
