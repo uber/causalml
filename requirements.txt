@@ -19,4 +19,4 @@ packaging
 keras
 tensorflow>=1.15.2
 torch
-pyro
+pyro-ppl
