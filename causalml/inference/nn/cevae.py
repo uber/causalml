@@ -32,32 +32,37 @@ logging.getLogger("pyro").handlers[0].setLevel(logging.DEBUG)
 
 
 class CEVAE_MODEL(object):
-    def __init__(self, outcome_dist="studentt", latent_dim=20, hidden_dim=20, num_epochs=50,
-                 batch_size=2048, learning_rate=0.0005, learning_rate_decay=0.02, num_samples=1000):
+    def __init__(self, outcome_dist="studentt", latent_dim=20, hidden_dim=20, num_epochs=50, num_layers=3,
+                 batch_size=2048, learning_rate=1e-3, learning_rate_decay=0.1, num_samples=1000, weight_decay=1e-4):
         """
         Initializes CEVAE.
 
             Args:
-                outcome_dist (str): outcome distribution as one of: "bernoulli" , "exponential", "laplace", "normal",
+                outcome_dist (str): Outcome distribution as one of: "bernoulli" , "exponential", "laplace", "normal",
                                     and "studentt"
                 latent_dim (int) : Dimension of the latent variable
                 hidden_dim (int) : Dimension of hidden layers of fully connected networks
                 num_epochs (int): Number of training epochs
+                num_layers (int): Number of hidden layers in fully connected networks
                 batch_size (int): Batch size
                 learning_rate (int): Learning rate
                 learning_rate_decay (float/int): Learning rate decay over all epochs; the per-step decay rate will
                                                  depend on batch size and number of epochs such that the initial
                                                  learning rate will be learning_rate and the
                                                  final learning rate will be learning_rate * learning_rate_decay
-                num_sample (int) : number of samples to calculate ITE
+                num_samples (int) : Number of samples to calculate ITE
+                weight_decay (float) : Weight decay
         """
         self.outcome_dist = outcome_dist
-        self.laten_dim = latent_dim
+        self.latent_dim = latent_dim
         self.hidden_dim = hidden_dim
         self.num_epochs = num_epochs
+        self.num_layers = num_layers
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.learning_rate_decay = learning_rate_decay
+        self.num_samples = num_samples
+        self.weight_decay = weight_decay
 
     def fit(self, X, treatment, y):
         """
@@ -73,7 +78,8 @@ class CEVAE_MODEL(object):
         self.cevae = CEVAE(outcome_dist=self.outcome_dist,
                            feature_dim=X.shape[-1],
                            latent_dim=self.latent_dim,
-                           hidden_dim=self.hidden_dim)
+                           hidden_dim=self.hidden_dim,
+                           num_layers=self.num_layers)
 
         self.cevae.fit(x=torch.tensor(X, dtype=torch.float),
                        t=torch.tensor(treatment, dtype=torch.float),
@@ -81,7 +87,8 @@ class CEVAE_MODEL(object):
                        num_epochs=self.num_epochs,
                        batch_size=self.batch_size,
                        learning_rate=self.learning_rate,
-                       learning_rate_decay=self.learning_rate_decay)
+                       learning_rate_decay=self.learning_rate_decay,
+                       weight_decay=self.weight_decay)
 
     def predict(self, X):
         """
