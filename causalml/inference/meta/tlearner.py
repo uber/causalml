@@ -5,7 +5,7 @@ from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.neural_network import MLPRegressor
-from sklearn.utils.testing import ignore_warnings
+from sklearn.utils._testing import ignore_warnings
 from xgboost import XGBRegressor
 
 from causalml.inference.meta.explainer import Explainer
