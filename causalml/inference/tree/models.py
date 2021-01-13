@@ -18,7 +18,7 @@ from collections import defaultdict
 import numpy as np
 import scipy.stats as stats
 import pandas as pd
-from sklearn.utils.testing import ignore_warnings
+from sklearn.utils._testing import ignore_warnings
 from collections import defaultdict
 from joblib import Parallel, delayed
 import multiprocessing as mp

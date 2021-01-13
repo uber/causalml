@@ -201,8 +201,8 @@ class FilterSelect:
                 if smooth:
                     results[ti].update({ci: results[ti].update({ci: results_series[ti, ci]
                                                                 if results_series.index.isin([(ti, ci)]).any()
-                                                                else 1})}) 
-                 else:
+                                                                else 1})})
+                else:
                     results[ti].update({ci: results_series[ti, ci]})
 
         # Probability of conversion and group size by treatment group
