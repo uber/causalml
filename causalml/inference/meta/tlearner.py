@@ -1,11 +1,16 @@
 from copy import deepcopy
 import logging
 import numpy as np
-from tqdm import tqdm
+from packaging import version
 from scipy.stats import norm
+import sklearn
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.neural_network import MLPRegressor
-from sklearn.utils._testing import ignore_warnings
+if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
+    from sklearn.utils._testing import ignore_warnings
+else:
+    from sklearn.utils.testing import ignore_warnings
+from tqdm import tqdm
 from xgboost import XGBRegressor
 
 from causalml.inference.meta.explainer import Explainer

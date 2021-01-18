@@ -15,13 +15,18 @@ The module structure is the following:
 #          Totte Harinen <totte@uber.com>
 
 from collections import defaultdict
-import numpy as np
-import scipy.stats as stats
-import pandas as pd
-from sklearn.utils.testing import ignore_warnings
-from collections import defaultdict
 from joblib import Parallel, delayed
 import multiprocessing as mp
+import numpy as np
+from packaging import version
+import pandas as pd
+import scipy.stats as stats
+import sklearn
+if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
+    from sklearn.utils._testing import ignore_warnings
+else:
+    from sklearn.utils.testing import ignore_warnings
+
 
 class DecisionTree:
     """ Tree Node Class
