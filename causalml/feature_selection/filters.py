@@ -199,9 +199,9 @@ class FilterSelect:
             results.update({ti: {}}) 
             for ci in y_name_keys:
                 if smooth:
-                    results[ti].update({ci: results[ti].update({ci: results_series[ti, ci]
-                                                                if results_series.index.isin([(ti, ci)]).any()
-                                                                else 1})})
+                    results[ti].update({ci: results_series[ti, ci]
+                                        if results_series.index.isin([(ti, ci)]).any()
+                                        else 1})
                 else:
                     results[ti].update({ci: results_series[ti, ci]})
 
