@@ -157,7 +157,7 @@ class FilterSelect:
     @staticmethod
     def _GetNodeSummary(data,
                         experiment_group_column='treatment_group_key', 
-                        y_name='conversion'):
+                        y_name='conversion', smooth=True):
         """
         To count the conversions and get the probabilities by treatment groups. This function comes from the uplift tree algorithm, that is used for tree node split evaluation.
 
@@ -165,6 +165,13 @@ class FilterSelect:
         ----------
         data : DataFrame
             The DataFrame that contains all the data (in the current "node").  
+        experiment_group_column : str
+            Treatment indicator column name.
+        y_name : str
+            Label indicator column name.
+        smooth : bool
+            Smooth label count by adding 1 in case certain labels do not occur
+            naturally with a treatment. Prevents zero divisions.
 
         Returns
         -------
@@ -191,7 +198,12 @@ class FilterSelect:
         for ti in treatment_group_keys: 
             results.update({ti: {}}) 
             for ci in y_name_keys:
-                results[ti].update({ci: results_series[ti, ci]}) 
+                if smooth:
+                    results[ti].update({ci: results_series[ti, ci]
+                                        if results_series.index.isin([(ti, ci)]).any()
+                                        else 1})
+                else:
+                    results[ti].update({ci: results_series[ti, ci]})
 
         # Probability of conversion and group size by treatment group
         nodeSummary = {}
