@@ -11,7 +11,7 @@ Cython>=0.28.0
 xgboost
 pydotplus
 tqdm
-shap
+shap<0.38.1
 dill
 lightgbm
 pygam
