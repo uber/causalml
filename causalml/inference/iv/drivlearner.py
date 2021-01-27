@@ -330,7 +330,7 @@ class BaseDRIVLearner(object):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
             p (2-tuple of np.ndarray or pd.Series or dict, optional): The first (second) element corresponds to
-                assigned (unassigned) units. Each is an array of propensity scores of float (0,1) in the single-treatment
+                unassigned (assigned) units. Each is an array of propensity scores of float (0,1) in the single-treatment
                 case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1). If None will run
                 ElasticNetPropensityModel() to generate the propensity scores.
             pZ (np.array or pd.Series, optional): an array of assignment probability of float (0,1); if None
@@ -416,9 +416,11 @@ class BaseDRIVLearner(object):
     def estimate_ate(
         self,
         X,
+        assignment,
         treatment,
         y,
         p=None,
+        pz=None,
         bootstrap_ci=False,
         n_bootstraps=1000,
         bootstrap_size=10000,
@@ -429,11 +431,15 @@ class BaseDRIVLearner(object):
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            assignment (np.array or pd.Series): an assignment vector
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            p (2-tuple of np.ndarray or pd.Series or dict, optional): The first (second) element corresponds to
+                unassigned (assigned) units. Each is an array of propensity scores of float (0,1) in the single-treatment
+                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1). If None will run
+                ElasticNetPropensityModel() to generate the propensity scores.
+            pZ (np.array or pd.Series, optional): an array of assignment probability of float (0,1); if None
+                will run ElasticNetPropensityModel() to generate the assignment probability score.
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -505,14 +511,14 @@ class BaseDRIVLearner(object):
                 + _ate ** 2 * (treatment_filt_1 - prob_treatment_1).var()
                 - 2
                 * _ate
-                * (y_filt_1 * treatment_filt_1 - y_hat_1 * prob_treatment_1).mean()
+                * (y_filt_1 * treatment_filt_1 - yhat_1 * prob_treatment_1).mean()
             )
             part_0 = (
                 (y_filt_0 - yhat_0).var()
                 + _ate ** 2 * (treatment_filt_0 - prob_treatment_0).var()
                 - 2
                 * _ate
-                * (y_filt_1 * treatment_filt_0 - y_hat_1 * prob_treatment_0).mean()
+                * (y_filt_0 * treatment_filt_0 - yhat_0 * prob_treatment_0).mean()
             )
             part_2 = np.mean(
                 (
@@ -572,7 +578,16 @@ class BaseDRIVLearner(object):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
         idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
-        p_b = {group: _p[idxs] for group, _p in p.items()}
+
+        if isinstance(p[0], (np.ndarray, pd.Series)):
+            p0_b = {self.t_groups[0]: convert_pd_to_np(p[0][idxs])}
+        else:
+            p0_b = {g: prop[idxs] for g, prop in p[0].items()}
+        if isinstance(p[1], (np.ndarray, pd.Series)):
+            p1_b = {self.t_groups[0]: convert_pd_to_np(p[1][idxs])}
+        else:
+            p1_b = {g: prop[idxs] for g, prop in p[1].items()}
+
         pZ_b = pZ[idxs]
         assignment_b = assignment[idxs]
         treatment_b = treatment[idxs]
@@ -582,7 +597,7 @@ class BaseDRIVLearner(object):
             assignment=assignment_b,
             treatment=treatment_b,
             y=y_b,
-            p=p_b,
+            p=(p0_b, p1_b),
             pZ=pZ_b,
             seed=seed,
         )
