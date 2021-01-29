@@ -102,6 +102,9 @@ class BaseDRLearner(object):
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
+        # The estimator splits the data into 3 partitions for cross-fit on the propensity score estimation,
+        # the outcome regression, and the treatment regression on the doubly robust estimates. The use of
+        # the partitions is rotated so we do not lose on the sample size.
         cv = KFold(n_splits=3, shuffle=True, random_state=seed)
         split_indices = [index for _, index in cv.split(y)]
 

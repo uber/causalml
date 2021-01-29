@@ -95,7 +95,10 @@ class BaseDRIVLearner(object):
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            assignment (np.array or pd.Series): a (0,1)-valued assignment vector
+            assignment (np.array or pd.Series): a (0,1)-valued assignment vector. The assignment is the
+                instrumental variable that does not depend on unknown confounders. The assignment status
+                influences treatment in a monotonic way, i.e. one can only be more likely to take the
+                treatment if assigned.
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
             p (2-tuple of np.ndarray or pd.Series or dict, optional): The first (second) element corresponds to
@@ -112,14 +115,18 @@ class BaseDRIVLearner(object):
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
+        # The estimator splits the data into 3 partitions for cross-fit on the propensity score estimation,
+        # the outcome regression, and the treatment regression on the doubly robust estimates. The use of
+        # the partitions is rotated so we do not lose on the sample size.  We do not cross-fit the assignment
+        # score estimation as the assignment process is usually simple.
         cv = KFold(n_splits=3, shuffle=True, random_state=seed)
         split_indices = [index for _, index in cv.split(y)]
 
         self.models_mu_c = {
             group: [
-                deepcopy(self.model_mu_t),
-                deepcopy(self.model_mu_t),
-                deepcopy(self.model_mu_t),
+                deepcopy(self.model_mu_c),
+                deepcopy(self.model_mu_c),
+                deepcopy(self.model_mu_c),
             ]
             for group in self.t_groups
         }
@@ -268,7 +275,8 @@ class BaseDRIVLearner(object):
             y (np.array or pd.Series, optional): an outcome vector
             verbose (bool, optional): whether to output progress logs
         Returns:
-            (numpy.ndarray): Predictions of treatment effects.
+            (numpy.ndarray): Predictions of treatment effects for compliers, i.e. those individuals
+                who take the treatment only if they are assigned.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
@@ -326,7 +334,10 @@ class BaseDRIVLearner(object):
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            assignment (np.array or pd.Series): a (0,1)-valued assignment vector
+            assignment (np.array or pd.Series): a (0,1)-valued assignment vector. The assignment is the
+                instrumental variable that does not depend on unknown confounders. The assignment status
+                influences treatment in a monotonic way, i.e. one can only be more likely to take the
+                treatment if assigned.
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
             p (2-tuple of np.ndarray or pd.Series or dict, optional): The first (second) element corresponds to
@@ -342,7 +353,8 @@ class BaseDRIVLearner(object):
             verbose (str): whether to output progress logs
             seed (int): random seed for cross-fitting
         Returns:
-            (numpy.ndarray): Predictions of treatment effects for compliers. Output dim: [n_samples, n_treatment]
+            (numpy.ndarray): Predictions of treatment effects for compliers, , i.e. those individuals
+                who take the treatment only if they are assigned. Output dim: [n_samples, n_treatment]
                 If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
                 UB [n_samples, n_treatment]
         """
@@ -431,7 +443,10 @@ class BaseDRIVLearner(object):
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            assignment (np.array or pd.Series): an assignment vector
+            assignment (np.array or pd.Series): an assignment vector. The assignment is the
+                instrumental variable that does not depend on unknown confounders. The assignment status
+                influences treatment in a monotonic way, i.e. one can only be more likely to take the
+                treatment if assigned.
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
             p (2-tuple of np.ndarray or pd.Series or dict, optional): The first (second) element corresponds to
