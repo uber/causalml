@@ -687,7 +687,7 @@ class BaseDRRegressor(BaseDRLearner):
             ate_alpha=ate_alpha,
             control_name=control_name)
 
-class XGBTDRRegressor(BaseDRRegressor):
+class XGBDRRegressor(BaseDRRegressor):
     def __init__(self, ate_alpha=.05, control_name=0, *args, **kwargs):
         """Initialize a DR-learner with two XGBoost models."""
         super().__init__(learner=XGBRegressor(*args, **kwargs),

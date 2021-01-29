@@ -1,2 +1,2 @@
 from .iv_regression import IVRegressor
-from .drivlearner import BaseDRIVLearner, BaseDRIVRegressor, XGBTDRIVRegressor
+from .drivlearner import BaseDRIVLearner, BaseDRIVRegressor, XGBDRIVRegressor

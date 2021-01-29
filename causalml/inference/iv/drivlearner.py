@@ -869,7 +869,7 @@ class BaseDRIVRegressor(BaseDRIVLearner):
         )
 
 
-class XGBTDRIVRegressor(BaseDRIVRegressor):
+class XGBDRIVRegressor(BaseDRIVRegressor):
     def __init__(self, ate_alpha=0.05, control_name=0, *args, **kwargs):
         """Initialize a DRIV-learner with two XGBoost models."""
         super().__init__(
