@@ -32,8 +32,8 @@ logging.getLogger("pyro").handlers[0].setLevel(logging.DEBUG)
 
 
 class CEVAE_MODEL(object):
-    def __init__(self, outcome_dist="studentt", latent_dim=20, hidden_dim=20, num_epochs=50, num_layers=3,
-                 batch_size=2048, learning_rate=1e-3, learning_rate_decay=0.1, num_samples=1000, weight_decay=1e-4):
+    def __init__(self, outcome_dist="studentt", latent_dim=20, hidden_dim=200, num_epochs=50, num_layers=3,
+                 batch_size=100, learning_rate=1e-3, learning_rate_decay=0.1, num_samples=1000, weight_decay=1e-4):
         """
         Initializes CEVAE.
 
