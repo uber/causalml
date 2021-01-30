@@ -24,14 +24,14 @@ networks defining p(y|t=0,z) and p(y|t=1,z); this allows highly imbalanced treat
 
 import logging
 import torch
-from pyro.contrib.cevae import CEVAE
+from pyro.contrib.cevae import CEVAE as CEVAEModel
 from causalml.inference.meta.utils import convert_pd_to_np
 
 logging.getLogger("pyro").setLevel(logging.DEBUG)
 logging.getLogger("pyro").handlers[0].setLevel(logging.DEBUG)
 
 
-class CEVAE_MODEL(object):
+class CEVAE(object):
     def __init__(self, outcome_dist="studentt", latent_dim=20, hidden_dim=200, num_epochs=50, num_layers=3,
                  batch_size=100, learning_rate=1e-3, learning_rate_decay=0.1, num_samples=1000, weight_decay=1e-4):
         """
@@ -75,7 +75,7 @@ class CEVAE_MODEL(object):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
-        self.cevae = CEVAE(outcome_dist=self.outcome_dist,
+        self.cevae = CEVAEModel(outcome_dist=self.outcome_dist,
                            feature_dim=X.shape[-1],
                            latent_dim=self.latent_dim,
                            hidden_dim=self.hidden_dim,
