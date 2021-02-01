@@ -4,7 +4,7 @@ numpy>=0.16.0,<1.19.0
 scipy==1.4.1
 matplotlib
 pandas>=0.24.1
-scikit-learn>=0.22.0
+scikit-learn>=0.22.0, <0.24.0
 statsmodels>=0.9.0
 seaborn
 Cython>=0.28.0
@@ -18,3 +18,5 @@ pygam
 packaging
 keras
 tensorflow>=1.15.2
+torch
+pyro-ppl
