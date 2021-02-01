@@ -1,2 +1,2 @@
 from .dragonnet import DragonNet
-from .cevae import CEVAE_MODEL
+from .cevae import CEVAE

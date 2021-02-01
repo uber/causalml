@@ -1,7 +1,7 @@
 import pandas as pd
 import torch
 
-from causalml.inference.nn import CEVAE_MODEL
+from causalml.inference.nn import CEVAE
 from causalml.dataset import simulate_hidden_confounder
 from causalml.metrics import get_cumgain
 
@@ -17,13 +17,13 @@ def test_CEVAE():
     learning_rate = 1e-3
     learning_rate_decay = 0.1
 
-    cevae = CEVAE_MODEL(outcome_dist=outcome_dist,
-                        latent_dim=latent_dim,
-                        hidden_dim=hidden_dim,
-                        num_epochs=num_epochs,
-                        batch_size=batch_size,
-                        learning_rate=learning_rate,
-                        learning_rate_decay=learning_rate_decay)
+    cevae = CEVAE(outcome_dist=outcome_dist,
+                  latent_dim=latent_dim,
+                  hidden_dim=hidden_dim,
+                  num_epochs=num_epochs,
+                  batch_size=batch_size,
+                  learning_rate=learning_rate,
+                  learning_rate_decay=learning_rate_decay)
 
     cevae.fit(X=torch.tensor(X, dtype=torch.float),
               treatment=torch.tensor(treatment, dtype=torch.float),
