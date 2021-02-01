@@ -311,7 +311,7 @@ class BaseDRLearner(BaseLearner):
 
             logger.info("Bootstrap Confidence Intervals")
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size, seed=seed)
+                te_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
