@@ -13,6 +13,7 @@ from causalml.inference.meta import BaseTLearner, BaseTRegressor, BaseTClassifie
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
 from causalml.inference.meta import BaseRLearner, BaseRClassifier, BaseRRegressor
 from causalml.inference.meta import TMLELearner
+from causalml.inference.meta import BaseDRLearner
 from causalml.metrics import ape, get_cumgain
 
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
@@ -642,3 +643,30 @@ def test_pandas_input(generate_regression_data):
         ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     except AttributeError:
         assert False
+
+def test_BaseDRLearner(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseDRLearner(learner=XGBRegressor(), treatment_effect_learner=LinearRegression())
+
+    # check the accuracy of the ATE estimation
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check the accuracy of the CATE estimation with the bootstrap CI
+    cate_p, _, _ = learner.fit_predict(X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10)
+
+    auuc_metrics = pd.DataFrame({'cate_p': cate_p.flatten(),
+                                 'W': treatment,
+                                 'y': y,
+                                 'treatment_effect_col': tau})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col='y',
+                          treatment_col='W',
+                          treatment_effect_col='tau')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
