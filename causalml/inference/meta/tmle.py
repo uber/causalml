@@ -92,15 +92,15 @@ class TMLELearner(object):
     def __repr__(self):
         return '{}(model={}, cv={})'.format(self.__class__.__name__, self.model_tau.__repr__(), self.cv)
 
-    def estimate_ate(self, X, p, treatment, y, segment=None, return_ci=False):
+    def estimate_ate(self, X, treatment, y, p, segment=None, return_ci=False):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict): an array of propensity scores of float (0,1) in the single-treatment
+                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             segment (np.array, optional): An optional segment vector of int. If given, the ATE and its CI will be
                                           estimated for each segment.
             return_ci (bool, optional): Whether to return confidence intervals

@@ -1,8 +1,12 @@
-import logging
 from copy import deepcopy
-
+import logging
 import numpy as np
 import pandas as pd
+from scipy.stats import norm
+from sklearn.model_selection import cross_val_predict, KFold
+from tqdm import tqdm
+
+from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import (
     check_treatment_vector,
@@ -11,14 +15,11 @@ from causalml.inference.meta.utils import (
 )
 from causalml.metrics import regression_metrics, classification_metrics
 from causalml.propensity import compute_propensity_score
-from scipy.stats import norm
-from sklearn.model_selection import cross_val_predict, KFold
-from tqdm import tqdm
 
 logger = logging.getLogger("causalml")
 
 
-class BaseDRLearner(object):
+class BaseDRLearner(BaseLearner):
     """A parent class for DR-learner regressor classes.
 
     A DR-learner estimates treatment effects with machine learning models.
@@ -200,7 +201,7 @@ class BaseDRLearner(object):
                 )
                 self.models_tau[group][ifold].fit(X_filt, dr)
 
-    def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
+    def predict(self, X, treatment=None, y=None, p=None, return_components=False, verbose=True):
         """Predict treatment effects.
 
         Args:
