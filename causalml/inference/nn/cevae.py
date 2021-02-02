@@ -26,7 +26,6 @@ import logging
 import torch
 from pyro.contrib.cevae import CEVAE as CEVAEModel
 
-from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import convert_pd_to_np
 
 pyro_logger = logging.getLogger("pyro")
@@ -35,7 +34,7 @@ if pyro_logger.handlers:
     pyro_logger.handlers[0].setLevel(logging.DEBUG)
 
 
-class CEVAE(object):
+class CEVAE:
     def __init__(self, outcome_dist="studentt", latent_dim=20, hidden_dim=200, num_epochs=50, num_layers=3,
                  batch_size=100, learning_rate=1e-3, learning_rate_decay=0.1, num_samples=1000, weight_decay=1e-4):
         """
@@ -107,7 +106,7 @@ class CEVAE(object):
                               num_samples=self.num_samples,
                               batch_size=self.batch_size).cpu().numpy()
 
-    def fit_predict(self, X, treatment, y):
+    def fit_predict(self, X, treatment, y, p=None):
         """
         Fits the CEVAE model and then predicts.
 
