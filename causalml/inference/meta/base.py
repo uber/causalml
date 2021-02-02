@@ -1,7 +1,14 @@
 from abc import ABCMeta, abstractclassmethod
+import logging
 import numpy as np
+import pandas as pd
 
 from causalml.inference.meta.explainer import Explainer
+from causalml.inference.meta.utils import check_p_conditions, convert_pd_to_np
+from causalml.propensity import compute_propensity_score
+
+
+logger = logging.getLogger('causalml')
 
 
 class BaseLearner(metaclass=ABCMeta):
@@ -37,6 +44,57 @@ class BaseLearner(metaclass=ABCMeta):
         y_b = y[idxs]
         self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
         return self.predict(X=X, p=p)
+
+    @staticmethod
+    def _format_p(p, t_groups):
+        """Format propensity scores into a dictionary of {treatment group: propensity scores}.
+
+        Args:
+            p (np.ndarray, pd.Series, or dict): propensity scores
+            t_groups (list): treatment group names.
+
+        Returns:
+            dict of {treatment group: propensity scores}
+        """
+        check_p_conditions(p, t_groups)
+
+        if isinstance(p, (np.ndarray, pd.Series)):
+            treatment_name = t_groups[0]
+            p = {treatment_name: convert_pd_to_np(p)}
+        elif isinstance(p, dict):
+            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+
+        return p
+
+    def _set_propensity_models(self, X, treatment, y):
+        """Set self.propensity and self.propensity_models.
+
+        It trains propensity models for all treatment groups, save them in self.propensity_models, and
+        save propensity scores in self.propensity in dictionaries with treatment groups as keys.
+
+        It will use self.model_p if available to train propensity models. Otherwise, it will use a default
+        PropensityModel (i.e. ElasticNetPropensityModel).
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
+        """
+        logger.info('Generating propensity score')
+        p = dict()
+        p_model = dict()
+        for group in self.t_groups:
+            mask = (treatment == group) | (treatment == self.control_name)
+            treatment_filt = treatment[mask]
+            X_filt = X[mask]
+            w_filt = (treatment_filt == group).astype(int)
+            w = (treatment == group).astype(int)
+            propensity_model = self.model_p if hasattr(self, 'model_p') else None
+            p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
+                                                                p_model=propensity_model,
+                                                                X_pred=X, treatment_pred=w)
+        self.propensity_model = p_model
+        self.propensity = p
 
     def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True,
                        test_size=0.3, random_state=None):
