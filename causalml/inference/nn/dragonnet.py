@@ -22,13 +22,15 @@ from keras.layers import Dense, Concatenate
 from keras import regularizers
 from keras.optimizers import SGD, Adam
 from keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN
+
+from causalml.inference.meta.base import BaseLearner
 from causalml.inference.nn.utils import (
     dragonnet_loss_binarycross, EpsilonLayer, regression_loss, binary_classification_loss,
     treatment_accuracy, track_epsilon, make_tarreg_loss)
 from causalml.inference.meta.utils import convert_pd_to_np
 
 
-class DragonNet(object):
+class DragonNet(BaseLearner):
     def __init__(self, neurons_per_layer=200, targeted_reg=True, ratio=1., val_split=0.2,
                  batch_size=64, epochs=30, learning_rate=1e-3, reg_l2=0.01, loss_func=dragonnet_loss_binarycross,
                  verbose=True):
@@ -97,7 +99,7 @@ class DragonNet(object):
 
         return model
 
-    def fit(self, X, treatment, y):
+    def fit(self, X, treatment, y, p=None):
         """
         Fits the DragonNet model.
 
@@ -155,7 +157,7 @@ class DragonNet(object):
                            batch_size=self.batch_size,
                            verbose=self.verbose)
 
-    def predict(self, X):
+    def predict(self, X, treatment=None, y=None, p=None):
         """
         Calls predict on fitted DragonNet.
 
@@ -191,7 +193,7 @@ class DragonNet(object):
         preds = self.predict(X)
         return (preds[:, 1] - preds[:, 0]).reshape(-1, 1)
 
-    def fit_predict(self, X, treatment, y, return_components=False):
+    def fit_predict(self, X, treatment, y, p=None, return_components=False):
         """
         Fits the DragonNet model and then predicts.
 

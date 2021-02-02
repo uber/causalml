@@ -25,10 +25,14 @@ networks defining p(y|t=0,z) and p(y|t=1,z); this allows highly imbalanced treat
 import logging
 import torch
 from pyro.contrib.cevae import CEVAE as CEVAEModel
+
+from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import convert_pd_to_np
 
-logging.getLogger("pyro").setLevel(logging.DEBUG)
-logging.getLogger("pyro").handlers[0].setLevel(logging.DEBUG)
+pyro_logger = logging.getLogger("pyro")
+pyro_logger.setLevel(logging.DEBUG)
+if pyro_logger.handlers:
+    pyro_logger.handlers[0].setLevel(logging.DEBUG)
 
 
 class CEVAE(object):
@@ -64,7 +68,7 @@ class CEVAE(object):
         self.num_samples = num_samples
         self.weight_decay = weight_decay
 
-    def fit(self, X, treatment, y):
+    def fit(self, X, treatment, y, p=None):
         """
         Fits CEVAE.
 
@@ -90,7 +94,7 @@ class CEVAE(object):
                        learning_rate_decay=self.learning_rate_decay,
                        weight_decay=self.weight_decay)
 
-    def predict(self, X):
+    def predict(self, X, treatment=None, y=None, p=None):
         """
         Calls predict on fitted DragonNet.
 
