@@ -100,21 +100,10 @@ class BaseXLearner(BaseLearner):
         self.t_groups.sort()
 
         if p is None:
-            logger.info('Generating propensity score')
-            p = dict()
-            p_model = dict()
-            for group in self.t_groups:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                X_filt = X[mask]
-                w_filt = (treatment_filt == group).astype(int)
-                w = (treatment == group).astype(int)
-                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                    X_pred=X, treatment_pred=w)
-            self.propensity_model = p_model
-            self.propensity = p
+            self._set_propensity_models(X=X, treatment=treatment, y=y)
+            p = self.propensity
         else:
-            check_p_conditions(p, self.t_groups)
+            p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
@@ -172,13 +161,7 @@ class BaseXLearner(BaseLearner):
                 p_model = self.propensity_model[group]
                 p[group] = p_model.predict(X)
         else:
-            check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+            p = self._format_p(p, self.t_groups)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         dhat_cs = {}
@@ -238,13 +221,8 @@ class BaseXLearner(BaseLearner):
 
         if p is None:
             p = self.propensity
-
-        check_p_conditions(p, self.t_groups)
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+        else:
+            p = self._format_p(p, self.t_groups)
 
         te = self.predict(X, treatment=treatment, y=y, p=p, return_components=return_components)
 
@@ -299,12 +277,7 @@ class BaseXLearner(BaseLearner):
         if p is None:
             p = self.propensity
         else:
-            check_p_conditions(p, self.t_groups)
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+            p = self._format_p(p, self.t_groups)
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -470,21 +443,10 @@ class BaseXClassifier(BaseXLearner):
         self.t_groups.sort()
 
         if p is None:
-            logger.info('Generating propensity score')
-            p = dict()
-            p_model = dict()
-            for group in self.t_groups:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                X_filt = X[mask]
-                w_filt = (treatment_filt == group).astype(int)
-                w = (treatment == group).astype(int)
-                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                    X_pred=X, treatment_pred=w)
-            self.propensity_model = p_model
-            self.propensity = p
+            self._set_propensity_models(X=X, treatment=treatment, y=y)
+            p = self.propensity
         else:
-            check_p_conditions(p, self.t_groups)
+            p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
@@ -543,13 +505,7 @@ class BaseXClassifier(BaseXLearner):
                 p_model = self.propensity_model[group]
                 p[group] = p_model.predict(X)
         else:
-            check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+            p = self._format_p(p, self.t_groups)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         dhat_cs = {}

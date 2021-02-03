@@ -212,7 +212,7 @@ def compute_propensity_score(X, treatment, p_model=None, X_pred=None, treatment_
     Returns:
         (tuple)
             - p (numpy.ndarray): propensity score
-            - p_model_dict (dict): dictionary of propensity model
+            - p_model (PropensityModel): a trained PropensityModel object
     """
     if treatment_pred is None:
         treatment_pred = treatment.copy()

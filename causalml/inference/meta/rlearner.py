@@ -8,10 +8,11 @@ from sklearn.model_selection import cross_val_predict, KFold, train_test_split
 from xgboost import XGBRegressor
 
 from causalml.inference.meta.base import BaseLearner
-from causalml.inference.meta.utils import (check_treatment_vector, check_p_conditions,
+from causalml.inference.meta.utils import (check_treatment_vector,
     get_xgboost_objective_metric, convert_pd_to_np)
 from causalml.inference.meta.explainer import Explainer
-from causalml.propensity import compute_propensity_score
+from causalml.propensity import compute_propensity_score, ElasticNetPropensityModel
+
 
 logger = logging.getLogger('causalml')
 
@@ -28,6 +29,7 @@ class BaseRLearner(BaseLearner):
                  learner=None,
                  outcome_learner=None,
                  effect_learner=None,
+                 propensity_learner=ElasticNetPropensityModel(),
                  ate_alpha=.05,
                  control_name=0,
                  n_fold=5,
@@ -39,22 +41,19 @@ class BaseRLearner(BaseLearner):
             outcome_learner (optional): a model to estimate outcomes
             effect_learner (optional): a model to estimate treatment effects. It needs to take `sample_weight` as an
                 input argument for `fit()`
+            propensity_learner (optional): a model to estimate propensity scores. `ElasticNetPropensityModel()` will
+                be used by default.
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
             n_fold (int, optional): the number of cross validation folds for outcome_learner
             random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
         """
         assert (learner is not None) or ((outcome_learner is not None) and (effect_learner is not None))
+        assert propensity_learner is not None
 
-        if outcome_learner is None:
-            self.model_mu = deepcopy(learner)
-        else:
-            self.model_mu = outcome_learner
-
-        if effect_learner is None:
-            self.model_tau = deepcopy(learner)
-        else:
-            self.model_tau = effect_learner
+        self.model_mu = outcome_learner if outcome_learner else deepcopy(learner)
+        self.model_tau = effect_learner if outcome_learner else deepcopy(learner)
+        self.model_p = propensity_learner
 
         self.ate_alpha = ate_alpha
         self.control_name = control_name
@@ -66,10 +65,10 @@ class BaseRLearner(BaseLearner):
         self.propensity_model = None
 
     def __repr__(self):
-        return ('{}(model_mu={},\n'
-                '\tmodel_tau={})'.format(self.__class__.__name__,
-                                         self.model_mu.__repr__(),
-                                         self.model_tau.__repr__()))
+        return (f'{self.__class__.__name__}\n'
+                f'\toutcome_learner={self.model_mu.__repr__()}\n'
+                f'\teffect_learner={self.model_tau.__repr__()}\n'
+                f'\tpropensity_learner={self.model_p.__repr__()}')
 
     def fit(self, X, treatment, y, p=None, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
@@ -89,27 +88,10 @@ class BaseRLearner(BaseLearner):
         self.t_groups.sort()
 
         if p is None:
-            logger.info('Generating propensity score')
-            p = dict()
-            p_model = dict()
-            for group in self.t_groups:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                X_filt = X[mask]
-                w_filt = (treatment_filt == group).astype(int)
-                w = (treatment == group).astype(int)
-                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                    X_pred=X, treatment_pred=w)
-            self.propensity_model = p_model
-            self.propensity = p
+            self._set_propensity_models(X=X, treatment=treatment, y=y)
+            p = self.propensity
         else:
-            check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+            p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
@@ -178,17 +160,6 @@ class BaseRLearner(BaseLearner):
         self.fit(X, treatment, y, p, verbose=verbose)
         te = self.predict(X)
 
-        if p is None:
-            p = self.propensity
-        else:
-            check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
-
         if not return_ci:
             return te
         else:
@@ -200,6 +171,10 @@ class BaseRLearner(BaseLearner):
 
             logger.info('Bootstrap Confidence Intervals')
             for i in tqdm(range(n_bootstraps)):
+                if p is None:
+                    p = self.propensity
+                else:
+                    p = self._format_p(p, self.t_groups)
                 te_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
 
@@ -231,18 +206,7 @@ class BaseRLearner(BaseLearner):
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        te = self.fit_predict(X, treatment, y, p)
-
-        if p is None:
-            p = self.propensity
-        else:
-            check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+        te = self.fit_predict(X, treatment, y, p, return_ci=False)
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -277,6 +241,10 @@ class BaseRLearner(BaseLearner):
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
             for n in tqdm(range(n_bootstraps)):
+                if p is None:
+                    p = self.propensity
+                else:
+                    p = self._format_p(p, self.t_groups)
                 cate_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size)
                 ate_bootstraps[:, n] = cate_b.mean()
 
@@ -300,6 +268,7 @@ class BaseRRegressor(BaseRLearner):
                  learner=None,
                  outcome_learner=None,
                  effect_learner=None,
+                 propensity_learner=ElasticNetPropensityModel(),
                  ate_alpha=.05,
                  control_name=0,
                  n_fold=5,
@@ -311,6 +280,8 @@ class BaseRRegressor(BaseRLearner):
             outcome_learner (optional): a model to estimate outcomes
             effect_learner (optional): a model to estimate treatment effects. It needs to take `sample_weight` as an
                 input argument for `fit()`
+            propensity_learner (optional): a model to estimate propensity scores. `ElasticNetPropensityModel()` will
+                be used by default.
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
             n_fold (int, optional): the number of cross validation folds for outcome_learner
@@ -320,6 +291,7 @@ class BaseRRegressor(BaseRLearner):
             learner=learner,
             outcome_learner=outcome_learner,
             effect_learner=effect_learner,
+            propensity_learner=propensity_learner,
             ate_alpha=ate_alpha,
             control_name=control_name,
             n_fold=n_fold,
@@ -334,6 +306,7 @@ class BaseRClassifier(BaseRLearner):
     def __init__(self,
                  outcome_learner=None,
                  effect_learner=None,
+                 propensity_learner=ElasticNetPropensityModel(),
                  ate_alpha=.05,
                  control_name=0,
                  n_fold=5,
@@ -344,6 +317,8 @@ class BaseRClassifier(BaseRLearner):
             outcome_learner: a model to estimate outcomes. Should be a classifier.
             effect_learner: a model to estimate treatment effects. It needs to take `sample_weight` as an
                 input argument for `fit()`. Should be a regressor.
+            propensity_learner (optional): a model to estimate propensity scores. `ElasticNetPropensityModel()` will
+                be used by default.
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
             n_fold (int, optional): the number of cross validation folds for outcome_learner
@@ -353,6 +328,7 @@ class BaseRClassifier(BaseRLearner):
             learner=None,
             outcome_learner=outcome_learner,
             effect_learner=effect_learner,
+            propensity_learner=propensity_learner,
             ate_alpha=ate_alpha,
             control_name=control_name,
             n_fold=n_fold,
@@ -379,27 +355,10 @@ class BaseRClassifier(BaseRLearner):
         self.t_groups.sort()
 
         if p is None:
-            logger.info('Generating propensity score')
-            p = dict()
-            p_model = dict()
-            for group in self.t_groups:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                X_filt = X[mask]
-                w_filt = (treatment_filt == group).astype(int)
-                w = (treatment == group).astype(int)
-                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                    X_pred=X, treatment_pred=w)
-            self.propensity_model = p_model
-            self.propensity = p
+            self._set_propensity_models(X=X, treatment=treatment, y=y)
+            p = self.propensity
         else:
-            check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+            p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
@@ -504,27 +463,10 @@ class XGBRRegressor(BaseRRegressor):
         self.t_groups.sort()
 
         if p is None:
-            logger.info('Generating propensity score')
-            p = dict()
-            p_model = dict()
-            for group in self.t_groups:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                X_filt = X[mask]
-                w_filt = (treatment_filt == group).astype(int)
-                w = (treatment == group).astype(int)
-                p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                    X_pred=X, treatment_pred=w)
-            self.propensity_model = p_model
-            self.propensity = p
+            self._set_propensity_models(X=X, treatment=treatment, y=y)
+            p = self.propensity
         else:
-            check_p_conditions(p, self.t_groups)
-
-        if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+            p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
