@@ -5,7 +5,7 @@ Changelog
 0.10.0 (2021-02-18)
 ------------------
 - CausalML surpassed `235,000 downloads <https://pepy.tech/project/causalml>`_!
-- We have 4 new community contributors, Suraj (`@surajiyer <https://github.com/surajiyer>`_), Harsh (`@HarshCasper <https://github.com/HarshCasper>`_), Manoj (`@manojbalaji1 <https://github.com/manojbalaji1>`_) and Václav (`@vaclavbelak <https://github.com/vaclavbelak>`_). Thanks for the contribution!
+- We have 5 new community contributors, Suraj (`@surajiyer <https://github.com/surajiyer>`_), Harsh (`@HarshCasper <https://github.com/HarshCasper>`_), Manoj (`@manojbalaji1 <https://github.com/manojbalaji1>`_), Matthew (`@maccam912 <https://github.com/maccam912>`_) and Václav (`@vaclavbelak <https://github.com/vaclavbelak>`_). Thanks for the contribution!
 
 Major Updates
 ~~~~~~~~~~~~~
@@ -16,13 +16,14 @@ Minor Updates
 ~~~~~~~~~~~~~
 - Add propensity_learner to R-learner by @jeongyoonlee (`#297 <https://github.com/uber/causalml/pull/297>`_)
 - Add BaseLearner class for other meta-learners to inherit from without duplicated code by @jeongyoonlee (`#295 <https://github.com/uber/causalml/pull/295>`_)
+- Fix installation issue for Shap>=0.38.1 by @paullo0106 (`#287 <https://github.com/uber/causalml/pull/287>`_)
 - Fix import error for sklearn>= 0.24 by @jeongyoonlee (`#283 <https://github.com/uber/causalml/pull/283>`_)
 - Fix KeyError issue in Filter method for certain dataset by @surajiyer (`#281 <https://github.com/uber/causalml/pull/281>`_)
 - Fix inconsistent cumlift score calculation of multiple models by @vaclavbelak (`#273 <https://github.com/uber/causalml/pull/273>`_)
 - Fix duplicate values handling in feature selection method by @manojbalaji1 (`#271 <https://github.com/uber/causalml/pull/271>`_)
-- Fix the color spectrum of  SHAP summary plot  for feature interpretations of meta-learners by @paullo0106 (`#269 <https://github.com/uber/causalml/pull/269>`_)
+- Fix the color spectrum of SHAP summary plot  for feature interpretations of meta-learners by @paullo0106 (`#269 <https://github.com/uber/causalml/pull/269>`_)
 - Add IIA and value optimization related documentation by @t-tte (`#264 <https://github.com/uber/causalml/pull/264>`_)
-- Fix StratifiedKFolk arguments for propensity score estimation by @paullo0106 (`#262 <https://github.com/uber/causalml/pull/262>`_)
+- Fix StratifiedKFold arguments for propensity score estimation by @paullo0106 (`#262 <https://github.com/uber/causalml/pull/262>`_)
 - Refactor the code with string format argument and is to compare object types, and change methods not using bound instance to static methods by @harshcasper (`#256 <https://github.com/uber/causalml/pull/256>`_, `#260 <https://github.com/uber/causalml/pull/260>`_)
 
 
