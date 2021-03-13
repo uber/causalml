@@ -208,9 +208,9 @@ class FilterSelect:
         # Probability of conversion and group size by treatment group
         nodeSummary = {}
         for treatment_group_key in results: 
-            n_1 = results[treatment_group_key][1]
-            n_total = (results[treatment_group_key][1] 
-                       + results[treatment_group_key][0])
+            n_1 = results[treatment_group_key].get(1, 0)
+            n_total = (results[treatment_group_key].get(1, 0) 
+                       + results[treatment_group_key].get(0, 0))
             y_mean = 1.0 * n_1 / n_total
             nodeSummary[treatment_group_key] = [y_mean, n_total]
         
