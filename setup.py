@@ -4,12 +4,12 @@ import causalml
 try:
     from Cython.Build import cythonize
 except ImportError:
-    dist.Distribution().fetch_build_eggs(['cython'])
+    dist.Distribution().fetch_build_eggs(['cython>=0.28.0'])
     from Cython.Build import cythonize
 try:
     from numpy import get_include as np_get_include
 except ImportError:
-    dist.Distribution().fetch_build_eggs(['numpy'])
+    dist.Distribution().fetch_build_eggs(['numpy<1.19.0'])
     from numpy import get_include as np_get_include
 
 
