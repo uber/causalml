@@ -51,8 +51,8 @@ class BaseRLearner(BaseLearner):
         assert (learner is not None) or ((outcome_learner is not None) and (effect_learner is not None))
         assert propensity_learner is not None
 
-        self.model_mu = outcome_learner if outcome_learner else deepcopy(learner)
-        self.model_tau = effect_learner if outcome_learner else deepcopy(learner)
+        self.model_mu = outcome_learner if outcome_learner is not None else deepcopy(learner)
+        self.model_tau = effect_learner if effect_learner is not None else deepcopy(learner)
         self.model_p = propensity_learner
 
         self.ate_alpha = ate_alpha
