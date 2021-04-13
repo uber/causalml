@@ -6,6 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from xgboost import XGBRegressor
 from xgboost import XGBClassifier
+from sklearn.ensemble import RandomForestRegressor
 
 from causalml.dataset import synthetic_data
 from causalml.inference.meta import BaseSLearner, BaseSRegressor, BaseSClassifier, LRSRegressor
@@ -122,6 +123,15 @@ def test_BaseTLearner(generate_regression_data):
     # higher than it would be under random targeting
     assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
+    # test of using control_learner and treatment_learner
+    learner = BaseTLearner(learner=XGBRegressor(),
+                           control_learner=RandomForestRegressor(),
+                           treatment_learner=RandomForestRegressor())
+    # check the accuracy of the ATE estimation
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
 
 def test_BaseTRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
@@ -234,6 +244,17 @@ def test_BaseXLearner(generate_regression_data):
     # higher than it would be under random targeting
     assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
 
+    # basic test of using outcome_learner and effect_learner
+    learner = BaseXLearner(learner=XGBRegressor(),
+                           control_outcome_learner=RandomForestRegressor(),
+                           treatment_outcome_learner=RandomForestRegressor(),
+                           control_effect_learner=RandomForestRegressor(),
+                           treatment_effect_learner=RandomForestRegressor())
+    # check the accuracy of the ATE estimation
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
 
 def test_BaseXRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
@@ -345,6 +366,14 @@ def test_BaseRLearner(generate_regression_data):
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
     assert cumgain['cate_p'].sum() > cumgain['Random'].sum()
+
+    # basic test of using outcome_learner and effect_learner
+    learner = BaseRLearner(learner=XGBRegressor(),
+                           outcome_learner=RandomForestRegressor(),
+                           effect_learner=RandomForestRegressor())
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
+    assert (ate_p >= lb) and (ate_p <= ub)
+    assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD * 5  # might need to look into higher ape
 
 
 def test_BaseRRegressor(generate_regression_data):
