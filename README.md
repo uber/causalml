@@ -50,11 +50,11 @@ Installation with `conda` is recommended. `conda` environment files for Python 3
 
 ## Install using `conda`:
 
-This will create a new `conda` virtual environment named `causalml-py36`, `causalml-py37`, or `causalml-py38`. If you want to change the name of the environment, update `environment-py3x.yml`.
+This will create a new `conda` virtual environment named `causalml-py36`, `causalml-py37`, or `causalml-py38`. If you want to change the name of the environment, update `envs/environment-py3x.yml`.
 
 ```
 $ git clone https://github.com/uber/causalml.git
-$ cd causalml
+$ cd causalml/envs/
 $ conda env create -f environment-py38.yml	# for the virtual environment with Python 3.8 and CausalML 
 $ conda activate causalml-py38
 (causalml-py38) 

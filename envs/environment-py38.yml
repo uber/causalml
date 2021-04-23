@@ -1,15 +1,10 @@
-name: causalml-py37
+name: causalml-py38
 channels:
   - defaults
 dependencies:
   - pip=21.0.1
-  - python=3.7
+  - python=3.8
   - setuptools=52.0.0
-  - sqlite=3.35.4=hce871da_0
-  - tk=8.6.10=hb0a8c7a_0
-  - xz=5.2.5=h1de35cc_0
-  - zlib=1.2.11=h1de35cc_3
-  - graphviz
   - pip:
     - absl-py==0.12.0
     - appnope==0.1.2
@@ -20,7 +15,6 @@ dependencies:
     - backcall==0.2.0
     - bleach==3.3.0
     - cachetools==4.2.1
-    - causalml==0.10.0
     - cffi==1.14.5
     - chardet==4.0.0
     - coverage==5.5
@@ -35,7 +29,6 @@ dependencies:
     - google-auth==1.29.0
     - google-auth-oauthlib==0.4.4
     - google-pasta==0.2.0
-    - graphviz
     - grpcio==1.37.0
     - h5py==2.10.0
     - idna==2.10
@@ -106,6 +99,7 @@ dependencies:
     - pytest==6.2.3
     - pytest-cov==2.11.1
     - python-dateutil==2.8.1
+    - graphviz
     - python-utils==2.5.6
     - pytz==2021.1
     - pyyaml==5.4.1
@@ -146,3 +140,4 @@ dependencies:
     - widgetsnbextension==3.5.1
     - wrapt==1.12.1
     - xgboost==1.4.1
+    - causalml==0.10.0

@@ -5,10 +5,6 @@ dependencies:
   - pip=21.0.1
   - python=3.6
   - setuptools=52.0.0
-  - sqlite=3.35.4=hce871da_0
-  - tk=8.6.10=hb0a8c7a_0
-  - xz=5.2.5=h1de35cc_0
-  - zlib=1.2.11=h1de35cc_3
   - graphviz
   - pip:
     - absl-py==0.12.0
@@ -20,7 +16,6 @@ dependencies:
     - backcall==0.2.0
     - bleach==3.3.0
     - cachetools==4.2.1
-    - causalml==0.10.0
     - cffi==1.14.5
     - chardet==4.0.0
     - coverage==5.5
@@ -145,3 +140,4 @@ dependencies:
     - widgetsnbextension==3.5.1
     - wrapt==1.12.1
     - xgboost==1.4.1
+    - causalml==0.10.0
