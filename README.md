@@ -35,30 +35,46 @@ The package currently supports the following methods
     * T-learner
     * X-learner
     * R-learner
+    * Doubly Robust (DR) learner
 * **Instrumental variables algorithms**
     * 2-Stage Least Squares (2SLS)
+    * Doubly Robust (DR) IV
+* **Neural-network-based algorithms**
+	* CEVAE
+	* DragonNet
 
 
 # Installation
 
-## Prerequisites
+Installation with `conda` is recommended. `conda` environment files for Python 3.6, 3.7 and 3.8 are available in the repository. Python 3.9 is not officially supported because some dependencies (e.g. `tensorflow`) does not support Python 3.9 yet.
 
-Install dependencies:
-```
-$ pip install -r requirements.txt
-```
+## Install using `conda`:
 
-Install from pip:
+This will create a new `conda` virtual environment named `causalml-py36`, `causalml-py37`, or `causalml-py38`. If you want to change the name of the environment, update `envs/environment-py3x.yml`.
 
 ```
-$ pip install causalml
+$ git clone https://github.com/uber/causalml.git
+$ cd causalml/envs/
+$ conda env create -f environment-py38.yml	# for the virtual environment with Python 3.8 and CausalML 
+$ conda activate causalml-py38
+(causalml-py38) 
 ```
 
-Install from source:
+## Install using `pip`:
 
 ```
 $ git clone https://github.com/uber/causalml.git
 $ cd causalml
+$ pip install -r requirements.txt
+$ pip install causalml
+```
+
+## Install from source:
+
+```
+$ git clone https://github.com/uber/causalml.git
+$ cd causalml
+$ pip install -r requirements.txt
 $ python setup.py build_ext --inplace
 $ python setup.py install
 ```
