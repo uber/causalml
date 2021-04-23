@@ -146,4 +146,3 @@ dependencies:
     - widgetsnbextension==3.5.1
     - wrapt==1.12.1
     - xgboost==1.4.1
-prefix: /Users/jeongyoonl/miniconda3/envs/causalml-py37
