@@ -28,20 +28,22 @@ research. It provides a standard interface that allows user to estimate the Cond
 The package currently supports the following methods
 
 * **Tree-based algorithms**
-    * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square
-    * Uplift tree/random forests on Contextual Treatment Selection
+    * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square [[1]](#papers)
+    * Uplift tree/random forests on Contextual Treatment Selection [[2]](#papers)
+    * Causal Tree [[3]](#papers) - Work-in-progress
 * **Meta-learner algorithms**
-    * S-learner
-    * T-learner
-    * X-learner
-    * R-learner
-    * Doubly Robust (DR) learner
+    * S-learner [[4]](#papers)
+    * T-learner [[4]](#papers)
+    * X-learner [[4]](#papers)
+    * R-learner [[5]](#papers)
+    * Doubly Robust (DR) learner [[6]](#papers)
+    * TMLE learner [[7]](#papers)
 * **Instrumental variables algorithms**
     * 2-Stage Least Squares (2SLS)
-    * Doubly Robust (DR) IV
+    * Doubly Robust (DR) IV [[8]](#papers)
 * **Neural-network-based algorithms**
-	* CEVAE
-	* DragonNet
+    * CEVAE [[9]](#papers)
+    * DragonNet [[10]](#papers)
 
 
 # Installation
@@ -199,9 +201,6 @@ See the [Uplift Tree visualization example notebook](https://github.com/uber/cau
 
 We welcome community contributors to the project. Before you start, please read our [code of conduct](https://github.com/uber/causalml/blob/master/CODE_OF_CONDUCT.md) and check out [contributing guidelines](./CONTRIBUTING.md) first.
 
-## Contributors
-
-[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/0)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/0)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/1)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/1)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/2)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/2)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/3)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/3)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/4)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/4)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/5)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/5)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/6)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/6)[![](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/images/7)](https://sourcerer.io/fame/jeongyoonlee/uber/causalml/links/7)
 
 # Versioning
 
@@ -237,12 +236,17 @@ Bibtex:
 
 ## Papers
 
-* Nicholas J Radcliffe and Patrick D Surry. Real-world uplift modelling with significance based uplift trees. White Paper TR-2011-1, Stochastic Solutions, 2011.
-* Yan Zhao, Xiao Fang, and David Simchi-Levi. Uplift modeling with multiple treatments and general response types. Proceedings of the 2017
-SIAM International Conference on Data Mining, SIAM, 2017.
-* Sören R. Künzel, Jasjeet S. Sekhon, Peter J. Bickel, and Bin Yu. Metalearners for estimating heterogeneous treatment effects using machine learning.
-Proceedings of the National Academy of Sciences, 2019.
-* Xinkun Nie and Stefan Wager. Quasi-Oracle Estimation of Heterogeneous Treatment Effects. Atlantic Causal Inference Conference, 2018.
+1. Radcliffe, Nicholas J., and Patrick D. Surry. "Real-world uplift modelling with significance-based uplift trees." White Paper TR-2011-1, Stochastic Solutions (2011): 1-33.
+2. Zhao, Yan, Xiao Fang, and David Simchi-Levi. "Uplift modeling with multiple treatments and general response types." Proceedings of the 2017 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics, 2017.
+3. Athey, Susan, and Guido Imbens. "Recursive partitioning for heterogeneous causal effects." Proceedings of the National Academy of Sciences 113.27 (2016): 7353-7360.
+4. Künzel, Sören R., et al. "Metalearners for estimating heterogeneous treatment effects using machine learning." Proceedings of the national academy of sciences 116.10 (2019): 4156-4165.
+5. Nie, Xinkun, and Stefan Wager. "Quasi-oracle estimation of heterogeneous treatment effects." arXiv preprint arXiv:1712.04912 (2017).
+6. Bang, Heejung, and James M. Robins. "Doubly robust estimation in missing data and causal inference models." Biometrics 61.4 (2005): 962-973.
+7. Van Der Laan, Mark J., and Daniel Rubin. "Targeted maximum likelihood learning." The international journal of biostatistics 2.1 (2006).
+8. Kennedy, Edward H. "Optimal doubly robust estimation of heterogeneous causal effects." arXiv preprint arXiv:2004.14497 (2020).
+9. Louizos, Christos, et al. "Causal effect inference with deep latent-variable models." arXiv preprint arXiv:1705.08821 (2017).
+10. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
+ 
 
 ## Related projects
 
