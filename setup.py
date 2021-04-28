@@ -50,7 +50,8 @@ setup(
         # Setuptools 18.0 properly handles Cython extensions.
         'setuptools>=18.0',
         'cython',
-        'numpy'
+        'numpy',
+        'scikit-learn>=0.22.0'
     ],
     install_requires=requirements,
     ext_modules=cythonize(extensions),
