@@ -1022,7 +1022,7 @@ class UpliftTreeClassifier:
                     if self.control_name in leftNodeSummary and self.control_name in rightNodeSummary:
                         leftScore1 = evaluationFunction(leftNodeSummary, control_name=self.control_name)
                         rightScore2 = evaluationFunction(rightNodeSummary, control_name=self.control_name)
-                        gain = leftScore1 - rightScore2
+                        gain = np.abs(leftScore1 - rightScore2)
                         gain_for_imp = (len(X_l) * leftScore1 - len(X_r) * rightScore2)
                     else:
                         gain = 0
