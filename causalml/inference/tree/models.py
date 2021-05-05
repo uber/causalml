@@ -187,6 +187,10 @@ class UpliftTreeClassifier:
         self.treatment_group = list(set(treatment))
         self.feature_imp_dict = defaultdict(float)
 
+        if self.evaluationFunction == self.evaluate_DDP and len(self.treatment_group) > 2:
+            raise ValueError("The DDP approach can only cope with two class problems, that is two different treatment options (e.g., control vs treatment)."
+                             "Please select another approach or only use a data set which employs two treatment options.")
+
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
             X, treatment, y, evaluationFunction=self.evaluationFunction,
             max_depth=self.max_depth, min_samples_leaf=self.min_samples_leaf,
@@ -1023,7 +1027,7 @@ class UpliftTreeClassifier:
                         leftScore1 = evaluationFunction(leftNodeSummary, control_name=self.control_name)
                         rightScore2 = evaluationFunction(rightNodeSummary, control_name=self.control_name)
                         gain = np.abs(leftScore1 - rightScore2)
-                        gain_for_imp = (len(X_l) * leftScore1 - len(X_r) * rightScore2)
+                        gain_for_imp = np.abs(len(X_l) * leftScore1 - len(X_r) * rightScore2)
                     else:
                         gain = 0
                 else:

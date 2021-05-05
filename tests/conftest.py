@@ -38,3 +38,20 @@ def generate_classification_data():
         return data
 
     yield _generate_data
+
+@pytest.fixture(scope='module')
+def generate_classification_data_two_treatments():
+
+    generated = False
+
+    def _generate_data():
+        if not generated:
+            np.random.seed(RANDOM_SEED)
+            data = make_uplift_classification(n_samples=N_SAMPLE,
+                                              treatment_name=TREATMENT_NAMES[0:2],
+                                              y_name=CONVERSION,
+                                              random_seed=RANDOM_SEED)
+
+        return data
+
+    yield _generate_data
