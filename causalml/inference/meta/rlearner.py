@@ -395,6 +395,7 @@ class BaseRClassifier(BaseRLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        X = convert_pd_to_np(X)
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             dhat = self.models_tau[group].predict(X)
