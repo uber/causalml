@@ -198,6 +198,7 @@ class BaseSLearner(BaseLearner):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, return_components=True)
 
         ate = np.zeros(self.t_groups.shape[0])
@@ -359,6 +360,7 @@ class LRSRegressor(BaseSRegressor):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.fit(X, treatment, y)
 
         ate = np.zeros(self.t_groups.shape[0])
