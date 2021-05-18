@@ -3,4 +3,4 @@ numpy>=0.16.0
 matplotlib
 sphinx
 sphinx_rtd_theme
-sphinxcontrib-bibtex
+sphinxcontrib-bibtex<2.0.0
