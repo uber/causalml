@@ -19,3 +19,4 @@ packaging
 torch
 pyro-ppl
 graphviz
+tensorflow>=2.4.0
