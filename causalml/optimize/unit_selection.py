@@ -188,7 +188,7 @@ class CounterfactualUnitSelector:
             The probability of conversion given control assignment.
 
         pr_y0_w1 : float
-            The probability of no conversion fiven treatment assignment
+            The probability of no conversion given treatment assignment
             (1 - pr_y1_w1).
 
         pr_y0_w0 : float
