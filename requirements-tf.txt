@@ -1,6 +1,6 @@
 setuptools>=41.0.0
 pip>=10.0
-numpy>=1.18.5
+numpy>=1.20.0
 scipy==1.4.1
 matplotlib
 pandas>=0.24.1
@@ -19,3 +19,4 @@ packaging
 torch
 pyro-ppl
 graphviz
+tensorflow>=2.4.0

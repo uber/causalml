@@ -1,11 +1,10 @@
-name: causalml-py36
+name: causalml-py39
 channels:
   - defaults
 dependencies:
   - pip=21.0.1
-  - python=3.6
+  - python=3.9
   - setuptools=52.0.0
-  - graphviz
   - pip:
     - absl-py==0.12.0
     - appnope==0.1.2
@@ -30,15 +29,14 @@ dependencies:
     - google-auth==1.29.0
     - google-auth-oauthlib==0.4.4
     - google-pasta==0.2.0
-    - graphviz
     - grpcio==1.37.0
     - h5py==2.10.0
     - idna==2.10
     - iniconfig==1.1.1
     - ipykernel==5.5.3
-    - ipython
-    - ipython-genutils
-    - ipywidgets
+    - ipython==7.22.0
+    - ipython-genutils==0.2.0
+    - ipywidgets==7.6.3
     - jedi==0.18.0
     - jinja2==2.11.3
     - joblib==1.0.1
@@ -60,7 +58,7 @@ dependencies:
     - lxml==4.6.3
     - markdown==3.3.4
     - markupsafe==1.1.1
-    - matplotlib
+    - matplotlib==3.4.1
     - mistune==0.8.4
     - nbclient==0.5.3
     - nbconvert==6.0.7
@@ -68,11 +66,11 @@ dependencies:
     - nest-asyncio==1.5.1
     - notebook==6.3.0
     - numba==0.53.1
-    - numpy==1.18.5
+    - numpy==1.20.3
     - oauthlib==3.1.0
     - opt-einsum==3.3.0
     - packaging==20.9
-    - pandas
+    - pandas==1.2.4
     - pandocfilters==1.4.3
     - parso==0.8.2
     - patsy==0.5.1
@@ -99,6 +97,7 @@ dependencies:
     - pytest==6.2.3
     - pytest-cov==2.11.1
     - python-dateutil==2.8.1
+    - graphviz
     - python-utils==2.5.6
     - pytz==2021.1
     - pyyaml==5.4.1
@@ -124,6 +123,7 @@ dependencies:
     - torch==1.8.1
     - tornado==6.1
     - tqdm==4.60.0
+    - traitlets==5.0.5
     - typing-extensions==3.7.4.3
     - urllib3==1.26.4
     - wcwidth==0.2.5

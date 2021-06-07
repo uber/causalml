@@ -26,13 +26,13 @@ dependencies:
     - dill==0.3.3
     - entrypoints==0.3
     - future==0.18.2
-    - gast==0.3.3
+    - gast==0.4.0
     - google-auth==1.29.0
     - google-auth-oauthlib==0.4.4
     - google-pasta==0.2.0
     - graphviz
-    - grpcio==1.37.0
-    - h5py==2.10.0
+    - grpcio==1.34.0
+    - h5py==3.1.0
     - idna==2.10
     - iniconfig==1.1.1
     - ipykernel==5.5.3
@@ -54,8 +54,6 @@ dependencies:
     - jupyter-nbextensions-configurator==0.4.1
     - jupyterlab-pygments==0.1.2
     - jupyterlab-widgets==1.0.0
-    - keras==2.4.3
-    - keras-preprocessing==1.1.2
     - kiwisolver==1.3.1
     - lightgbm==3.2.1
     - llvmlite==0.36.0
@@ -70,7 +68,7 @@ dependencies:
     - nest-asyncio==1.5.1
     - notebook==6.3.0
     - numba==0.53.1
-    - numpy==1.18.5
+    - numpy==1.20.0
     - oauthlib==3.1.0
     - opt-einsum==3.3.0
     - packaging==20.9
@@ -118,11 +116,6 @@ dependencies:
     - six==1.15.0
     - slicer==0.0.3
     - statsmodels==0.12.2
-    - tensorboard==2.5.0
-    - tensorboard-data-server==0.6.0
-    - tensorboard-plugin-wit==1.8.0
-    - tensorflow==2.3.2
-    - tensorflow-estimator==2.3.0
     - termcolor==1.1.0
     - terminado==0.9.4
     - testpath==0.4.4
@@ -141,4 +134,4 @@ dependencies:
     - widgetsnbextension==3.5.1
     - wrapt==1.12.1
     - xgboost==1.4.1
-    - causalml==0.10.0
+    - causalml>=0.10.0

@@ -16,14 +16,13 @@ the quality of treatment effect estimates. The authors propose two adaptations:
 """
 
 import numpy as np
-from keras.models import Model
-from keras.layers import Input
-from keras.layers import Dense, Concatenate
-from keras import regularizers
-from keras.optimizers import SGD, Adam
-from keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN
+from tensorflow.keras import Input, Model
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, TerminateOnNaN
+from tensorflow.keras.layers import Dense, Concatenate
+from tensorflow.keras.optimizers import SGD, Adam
+from tensorflow.keras.regularizers import l2
 
-from causalml.inference.nn.utils import (
+from causalml.inference.tf.utils import (
     dragonnet_loss_binarycross, EpsilonLayer, regression_loss, binary_classification_loss,
     treatment_accuracy, track_epsilon, make_tarreg_loss)
 from causalml.inference.meta.utils import convert_pd_to_np
@@ -68,27 +67,27 @@ class DragonNet:
         # HYPOTHESIS
         y0_hidden = Dense(units=int(self.neurons_per_layer / 2),
                           activation='elu',
-                          kernel_regularizer=regularizers.l2(self.reg_l2))(x)
+                          kernel_regularizer=l2(self.reg_l2))(x)
         y1_hidden = Dense(units=int(self.neurons_per_layer/2),
                           activation='elu',
-                          kernel_regularizer=regularizers.l2(self.reg_l2))(x)
+                          kernel_regularizer=l2(self.reg_l2))(x)
 
         # second layer
         y0_hidden = Dense(units=int(self.neurons_per_layer/2),
                         activation='elu',
-                        kernel_regularizer=regularizers.l2(self.reg_l2))(y0_hidden)
+                        kernel_regularizer=l2(self.reg_l2))(y0_hidden)
         y1_hidden = Dense(units=int(self.neurons_per_layer / 2),
                         activation='elu',
-                        kernel_regularizer=regularizers.l2(self.reg_l2))(y1_hidden)
+                        kernel_regularizer=l2(self.reg_l2))(y1_hidden)
 
         # third
         y0_predictions = Dense(units=1,
                                activation=None,
-                               kernel_regularizer=regularizers.l2(self.reg_l2),
+                               kernel_regularizer=l2(self.reg_l2),
                                name='y0_predictions')(y0_hidden)
         y1_predictions = Dense(units=1,
                                activation=None,
-                               kernel_regularizer=regularizers.l2(self.reg_l2),
+                               kernel_regularizer=l2(self.reg_l2),
                                name='y1_predictions')(y1_hidden)
 
         dl = EpsilonLayer()

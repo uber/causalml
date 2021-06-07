@@ -1,4 +1,4 @@
-name: causalml-py36
+name: causalml-tf-py36
 channels:
   - defaults
 dependencies:
@@ -54,6 +54,8 @@ dependencies:
     - jupyter-nbextensions-configurator==0.4.1
     - jupyterlab-pygments==0.1.2
     - jupyterlab-widgets==1.0.0
+    - keras==2.4.3
+    - keras-preprocessing==1.1.2
     - kiwisolver==1.3.1
     - lightgbm==3.2.1
     - llvmlite==0.36.0
@@ -116,6 +118,11 @@ dependencies:
     - six==1.15.0
     - slicer==0.0.3
     - statsmodels==0.12.2
+    - tensorboard==2.5.0
+    - tensorboard-data-server==0.6.1
+    - tensorboard-plugin-wit==1.8.0
+    - tensorflow==2.5.0
+    - tensorflow-estimator==2.5.0
     - termcolor==1.1.0
     - terminado==0.9.4
     - testpath==0.4.4
@@ -133,4 +140,4 @@ dependencies:
     - widgetsnbextension==3.5.1
     - wrapt==1.12.1
     - xgboost==1.4.1
-    - causalml>=0.10.0
+    - causalml[tf]>=0.10.0

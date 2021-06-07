@@ -1,7 +1,7 @@
 import tensorflow as tf
-import keras.backend as K
-from keras.engine.topology import Layer
-from keras.metrics import binary_accuracy
+from tensorflow.keras import backend as K
+from tensorflow.keras.layers import Layer
+from tensorflow.keras.metrics import binary_accuracy
 
 
 def binary_classification_loss(concat_true, concat_pred):

@@ -9,7 +9,7 @@ except ImportError:
 try:
     from numpy import get_include as np_get_include
 except ImportError:
-    dist.Distribution().fetch_build_eggs(['numpy<1.19.0'])
+    dist.Distribution().fetch_build_eggs(['numpy'])
     from numpy import get_include as np_get_include
 
 
@@ -55,5 +55,8 @@ setup(
     ],
     install_requires=requirements,
     ext_modules=cythonize(extensions),
-    include_dirs=[np_get_include()]
+    include_dirs=[np_get_include()],
+    extras_require={
+        'tf': ['tensorflow>=2.4.0']
+    }
 )
