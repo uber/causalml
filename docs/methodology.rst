@@ -151,6 +151,18 @@ Finally, the :math:`\chi^2`-divergence is given by:
 
 where the notation is again the same as above.
 
+DDP
+~~~
+
+Another Uplift Tree algorithm that is implemented is the delta-delta-p (:math:`\Delta\Delta P`) approach by :cite:`hansotia2002ddp`, where the sample splitting criterion is defined as follows:
+
+.. math::
+    \Delta\Delta P=|(P^T(y|a_0)-P^C(y|a_0) - (P^T(y|a_1)-P^C(y|a_1)))|
+
+where :math:`a_0` and :math:`a_1` are the outcomes of a Split A, :math:`y` is the selected class, and :math:`P^T` and :math:`P^C` are the response rates of treatment and control group, respectively. In other words, we first calculate the difference in the response rate in each branch (:math:`\Delta P_{left}` and :math:`\Delta P_{right}`), and subsequently, calculate their differences (:math:`\Delta\Delta P = |\Delta P_{left} - \Delta P_{right}|`).
+
+
+
 CTS
 ~~~
 

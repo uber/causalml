@@ -116,7 +116,7 @@ class UpliftTreeClassifier:
     ----------
 
     evaluationFunction : string
-        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
+        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP'.
 
     max_features: int, optional (default=None)
         The number of features to consider when looking for the best split.
@@ -156,6 +156,8 @@ class UpliftTreeClassifier:
             self.evaluationFunction = self.evaluate_ED
         elif evaluationFunction == 'Chi':
             self.evaluationFunction = self.evaluate_Chi
+        elif evaluationFunction == 'DDP':
+            self.evaluationFunction = self.evaluate_DDP
         else:
             self.evaluationFunction = self.evaluate_CTS
         self.fitted_uplift_tree = None
@@ -184,6 +186,10 @@ class UpliftTreeClassifier:
 
         self.treatment_group = list(set(treatment))
         self.feature_imp_dict = defaultdict(float)
+
+        if self.evaluationFunction == self.evaluate_DDP and len(self.treatment_group) > 2:
+            raise ValueError("The DDP approach can only cope with two class problems, that is two different treatment options (e.g., control vs treatment)."
+                             "Please select another approach or only use a data set which employs two treatment options.")
 
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
             X, treatment, y, evaluationFunction=self.evaluationFunction,
@@ -251,7 +257,7 @@ class UpliftTreeClassifier:
             The minimum gain required to make a tree node split. The children tree branches are trimmed if the actual
             split gain is less than the minimum gain.
         evaluationFunction : string, optional (default = None)
-            Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
+            Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP'.
         notify: bool, optional (default = False)
         n_reg: int, optional (default=0)
             The regularization parameter defined in Rzepakowski et al. 2012, the weight (in terms of sample size) of the
@@ -673,6 +679,32 @@ class UpliftTreeClassifier:
         return d_res
 
     @staticmethod
+    def evaluate_DDP(nodeSummary, control_name):
+        '''
+        Calculate Delta P as split evaluation criterion for a given node.
+
+        Args
+        ----
+        nodeSummary : dictionary
+            The tree node summary statistics, produced by tree_node_summary() method.
+
+        control_name : string
+            The control group name.
+
+        Returns
+        -------
+        d_res : Delta P
+        '''
+        if control_name not in nodeSummary:
+            return 0
+        pc = nodeSummary[control_name][0]
+        d_res = 0
+        for treatment_group in nodeSummary:
+            if treatment_group != control_name:
+                d_res += nodeSummary[treatment_group][0] - pc
+        return d_res
+
+    @staticmethod
     def evaluate_CTS(currentNodeSummary):
         '''
         Calculate CTS (conditional treatment selection) as split evaluation criterion for a given node.
@@ -865,7 +897,7 @@ class UpliftTreeClassifier:
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         evaluationFunction : string
-            Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
+            Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP'.
         max_depth: int, optional (default=10)
             The maximum depth of the tree.
         min_samples_leaf: int, optional (default=100)
@@ -990,6 +1022,14 @@ class UpliftTreeClassifier:
                     rightScore2 = evaluationFunction(rightNodeSummary)
                     gain = (currentScore - p * leftScore1 - (1 - p) * rightScore2)
                     gain_for_imp = (len(X) * currentScore - len(X_l) * leftScore1 - len(X_r) * rightScore2)
+                elif evaluationFunction == self.evaluate_DDP:
+                    if self.control_name in leftNodeSummary and self.control_name in rightNodeSummary:
+                        leftScore1 = evaluationFunction(leftNodeSummary, control_name=self.control_name)
+                        rightScore2 = evaluationFunction(rightNodeSummary, control_name=self.control_name)
+                        gain = np.abs(leftScore1 - rightScore2)
+                        gain_for_imp = np.abs(len(X_l) * leftScore1 - len(X_r) * rightScore2)
+                    else:
+                        gain = 0
                 else:
                     if (self.control_name in leftNodeSummary and
                         self.control_name in rightNodeSummary):
@@ -1172,7 +1212,7 @@ class UpliftRandomForestClassifier:
         The number of trees in the uplift random forest.
 
     evaluationFunction : string
-        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS'.
+        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP'.
 
     max_features: int, optional (default=10)
         The number of features to consider when looking for the best split.
