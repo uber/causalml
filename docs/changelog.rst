@@ -2,6 +2,31 @@
 
 Changelog
 =========
+0.11.0 (2021-07-28)
+------------------
+- CausalML surpassed `2K stars <https://github.com/uber/causalml/stargazers>`_!
+- We have 3 new community contributors, Jannik (`@jroessler <https://github.com/jroessler>`_), Mohamed (`@ibraaaa <https://github.com/ibraaaa>`_), and Leo (`@lleiou <https://github.com/lleiou>`_). Thanks for the contribution!
+
+Major Updates
+~~~~~~~~~~~~~
+- Make tensorflow dependency optional by @jeongyoonlee (`#343 <https://github.com/uber/causalml/pull/343>`_)
+- Add delta-delta-p (ddp) tree inference approach by @jroessler (`#327 <https://github.com/uber/causalml/pull/327>`_)
+- Add conda env files for Python 3.6, 3.7, and 3.8 by @jeongyoonlee (`#324 <https://github.com/uber/causalml/pull/324>`_)
+
+Minor Updates
+~~~~~~~~~~~~~
+- Add automatic package publish by @jeongyoonlee (`#354 <https://github.com/uber/causalml/pull/354>`_)
+- Fix filter method failure with NaNs in the data issue by @manojbalaji1 (`#352 <https://github.com/uber/causalml/pull/352>`_)
+- Fix typo in unit_selection optimization by @jeongyoonlee (`#347 <https://github.com/uber/causalml/pull/347>`_)
+- Fix docs build failure by @jeongyoonlee (`#335 <https://github.com/uber/causalml/pull/335>`_)
+- Convert pandas inputs to numpy in S/T/R Learners by @jeongyoonlee (`#333 <https://github.com/uber/causalml/pull/333>`_)
+- Require scikit-learn as a dependency of setup.py by @ibraaaa (`#325 <https://github.com/uber/causalml/pull/325>`_)
+- Fix AttributeError when passing in Outcome and Effect learner to R-Learner by @paul.lo (`#320 <https://github.com/uber/causalml/pull/320>`_)
+- Fix error when there is no positive class for KL Divergence filter by @lleiou (`#311 <https://github.com/uber/causalml/pull/311>`_)
+- Add versions to cython and numpy in setup.py for requirements.txt accordingly by @maccam912 (`#306 <https://github.com/uber/causalml/pull/306>`_)
+
+
+
 0.10.0 (2021-02-18)
 ------------------
 - CausalML surpassed `235,000 downloads <https://pepy.tech/project/causalml>`_!
