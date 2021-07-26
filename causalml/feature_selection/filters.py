@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 from scipy import stats
+from sklearn.impute import SimpleImputer
     
 class FilterSelect:
     """A class for feature importance methods.
@@ -304,7 +305,8 @@ class FilterSelect:
 
     def _filter_D_one_feature(self, data, feature_name, y_name, 
                               n_bins=10, method='KL', control_group='control',
-                              experiment_group_column='treatment_group_key'):
+                              experiment_group_column='treatment_group_key',
+                              null_impute=None):
         """
         Calculate the chosen divergence measure for one feature.
 
@@ -322,6 +324,7 @@ class FilterSelect:
         experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in the DataFrame, which contains the treatment and control assignment label
         control_group (string, optional, default = 'control'): name for control group, value in the experiment group column
         n_bins (int, optional, default = 10): number of bins to be used for bin-based uplift filter methods
+        null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then exception will be raised
         Returns
         ----------
         (pd.DataFrame): a data frame containing the feature importance statistics
@@ -337,11 +340,19 @@ class FilterSelect:
 
         totalSize = len(data.index)
 
+        # impute null if enabled
+        if null_impute is not None:
+            data[feature_name] = SimpleImputer(missing_values=np.nan, strategy=null_impute).fit_transform(data[feature_name].values.reshape(-1, 1))
+        elif data[feature_name].isna().any():
+            raise Exception("Null values present al column '{}'. Please impute the null value or use null_impute paramter provided!!!".format(feature_name))
+
         # drop duplicate edges in pq.cut result to avoid issues
         x_bin = pd.qcut(data[feature_name].values, n_bins, labels=False, 
                         duplicates='drop')
+
         d_children = 0
-        for i_bin in range(x_bin.max() + 1): # range(n_bins):
+
+        for i_bin in range(np.nanmax(x_bin).astype(int) + 1): # range(n_bins):
             nodeSummary = self._GetNodeSummary(
                 data=data.loc[x_bin == i_bin], 
                 experiment_group_column=experiment_group_column, y_name=y_name
@@ -364,14 +375,15 @@ class FilterSelect:
             'method': method,
             'score': d_res, 
             'p_value': None,
-            'misc': 'number_of_bins: {}'.format(min(n_bins, x_bin.max()+1)),# format(n_bins),
+            'misc': 'number_of_bins: {}'.format(min(n_bins, np.nanmax(x_bin).astype(int) + 1)),# format(n_bins),
         }, index=[0]).reset_index(drop=True)
 
         return(D_result)
 
     def filter_D(self, data, features, y_name, 
                  n_bins=10, method='KL', control_group='control',
-                 experiment_group_column='treatment_group_key'):
+                 experiment_group_column='treatment_group_key',
+                 null_impute=None):
         """
         Rank features based on the chosen divergence measure.
 
@@ -389,6 +401,7 @@ class FilterSelect:
         experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in the DataFrame, which contains the treatment and control assignment label
         control_group (string, optional, default = 'control'): name for control group, value in the experiment group column
         n_bins (int, optional, default = 10): number of bins to be used for bin-based uplift filter methods
+        null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then exception will be raised
 
         Returns
         ----------
@@ -402,6 +415,7 @@ class FilterSelect:
                 data=data, feature_name=x_name_i, y_name=y_name,
                 n_bins=n_bins, method=method, control_group=control_group,
                 experiment_group_column=experiment_group_column, 
+                null_impute=null_impute
             )
             all_result = pd.concat([all_result, one_result])
 
@@ -414,7 +428,8 @@ class FilterSelect:
                       experiment_group_column='treatment_group_key',
                       control_group = 'control', 
                       treatment_group = 'treatment',
-                      n_bins=5, 
+                      n_bins=5,
+                      null_impute=None
                       ):
         """
         Rank features based on the chosen statistic of the interaction.
@@ -433,6 +448,7 @@ class FilterSelect:
             control_group (string): name for control group, value in the experiment group column
             treatment_group (string): name for treatment group, value in the experiment group column
             n_bins (int, optional): number of bins to be used for bin-based uplift filter methods
+            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If value is None and null is present then exception will be raised
         
         Returns
         ----------
@@ -458,6 +474,7 @@ class FilterSelect:
                 features=features, y_name=y_name, 
                 n_bins=n_bins, control_group=control_group,
                 experiment_group_column=experiment_group_column, 
+                null_impute=null_impute
             )
         
         all_result['method'] = method + ' filter'
