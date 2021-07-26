@@ -9,14 +9,14 @@ Changelog
 
 Major Updates
 ~~~~~~~~~~~~~
-- Make tensorflow dependency optional by @jeongyoonlee (`#343 <https://github.com/uber/causalml/pull/343>`_)
+- Make tensorflow dependency optional and add python 3.9 support by @jeongyoonlee (`#343 <https://github.com/uber/causalml/pull/343>`_)
 - Add delta-delta-p (ddp) tree inference approach by @jroessler (`#327 <https://github.com/uber/causalml/pull/327>`_)
 - Add conda env files for Python 3.6, 3.7, and 3.8 by @jeongyoonlee (`#324 <https://github.com/uber/causalml/pull/324>`_)
 
 Minor Updates
 ~~~~~~~~~~~~~
+- Fix filter method failure with NaNs in the data issue by @manojbalaji1 (`#367 <https://github.com/uber/causalml/pull/367>`_)
 - Add automatic package publish by @jeongyoonlee (`#354 <https://github.com/uber/causalml/pull/354>`_)
-- Fix filter method failure with NaNs in the data issue by @manojbalaji1 (`#352 <https://github.com/uber/causalml/pull/352>`_)
 - Fix typo in unit_selection optimization by @jeongyoonlee (`#347 <https://github.com/uber/causalml/pull/347>`_)
 - Fix docs build failure by @jeongyoonlee (`#335 <https://github.com/uber/causalml/pull/335>`_)
 - Convert pandas inputs to numpy in S/T/R Learners by @jeongyoonlee (`#333 <https://github.com/uber/causalml/pull/333>`_)
