@@ -344,7 +344,7 @@ class FilterSelect:
         if null_impute is not None:
             data[feature_name] = SimpleImputer(missing_values=np.nan, strategy=null_impute).fit_transform(data[feature_name].values.reshape(-1, 1))
         elif data[feature_name].isna().any():
-            raise Exception("Null values present al column '{}'. Please impute the null value or use null_impute paramter provided!!!".format(feature_name))
+            raise Exception("Null value(s) present in column '{}'. Please impute the null value or use null_impute parameter provided!!!".format(feature_name))
 
         # drop duplicate edges in pq.cut result to avoid issues
         x_bin = pd.qcut(data[feature_name].values, n_bins, labels=False, 
