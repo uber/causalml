@@ -1053,7 +1053,6 @@ class UpliftTreeClassifier:
                     bestAttribute = (col, value)
                     best_set_left = [X_l, w_l, y_l]
                     best_set_right = [X_r, w_r, y_r]
-                    self.feature_imp_dict[bestAttribute[0]] += gain_for_imp
 
         dcY = {'impurity': '%.3f' % currentScore, 'samples': '%d' % len(X)}
         # Add treatment size
@@ -1064,6 +1063,7 @@ class UpliftTreeClassifier:
         dcY['matchScore'] = round(upliftScore[0], 4)
 
         if bestGain > 0 and depth < max_depth:
+            self.feature_imp_dict[bestAttribute[0]] += gain_for_imp
             trueBranch = self.growDecisionTreeFrom(
                 *best_set_left, evaluationFunction, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
