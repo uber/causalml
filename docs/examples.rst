@@ -62,7 +62,7 @@ Average Treatment Effect (ATE) Estimation
     print('Average Treatment Effect (Neural Network (MLP)): {:.2f} ({:.2f}, {:.2f})'.format(te[0], lb[0], ub[0]))
 
     xl = BaseXRegressor(learner=XGBRegressor(random_state=42))
-    te, lb, ub = xl.estimate_ate(X, p, treatment, y)
+    te, lb, ub = xl.estimate_ate(X, treatment, y, e)
     print('Average Treatment Effect (BaseXRegressor using XGBoost): {:.2f} ({:.2f}, {:.2f})'.format(te[0], lb[0], ub[0]))
 
     rl = BaseRRegressor(learner=XGBRegressor(random_state=42))
