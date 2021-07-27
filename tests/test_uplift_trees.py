@@ -124,3 +124,36 @@ def test_UpliftTreeClassifier(generate_classification_data):
     # Check if the cumulative gain of UpLift Random Forest is higher than
     # random
     assert cumgain['uplift_tree'].sum() > cumgain['Random'].sum()
+
+
+def test_UpliftTreeClassifier_feature_importance(generate_classification_data):
+    # test if feature importance is working as expected
+    df, x_names = generate_classification_data()
+    df_train, df_test = train_test_split(df,
+                                         test_size=0.2,
+                                         random_state=RANDOM_SEED)
+
+    # Train the upLift classifier
+    uplift_model = UpliftTreeClassifier(control_name=TREATMENT_NAMES[0])
+    uplift_model.fit(df_train[x_names].values,
+                     treatment=df_train['treatment_group_key'].values,
+                     y=df_train[CONVERSION].values)
+
+    assert hasattr(uplift_model, 'feature_importances_')
+    num_non_zero_imp_features = sum([1 if imp > 0 else 0 for imp in uplift_model.feature_importances_])
+
+    def getNonleafCount(node):
+        # base case
+        if (node is None or (node.trueBranch is None and
+                             node.falseBranch is None)):
+            return 0
+        # If root is Not None and its one of its child is also not None
+        return (1 + getNonleafCount(node.trueBranch) +
+                getNonleafCount(node.falseBranch))
+
+    num_non_leaf_nodes = getNonleafCount(uplift_model.fitted_uplift_tree)
+    # Check if the features with positive importance is not more than number of nodes
+    # the reason is, each non-leaf node evaluates only one feature, and some of the nodes
+    # would evaluate the same feature, thus the number of features with importance value
+    # shouldn't be larger than the number of non-leaf node
+    assert num_non_zero_imp_features <= num_non_leaf_nodes
