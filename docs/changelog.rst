@@ -15,13 +15,14 @@ Major Updates
 
 Minor Updates
 ~~~~~~~~~~~~~
+- Fix inconsistent feature importance calculation in uplift tree by @paullo0106 (`#372 <https://github.com/uber/causalml/pull/372>`_)
 - Fix filter method failure with NaNs in the data issue by @manojbalaji1 (`#367 <https://github.com/uber/causalml/pull/367>`_)
 - Add automatic package publish by @jeongyoonlee (`#354 <https://github.com/uber/causalml/pull/354>`_)
 - Fix typo in unit_selection optimization by @jeongyoonlee (`#347 <https://github.com/uber/causalml/pull/347>`_)
 - Fix docs build failure by @jeongyoonlee (`#335 <https://github.com/uber/causalml/pull/335>`_)
 - Convert pandas inputs to numpy in S/T/R Learners by @jeongyoonlee (`#333 <https://github.com/uber/causalml/pull/333>`_)
 - Require scikit-learn as a dependency of setup.py by @ibraaaa (`#325 <https://github.com/uber/causalml/pull/325>`_)
-- Fix AttributeError when passing in Outcome and Effect learner to R-Learner by @paul.lo (`#320 <https://github.com/uber/causalml/pull/320>`_)
+- Fix AttributeError when passing in Outcome and Effect learner to R-Learner by @paullo0106 (`#320 <https://github.com/uber/causalml/pull/320>`_)
 - Fix error when there is no positive class for KL Divergence filter by @lleiou (`#311 <https://github.com/uber/causalml/pull/311>`_)
 - Add versions to cython and numpy in setup.py for requirements.txt accordingly by @maccam912 (`#306 <https://github.com/uber/causalml/pull/306>`_)
 
