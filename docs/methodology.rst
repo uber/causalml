@@ -46,7 +46,7 @@ T-learner :cite:`kunzel2019metalearners` consists of two stages as follows:
 Estimate the average outcomes :math:`\mu_0(x)` and :math:`\mu_1(x)`:
 
 .. math::
-   \mu_0(x) = E[Y(0)|X=x]
+   \mu_0(x) = E[Y(0)|X=x] \\
    \mu_1(x) = E[Y(1)|X=x]
 
 using machine learning models.
@@ -68,9 +68,9 @@ X-learner :cite:`kunzel2019metalearners` is an extension of T-learner, and consi
 Estimate the average outcomes :math:`\mu_0(x)` and :math:`\mu_1(x)`:
 
 .. math::
-   \mu_0(x) = E[Y(0)|X=x]
+   \mu_0(x) = E[Y(0)|X=x] \\
    \mu_1(x) = E[Y(1)|X=x]
-   
+
 using machine learning models.
 
 **Stage 2**
@@ -78,7 +78,7 @@ using machine learning models.
 Impute the user level treatment effects, :math:`D^1_i` and :math:`D^0_j` for user :math:`i` in the treatment group based on :math:`\mu_0(x)`, and user :math:`j` in the control groups based on :math:`\mu_1(x)`:
 
 .. math::
-   D^1_i = Y^1_i - \hat\mu_0(X^1_i)
+   D^1_i = Y^1_i - \hat\mu_0(X^1_i) \\
    D^0_i = \hat\mu_1(X^0_i) - Y^0_i
 
 then estimate :math:`\tau_1(x) = E[D^1|X=x]`, and :math:`\tau_0(x) = E[D^0|X=x]` using machine learning models.
@@ -242,7 +242,7 @@ See :cite:`stuart2010matching` for a discussion of the strengths and weaknesses 
 Inverse probability of treatment weighting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The inverse probability of treatment weighting (IPTW) approach uses the propensity score :math:`e` to weigh the treated and non-treated populations by the inverse of the probability of the actual treatment :math:`W`. For a binary treatment :math:`W \in \{1, 0\}`: 
+The inverse probability of treatment weighting (IPTW) approach uses the propensity score :math:`e` to weigh the treated and non-treated populations by the inverse of the probability of the actual treatment :math:`W`. For a binary treatment :math:`W \in \{1, 0\}`:
 
 .. math::
    \frac{W}{e} + \frac{1 - W}{1 - e}
