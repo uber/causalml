@@ -7,7 +7,6 @@ import pandas as pd
 from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_random_state
-import multiprocessing as mp
 
 logger = logging.getLogger('causalml')
 
