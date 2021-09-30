@@ -85,10 +85,12 @@ class NearestNeighborMatch(object):
             matching
         random_state (numpy.random.RandomState or int): RandomState or an int
             seed
+        n_jobs (int): The number of parallel jobs to run for neighbors search.
+            None means 1 unless in a joblib.parallel_backend context. -1 means using all processors
     """
 
     def __init__(self, caliper=.2, replace=False, ratio=1, shuffle=True,
-                 random_state=None):
+                 random_state=None, n_jobs=-1):
         """Initialize a propensity score matching model.
 
         Args:
@@ -98,12 +100,15 @@ class NearestNeighborMatch(object):
                 matching or not
             random_state (numpy.random.RandomState or int): RandomState or an
                 int seed
+            n_jobs (int): The number of parallel jobs to run for neighbors search.
+                None means 1 unless in a joblib.parallel_backend context. -1 means using all processors
         """
         self.caliper = caliper
         self.replace = replace
         self.ratio = ratio
         self.shuffle = shuffle
         self.random_state = check_random_state(random_state)
+        self.n_jobs = n_jobs
 
     def match(self, data, treatment_col, score_cols):
         """Find matches from the control group by matching on specified columns
@@ -136,7 +141,7 @@ class NearestNeighborMatch(object):
             # SD is the same as caliper because we use a StandardScaler above
             sdcal = self.caliper
 
-            matching_model = NearestNeighbors(n_neighbors=self.ratio)
+            matching_model = NearestNeighbors(n_neighbors=self.ratio, n_jobs=self.n_jobs)
             matching_model.fit(control_scaled)
             distances, indices = matching_model.kneighbors(treatment_scaled)
 
