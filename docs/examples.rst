@@ -104,7 +104,7 @@ Multiple Simulations
   preds_summary = get_synthetic_summary(simulate_nuisance_and_easy_treatment, n=1000, k=num_simulations)
 
   # Generate scatter plot of performance summary
-  scatter_plot_summary(preds_summay, k=num_simulations)
+  scatter_plot_summary(preds_summary, k=num_simulations)
 
   # Generate bar plot of performance summary
   bar_plot_summary(preds_summary, k=num_simulations)
