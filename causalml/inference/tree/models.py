@@ -1261,10 +1261,11 @@ class UpliftRandomForestClassifier:
                  min_samples_leaf=100,
                  min_samples_treatment=10,
                  n_reg=10,
-                 evaluationFunction=None,
+                 evaluationFunction='KL',
                  control_name=None,
                  normalization=True,
                  n_jobs=-1):
+
         """
         Initialize the UpliftRandomForestClassifier class.
         """
