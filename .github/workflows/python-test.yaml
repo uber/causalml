@@ -1,4 +1,4 @@
-name: Python test on push and pull request
+name: build
 
 on: [push, pull_request]
 
