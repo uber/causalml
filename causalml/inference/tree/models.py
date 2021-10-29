@@ -966,6 +966,7 @@ class UpliftTreeClassifier:
         upliftScore = [maxDiff, p_value]
 
         bestGain = 0.0
+        bestGainImp = 0.0
         bestAttribute = None
 
         # last column is the result/target column, 2nd to the last is the treatment group
@@ -1050,6 +1051,7 @@ class UpliftTreeClassifier:
                         gain = 0
                 if (gain > bestGain and len(X_l) > min_samples_leaf and len(X_r) > min_samples_leaf):
                     bestGain = gain
+                    bestGainImp = gain_for_imp
                     bestAttribute = (col, value)
                     best_set_left = [X_l, w_l, y_l]
                     best_set_right = [X_r, w_r, y_r]
@@ -1063,7 +1065,7 @@ class UpliftTreeClassifier:
         dcY['matchScore'] = round(upliftScore[0], 4)
 
         if bestGain > 0 and depth < max_depth:
-            self.feature_imp_dict[bestAttribute[0]] += gain_for_imp
+            self.feature_imp_dict[bestAttribute[0]] += bestGainImp
             trueBranch = self.growDecisionTreeFrom(
                 *best_set_left, evaluationFunction, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
@@ -1259,10 +1261,11 @@ class UpliftRandomForestClassifier:
                  min_samples_leaf=100,
                  min_samples_treatment=10,
                  n_reg=10,
-                 evaluationFunction=None,
+                 evaluationFunction='KL',
                  control_name=None,
                  normalization=True,
                  n_jobs=-1):
+
         """
         Initialize the UpliftRandomForestClassifier class.
         """

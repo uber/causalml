@@ -140,6 +140,7 @@ def test_UpliftTreeClassifier_feature_importance(generate_classification_data):
                      y=df_train[CONVERSION].values)
 
     assert hasattr(uplift_model, 'feature_importances_')
+    assert (np.all(uplift_model.feature_importances_ >= 0))
     num_non_zero_imp_features = sum([1 if imp > 0 else 0 for imp in uplift_model.feature_importances_])
 
     def getNonleafCount(node):
