@@ -24,6 +24,7 @@ $ git checkout -b branch_name
 ```
 $ git add file1_changed file2_changed
 $ git commit -m "Issue number: message to describe the change."
+```
 7. Push your local branch to remote
 ```
 $ git push origin branch_name
