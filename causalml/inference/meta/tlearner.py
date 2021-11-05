@@ -178,7 +178,7 @@ class BaseTLearner(BaseLearner):
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, treatment, y, p=None, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
+    def estimate_ate(self, X, treatment, y, p=None, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000, pretrain=False):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
@@ -192,7 +192,10 @@ class BaseTLearner(BaseLearner):
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, return_components=True)
+        if pretrain:
+            te, yhat_cs, yhat_ts = self.fit(X, treatment, y, return_components=True)
+        else:
+            te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, return_components=True)
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])

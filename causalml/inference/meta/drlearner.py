@@ -338,6 +338,7 @@ class BaseDRLearner(BaseLearner):
         n_bootstraps=1000,
         bootstrap_size=10000,
         seed=None,
+        pretrain=False
     ):
         """Estimate the Average Treatment Effect (ATE).
 
@@ -355,7 +356,10 @@ class BaseDRLearner(BaseLearner):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, p, return_components=True, seed=seed)
+        if pretrain:
+            te, yhat_cs, yhat_ts = self.fit(X, treatment, y, p, return_components=True, seed=seed)
+        else:
+            te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, p, return_components=True, seed=seed)
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         if p is None:
