@@ -17,7 +17,7 @@ This project is stable and being incubated for long-term support. It may contain
 # Causal ML: A Python Package for Uplift Modeling and Causal Inference with ML
 
 **Causal ML** is a Python package that provides a suite of uplift modeling and causal inference methods using machine learning algorithms based on recent
-research. It provides a standard interface that allows user to estimate the Conditional Average Treatment Effect (CATE) or Individual Treatment
+research [[1]](#papers). It provides a standard interface that allows user to estimate the Conditional Average Treatment Effect (CATE) or Individual Treatment
  Effect (ITE) from experimental or observational data. Essentially, it estimates the causal impact of intervention `T` on outcome `Y` for users
  with observed features `X`, without strong assumptions on the model form. Typical use cases include
 
@@ -28,22 +28,22 @@ research. It provides a standard interface that allows user to estimate the Cond
 The package currently supports the following methods
 
 * **Tree-based algorithms**
-    * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square [[1]](#papers)
-    * Uplift tree/random forests on Contextual Treatment Selection [[2]](#papers)
-    * Causal Tree [[3]](#papers) - Work-in-progress
+    * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square [[2]](#papers)
+    * Uplift tree/random forests on Contextual Treatment Selection [[3]](#papers)
+    * Causal Tree [[4]](#papers) - Work-in-progress
 * **Meta-learner algorithms**
-    * S-learner [[4]](#papers)
-    * T-learner [[4]](#papers)
-    * X-learner [[4]](#papers)
-    * R-learner [[5]](#papers)
-    * Doubly Robust (DR) learner [[6]](#papers)
-    * TMLE learner [[7]](#papers)
+    * S-learner [[5]](#papers)
+    * T-learner [[5]](#papers)
+    * X-learner [[5]](#papers)
+    * R-learner [[6]](#papers)
+    * Doubly Robust (DR) learner [[7]](#papers)
+    * TMLE learner [[8]](#papers)
 * **Instrumental variables algorithms**
     * 2-Stage Least Squares (2SLS)
-    * Doubly Robust (DR) IV [[8]](#papers)
+    * Doubly Robust (DR) IV [[9]](#papers)
 * **Neural-network-based algorithms**
-    * CEVAE [[9]](#papers)
-    * DragonNet [[10]](#papers) - with `causalml[tf]` installation (see [Installation](#installation))
+    * CEVAE [[10]](#papers)
+    * DragonNet [[11]](#papers) - with `causalml[tf]` installation (see [Installation](#installation))
 
 
 # Installation
