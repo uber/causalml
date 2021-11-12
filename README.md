@@ -17,7 +17,7 @@ This project is stable and being incubated for long-term support. It may contain
 # Causal ML: A Python Package for Uplift Modeling and Causal Inference with ML
 
 **Causal ML** is a Python package that provides a suite of uplift modeling and causal inference methods using machine learning algorithms based on recent
-research. It provides a standard interface that allows user to estimate the Conditional Average Treatment Effect (CATE) or Individual Treatment
+research [[1]](#papers). It provides a standard interface that allows user to estimate the Conditional Average Treatment Effect (CATE) or Individual Treatment
  Effect (ITE) from experimental or observational data. Essentially, it estimates the causal impact of intervention `T` on outcome `Y` for users
  with observed features `X`, without strong assumptions on the model form. Typical use cases include
 
@@ -28,22 +28,22 @@ research. It provides a standard interface that allows user to estimate the Cond
 The package currently supports the following methods
 
 * **Tree-based algorithms**
-    * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square [[1]](#papers)
-    * Uplift tree/random forests on Contextual Treatment Selection [[2]](#papers)
-    * Causal Tree [[3]](#papers) - Work-in-progress
+    * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square [[2]](#papers)
+    * Uplift tree/random forests on Contextual Treatment Selection [[3]](#papers)
+    * Causal Tree [[4]](#papers) - Work-in-progress
 * **Meta-learner algorithms**
-    * S-learner [[4]](#papers)
-    * T-learner [[4]](#papers)
-    * X-learner [[4]](#papers)
-    * R-learner [[5]](#papers)
-    * Doubly Robust (DR) learner [[6]](#papers)
-    * TMLE learner [[7]](#papers)
+    * S-learner [[5]](#papers)
+    * T-learner [[5]](#papers)
+    * X-learner [[5]](#papers)
+    * R-learner [[6]](#papers)
+    * Doubly Robust (DR) learner [[7]](#papers)
+    * TMLE learner [[8]](#papers)
 * **Instrumental variables algorithms**
     * 2-Stage Least Squares (2SLS)
-    * Doubly Robust (DR) IV [[8]](#papers)
+    * Doubly Robust (DR) IV [[9]](#papers)
 * **Neural-network-based algorithms**
-    * CEVAE [[9]](#papers)
-    * DragonNet [[10]](#papers) - with `causalml[tf]` installation (see [Installation](#installation))
+    * CEVAE [[10]](#papers)
+    * DragonNet [[11]](#papers) - with `causalml[tf]` installation (see [Installation](#installation))
 
 
 # Installation
@@ -254,16 +254,19 @@ Bibtex:
 
 ## Papers
 
-1. Radcliffe, Nicholas J., and Patrick D. Surry. "Real-world uplift modelling with significance-based uplift trees." White Paper TR-2011-1, Stochastic Solutions (2011): 1-33.
-2. Zhao, Yan, Xiao Fang, and David Simchi-Levi. "Uplift modeling with multiple treatments and general response types." Proceedings of the 2017 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics, 2017.
-3. Athey, Susan, and Guido Imbens. "Recursive partitioning for heterogeneous causal effects." Proceedings of the National Academy of Sciences 113.27 (2016): 7353-7360.
-4. Künzel, Sören R., et al. "Metalearners for estimating heterogeneous treatment effects using machine learning." Proceedings of the national academy of sciences 116.10 (2019): 4156-4165.
-5. Nie, Xinkun, and Stefan Wager. "Quasi-oracle estimation of heterogeneous treatment effects." arXiv preprint arXiv:1712.04912 (2017).
-6. Bang, Heejung, and James M. Robins. "Doubly robust estimation in missing data and causal inference models." Biometrics 61.4 (2005): 962-973.
-7. Van Der Laan, Mark J., and Daniel Rubin. "Targeted maximum likelihood learning." The international journal of biostatistics 2.1 (2006).
-8. Kennedy, Edward H. "Optimal doubly robust estimation of heterogeneous causal effects." arXiv preprint arXiv:2004.14497 (2020).
-9. Louizos, Christos, et al. "Causal effect inference with deep latent-variable models." arXiv preprint arXiv:1705.08821 (2017).
-10. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
+1. Chen, Huigang, Totte Harinen, Jeong-Yoon Lee, Mike Yung, and Zhenyu Zhao. "Causalml: Python package for causal machine learning." arXiv preprint arXiv:2002.11631 (2020).
+2. Radcliffe, Nicholas J., and Patrick D. Surry. "Real-world uplift modelling with significance-based uplift trees." White Paper TR-2011-1, Stochastic Solutions (2011): 1-33.
+3. Zhao, Yan, Xiao Fang, and David Simchi-Levi. "Uplift modeling with multiple treatments and general response types." Proceedings of the 2017 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics, 2017.
+4. Athey, Susan, and Guido Imbens. "Recursive partitioning for heterogeneous causal effects." Proceedings of the National Academy of Sciences 113.27 (2016): 7353-7360.
+5. Künzel, Sören R., et al. "Metalearners for estimating heterogeneous treatment effects using machine learning." Proceedings of the national academy of sciences 116.10 (2019): 4156-4165.
+6. Nie, Xinkun, and Stefan Wager. "Quasi-oracle estimation of heterogeneous treatment effects." arXiv preprint arXiv:1712.04912 (2017).
+7. Bang, Heejung, and James M. Robins. "Doubly robust estimation in missing data and causal inference models." Biometrics 61.4 (2005): 962-973.
+8. Van Der Laan, Mark J., and Daniel Rubin. "Targeted maximum likelihood learning." The international journal of biostatistics 2.1 (2006).
+9. Kennedy, Edward H. "Optimal doubly robust estimation of heterogeneous causal effects." arXiv preprint arXiv:2004.14497 (2020).
+10. Louizos, Christos, et al. "Causal effect inference with deep latent-variable models." arXiv preprint arXiv:1705.08821 (2017).
+11. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
+12. Zhao, Zhenyu, Yumin Zhang, Totte Harinen, and Mike Yung. "Feature Selection Methods for Uplift Modeling." arXiv preprint arXiv:2005.03447 (2020).
+13. Zhao, Zhenyu, and Totte Harinen. "Uplift modeling for multiple treatments with cost optimization." In 2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA), pp. 422-431. IEEE, 2019.
  
 
 ## Related projects
