@@ -1,6 +1,6 @@
-# Contributing to Causal ML
+# Contributing to CausalML
 
-The Causal ML project welcome community contributors.
+The **CausalML** project welcome community contributors.
 To contribute to it, please follow guidelines here.
 
 The codebase is hosted on Github at https://github.com/uber/causalml.
@@ -10,7 +10,7 @@ All code need to follow the [PEP8 style guide](https://www.python.org/dev/peps/p
 Before contributing, please review outstanding issues.
 If you'd like to contribute to something else, open an issue for discussion first.
 
-# Recommended Development Workflow
+## Development Workflow :computer:
 
 1. Fork the `causalml` repo. This will create your own copy of the `causalml` repo. For more details about forks, please check [this guide](https://docs.github.com/en/github/collaborating-with-pull-requests/working-with-forks/about-forks) at GitHub.
 2. Clone the forked repo locally
@@ -21,36 +21,56 @@ $ git checkout -b branch_name
 4. Make a change
 5. Test your change as described below in the Test section
 6. Commit the change to your local branch
-```
+```bash
 $ git add file1_changed file2_changed
 $ git commit -m "Issue number: message to describe the change."
 ```
 7. Push your local branch to remote
-```
+```bash
 $ git push origin branch_name
 ```
 8. Go to GitHub and create PR from your branch in your forked repo to the original `causalml` repo. An instruction to create a PR from a fork is available [here](https://docs.github.com/en/github/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)
 
+## Documentation :books:
 
-# Test
+[**CausalML** documentation](https://causalml.readthedocs.io/) is generated with [Sphinx](https://www.sphinx-doc.org/en/master/) and hosted on [Read the Docs](https://readthedocs.org/).
+
+### Docstrings
+
+All public classes and functions should have docstrings to specify their inputs, outputs, behaviors and/or examples. For docstring conventions in Python, please refer to [PEP257](https://www.python.org/dev/peps/pep-0257/).
+
+**CausalML** supports the NumPy and Google style docstrings in addition to Python's original docstring with [`sphinx.ext.napoleon`](https://www.sphinx-doc.org/en/master/usage/extensions/napoleon.html). Google style docstrings are recommended for simplicity. You can find examples of Google style docstrings [here](https://sphinxcontrib-napoleon.readthedocs.io/en/latest/example_google.html)
+
+### Generating Documentation Locally
+
+You can generate documentation in HTML locally as follows:
+```bash
+$ cd docs/
+$ pip install -r requirements.txt
+$ make html
+```
+
+Documentation will be available in `docs/_build/html/index.html`.
+
+## Test :wrench:
 
 If you added a new inference method, add test code to the `tests/` folder.
 
-## Prerequisites
+### Prerequisites
 
-Causal ML uses `pytest` for tests. Install `pytest` and `pytest-cov`, and the package dependencies:
+**CausalML** uses `pytest` for tests. Install `pytest` and `pytest-cov`, and the package dependencies:
 ```bash
 $ pip install pytest pytest-cov -r requirements.txt
 ```
 
-## Building Cython
+### Building Cython
 
 In order to run tests, you need to build the Cython modules
 ```bash
 $ python setup.py build_ext --inplace
 ```
 
-## Testing
+### Testing
 
 Before submitting a PR, make sure the change to pass all tests and test coverage to be at least 70%.
 ```bash
@@ -58,7 +78,7 @@ $ pytest -vs tests/ --cov causalml/
 ```
 
 
-# Submission
+## Submission :tada:
 
 In your PR, please include:
 - Changes made
