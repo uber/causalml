@@ -1,0 +1,14 @@
+name: causalml-rtd-py38
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pip
+  - python=3.8
+  - cython
+  - numpy
+  - scikit-learn
+  - matplotlib
+  - sphinx
+  - sphinx_rtd_theme
+  - sphinxcontrib-bibtex<2.0.0

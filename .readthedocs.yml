@@ -2,7 +2,7 @@
 version: 2
 
 conda:
-  environment: envs/environment-py38.yml
+  environment: docs/environment-py38-rtd.yml
 
 python:
   install:
