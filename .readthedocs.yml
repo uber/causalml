@@ -1,6 +1,14 @@
 # Required
 version: 2
 
+conda:
+  environment: envs/environment-py38.yml
+
+python:
+  install:
+    - method: setuptools
+      path: .
+
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   configuration: docs/conf.py
@@ -9,9 +17,3 @@ sphinx:
 formats: all
 
 # Optionally set the version of Python and requirements required to build your docs
-python:
-  version: 3.8
-  install:
-    - method: setuptools
-      path: .
-    - requirements: docs/requirements.txt
