@@ -33,7 +33,7 @@ def test_UpliftRandomForestClassifier(generate_classification_data):
                      y=df_train[CONVERSION].values)
 
     y_pred = uplift_model.predict(df_test[x_names].values)
-    result = pd.DataFrame(y_pred, columns=uplift_model.classes_)
+    result = pd.DataFrame(y_pred, columns=uplift_model.classes_[1:])
 
     best_treatment = np.where((result < 0).all(axis=1),
                               CONTROL_NAME,
@@ -57,7 +57,7 @@ def test_UpliftRandomForestClassifier(generate_classification_data):
         is_treated=1 - actual_is_control[synthetic],
         conversion=df_test.loc[synthetic, CONVERSION].values,
         uplift_tree=synth.max(axis=1)
-    ).drop(columns=list(uplift_model.classes_))
+    ).drop(columns=list(uplift_model.classes_[1:]))
 
     cumgain = get_cumgain(auuc_metrics,
                           outcome_col=CONVERSION,
@@ -83,14 +83,13 @@ def test_UpliftTreeClassifier(generate_classification_data):
                      treatment=df_train['treatment_group_key'].values,
                      y=df_train[CONVERSION].values)
 
-    _, _, _, y_pred = uplift_model.predict(df_test[x_names].values,
-                                           full_output=True)
+    y_pred = uplift_model.predict(df_test[x_names].values)
     pr.disable()
     with open('UpliftTreeClassifier.prof', 'w') as f:
         ps = pstats.Stats(pr, stream=f).sort_stats('cumulative')
         ps.print_stats()
 
-    result = pd.DataFrame(y_pred)
+    result = pd.DataFrame(y_pred, columns=uplift_model.classes_)
     result.drop(CONTROL_NAME, axis=1, inplace=True)
 
     best_treatment = np.where((result < 0).all(axis=1),
