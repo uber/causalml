@@ -188,8 +188,9 @@ class UpliftTreeClassifier:
         self.feature_imp_dict = defaultdict(float)
 
         if self.evaluationFunction == self.evaluate_DDP and len(self.treatment_group) > 2:
-            raise ValueError("The DDP approach can only cope with two class problems, that is two different treatment options (e.g., control vs treatment)."
-                             "Please select another approach or only use a data set which employs two treatment options.")
+            raise ValueError("The DDP approach can only cope with two class problems, that is two different treatment "
+                             "options (e.g., control vs treatment). Please select another approach or only use a "
+                             "dataset which employs two treatment options.")
 
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
             X, treatment, y, evaluationFunction=self.evaluationFunction,
@@ -981,8 +982,7 @@ class UpliftTreeClassifier:
             # unique values
             lsUnique = np.unique(columnValues)
 
-            if (isinstance(lsUnique[0], int) or
-                isinstance(lsUnique[0], float)):
+            if np.issubdtype(lsUnique.dtype, np.number):
                 if len(lsUnique) > 10:
                     lspercentile = np.percentile(columnValues, [3, 5, 10, 20, 30, 50, 70, 80, 90, 95, 97])
                 else:
@@ -1243,9 +1243,9 @@ class UpliftRandomForestClassifier:
         The normalization factor defined in Rzepakowski et al. 2012,
         correcting for tests with large number of splits and imbalanced
         treatment and control splits
-    
+
     n_jobs: int, optional (default=-1)
-        The parallelization parameter to define how many parallel jobs need to be created. 
+        The parallelization parameter to define how many parallel jobs need to be created.
         This is passed on to joblib library for parallelizing uplift-tree creation.
 
     Outputs
@@ -1361,7 +1361,7 @@ class UpliftRandomForestClassifier:
         y_pred_list : ndarray, shape = (num_samples, num_treatments])
             An ndarray  containing the predicted delta in each treatment group,
             the best treatment group and the maximum delta.
-        
+
         df_res : DataFrame, shape = [num_samples, (num_treatments + 1)]
             If full_output, a DataFrame containing the predicted delta in each treatment group,
             the best treatment group and the maximum delta.
