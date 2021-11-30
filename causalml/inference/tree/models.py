@@ -869,7 +869,7 @@ class UpliftTreeClassifier:
             p_t = currentNodeSummary[suboptTreatment][0]
             n_t = currentNodeSummary[suboptTreatment][1]
 
-        p_value = (1. - stats.norm.cdf((p_c - p_t) / np.sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
+        p_value = (1. - stats.norm.cdf(abs(p_c - p_t) / np.sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
         upliftScore = [maxDiff, p_value]
 
         bestGain = 0.0
