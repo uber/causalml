@@ -22,13 +22,16 @@ from packaging import version
 import pandas as pd
 import scipy.stats as stats
 import sklearn
-from sklearn.utils import check_array, check_random_state
+from sklearn.utils import check_random_state
 if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
     from sklearn.utils._testing import ignore_warnings
 else:
     from sklearn.utils.testing import ignore_warnings
 
 from .utils import entropyH, kl_divergence
+
+
+MAX_INT = np.iinfo(np.int32).max
 
 
 class DecisionTree:
@@ -1200,7 +1203,7 @@ class UpliftRandomForestClassifier:
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         """
-        self.random_state_ = check_random_state(self.random_state)
+        random_state = check_random_state(self.random_state)
 
         # Create forest
         self.uplift_forest = [
@@ -1212,7 +1215,7 @@ class UpliftRandomForestClassifier:
                 evaluationFunction=self.evaluationFunction,
                 control_name=self.control_name,
                 normalization=self.normalization,
-                random_state=self.random_state_)
+                random_state=random_state.randint(MAX_INT))
             for _ in range(self.n_estimators)
         ]
 
@@ -1232,8 +1235,10 @@ class UpliftRandomForestClassifier:
         self.feature_importances_ = np.mean(all_importances, axis=0)
         self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
-    def bootstrap(self, X, treatment, y, tree):
-        bt_index = self.random_state_.choice(len(X), len(X))
+    @staticmethod
+    def bootstrap(X, treatment, y, tree):
+        random_state = check_random_state(tree.random_state)
+        bt_index = random_state.choice(len(X), len(X))
         x_train_bt = X[bt_index]
         y_train_bt = y[bt_index]
         treatment_train_bt = treatment[bt_index]
