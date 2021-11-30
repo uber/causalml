@@ -25,7 +25,8 @@ def test_UpliftRandomForestClassifier(generate_classification_data):
     # Train the UpLift Random Forest classifier
     uplift_model = UpliftRandomForestClassifier(
         min_samples_leaf=50,
-        control_name=TREATMENT_NAMES[0]
+        control_name=TREATMENT_NAMES[0],
+        random_state=RANDOM_SEED
     )
 
     uplift_model.fit(df_train[x_names].values,
@@ -75,7 +76,7 @@ def test_UpliftTreeClassifier(generate_classification_data):
                                          random_state=RANDOM_SEED)
 
     # Train the UpLift Random Forest classifier
-    uplift_model = UpliftTreeClassifier(control_name=TREATMENT_NAMES[0])
+    uplift_model = UpliftTreeClassifier(control_name=TREATMENT_NAMES[0], random_state=RANDOM_SEED)
 
     pr = cProfile.Profile(subcalls=True, builtins=True, timeunit=.001)
     pr.enable()
@@ -133,7 +134,7 @@ def test_UpliftTreeClassifier_feature_importance(generate_classification_data):
                                          random_state=RANDOM_SEED)
 
     # Train the upLift classifier
-    uplift_model = UpliftTreeClassifier(control_name=TREATMENT_NAMES[0])
+    uplift_model = UpliftTreeClassifier(control_name=TREATMENT_NAMES[0], random_state=RANDOM_SEED)
     uplift_model.fit(df_train[x_names].values,
                      treatment=df_train['treatment_group_key'].values,
                      y=df_train[CONVERSION].values)

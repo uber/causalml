@@ -22,6 +22,7 @@ from packaging import version
 import pandas as pd
 import scipy.stats as stats
 import sklearn
+from sklearn.utils import check_array, check_random_state
 if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
     from sklearn.utils._testing import ignore_warnings
 else:
@@ -141,16 +142,19 @@ class UpliftTreeClassifier:
         parent node influence on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
     control_name: string
-        The name of the control group (other experiment groups will be regarded as treatment groups)
+        The name of the control group (other experiment groups will be regarded as treatment groups).
 
     normalization: boolean, optional (default=True)
         The normalization factor defined in Rzepakowski et al. 2012, correcting for tests with large number of splits
-        and imbalanced treatment and control splits
+        and imbalanced treatment and control splits.
+
+    random_state: int, RandomState instance or None (default=None)
+        A random seed or `np.random.RandomState` to control randomness in building a tree.
 
     """
     def __init__(self, control_name, max_features=None, max_depth=3, min_samples_leaf=100,
                  min_samples_treatment=10, n_reg=100, evaluationFunction='KL',
-                 normalization=True):
+                 normalization=True, random_state=None):
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
@@ -175,6 +179,7 @@ class UpliftTreeClassifier:
         self.n_class = 1
 
         self.normalization = normalization
+        self.random_state = random_state
 
     def fit(self, X, treatment, y):
         """ Fit the uplift model.
@@ -195,6 +200,8 @@ class UpliftTreeClassifier:
         self : object
         """
         assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
+
+        self.random_state_ = check_random_state(self.random_state)
 
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
@@ -873,7 +880,7 @@ class UpliftTreeClassifier:
         else:
             max_features = columnCount
 
-        for col in list(np.random.choice(a=range(columnCount), size=max_features, replace=False)):
+        for col in list(self.random_state_.choice(a=range(columnCount), size=max_features, replace=False)):
             columnValues = X[:, col]
             # unique values
             lsUnique = np.unique(columnValues)
@@ -917,8 +924,8 @@ class UpliftTreeClassifier:
                     gain = (currentScore - p * leftScore1 - (1 - p) * rightScore2)
                     gain_for_imp = (len(X) * currentScore - len(X_l) * leftScore1 - len(X_r) * rightScore2)
                 elif self.evaluationFunction == self.evaluate_DDP:
-                    leftScore1 = self.evaluationFunction(leftNodeSummary, control_name=self.control_name)
-                    rightScore2 = self.evaluationFunction(rightNodeSummary, control_name=self.control_name)
+                    leftScore1 = self.evaluationFunction(leftNodeSummary)
+                    rightScore2 = self.evaluationFunction(rightNodeSummary)
                     gain = np.abs(leftScore1 - rightScore2)
                     gain_for_imp = np.abs(len(X_l) * leftScore1 - len(X_r) * rightScore2)
                 else:
@@ -1107,8 +1114,8 @@ class UpliftRandomForestClassifier:
     max_features: int, optional (default=10)
         The number of features to consider when looking for the best split.
 
-    random_state: int, optional (default=2019)
-        The seed used by the random number generator.
+    random_state: int, RandomState instance or None (default=None)
+        A random seed or `np.random.RandomState` to control randomness in building the trees and forest.
 
     max_depth: int, optional (default=5)
         The maximum depth of the tree.
@@ -1145,7 +1152,7 @@ class UpliftRandomForestClassifier:
                  control_name,
                  n_estimators=10,
                  max_features=10,
-                 random_state=2019,
+                 random_state=None,
                  max_depth=5,
                  min_samples_leaf=100,
                  min_samples_treatment=10,
@@ -1166,6 +1173,7 @@ class UpliftRandomForestClassifier:
         self.n_reg = n_reg
         self.evaluationFunction = evaluationFunction
         self.control_name = control_name
+        self.normalization = normalization
         self.n_jobs = n_jobs
 
         assert control_name is not None and isinstance(control_name, str), \
@@ -1173,20 +1181,6 @@ class UpliftRandomForestClassifier:
         self.control_name = control_name
         self.classes_ = [control_name]
         self.n_class = 1
-
-        # Create forest
-        self.uplift_forest = []
-        for _ in range(n_estimators):
-            uplift_tree = UpliftTreeClassifier(
-                max_features=self.max_features, max_depth=self.max_depth,
-                min_samples_leaf=self.min_samples_leaf,
-                min_samples_treatment=self.min_samples_treatment,
-                n_reg=self.n_reg,
-                evaluationFunction=self.evaluationFunction,
-                control_name=self.control_name,
-                normalization=normalization)
-
-            self.uplift_forest.append(uplift_tree)
 
         if self.n_jobs == -1:
             self.n_jobs = mp.cpu_count()
@@ -1206,7 +1200,21 @@ class UpliftRandomForestClassifier:
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         """
-        np.random.seed(self.random_state)
+        self.random_state_ = check_random_state(self.random_state)
+
+        # Create forest
+        self.uplift_forest = [
+            UpliftTreeClassifier(
+                max_features=self.max_features, max_depth=self.max_depth,
+                min_samples_leaf=self.min_samples_leaf,
+                min_samples_treatment=self.min_samples_treatment,
+                n_reg=self.n_reg,
+                evaluationFunction=self.evaluationFunction,
+                control_name=self.control_name,
+                normalization=self.normalization,
+                random_state=self.random_state_)
+            for _ in range(self.n_estimators)
+        ]
 
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
@@ -1224,9 +1232,8 @@ class UpliftRandomForestClassifier:
         self.feature_importances_ = np.mean(all_importances, axis=0)
         self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
-    @staticmethod
-    def bootstrap(X, treatment, y, tree):
-        bt_index = np.random.choice(len(X), len(X))
+    def bootstrap(self, X, treatment, y, tree):
+        bt_index = self.random_state_.choice(len(X), len(X))
         x_train_bt = X[bt_index]
         y_train_bt = y[bt_index]
         treatment_train_bt = treatment[bt_index]
@@ -1252,7 +1259,7 @@ class UpliftRandomForestClassifier:
         -------
         y_pred_list : ndarray, shape = (num_samples, num_treatments])
             An ndarray containing the predicted treatment effect of each treatment group for each sample
-        
+
         df_res : DataFrame, shape = [num_samples, (num_treatments * 2 + 3)]
             If `full_output` is `True`, a DataFrame containing the predicted outcome of each treatment and
             control group, the treatment effect of each treatment group, the treatment group with the
