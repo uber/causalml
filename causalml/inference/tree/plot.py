@@ -80,9 +80,9 @@ def uplift_tree_plot(decisionTree, x_names):
     def toString(iSplit, decisionTree, bBranch, szParent="null", indent='', indexParent=0, upliftScores=list()):
         if decisionTree.results is not None:  # leaf node
             lsY = []
-            for szX, n in decisionTree.results.items():
-                lsY.append('%s:%.2f' % (szX, n))
-            dcY = {"name": "%s" % ', '.join(lsY), "parent": szParent}
+            for tr, p in zip(decisionTree.classes_, decisionTree.results):
+                lsY.append(f'{tr}:{p:.2f}')
+            dcY = {"name": ', '.join(lsY), "parent": szParent}
             dcSummary = decisionTree.summary
             upliftScores += [dcSummary['matchScore']]
             dcNodes[iSplit].append(['leaf', dcY['name'], szParent, bBranch,
