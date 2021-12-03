@@ -9,7 +9,7 @@ from xgboost import XGBRegressor
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (check_treatment_vector,
-    get_xgboost_objective_metric, convert_pd_to_np)
+    get_xgboost_objective_metric, convert_pd_to_np, get_weighted_variance)
 from causalml.inference.meta.explainer import Explainer
 from causalml.propensity import compute_propensity_score, ElasticNetPropensityModel
 
@@ -70,7 +70,7 @@ class BaseRLearner(BaseLearner):
                 f'\teffect_learner={self.model_tau.__repr__()}\n'
                 f'\tpropensity_learner={self.model_p.__repr__()}')
 
-    def fit(self, X, treatment, y, p=None, verbose=True):
+    def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
@@ -80,10 +80,15 @@ class BaseRLearner(BaseLearner):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array or pd.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
+        if sample_weight is not None:
+            assert len(sample_weight) == len(y), "Data length must be equal for sample_weight and the input data"
+            sample_weight = convert_pd_to_np(sample_weight)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 
@@ -111,13 +116,24 @@ class BaseRLearner(BaseLearner):
             p_filt = p[group][mask]
             w = (treatment_filt == group).astype(int)
 
+            weight = (w - p_filt) ** 2
+            diff_c = y_filt[w == 0] - yhat_filt[w == 0]
+            diff_t = y_filt[w == 1] - yhat_filt[w == 1]
+            if sample_weight is not None:
+                sample_weight_filt = sample_weight[mask]
+                sample_weight_filt_c = sample_weight_filt[w == 0]
+                sample_weight_filt_t = sample_weight_filt[w == 1]
+                self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
+                self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
+                weight *= sample_weight_filt  # update weight
+            else:
+                self.vars_c[group] = diff_c.var()
+                self.vars_t[group] = diff_t.var()
+
             if verbose:
                 logger.info('training the treatment effect model for {} with R-loss'.format(group))
             self.models_tau[group].fit(X_filt, (y_filt - yhat_filt) / (w - p_filt),
-                                       sample_weight=(w - p_filt) ** 2)
-
-            self.vars_c[group] = (y_filt[w == 0] - yhat_filt[w == 0]).var()
-            self.vars_t[group] = (y_filt[w == 1] - yhat_filt[w == 1]).var()
+                                       sample_weight=weight)
 
     def predict(self, X, p=None):
         """Predict treatment effects.
@@ -136,7 +152,7 @@ class BaseRLearner(BaseLearner):
 
         return te
 
-    def fit_predict(self, X, treatment, y, p=None, return_ci=False,
+    def fit_predict(self, X, treatment, y, p=None, sample_weight=None, return_ci=False,
                     n_bootstraps=1000, bootstrap_size=10000, verbose=True):
         """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
 
@@ -147,6 +163,8 @@ class BaseRLearner(BaseLearner):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array or pd.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -157,7 +175,7 @@ class BaseRLearner(BaseLearner):
                 UB [n_samples, n_treatment]
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        self.fit(X, treatment, y, p, verbose=verbose)
+        self.fit(X, treatment, y, p, sample_weight, verbose=verbose)
         te = self.predict(X)
 
         if not return_ci:
@@ -189,7 +207,8 @@ class BaseRLearner(BaseLearner):
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, treatment, y, p=None, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
+    def estimate_ate(self, X, treatment, y, p=None, sample_weight=None, bootstrap_ci=False,
+                     n_bootstraps=1000, bootstrap_size=10000):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
@@ -199,6 +218,8 @@ class BaseRLearner(BaseLearner):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array or pd.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -206,7 +227,7 @@ class BaseRLearner(BaseLearner):
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        te = self.fit_predict(X, treatment, y, p, return_ci=False)
+        te = self.fit_predict(X, treatment, y, p, sample_weight, return_ci=False)
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -337,7 +358,7 @@ class BaseRClassifier(BaseRLearner):
         if (outcome_learner is None) and (effect_learner is None):
             raise ValueError("Either the outcome learner or the effect learner must be specified.")
 
-    def fit(self, X, treatment, y, p=None, verbose=True):
+    def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
@@ -347,10 +368,15 @@ class BaseRClassifier(BaseRLearner):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array or pd.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
+        if sample_weight is not None:
+            assert len(sample_weight) == len(y), "Data length must be equal for sample_weight and the input data"
+            sample_weight = convert_pd_to_np(sample_weight)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 
@@ -378,13 +404,24 @@ class BaseRClassifier(BaseRLearner):
             p_filt = p[group][mask]
             w = (treatment_filt == group).astype(int)
 
+            weight = (w - p_filt) ** 2
+            diff_c = y_filt[w == 0] - yhat_filt[w == 0]
+            diff_t = y_filt[w == 1] - yhat_filt[w == 1]
+            if sample_weight is not None:
+                sample_weight_filt = sample_weight[mask]
+                sample_weight_filt_c = sample_weight_filt[w == 0]
+                sample_weight_filt_t = sample_weight_filt[w == 1]
+                self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
+                self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
+                weight *= sample_weight_filt  # update weight
+            else:
+                self.vars_c[group] = diff_c.var()
+                self.vars_t[group] = diff_t.var()
+
             if verbose:
                 logger.info('training the treatment effect model for {} with R-loss'.format(group))
             self.models_tau[group].fit(X_filt, (y_filt - yhat_filt) / (w - p_filt),
-                                       sample_weight=(w - p_filt) ** 2)
-
-            self.vars_c[group] = (y_filt[w == 0] - yhat_filt[w == 0]).var()
-            self.vars_t[group] = (y_filt[w == 1] - yhat_filt[w == 1]).var()
+                                       sample_weight=weight)
 
     def predict(self, X, p=None):
         """Predict treatment effects.
@@ -447,7 +484,7 @@ class XGBRRegressor(BaseRRegressor):
                                         **kwargs)
         )
 
-    def fit(self, X, treatment, y, p=None, verbose=True):
+    def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
         """Fit the treatment effect and outcome models of the R learner.
 
         Args:
@@ -456,10 +493,15 @@ class XGBRRegressor(BaseRRegressor):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array or pd.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
+        # initialize equal sample weight if it's not provided, for simplicity purpose
+        sample_weight = convert_pd_to_np(sample_weight) if sample_weight is not None else convert_pd_to_np(np.ones(len(y)))
+        assert len(sample_weight) == len(y), "Data length must be equal for sample_weight and the input data"
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 
@@ -487,31 +529,39 @@ class XGBRRegressor(BaseRRegressor):
             y_filt = y[treatment_mask]
             yhat_filt = yhat[treatment_mask]
             p_filt = p[group][treatment_mask]
+            sample_weight_filt = sample_weight[treatment_mask]
 
             if verbose:
                 logger.info('training the treatment effect model for {} with R-loss'.format(group))
 
             if self.early_stopping:
                 X_train_filt, X_test_filt, y_train_filt, y_test_filt, yhat_train_filt, yhat_test_filt, \
-                    w_train, w_test, p_train_filt, p_test_filt = train_test_split(
-                        X_filt, y_filt, yhat_filt, w, p_filt,
+                    w_train, w_test, p_train_filt, p_test_filt, sample_weight_train_filt, sample_weight_test_filt \
+                    = train_test_split(
+                        X_filt, y_filt, yhat_filt, w, p_filt, sample_weight_filt,
                         test_size=self.test_size, random_state=self.random_state
                     )
 
+                weight = sample_weight_filt
                 self.models_tau[group].fit(X=X_train_filt,
                                            y=(y_train_filt - yhat_train_filt) / (w_train - p_train_filt),
-                                           sample_weight=(w_train - p_train_filt) ** 2,
+                                           sample_weight=sample_weight_train_filt * ((w_train - p_train_filt) ** 2),
                                            eval_set=[(X_test_filt,
                                                       (y_test_filt - yhat_test_filt) / (w_test - p_test_filt))],
-                                           sample_weight_eval_set=[(w_test - p_test_filt) ** 2],
+                                           sample_weight_eval_set=[sample_weight_test_filt * ((w_test - p_test_filt) ** 2)],
                                            eval_metric=self.effect_learner_eval_metric,
                                            early_stopping_rounds=self.early_stopping_rounds,
                                            verbose=verbose)
 
             else:
                 self.models_tau[group].fit(X_filt, (y_filt - yhat_filt) / (w - p_filt),
-                                           sample_weight=(w - p_filt) ** 2,
+                                           sample_weight=sample_weight_filt * ((w - p_filt) ** 2),
                                            eval_metric=self.effect_learner_eval_metric)
 
-            self.vars_c[group] = (y_filt[w == 0] - yhat_filt[w == 0]).var()
-            self.vars_t[group] = (y_filt[w == 1] - yhat_filt[w == 1]).var()
+            diff_c = y_filt[w == 0] - yhat_filt[w == 0]
+            diff_t = y_filt[w == 1] - yhat_filt[w == 1]
+            sample_weight_filt_c = sample_weight_filt[w == 0]
+            sample_weight_filt_t = sample_weight_filt[w == 1]
+            self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
+            self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
+

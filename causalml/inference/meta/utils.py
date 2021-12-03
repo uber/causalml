@@ -100,3 +100,25 @@ def get_xgboost_objective_metric(objective):
     assert (objective in metric_mapping), \
         'Effect learner objective must be one of: ' + ", ".join(metric_mapping)
     return objective, metric_mapping[objective]
+
+def get_weighted_variance(x, sample_weight):
+    """
+    Calculate the variance of array x with sample_weight.
+
+    Args
+    ----
+
+    x : (np.array)
+        A list of number
+
+    sample_weight (np.array or list): an array of sample weights indicating the
+        weight of each observation for `effect_learner`. If None, it assumes equal weight.
+
+    Returns
+    -------
+    The variance of x with sample weight
+    """
+    average = np.average(x, weights=sample_weight)
+    variance = np.average((x-average)**2, weights=sample_weight)
+    return variance
+
