@@ -12,7 +12,7 @@ from causalml.dataset import synthetic_data
 from causalml.inference.meta import BaseSLearner, BaseSRegressor, BaseSClassifier, LRSRegressor
 from causalml.inference.meta import BaseTLearner, BaseTRegressor, BaseTClassifier, XGBTRegressor, MLPTRegressor
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
-from causalml.inference.meta import BaseRLearner, BaseRClassifier, BaseRRegressor
+from causalml.inference.meta import BaseRLearner, BaseRClassifier, BaseRRegressor, XGBRRegressor
 from causalml.inference.meta import TMLELearner
 from causalml.inference.meta import BaseDRLearner
 from causalml.metrics import ape, get_cumgain
@@ -638,6 +638,60 @@ def test_BaseRClassifier(generate_classification_data):
     # Check if the cumulative gain when using the model's prediction is
     # higher than it would be under random targeting
     assert cumgain['tau_pred'].sum() > cumgain['Random'].sum()
+
+
+def test_BaseRClassifier_with_sample_weights(generate_classification_data):
+
+    np.random.seed(RANDOM_SEED)
+
+    df, x_names = generate_classification_data()
+
+    df['treatment_group_key'] = np.where(df['treatment_group_key'] == CONTROL_NAME, 0, 1)
+    df['sample_weights'] = np.random.randint(low=1, high=3, size=df.shape[0])
+
+    propensity_model = LogisticRegression()
+    propensity_model.fit(X=df[x_names].values, y=df['treatment_group_key'].values)
+    df['propensity_score'] = propensity_model.predict_proba(df[x_names].values)[:, 1]
+
+    df_train, df_test = train_test_split(df,
+                                         test_size=0.2,
+                                         random_state=RANDOM_SEED)
+
+    uplift_model = BaseRClassifier(outcome_learner=XGBClassifier(),
+                                   effect_learner=XGBRegressor())
+
+    uplift_model.fit(X=df_train[x_names].values,
+                     p=df_train['propensity_score'].values,
+                     treatment=df_train['treatment_group_key'].values,
+                     y=df_train[CONVERSION].values,
+                     sample_weight=df_train['sample_weights'])
+
+    tau_pred = uplift_model.predict(X=df_test[x_names].values)
+
+    auuc_metrics = pd.DataFrame({'tau_pred': tau_pred.flatten(),
+                                 'W': df_test['treatment_group_key'].values,
+                                 CONVERSION: df_test[CONVERSION].values,
+                                 'treatment_effect_col': df_test['treatment_effect'].values})
+
+    cumgain = get_cumgain(auuc_metrics,
+                          outcome_col=CONVERSION,
+                          treatment_col='W',
+                          treatment_effect_col='treatment_effect_col')
+
+    # Check if the cumulative gain when using the model's prediction is
+    # higher than it would be under random targeting
+    assert cumgain['tau_pred'].sum() > cumgain['Random'].sum()
+
+    # Check if XGBRRegressor successfully produces treatment effect estimation
+    # when sample_weight is passed
+    uplift_model = XGBRRegressor()
+    uplift_model.fit(X=df_train[x_names].values,
+                     p=df_train['propensity_score'].values,
+                     treatment=df_train['treatment_group_key'].values,
+                     y=df_train[CONVERSION].values,
+                     sample_weight=df_train['sample_weights'])
+    tau_pred = uplift_model.predict(X=df_test[x_names].values)
+    assert len(tau_pred) == len(df_test['sample_weights'].values)
 
 
 def test_pandas_input(generate_regression_data):
