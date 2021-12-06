@@ -82,7 +82,7 @@ Mechanism 4
 |
 | The treatment flag is a binomial variable whose d.g.p. is:
 |
-|   :math:`P(W_i = 1 | X_i) = \frac{1}{1+\exp{-X_{i1}} + np.exp{-X_{i2}}}`
+|   :math:`P(W_i = 1 | X_i) = \frac{1}{1+\exp{-X_{i1}} + \exp{-X_{i2}}}`
 |
 | The outcome variable is:
 |
