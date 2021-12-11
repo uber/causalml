@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="https://github.com/uber/causalml"><img width="380px" height="140px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/causalml_logo.png"></a>
+  <a href="https://github.com/uber/causalml"><img width="380px" height="140px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/logo/causalml_logo.png"></a>
 </div>
 
 ------------------------------------------------------
