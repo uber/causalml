@@ -89,6 +89,29 @@ Mechanism 4
 |   :math:`y_i = \frac{1}{2}\big(max(X_{i1} + X_{i2} + X_{i3}, 0) + max(X_{i4} + X_{i5}, 0)\big) + (W_i - 0.5)(max(X_{i1} + X_{i2} + X_{i3}, 0) - max(X_{i4}, X_{i5}, 0))`
 |
 
+Validation with Uplift Curve (AUUC)
+----------------------------------
+
+We can validate the estimation by evaluating and comparing the uplift gains with AUUC (Area Under Uplift Curve), it calculates cumulative gains and please find more details in `meta_learners_with_synthetic_data.ipynb example notebook <https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data.ipynb>`_.
+
+.. code-block:: python
+
+    from causalml.dataset import *
+    from causalml.metrics import *
+    # Single simulation
+    train_preds, valid_preds = get_synthetic_preds_holdout(simulate_nuisance_and_easy_treatment,
+                                                           n=50000,
+                                                           valid_size=0.2)
+    # Cumulative Gain AUUC values for a Single Simulation of Validaiton Data
+    get_synthetic_auuc(valid_preds)
+
+
+.. image:: ./_static/img/auuc_table_vis.png
+    :width: 629
+
+.. image:: ./_static/img/auuc_vis.png
+    :width: 629
+
 Validation with Sensitivity Analysis
 ----------------------------------
 Sensitivity analysis aim to check the robustness of the unconfoundeness assumption. If there is hidden bias (unobserved confounders), it detemineds how severe whould have to be to change conclusion by examine the average treatment effect estimation.
