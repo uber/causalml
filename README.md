@@ -238,6 +238,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](https:
 ## Conference Talks and Publications by CausalML Team
 * (Talk) Introduction to CausalML at [Causal Data Science Meeting 2021](https://www.causalscience.org/meeting/program/day-2/)
 * (Talk) Introduction to CausalML at [2021 Conference on Digital Experimentation @ MIT (CODE@MIT)](https://ide.mit.edu/events/2021-conference-on-digital-experimentation-mit-codemit/)
+* (Talk) Causal Inference and Machine Learning in Practice with EconML and CausalML: Industrial Use Cases at Microsoft, TripAdvisor, Uber at [KDD 2021 Tutorials](https://kdd.org/kdd2021/tutorials) ([website and slide links](https://causal-machine-learning.github.io/kdd2021-tutorial/))
 * (Publication) CausalML White Paper [Causalml: Python package for causal machine learning](https://arxiv.org/abs/2002.11631)
 * (Publication) [Uplift Modeling for Multiple Treatments with Cost Optimization](https://ieeexplore.ieee.org/document/8964199) at [2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA)](http://203.170.84.89/~idawis33/dsaa2019/preliminary-program/)
 * (Publication) [Feature Selection Methods for Uplift Modeling](https://arxiv.org/abs/2005.03447)
