@@ -52,7 +52,7 @@ Installation with `conda` is recommended. `conda` environment files for Python 3
 
 ## Install using `conda`:
 
-This will create a new `conda` virtual environment named `causalml-[tf-]py3x`, where `x` is in `[6, 7, 8, 9]`. e.g. `causalml-py37` or `causalml-tf-py-38`. `If you want to change the name of the environment, update the relevant YAML file in `envs/`
+This will create a new `conda` virtual environment named `causalml-[tf-]py3x`, where `x` is in `[6, 7, 8, 9]`. e.g. `causalml-py37` or `causalml-tf-py38`. If you want to change the name of the environment, update the relevant YAML file in `envs/`
 
 ```
 $ git clone https://github.com/uber/causalml.git
