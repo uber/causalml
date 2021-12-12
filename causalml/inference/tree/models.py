@@ -22,7 +22,7 @@ from packaging import version
 import pandas as pd
 import scipy.stats as stats
 import sklearn
-from sklearn.utils import check_random_state
+from sklearn.utils import check_array, check_random_state, check_X_y
 if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
     from sklearn.utils._testing import ignore_warnings
 else:
@@ -202,15 +202,20 @@ class UpliftTreeClassifier:
         -------
         self : object
         """
-        assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
         self.random_state_ = check_random_state(self.random_state)
+
+        X, y = check_X_y(X, y)
+        treatment = np.asarray(treatment)
+        assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
         self.classes_ = [self.control_name]
-        for tr in treatment_groups:
+        treatment_idx = np.zeros_like(treatment, dtype=int)
+        for i, tr in enumerate(treatment_groups, 1):
             self.classes_.append(tr)
+            treatment_idx[treatment == tr] = i
         self.n_class = len(self.classes_)
 
         self.feature_imp_dict = defaultdict(float)
@@ -221,7 +226,7 @@ class UpliftTreeClassifier:
                              "dataset which employs two treatment options.")
 
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
-            X, treatment, y,
+            X, treatment_idx, y,
             max_depth=self.max_depth, min_samples_leaf=self.min_samples_leaf,
             depth=1, min_samples_treatment=self.min_samples_treatment,
             n_reg=self.n_reg, parentNodeSummary=None
@@ -255,9 +260,17 @@ class UpliftTreeClassifier:
         -------
         self : object
         """
-        assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
-        self.pruneTree(X, treatment, y,
+        X, y = check_X_y(X, y)
+        treatment = np.asarray(treatment)
+        assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
+
+        # Get treatment group keys. self.classes_[0] is reserved for the control group.
+        treatment_idx = np.zeros_like(treatment)
+        for i, tr in enumerate(self.classes_):
+            treatment_idx[treatment == tr] = i
+
+        self.pruneTree(X, treatment_idx, y,
                        tree=self.fitted_uplift_tree,
                        rule=rule,
                        minGain=minGain,
@@ -265,7 +278,7 @@ class UpliftTreeClassifier:
                        parentNodeSummary=None)
         return self
 
-    def pruneTree(self, X, treatment, y, tree, rule='maxAbsDiff', minGain=0.,
+    def pruneTree(self, X, treatment_idx, y, tree, rule='maxAbsDiff', minGain=0.,
                   n_reg=0,
                   parentNodeSummary=None):
         """Prune one single tree node in the uplift model.
@@ -273,8 +286,8 @@ class UpliftTreeClassifier:
         ----
         X : ndarray, shape = [num_samples, num_features]
             An ndarray of the covariates used to train the uplift model.
-        treatment : array-like, shape = [num_samples]
-            An array containing the treatment group for each unit.
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         rule : string, optional (default = 'maxAbsDiff')
@@ -294,12 +307,12 @@ class UpliftTreeClassifier:
         """
         # Current Node Summary for Validation Data Set
         currentNodeSummary = self.tree_node_summary(
-            treatment, y, min_samples_treatment=self.min_samples_treatment,
+            treatment_idx, y, min_samples_treatment=self.min_samples_treatment,
             n_reg=n_reg, parentNodeSummary=parentNodeSummary
         )
         tree.nodeSummary = currentNodeSummary
         # Divide sets for child nodes
-        X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment, y, tree.col, tree.value)
+        X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, tree.col, tree.value)
 
         # recursive call for each branch
         if tree.trueBranch.results is None:
@@ -434,12 +447,20 @@ class UpliftTreeClassifier:
         -------
         self : object
         """
-        assert len(X) == len(y) and len(X) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
-        self.fillTree(X, treatment, y, tree=self.fitted_uplift_tree)
+        X, y = check_X_y(X, y)
+        treatment = np.asarray(treatment)
+        assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
+
+        # Get treatment group keys. self.classes_[0] is reserved for the control group.
+        treatment_idx = np.zeros_like(treatment)
+        for i, tr in enumerate(self.classes_):
+            treatment_idx[treatment == tr] = i
+
+        self.fillTree(X, treatment_idx, y, tree=self.fitted_uplift_tree)
         return self
 
-    def fillTree(self, X, treatment, y, tree):
+    def fillTree(self, X, treatment_idx, y, tree):
         """ Fill the data into an existing tree.
         This is a lower-level function to execute on the tree filling task.
 
@@ -447,8 +468,8 @@ class UpliftTreeClassifier:
         ----
         X : ndarray, shape = [num_samples, num_features]
             An ndarray of the covariates used to train the uplift model.
-        treatment : array-like, shape = [num_samples]
-            An array containing the treatment group for each unit.
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         tree : object
@@ -459,13 +480,13 @@ class UpliftTreeClassifier:
         self : object
         """
         # Current Node Summary for Validation Data Set
-        currentNodeSummary = self.tree_node_summary(treatment, y,
+        currentNodeSummary = self.tree_node_summary(treatment_idx, y,
                                                     min_samples_treatment=0,
                                                     n_reg=0,
                                                     parentNodeSummary=None)
         tree.nodeSummary = currentNodeSummary
         # Divide sets for child nodes
-        X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment, y, tree.col, tree.value)
+        X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, tree.col, tree.value)
 
         # recursive call for each branch
         if tree.trueBranch is not None:
@@ -487,7 +508,7 @@ class UpliftTreeClassifier:
             tree.summary['group_size'] += ' ' + treatment_group + ': ' + str(summary[1])
         # classProb
         if tree.results is not None:
-            tree.results = self.uplift_classification_results(treatment, y)
+            tree.results = self.uplift_classification_results(treatment_idx, y)
         return self
 
     def predict(self, X):
@@ -506,6 +527,8 @@ class UpliftTreeClassifier:
             An ndarray of predicted treatment effects across treatments.
         '''
 
+        X = check_array(X)
+
         pred_nodes = []
         for i_row in range(len(X)):
             pred_leaf, _ = self.classify(X[i_row], self.fitted_uplift_tree, dataMissing=False)
@@ -513,7 +536,7 @@ class UpliftTreeClassifier:
         return np.array(pred_nodes)
 
     @staticmethod
-    def divideSet(X, treatment, y, column, value):
+    def divideSet(X, treatment_idx, y, column, value):
         '''
         Tree node split.
 
@@ -521,8 +544,8 @@ class UpliftTreeClassifier:
         ----
         X : ndarray, shape = [num_samples, num_features]
             An ndarray of the covariates used to train the uplift model.
-        treatment : array-like, shape = [num_samples]
-            An array containing the treatment group for each unit.
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         column : int
@@ -536,21 +559,21 @@ class UpliftTreeClassifier:
                 The covariates, treatments and outcomes of left node and the right node.
         '''
         # for int and float values
-        if isinstance(value, int) or isinstance(value, float):
+        if np.issubdtype(value.dtype, np.number):
             filt = X[:, column] >= value
         else:  # for strings
             filt = X[:, column] == value
 
-        return X[filt], X[~filt], treatment[filt], treatment[~filt], y[filt], y[~filt]
+        return X[filt], X[~filt], treatment_idx[filt], treatment_idx[~filt], y[filt], y[~filt]
 
-    def group_uniqueCounts(self, treatment, y):
+    def group_uniqueCounts(self, treatment_idx, y):
         '''
         Count sample size by experiment group.
 
         Args
         ----
-        treatment : array-like, shape = [num_samples]
-            An array containing the treatment group for each unit.
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
 
@@ -561,8 +584,7 @@ class UpliftTreeClassifier:
         '''
         results = []
         for i in range(self.n_class):
-            t = self.classes_[i]
-            filt = treatment == t
+            filt = treatment_idx == i
             n_pos = y[filt].sum()
 
             # [N(Y = 0, T = 1), N(Y = 1, T = 1)]
@@ -724,14 +746,14 @@ class UpliftTreeClassifier:
         norm_res += 0.5
         return norm_res
 
-    def tree_node_summary(self, treatment, y, min_samples_treatment=10, n_reg=100, parentNodeSummary=None):
+    def tree_node_summary(self, treatment_idx, y, min_samples_treatment=10, n_reg=100, parentNodeSummary=None):
         '''
         Tree node summary statistics.
 
         Args
         ----
-        treatment : array-like, shape = [num_samples]
-            An array containing the treatment group for each unit.
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         min_samples_treatment: int, optional (default=10)
@@ -751,7 +773,7 @@ class UpliftTreeClassifier:
             in the current node.
         '''
         # counts: [[N(Y=0, T=0), N(Y=1, T=0)], [N(Y=0, T=1), N(Y=1, T=1)], ...]
-        counts = self.group_uniqueCounts(treatment, y)
+        counts = self.group_uniqueCounts(treatment_idx, y)
 
         # nodeSummary: [[P(Y=1|T=0), N(T=0)], [P(Y=1|T=1), N(T=1)], ...]
         nodeSummary = []
@@ -770,14 +792,14 @@ class UpliftTreeClassifier:
 
         return nodeSummary
 
-    def uplift_classification_results(self, treatment, y):
+    def uplift_classification_results(self, treatment_idx, y):
         '''
         Classification probability for each treatment in the tree node.
 
         Args
         ----
-        treatment : array-like, shape = [num_samples]
-            An array containing the treatment group for each unit.
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
 
@@ -787,7 +809,7 @@ class UpliftTreeClassifier:
             The positive probabilities P(Y = 1) of each of the control and treatment groups
         '''
         # counts: [[N(Y=0, T=0), N(Y=1, T=0)], [N(Y=0, T=1), N(Y=1, T=1)], ...]
-        counts = self.group_uniqueCounts(treatment, y)
+        counts = self.group_uniqueCounts(treatment_idx, y)
         res = []
         for count in counts:
             n_pos = count[1]
@@ -796,7 +818,7 @@ class UpliftTreeClassifier:
             res.append(p)
         return res
 
-    def growDecisionTreeFrom(self, X, treatment, y, max_depth=10,
+    def growDecisionTreeFrom(self, X, treatment_idx, y, max_depth=10,
                              min_samples_leaf=100, depth=1,
                              min_samples_treatment=10, n_reg=100,
                              parentNodeSummary=None):
@@ -807,8 +829,8 @@ class UpliftTreeClassifier:
         ----
         X : ndarray, shape = [num_samples, num_features]
             An ndarray of the covariates used to train the uplift model.
-        treatment : array-like, shape = [num_samples]
-            An array containing the treatment group for each unit.
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group idx for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         max_depth: int, optional (default=10)
@@ -835,7 +857,7 @@ class UpliftTreeClassifier:
             return DecisionTree(classes_=self.classes_)
 
         # Current node summary: [P(Y=1|T), N(T)]
-        currentNodeSummary = self.tree_node_summary(treatment, y,
+        currentNodeSummary = self.tree_node_summary(treatment_idx, y,
                                                     min_samples_treatment=min_samples_treatment,
                                                     n_reg=n_reg,
                                                     parentNodeSummary=parentNodeSummary)
@@ -896,7 +918,7 @@ class UpliftTreeClassifier:
                 lsUnique = np.unique(lspercentile)
 
             for value in lsUnique:
-                X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment, y, col, value)
+                X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, col, value)
                 # check the split validity on min_samples_leaf  372
                 if (len(X_l) < min_samples_leaf or len(X_r) < min_samples_leaf):
                     continue
@@ -978,21 +1000,21 @@ class UpliftTreeClassifier:
                 trueBranch=trueBranch, falseBranch=falseBranch, summary=dcY,
                 maxDiffTreatment=maxDiffTreatment, maxDiffSign=maxDiffSign,
                 nodeSummary=currentNodeSummary,
-                backupResults=self.uplift_classification_results(treatment, y),
+                backupResults=self.uplift_classification_results(treatment_idx, y),
                 bestTreatment=bestTreatment, upliftScore=upliftScore
             )
         else:
             if self.evaluationFunction == self.evaluate_CTS:
                 return DecisionTree(
                     classes_=self.classes_,
-                    results=self.uplift_classification_results(treatment, y),
+                    results=self.uplift_classification_results(treatment_idx, y),
                     summary=dcY, nodeSummary=currentNodeSummary,
                     bestTreatment=bestTreatment, upliftScore=upliftScore
                 )
             else:
                 return DecisionTree(
                     classes_=self.classes_,
-                    results=self.uplift_classification_results(treatment, y),
+                    results=self.uplift_classification_results(treatment_idx, y),
                     summary=dcY, maxDiffTreatment=maxDiffTreatment,
                     maxDiffSign=maxDiffSign, nodeSummary=currentNodeSummary,
                     bestTreatment=bestTreatment, upliftScore=upliftScore
