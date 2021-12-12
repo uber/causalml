@@ -249,7 +249,7 @@ The inverse probability of treatment weighting (IPTW) approach uses the propensi
 
 In this way, the IPTW approach can be seen as creating an artificial population in which the treated and non-treated units are similar in terms of their observed features :math:`X`.
 
-One of the possible benefits of IPTW compared to matching is that less data may be discarded due to lack of overlap between treated and non-treated units. A known problem with the approach is that extreme propensity scores can generate highly variable estimators. Different methods have been proposed for trimming and normalizing the IPT weights (:cite:`https://doi.org/10.1111/1468-0262.00442`). An overview of the IPTW approach can be found in :cite:`@article{https://doi.org/10.1002/sim.6607`.
+One of the possible benefits of IPTW compared to matching is that less data may be discarded due to lack of overlap between treated and non-treated units. A known problem with the approach is that extreme propensity scores can generate highly variable estimators. Different methods have been proposed for trimming and normalizing the IPT weights (:cite:`https://doi.org/10.1111/1468-0262.00442`). An overview of the IPTW approach can be found in :cite:`https://doi.org/10.1002/sim.6607`.
 
 Instrumental variables
 ~~~~~~~~~~~~~~~~~~~~~~

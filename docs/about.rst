@@ -21,5 +21,14 @@ The package currently supports the following methods:
     - :ref:`T-learner`
     - :ref:`X-learner`
     - :ref:`R-learner`
-- Instrumental variables algorithm
+    - Doubly Robust (DR) learner
+    - TMLE learner
+- Instrumental variables algorithms
     - 2-Stage Least Squares (2SLS)
+    - Doubly Robust (DR) IV
+- Neural network based algorithms
+    - CEVAE
+    - DragonNet
+- Treatment optimization algorithms
+    - :ref:`Counterfactual Unit Selection`
+    - :ref:`Counterfactual Value Estimator`
