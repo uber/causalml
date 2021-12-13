@@ -1,3 +1,6 @@
+# cython: cdivision=True
+# cython: boundscheck=False
+# cython: wraparound=False
 """
 Forest of trees-based ensemble methods for Uplift modeling on Classification
 Problem. Those methods include random forests and extremely randomized trees.
@@ -15,23 +18,94 @@ The module structure is the following:
 #          Totte Harinen <totte@uber.com>
 
 from collections import defaultdict
+import cython
 from joblib import Parallel, delayed
 import multiprocessing as mp
+cimport numpy as np
 import numpy as np
 from packaging import version
 import pandas as pd
 import scipy.stats as stats
 import sklearn
 from sklearn.utils import check_array, check_random_state, check_X_y
+from typing import List
 if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
     from sklearn.utils._testing import ignore_warnings
 else:
     from sklearn.utils.testing import ignore_warnings
 
-from .utils import entropyH, kl_divergence
-
 
 MAX_INT = np.iinfo(np.int32).max
+
+
+cdef extern from "math.h":
+    double log(double x) nogil
+
+
+@cython.cfunc
+def kl_divergence(pk: cython.float, qk: cython.float) -> cython.float:
+    '''
+    Calculate KL Divergence for binary classification.
+
+    sum(np.array(pk) * np.log(np.array(pk) / np.array(qk)))
+
+    Args
+    ----
+    pk : float
+        The probability of 1 in one distribution.
+    qk : float
+        The probability of 1 in the other distribution.
+
+    Returns
+    -------
+    S : float
+        The KL divergence.
+    '''
+
+    eps: cython.float = 1e-6
+    S: cython.float
+
+    if qk == 0.:
+        return 0.
+
+    qk = min(max(qk, eps), 1 - eps)
+
+    if pk == 0.:
+        S = -log(1 - qk)
+    elif pk == 1.:
+        S = -log(qk)
+    else:
+        S = pk * log(pk / qk) + (1 - pk) * log((1 - pk) / (1 - qk))
+
+    return S
+
+
+@cython.cfunc
+def entropyH(p: cython.float, q: cython.float=-1.) -> cython.float:
+    '''
+    Entropy
+
+    Entropy calculation for normalization.
+
+    Args
+    ----
+    p : float
+        The probability used in the entropy calculation.
+
+    q : float, optional, (default = -1.)
+        The second probability used in the entropy calculation.
+
+    Returns
+    -------
+    entropy : float
+    '''
+
+    if q == -1. and p > 0.:
+        return -p * log(p)
+    elif q > 0.:
+        return -p * log(q)
+    else:
+        return 0.
 
 
 class DecisionTree:
@@ -78,8 +152,8 @@ class DecisionTree:
         information is served as a backup for the children node, in case no valid statistics can be calculated from the
         children node, the parent node information will be used in certain cases.
 
-    bestTreatment : string
-        The treatment name providing the best uplift (treatment effect).
+    bestTreatment : int
+        The treatment index providing the best uplift (treatment effect).
 
     upliftScore : list
         The uplift score of this node: [max_Diff, p_value], where max_Diff stands for the maximum treatment effect, and
@@ -90,10 +164,9 @@ class DecisionTree:
 
     """
 
-    def __init__(self, classes_, col=-1, value=None, trueBranch=None, falseBranch=None,
-                 results=None, summary=None, maxDiffTreatment=None,
-                 maxDiffSign=1., nodeSummary=None, backupResults=None,
-                 bestTreatment=None, upliftScore=None, matchScore=None):
+    def __init__(self, classes_, col=-1, value=None, trueBranch=None, falseBranch=None, results=None, summary=None,
+                  maxDiffTreatment=None, maxDiffSign=1., nodeSummary=None, backupResults=None, bestTreatment=None,
+                  upliftScore=None, matchScore=None):
         self.classes_ = classes_
         self.col = col
         self.value = value
@@ -267,7 +340,7 @@ class UpliftTreeClassifier:
 
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_idx = np.zeros_like(treatment)
-        for i, tr in enumerate(self.classes_):
+        for i, tr in enumerate(self.classes_, 1):
             treatment_idx[treatment == tr] = i
 
         self.pruneTree(X, treatment_idx, y,
@@ -312,17 +385,18 @@ class UpliftTreeClassifier:
         )
         tree.nodeSummary = currentNodeSummary
         # Divide sets for child nodes
-        X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, tree.col, tree.value)
+        if (tree.trueBranch is None) or (tree.falseBranch is None):
+            X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, tree.col, tree.value)
 
-        # recursive call for each branch
-        if tree.trueBranch.results is None:
-            self.pruneTree(X_l, w_l, y_l, tree.trueBranch, rule, minGain,
-                           n_reg,
-                           parentNodeSummary=currentNodeSummary)
-        if tree.falseBranch.results is None:
-            self.pruneTree(X_r, w_r, y_r, tree.falseBranch, rule, minGain,
-                           n_reg,
-                           parentNodeSummary=currentNodeSummary)
+            # recursive call for each branch
+            if tree.trueBranch.results is None:
+                self.pruneTree(X_l, w_l, y_l, tree.trueBranch, rule, minGain,
+                               n_reg,
+                               parentNodeSummary=currentNodeSummary)
+            if tree.falseBranch.results is None:
+                self.pruneTree(X_r, w_r, y_r, tree.falseBranch, rule, minGain,
+                               n_reg,
+                               parentNodeSummary=currentNodeSummary)
 
         # merge leaves (potentially)
         if (tree.trueBranch.results is not None and
@@ -454,7 +528,7 @@ class UpliftTreeClassifier:
 
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_idx = np.zeros_like(treatment)
-        for i, tr in enumerate(self.classes_):
+        for i, tr in enumerate(self.classes_, 1):
             treatment_idx[treatment == tr] = i
 
         self.fillTree(X, treatment_idx, y, tree=self.fitted_uplift_tree)
@@ -485,14 +559,16 @@ class UpliftTreeClassifier:
                                                     n_reg=0,
                                                     parentNodeSummary=None)
         tree.nodeSummary = currentNodeSummary
-        # Divide sets for child nodes
-        X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, tree.col, tree.value)
 
-        # recursive call for each branch
-        if tree.trueBranch is not None:
-            self.fillTree(X_l, w_l, y_l, tree.trueBranch)
-        if tree.falseBranch is not None:
-            self.fillTree(X_r, w_r, y_r, tree.falseBranch)
+        # Divide sets for child nodes
+        if tree.trueBranch or tree.falseBranch:
+            X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, tree.col, tree.value)
+
+            # recursive call for each branch
+            if tree.trueBranch is not None:
+                self.fillTree(X_l, w_l, y_l, tree.trueBranch)
+            if tree.falseBranch is not None:
+                self.fillTree(X_r, w_r, y_r, tree.falseBranch)
 
         # Update Information
 
@@ -691,7 +767,8 @@ class UpliftTreeClassifier:
         '''
         return -max([stat[0] for stat in nodeSummary])
 
-    def normI(self, currentNodeSummary, leftNodeSummary, rightNodeSummary, alpha=0.9):
+    def normI(self, n_c: cython.int, n_c_left: cython.int, n_t: list, n_t_left: list,
+              alpha: cython.float=0.9) -> cython.float:
         '''
         Normalization factor.
 
@@ -703,9 +780,6 @@ class UpliftTreeClassifier:
         leftNodeSummary : list of list
             The summary statistics of the left tree node, [P(Y=1|T), N(T)].
 
-        rightNodeSummary : list of list
-            The summary statistics of the right tree node, [P(Y=1|T), N(T)].
-
         alpha : float
             The weight used to balance different normalization parts.
 
@@ -714,18 +788,14 @@ class UpliftTreeClassifier:
         norm_res : float
             Normalization factor.
         '''
-        norm_res = 0
-        # n_t, n_c: sample size for all treatment, and control
-        # pt_a, pc_a: % of treatment is in left node, % of control is in left node
-        n_c = currentNodeSummary[0][1]
-        n_c_left = leftNodeSummary[0][1]
-        n_t = []
-        n_t_left = []
-        for i_treatment in range(1, self.n_class):
-            n_t.append(currentNodeSummary[i_treatment][1])
-            n_t_left.append(leftNodeSummary[i_treatment][1])
+
+        norm_res: cython.float = 0.
+        pt_a: cython.float
+        pc_a: cython.float
+
         pt_a = 1. * np.sum(n_t_left) / (np.sum(n_t) + 0.1)
         pc_a = 1. * n_c_left / (n_c + 0.1)
+
         # Normalization Part 1
         norm_res += (
             alpha * entropyH(1. * np.sum(n_t) / (np.sum(n_t) + n_c), 1. * n_c / (np.sum(n_t) + n_c))
@@ -871,19 +941,19 @@ class UpliftTreeClassifier:
         maxDiffTreatment = 0    # treatment index for the control group
         maxDiffSign = 0
         p_c, n_c = currentNodeSummary[0]
-        for i_treatment in range(1, self.n_class):
-            p_t, _ = currentNodeSummary[i_treatment]
+        for i_tr in range(1, self.n_class):
+            p_t, _ = currentNodeSummary[i_tr]
             # P(Y|T=t) - P(Y|T=0)
             diff = p_t - p_c
             if abs(diff) >= maxAbsDiff:
-                maxDiffTreatment = i_treatment
+                maxDiffTreatment = i_tr
                 maxDiffSign = np.sign(diff)
                 maxAbsDiff = abs(diff)
             if diff >= maxDiff:
                 maxDiff = diff
-                suboptTreatment = i_treatment
+                suboptTreatment = i_tr
                 if diff > 0:
-                    bestTreatment = i_treatment
+                    bestTreatment = i_tr
         if maxDiff > 0:
             p_t = currentNodeSummary[bestTreatment][0]
             n_t = currentNodeSummary[bestTreatment][1]
@@ -959,10 +1029,12 @@ class UpliftTreeClassifier:
                     gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)
                     gain_for_imp = (len(X_l) * leftScore1 + len(X_r) * rightScore2 - len(X) * currentScore)
                     if self.normalization:
-                        norm_factor = self.normI(currentNodeSummary,
-                                                 leftNodeSummary,
-                                                 rightNodeSummary,
-                                                 alpha=0.9)
+                        n_c = currentNodeSummary[0][1]
+                        n_c_left = leftNodeSummary[0][1]
+                        n_t = [tr[1] for tr in currentNodeSummary[1:]]
+                        n_t_left = [tr[1] for tr in leftNodeSummary[1:]]
+
+                        norm_factor = self.normI(n_c, n_c_left, n_t, n_t_left, alpha=0.9)
                     else:
                         norm_factor = 1
                     gain = gain / norm_factor

@@ -4,8 +4,7 @@ import pandas as pd
 import pstats
 from sklearn.model_selection import train_test_split
 
-from causalml.inference.tree import UpliftTreeClassifier
-from causalml.inference.tree import UpliftRandomForestClassifier
+from causalml.inference.tree import UpliftTreeClassifier, UpliftRandomForestClassifier
 from causalml.metrics import get_cumgain
 
 from .const import RANDOM_SEED, N_SAMPLE, CONTROL_NAME, TREATMENT_NAMES, CONVERSION

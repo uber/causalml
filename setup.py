@@ -1,16 +1,19 @@
 from setuptools import dist, setup, find_packages
 from setuptools.extension import Extension
-import causalml
 try:
     from Cython.Build import cythonize
 except ImportError:
     dist.Distribution().fetch_build_eggs(['cython>=0.28.0'])
     from Cython.Build import cythonize
+import Cython.Compiler.Options
+Cython.Compiler.Options.annotate = True
 try:
     from numpy import get_include as np_get_include
 except ImportError:
     dist.Distribution().fetch_build_eggs(['numpy'])
     from numpy import get_include as np_get_include
+
+import causalml
 
 
 with open("README.md", "r", encoding="utf-8") as f:
@@ -23,6 +26,11 @@ with open("requirements.txt") as f:
 extensions = [
     Extension("causalml.inference.tree.causaltree",
               ["causalml/inference/tree/causaltree.pyx"],
+              libraries=[],
+              include_dirs=[np_get_include()],
+              extra_compile_args=["-O3"]),
+    Extension("causalml.inference.tree.uplift",
+              ["causalml/inference/tree/uplift.pyx"],
               libraries=[],
               include_dirs=[np_get_include()],
               extra_compile_args=["-O3"])
@@ -54,7 +62,7 @@ setup(
         'scikit-learn>=0.22.0'
     ],
     install_requires=requirements,
-    ext_modules=cythonize(extensions),
+    ext_modules=cythonize(extensions, annotate=True),
     include_dirs=[np_get_include()],
     extras_require={
         'tf': ['tensorflow>=2.4.0']
