@@ -123,7 +123,7 @@ Fit a propensity score model :math:`\hat{e}(x)` with machine learning using :mat
 
 Use machine learning to fit the CATE model, :math:`\hat{\tau}(X)` from the pseudo-outcome
 
-..math::
+.. math::
    \phi = \frac{W-\hat{e}(X)}{\hat{e}(X)(1-\hat{e}(X))}\left(Y-\hat{m}_W(X))+\hat{m}_1(X)-\hat{m}_0(X)
 
 with :math:`\{Y^3, X^3, W^3\}`
@@ -283,9 +283,11 @@ The instrumental variables approach attempts to estimate the effect of :math:`W`
 The most common method for instrumental variables estimation is the two-stage least squares (2SLS). In this approach, the cause variable :math:`W` is first regressed on the instrument :math:`Z`. Then, in the second stage, the outcome of interest :math:`Y` is regressed on the predicted value from the first-stage model. Intuitively, the effect of :math:`W` on :math:`Y` is estimated by using only the proportion of variation in :math:`W` due to variation in :math:`Z`. See :cite:`10.1257/jep.15.4.69` for a detailed discussion of the method.
 
 In many situations the treatment, :math:`W`, cannot be administered directly in an experimental setting. However one can randomly assign subjects into treatment/control groups so that subjects in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where subjects may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. Similar to the section of Value optimization methods, in general there are 3 types of subjects in this situation,
+
 * **Compliers** Those who will take the treatment if and only if they are assigned to the treatment group.
 * **Always-Taker** Those who will take the treatment regardless which group they are assigned to.
 * **Never-Taker** Those who wil not take the treatment regardless which group they are assigned to.
+
 However one assumes that there is no Defier for identification purposes, i.e. those who will only take the treatment if they are assigned to the control group.
 
 In this case one can measure the treatment effect of Compliers,
@@ -308,7 +310,7 @@ Fit propensity score models :math:`\hat{e}_0(x)` and :math:`\hat{e}_1(x)` for as
 
 Use machine learning to fit the conditional LATE model, :math:`\hat{\tau}(X)` by minimizing the following loss function
 
-..math::
+.. math::
    L(\hat{\tau}(X)) = \hat{E} \big[\big(\hat{m}_1(X)-\hat{m}_0(X)+\frac{Z(Y-\hat{m}_1(X))}{p_Z}-\frac{(1-Z)(Y-\hat{m}_0(X))}{1-p_Z}-\big(\hat{e}_1(X)-\hat{e}_0(X)+\frac{Z(W-\hat{e}_1(X))}{p_Z}-\frac{(1-Z)(W-\hat{e}_0(X))}{1-p_Z}\big) \hat{tau}(X) \big)^2\big]
 
 with :math:`\{Y^3, X^3, W^3\}`
