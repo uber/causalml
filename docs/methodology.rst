@@ -110,6 +110,27 @@ Estimate treatment effects by minimising the R-loss, :math:`\hat{L}_n(\tau(x))`:
 
 where :math:`\hat{e}^{(-i)}(X_i)`, etc. denote the out-of-fold held-out predictions made without using the :math:`i`-th training sample.
 
+Doubly Robust (DR) learner
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+DR-learner :cite:`kennedy2020optimal` estiamtes the CATE via cross-fitting a doubly-robust score function in two stages as follows. We start by randomly split the data :math:`\{Y, X, W\}` into 3 partitions :math:`\{Y^i, X^i, W^i\}, i=\{1,2,3\}`.
+
+**Stage 1**
+
+Fit a propensity score model :math:`\hat{e}(x)` with machine learning using :math:`\{X^1, W^1\}`, and fit outcome regression models :math:`\hat{m}_0(x)` and :math:`\hat{m}_1(x)` for treated and untreated users with machine learning using :math:`\{Y^2, X^2, W^2\}`.
+
+**Stage 2**
+
+Use machine learning to fit the CATE model, :math:`\hat{\tau}(X)` from the pseudo-outcome
+
+..math::
+   \phi = \frac{W-\hat{e}(X)}{\hat{e}(X)(1-\hat{e}(X))}\left(Y-\hat{m}_W(X))+\hat{m}_1(X)-\hat{m}_0(X)
+
+with :math:`\{Y^3, X^3, W^3\}`
+
+**Stage 3**
+
+Repeat Stage 1 and Stage 2 again twice. First use :math:`\{Y^2, X^2, W^2\}`, :math:`\{Y^3, X^3, W^3\}`, and :math:`\{Y^1, X^1, W^1\}` for the propensity score model, the outcome models, and the CATE model. Then use :math:`\{Y^3, X^3, W^3\}`, :math:`\{Y^2, X^2, W^2\}`, and :math:`\{Y^1, X^1, W^1\}` for the propensity score model, the outcome models, and the CATE model. The final CATE model is the average of the 3 CATE models.
 
 Tree-Based Algorithms
 ---------------------
@@ -260,3 +281,38 @@ The instrumental variables approach attempts to estimate the effect of :math:`W`
    \frac{Cov(Y_i, Z_i)}{Cov(W_i, Z_i)}
 
 The most common method for instrumental variables estimation is the two-stage least squares (2SLS). In this approach, the cause variable :math:`W` is first regressed on the instrument :math:`Z`. Then, in the second stage, the outcome of interest :math:`Y` is regressed on the predicted value from the first-stage model. Intuitively, the effect of :math:`W` on :math:`Y` is estimated by using only the proportion of variation in :math:`W` due to variation in :math:`Z`. See :cite:`10.1257/jep.15.4.69` for a detailed discussion of the method.
+
+In many situations the treatment, :math:`W`, cannot be administered directly in an experimental setting. However one can randomly assign subjects into treatment/control groups so that subjects in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where subjects may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. Similar to the section of Value optimization methods, in general there are 3 types of subjects in this situation,
+* **Compliers** Those who will take the treatment if and only if they are assigned to the treatment group.
+* **Always-Taker** Those who will take the treatment regardless which group they are assigned to.
+* **Never-Taker** Those who wil not take the treatment regardless which group they are assigned to.
+However one assumes that there is no Defier for identification purposes, i.e. those who will only take the treatment if they are assigned to the control group.
+
+In this case one can measure the treatment effect of Compliers,
+
+.. math::
+   \hat{\tau_{Complier}}=\frac{E[Y|Z=1]-E[Y|Z=0]}{E[W|Z=1]-E[W|Z=0]}
+
+This is Local Average Treatment Effect (LATE). The estimator is also equivalent to 2SLS if we take the assignment status, :math:`Z`, as an instrument.
+
+Doubly Robust Instrumental Variable (DRIV) learner
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+We combine the idea from DR-learner :cite:`kennedy2020optimal` with the doubly robust score function for LATE described in :cite:`10.1111/ectj.12097` to estimate the conditional LATE. Towards that end, we start by randomly split the data :math:`\{Y, X, W, Z\}` into 3 partitions :math:`\{Y^i, X^i, W^i, Z^i\}, i=\{1,2,3\}`.
+
+**Stage 1**
+
+Fit propensity score models :math:`\hat{e}_0(x)` and :math:`\hat{e}_1(x)` for assigned and unassigned users using :math:`\{X^1, W^1, Z^1\}`, and fit outcome regression models :math:`\hat{m}_0(x)` and :math:`\hat{m}_1(x)` for assigned and unassigned users with machine learning using :math:`\{Y^2, X^2, Z^2\}`. Assignment probabiliy, :math:`p_Z`, can either be user provided or come from a simple model, since in most use cases assignment is random by design.
+
+**Stage 2**
+
+Use machine learning to fit the conditional LATE model, :math:`\hat{\tau}(X)` by minimizing the following loss function
+
+..math::
+   L(\hat{\tau}(X)) = \hat{E} \big[\big(\hat{m}_1(X)-\hat{m}_0(X)+\frac{Z(Y-\hat{m}_1(X))}{p_Z}-\frac{(1-Z)(Y-\hat{m}_0(X))}{1-p_Z}-\big(\hat{e}_1(X)-\hat{e}_0(X)+\frac{Z(W-\hat{e}_1(X))}{p_Z}-\frac{(1-Z)(W-\hat{e}_0(X))}{1-p_Z}\big) \hat{tau}(X) \big)^2\big]
+
+with :math:`\{Y^3, X^3, W^3\}`
+
+**Stage 3**
+
+Similar to the DR-Leaner Repeat Stage 1 and Stage 2 again twice with different permutations of partitions for estimation. The final conditional LATE model is the average of the 3 conditional LATE models.
