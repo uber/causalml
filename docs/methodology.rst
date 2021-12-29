@@ -362,7 +362,7 @@ Let :math:`Q=\log(\tilde{m}_W(X)/(1-\tilde{m}_W(X)))`. Maximize the following ps
 Let
 
 .. math::
-   \tilde{Q}_0^* = \frac{1}{1+\exp\left(-Q-h_0 \frac{1}{1-\hat{e}(X)\right)},\\
-   \tilde{Q}_1^* = \frac{1}{1+\exp\left(-Q-h_1 \frac{1}{\hat{e}(X)}\right)}.
+   \tilde{Q}_0 &= \frac{1}{1+\exp\left(-Q-h_0 \frac{1}{1-\hat{e}(X)\right)},\\
+   \tilde{Q}_1 &= \frac{1}{1+\exp\left(-Q-h_1 \frac{1}{\hat{e}(X)}\right)}.
 
-The ATE estimate is the sample average of the differences of :math:`\tilde{Q}_1^*` and :math:`\tilde{Q}_0^*` after rescale to the original range.
+The ATE estimate is the sample average of the differences of :math:`\tilde{Q}_1` and :math:`\tilde{Q}_0` after rescale to the original range.
