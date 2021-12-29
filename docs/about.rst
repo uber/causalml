@@ -21,7 +21,7 @@ The package currently supports the following methods:
     - :ref:`T-learner`
     - :ref:`X-learner`
     - :ref:`R-learner`
-    - Doubly Robust (DR) learner
+    - :ref:`Doubly Robust (DR) learner`
     - TMLE learner
 - Instrumental variables algorithms
     - 2-Stage Least Squares (2SLS)
