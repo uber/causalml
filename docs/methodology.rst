@@ -308,7 +308,7 @@ The most common method for instrumental variables estimation is the two-stage le
 .. math::
    Y = W \alpha + X \beta + u = \Xi \gamma + u
 
-Here for convenience we let :math:`\Xi=[W, X]` and :math:`\gamma=[\alpha', \beta']'`. Assume that we have instrumental variables :math:`Z` whose number of columns is at least the number of columns of :math:`W`, let :math:`Omega=[Z, X]`, 2SLS estimator is as follows
+Here for convenience we let :math:`\Xi=[W, X]` and :math:`\gamma=[\alpha', \beta']'`. Assume that we have instrumental variables :math:`Z` whose number of columns is at least the number of columns of :math:`W`, let :math:`\Omega=[Z, X]`, 2SLS estimator is as follows
 
 .. math::
    \hat{\gamma}_{2SLS} = \left[\Xi'\Omega (\Omega'\Omega)^{-1} \Omega' \Xi\right]^{-1}\left[\Xi'\Omega'(\Omega'\Omega)^{-1}\Omega'Y\right].
@@ -355,11 +355,12 @@ Let :math:`Q=\log(\tilde{m}_W(X)/(1-\tilde{m}_W(X)))`. Maximize the following ps
 
 .. math::
    \max_{h_0, h_1} -\frac{1}{N} \sum_i & \left[ \tilde{Y}_i \log \left(1+\exp(-Q_i-h_0 \frac{1-W}{1-\hat{e}(X_i)}-h_1 \frac{W}{\hat{e}(X_i)} \right) \right. \\
-   &\quad\left.+(1-tilde{Y}_i)\log\left(1+\exp(Q_i+h_0\frac{1-W}{1-\hat{e}(X_i)}+h_1\frac{W}{\hat{e}(X_i)}\right)\right]
+   &\quad\left.+(1-\tilde{Y}_i)\log\left(1+\exp(Q_i+h_0\frac{1-W}{1-\hat{e}(X_i)}+h_1\frac{W}{\hat{e}(X_i)}\right)\right]
 
 **Step 4**
 
 Let
+
 .. math::
    \tilde{Q}_0^* = \frac{1}{1+\exp\left(-Q-h_0 \frac{1}{1-\hat{e}(X)\right)},\\
    \tilde{Q}_1^* = \frac{1}{1+\exp\left(-Q-h_1 \frac{1}{\hat{e}(X)}\right)}.
