@@ -143,7 +143,7 @@ Fit propensity score models :math:`\hat{e}_0(x)` and :math:`\hat{e}_1(x)` for as
 
 **Stage 2**
 
-Use machine learning to fit the conditional LATE model, :math:`\hat{\tau}(X)` by minimizing the following loss function
+Use machine learning to fit the conditional :ref:`LATE` model, :math:`\hat{\tau}(X)` by minimizing the following loss function
 
 .. math::
    L(\hat{\tau}(X)) = \hat{E} &\left[\left(\hat{m}_1(X)-\hat{m}_0(X)+\frac{Z(Y-\hat{m}_1(X))}{p_Z}-\frac{(1-Z)(Y-\hat{m}_0(X))}{1-p_Z} \right.\right.\\
@@ -304,6 +304,9 @@ The instrumental variables approach attempts to estimate the effect of :math:`W`
    \frac{Cov(Y_i, Z_i)}{Cov(W_i, Z_i)}
 
 The most common method for instrumental variables estimation is the two-stage least squares (2SLS). In this approach, the cause variable :math:`W` is first regressed on the instrument :math:`Z`. Then, in the second stage, the outcome of interest :math:`Y` is regressed on the predicted value from the first-stage model. Intuitively, the effect of :math:`W` on :math:`Y` is estimated by using only the proportion of variation in :math:`W` due to variation in :math:`Z`. See :cite:`10.1257/jep.15.4.69` for a detailed discussion of the method.
+
+LATE
+~~~~
 
 In many situations the treatment, :math:`W`, cannot be administered directly in an experimental setting. However one can randomly assign subjects into treatment/control groups so that subjects in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where subjects may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. Similar to the section of Value optimization methods, in general there are 3 types of subjects in this situation,
 
