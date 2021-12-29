@@ -295,20 +295,30 @@ In this way, the IPTW approach can be seen as creating an artificial population 
 
 One of the possible benefits of IPTW compared to matching is that less data may be discarded due to lack of overlap between treated and non-treated units. A known problem with the approach is that extreme propensity scores can generate highly variable estimators. Different methods have been proposed for trimming and normalizing the IPT weights (:cite:`https://doi.org/10.1111/1468-0262.00442`). An overview of the IPTW approach can be found in :cite:`https://doi.org/10.1002/sim.6607`.
 
-Instrumental variables
-~~~~~~~~~~~~~~~~~~~~~~
+2-Stage Least Squares (2SLS)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The instrumental variables approach attempts to estimate the effect of :math:`W` on :math:`Y` with the help of a third variable :math:`Z` that is correlated with :math:`W` but is uncorrelated with the error term for :math:`Y`. In other words, the instrument :math:`Z` is only related with :math:`Y` through the directed path that goes through :math:`W`. If these conditions are satisfied, the effect of :math:`W` on :math:`Y` can be estimated using the sample analog of:
+One of the basic requirements for identifying the treatment effect of :math:`W` on :math:`Y` is that :math:`W` is orthogonal to the potential outcome of :math:`Y`, conditional on the covariates :math:`X`. This may be violated if both :math:`W` and :math:`Y` are affected by an unobserved variable, the error term after removing the true effect of :math:`W` from :math:`Y`, that is not in :math:`X`. In this case, the instrumental variables approach attempts to estimate the effect of :math:`W` on :math:`Y` with the help of a third variable :math:`Z` that is correlated with :math:`W` but is uncorrelated with the error term. In other words, the instrument :math:`Z` is only related with :math:`Y` through the directed path that goes through :math:`W`. If these conditions are satisfied, in the case without covariates, the effect of :math:`W` on :math:`Y` can be estimated using the sample analog of:
 
 .. math::
    \frac{Cov(Y_i, Z_i)}{Cov(W_i, Z_i)}
 
-The most common method for instrumental variables estimation is the two-stage least squares (2SLS). In this approach, the cause variable :math:`W` is first regressed on the instrument :math:`Z`. Then, in the second stage, the outcome of interest :math:`Y` is regressed on the predicted value from the first-stage model. Intuitively, the effect of :math:`W` on :math:`Y` is estimated by using only the proportion of variation in :math:`W` due to variation in :math:`Z`. See :cite:`10.1257/jep.15.4.69` for a detailed discussion of the method.
+The most common method for instrumental variables estimation is the two-stage least squares (2SLS). In this approach, the cause variable :math:`W` is first regressed on the instrument :math:`Z`. Then, in the second stage, the outcome of interest :math:`Y` is regressed on the predicted value from the first-stage model. Intuitively, the effect of :math:`W` on :math:`Y` is estimated by using only the proportion of variation in :math:`W` due to variation in :math:`Z`. Specifically, assume that we have the linear model
+
+.. math::
+   Y = W \alpha + X \beta + u = \Xi \gamma + u
+
+Here for convenience we let :math:`\Xi=[W, X]` and :math:`\gamma=[\alpha', \beta']'`. Assume that we have instrumental variables :math:`Z` whose number of columns is at least the number of columns of :math:`W`, let :math:`Omega=[Z, X]`, 2SLS estimator is as follows
+
+.. math::
+   \hat{\gamma}_{2SLS} = \left[\Xi'\Omega (\Omega'\Omega)^{-1} \Omega' \Xi\right]^{-1}\left[\Xi'\Omega'(\Omega'\Omega)^{-1}\Omega'Y\right].
+
+See :cite:`10.1257/jep.15.4.69` for a detailed discussion of the method.
 
 LATE
 ~~~~
 
-In many situations the treatment, :math:`W`, cannot be administered directly in an experimental setting. However one can randomly assign subjects into treatment/control groups so that subjects in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where subjects may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. Similar to the section of Value optimization methods, in general there are 3 types of subjects in this situation,
+In many situations the treatment :math:`W` may depend on user's own choice and cannot be administered directly in an experimental setting. However one can randomly assign users into treatment/control groups so that users in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where users may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. Similar to the section of Value optimization methods, in general there are 3 types of users in this situation,
 
 * **Compliers** Those who will take the treatment if and only if they are assigned to the treatment group.
 * **Always-Taker** Those who will take the treatment regardless which group they are assigned to.
@@ -322,3 +332,36 @@ In this case one can measure the treatment effect of Compliers,
    \hat{\tau}_{Complier}=\frac{E[Y|Z=1]-E[Y|Z=0]}{E[W|Z=1]-E[W|Z=0]}
 
 This is Local Average Treatment Effect (LATE). The estimator is also equivalent to 2SLS if we take the assignment status, :math:`Z`, as an instrument.
+
+
+Targeted maximum likelihood estimation (TMLE) for ATE
+-----------------------------------------------------
+
+Targeted maximum likelihood estimation (TMLE) :cite:`tmle` provides a doubly robust semiparametric method that "targets" directly on the average treatment effect with the aid from machine learning algorithms. Compared to other methods including outcome regression and inverse probability of treatment weighting, TMLE usually gives better performance especially when dealing with skewed treatment and outliers.
+
+Given binary treatment :math:`W`, covariates :math:`X`, and outcome :math:`Y`, the TMLE for ATE is performed in the following steps
+
+**Step 1**
+
+Use cross fit to estimate the propensity score :math:`\hat{e}(x)`, the predicted outcome for treated :math:`\hat{m}_1(x)`, and predicted outcome for control :math:`\hat{m}_0(x)` with machine learning.
+
+**Step 2**
+
+Scale :math:`Y` into :math:`\tilde{Y}=\frac{Y-\min Y}{\max Y - \min Y}` so that :math:`\tilde{Y} \in [0,1]`. Use the same scale function to transform :math:`\hat{m}_i(x)` into :math:`\tilde{m}_i(x)`, :math:`i=0,1`. Clip the scaled functions so that their values stay in the unit interval.
+
+**Step 3**
+
+Let :math:`Q=\log(\tilde{m}_W(X)/(1-\tilde{m}_W(X)))`. Maximize the following pseudo log-likelihood function
+
+.. math::
+   \max_{h_0, h_1} -\frac{1}{N} \sum_i & \left[ \tilde{Y}_i \log \left(1+\exp(-Q_i-h_0 \frac{1-W}{1-\hat{e}(X_i)}-h_1 \frac{W}{\hat{e}(X_i)} \right) \right. \\
+   &\quad\left.+(1-tilde{Y}_i)\log\left(1+\exp(Q_i+h_0\frac{1-W}{1-\hat{e}(X_i)}+h_1\frac{W}{\hat{e}(X_i)}\right)\right]
+
+**Step 4**
+
+Let
+.. math::
+   \tilde{Q}_0^* = \frac{1}{1+\exp\left(-Q-h_0 \frac{1}{1-\hat{e}(X)\right)},\\
+   \tilde{Q}_1^* = \frac{1}{1+\exp\left(-Q-h_1 \frac{1}{\hat{e}(X)}\right)}.
+
+The ATE estimate is the sample average of the differences of :math:`\tilde{Q}_1^*` and :math:`\tilde{Q}_0^*` after rescale to the original range.
