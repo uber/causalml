@@ -124,7 +124,7 @@ Fit a propensity score model :math:`\hat{e}(x)` with machine learning using :mat
 Use machine learning to fit the CATE model, :math:`\hat{\tau}(X)` from the pseudo-outcome
 
 .. math::
-   \phi = \frac{W-\hat{e}(X)}{\hat{e}(X)(1-\hat{e}(X))}\left(Y-\hat{m}_W(X))+\hat{m}_1(X)-\hat{m}_0(X)
+   \phi = \frac{W-\hat{e}(X)}{\hat{e}(X)(1-\hat{e}(X))}\left(Y-\hat{m}_W(X)\right)+\hat{m}_1(X)-\hat{m}_0(X)
 
 with :math:`\{Y^3, X^3, W^3\}`
 
@@ -311,7 +311,8 @@ Fit propensity score models :math:`\hat{e}_0(x)` and :math:`\hat{e}_1(x)` for as
 Use machine learning to fit the conditional LATE model, :math:`\hat{\tau}(X)` by minimizing the following loss function
 
 .. math::
-   L(\hat{\tau}(X)) = \hat{E} \big[\big(\hat{m}_1(X)-\hat{m}_0(X)+\frac{Z(Y-\hat{m}_1(X))}{p_Z}-\frac{(1-Z)(Y-\hat{m}_0(X))}{1-p_Z}-\big(\hat{e}_1(X)-\hat{e}_0(X)+\frac{Z(W-\hat{e}_1(X))}{p_Z}-\frac{(1-Z)(W-\hat{e}_0(X))}{1-p_Z}\big) \hat{tau}(X) \big)^2\big]
+   L(\hat{\tau}(X)) = \hat{E} \big[\big(\hat{m}_1(X)-\hat{m}_0(X)+\frac{Z(Y-\hat{m}_1(X))}{p_Z}-\frac{(1-Z)(Y-\hat{m}_0(X))}{1-p_Z} \\
+   -\big(\hat{e}_1(X)-\hat{e}_0(X)+\frac{Z(W-\hat{e}_1(X))}{p_Z}-\frac{(1-Z)(W-\hat{e}_0(X))}{1-p_Z}\big) \hat{\tau}(X) \big)^2\big]
 
 with :math:`\{Y^3, X^3, W^3\}`
 
