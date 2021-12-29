@@ -146,10 +146,8 @@ Fit propensity score models :math:`\hat{e}_0(x)` and :math:`\hat{e}_1(x)` for as
 Use machine learning to fit the conditional LATE model, :math:`\hat{\tau}(X)` by minimizing the following loss function
 
 .. math::
-\begin{align*}
    L(\hat{\tau}(X)) = \hat{E} &\left[\left(\hat{m}_1(X)-\hat{m}_0(X)+\frac{Z(Y-\hat{m}_1(X))}{p_Z}-\frac{(1-Z)(Y-\hat{m}_0(X))}{1-p_Z} \right.\right.\\
    &\left.\left.\quad -\Big(\hat{e}_1(X)-\hat{e}_0(X)+\frac{Z(W-\hat{e}_1(X))}{p_Z}-\frac{(1-Z)(W-\hat{e}_0(X))}{1-p_Z}\Big) \hat{\tau}(X) \right)^2\right]
-\end{align*}
 
 with :math:`\{Y^3, X^3, W^3\}`
 
