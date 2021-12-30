@@ -153,7 +153,7 @@ with :math:`\{Y^3, X^3, W^3\}`
 
 **Stage 3**
 
-Similar to the DR-Leaner Repeat Stage 1 and Stage 2 again twice with different permutations of partitions for estimation. The final conditional LATE model is the average of the 3 conditional LATE models.
+Similar to the DR-Learner Repeat Stage 1 and Stage 2 again twice with different permutations of partitions for estimation. The final conditional LATE model is the average of the 3 conditional LATE models.
 
 Tree-Based Algorithms
 ---------------------
