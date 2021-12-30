@@ -308,7 +308,7 @@
   author    = {Li, Ang and Pearl, Judea},
   booktitle = {Proceedings of the Twenty-Eighth International Joint Conference on
                Artificial Intelligence, {IJCAI-19}},
-  publisher = {International Joint Conferences on Artificial Intelligence Organization},             
+  publisher = {International Joint Conferences on Artificial Intelligence Organization},
   pages     = {1793--1799},
   year      = {2019},
   month     = {7},
@@ -413,4 +413,40 @@ URL = {https://www.aeaweb.org/articles?id=10.1257/jep.15.4.69}}
   author={Zhao, Zhenyu and Zhang, Yumin and Harinen, Totte and Yung, Mike},
   journal={arXiv preprint arXiv:2005.03447},
   year={2020}
+}
+
+@misc{kennedy2020optimal,
+      title={Optimal doubly robust estimation of heterogeneous causal effects},
+      author={Edward H. Kennedy},
+      year={2020},
+      eprint={2004.14497},
+      archivePrefix={arXiv},
+      primaryClass={math.ST}
+}
+
+@article{10.1111/ectj.12097,
+    author = {Chernozhukov, Victor and Chetverikov, Denis and Demirer, Mert and Duflo, Esther and Hansen, Christian and Newey, Whitney and Robins, James},
+    title = "{Double/debiased machine learning for treatment and structural parameters}",
+    journal = {The Econometrics Journal},
+    volume = {21},
+    number = {1},
+    pages = {C1-C68},
+    year = {2018},
+    month = {01},
+    abstract = "{We revisit the classic semi‐parametric problem of inference on a low‐dimensional parameter θ0 in the presence of high‐dimensional nuisance parameters η0. We depart from the classical setting by allowing for η0 to be so high‐dimensional that the traditional assumptions (e.g. Donsker properties) that limit complexity of the parameter space for this object break down. To estimate η0, we consider the use of statistical or machine learning (ML) methods, which are particularly well suited to estimation in modern, very high‐dimensional cases. ML methods perform well by employing regularization to reduce variance and trading off regularization bias with overfitting in practice. However, both regularization bias and overfitting in estimating η0 cause a heavy bias in estimators of θ0 that are obtained by naively plugging ML estimators of η0 into estimating equations for θ0. This bias results in the naive estimator failing to be N−1/2 consistent, where N is the sample size. We show that the impact of regularization bias and overfitting on estimation of the parameter of interest θ0 can be removed by using two simple, yet critical, ingredients: (1) using Neyman‐orthogonal moments/scores that have reduced sensitivity with respect to nuisance parameters to estimate θ0; (2) making use of cross‐fitting, which provides an efficient form of data‐splitting. We call the resulting set of methods double or debiased ML (DML). We verify that DML delivers point estimators that concentrate in an N−1/2‐neighbourhood of the true parameter values and are approximately unbiased and normally distributed, which allows construction of valid confidence statements. The generic statistical theory of DML is elementary and simultaneously relies on only weak theoretical requirements, which will admit the use of a broad array of modern ML methods for estimating the nuisance parameters, such as random forests, lasso, ridge, deep neural nets, boosted trees, and various hybrids and ensembles of these methods. We illustrate the general theory by applying it to provide theoretical properties of the following: DML applied to learn the main regression parameter in a partially linear regression model; DML applied to learn the coefficient on an endogenous variable in a partially linear instrumental variables model; DML applied to learn the average treatment effect and the average treatment effect on the treated under unconfoundedness; DML applied to learn the local average treatment effect in an instrumental variables setting. In addition to these theoretical applications, we also illustrate the use of DML in three empirical examples.}",
+    issn = {1368-4221},
+    doi = {10.1111/ectj.12097},
+    url = {https://doi.org/10.1111/ectj.12097},
+    eprint = {https://academic.oup.com/ectj/article-pdf/21/1/C1/27684918/ectj00c1.pdf},
+}
+
+@book{tmle,
+author = {Laan, Mark and Rose, Sherri},
+year = {2011},
+month = {01},
+pages = {},
+title = {Targeted Learning: Causal Inference for Observational and Experimental Data},
+publisher={Springer-Verlag New York},
+isbn = {978-1-4419-9781-4},
+doi = {10.1007/978-1-4419-9782-1}
 }

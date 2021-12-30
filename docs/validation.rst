@@ -92,7 +92,7 @@ Mechanism 4
 Validation with Uplift Curve (AUUC)
 ----------------------------------
 
-We can validate the estimation by evaluating and comparing the uplift gains with AUUC (Area Under Uplift Curve), it calculates cumulative gains and please find more details in `meta_learners_with_synthetic_data.ipynb example notebook <https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data.ipynb>`_.
+We can validate the estimation by evaluating and comparing the uplift gains with AUUC (Area Under Uplift Curve), it calculates cumulative gains. Please find more details in `meta_learners_with_synthetic_data.ipynb example notebook <https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data.ipynb>`_.
 
 .. code-block:: python
 
@@ -111,6 +111,8 @@ We can validate the estimation by evaluating and comparing the uplift gains with
 
 .. image:: ./_static/img/auuc_vis.png
     :width: 629
+
+For data with skewed treatment, it is sometimes advantageous to use :ref:`Targeted maximum likelihood estimation (TMLE) for ATE` to generate the AUUC curve for validation, as TMLE provides a more accurate estimation of ATE. Please find `validation_with_tmle.ipynb example notebook <https://github.com/uber/causalml/blob/master/examples/validation_with_tmle.ipynb>`_ for details.
 
 Validation with Sensitivity Analysis
 ----------------------------------
@@ -142,9 +144,9 @@ Selection Bias
 ~~~~~~~~~~~~~~
 
 | `Blackwell(2013) <https://www.mattblackwell.org/files/papers/sens.pdf>` introduced an approach to sensitivity analysis for causal effects that directly models confounding or selection bias.
-| 
-| One Sided Confounding Function: here as the name implies, this function can detect sensitivity to one-sided selection bias, but it would fail to detect other deviations from ignobility. That is, it can only determine the bias resulting from the treatment group being on average better off or the control group being on average better off. 
-| 
+|
+| One Sided Confounding Function: here as the name implies, this function can detect sensitivity to one-sided selection bias, but it would fail to detect other deviations from ignobility. That is, it can only determine the bias resulting from the treatment group being on average better off or the control group being on average better off.
+|
 | Alignment Confounding Function: this type of bias is likely to occur when units select into treatment and control based on their predicted treatment effects
-| 
+|
 | The sensitivity analysis is rigid in this way because the confounding function is not identified from the data, so that the causal model in the last section is only identified conditional on a specific choice of that function. The goal of the sensitivity analysis is not to choose the “correct” confounding function, since we have no way of evaluating this correctness. By its very nature, unmeasured confounding is unmeasured. Rather, the goal is to identify plausible deviations from ignobility and test sensitivity to those deviations. The main harm that results from the incorrect specification of the confounding function is that hidden biases remain hidden.
