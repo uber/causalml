@@ -2,6 +2,30 @@
 
 Changelog
 =========
+
+0.12.0 (Jan 2022)
+-----------------
+- CausalML surpassed `637K downloads <https://pepy.tech/project/causalml>`_ on PyPI and `2K stars <https://github.com/uber/causalml/stargazers>`_ on Github!
+- We have 4 new community contributors, Luis (`@lgmoneda <https://github.com/lgmoneda>`_), Ravi (`@raviksharma <https://github.com/raviksharma>`_), Louis (`@LouisHernandez17 <https://github.com/LouisHernandez17>`_) and JackRab (`@JackRab <https://github.com/JackRab>`_). Thanks for the contribution!
+- We refactored and speeded up UpliftTreeClassifier/UpliftRandomForestClassifier by 5x with Cython  (`#422 <https://github.com/uber/causalml/pull/422>`_ `#440 <https://github.com/uber/causalml/pull/440>`_ by @jeongyoonlee)
+- We revamped our `API documentation <https://causalml.readthedocs.io/en/latest/about.html>`_, it now includes the latest methodology, references, installation, notebook examples, and graphs! (`#413 <https://github.com/uber/causalml/discussions/413>`_ by @huigangchen @t-tte @zhenyuz0500 @jeongyoonlee @paullo0106)
+- Our team gave talks at `2021 Conference on Digital Experimentation @ MIT (CODE@MIT) <https://ide.mit.edu/events/2021-conference-on-digital-experimentation-mit-codemit/>`_, `Causal Data Science Meeting 2021 <https://www.causalscience.org/meeting/program/day-2/>`_,  and `KDD 2021 Tutorials <https://causal-machine-learning.github.io/kdd2021-tutorial/>`_ on CausalML introduction and applications. Please take a look if you missed them! Full list of publications and talks can be found here.
+
+Updates
+~~~~~~~~~~~~~
+- Update documentation on Instrument Variable methods @huigangchen (`#447 <https://github.com/uber/causalml/pull/447>`_)
+- Add benchmark simulation studies example notebook by @t-tte (`#443 <https://github.com/uber/causalml/pull/443>`_)
+- Add sample_weight support for R-learner by @paullo0106 (`#425 <https://github.com/uber/causalml/pull/425>`_)
+- Fix incorrect binning of numeric features in UpliftTreeClassifier by @jeongyoonlee (`#420 <https://github.com/uber/causalml/pull/420>`_)
+- Update papers, talks, and publication info to README and refs.bib by @zhenyuz0500 (`#410 <https://github.com/uber/causalml/pull/410>`_ `#414 <https://github.com/uber/causalml/pull/414>`_ `#433 <https://github.com/uber/causalml/pull/433>`_)
+- Add instruction for contributing.md doc by @jeongyoonlee (`#408 <https://github.com/uber/causalml/pull/408>`_)
+- Fix incorrect feature importance calculation logic by @paullo0106 (`#406 <https://github.com/uber/causalml/pull/406>`_)
+- Add parallel jobs support for NearestNeighbors search with n_jobs parameter by @paullo0106 (`#389 <https://github.com/uber/causalml/pull/389>`_)
+- Fix bug in simulate_randomized_trial by @jroessler (`#385 <https://github.com/uber/causalml/pull/385>`_)
+- Add GA pytest workflow by @ppstacy (`#380 <https://github.com/uber/causalml/pull/380>`_)
+
+
+
 0.11.0 (2021-07-28)
 ------------------
 - CausalML surpassed `2K stars <https://github.com/uber/causalml/stargazers>`_!
