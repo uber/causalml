@@ -5,7 +5,7 @@ Changelog
 
 0.12.0 (Jan 2022)
 -----------------
-- CausalML surpassed `637K downloads <https://pepy.tech/project/causalml>`_ on PyPI and `2K stars <https://github.com/uber/causalml/stargazers>`_ on Github!
+- CausalML surpassed `637K downloads <https://pepy.tech/project/causalml>`_ on PyPI and `2,500 stars <https://github.com/uber/causalml/stargazers>`_ on Github!
 - We have 4 new community contributors, Luis (`@lgmoneda <https://github.com/lgmoneda>`_), Ravi (`@raviksharma <https://github.com/raviksharma>`_), Louis (`@LouisHernandez17 <https://github.com/LouisHernandez17>`_) and JackRab (`@JackRab <https://github.com/JackRab>`_). Thanks for the contribution!
 - We refactored and speeded up UpliftTreeClassifier/UpliftRandomForestClassifier by 5x with Cython  (`#422 <https://github.com/uber/causalml/pull/422>`_ `#440 <https://github.com/uber/causalml/pull/440>`_ by @jeongyoonlee)
 - We revamped our `API documentation <https://causalml.readthedocs.io/en/latest/about.html>`_, it now includes the latest methodology, references, installation, notebook examples, and graphs! (`#413 <https://github.com/uber/causalml/discussions/413>`_ by @huigangchen @t-tte @zhenyuz0500 @jeongyoonlee @paullo0106)
