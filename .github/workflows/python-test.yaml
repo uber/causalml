@@ -24,7 +24,8 @@ jobs:
       - name: Install dependencies
         run: |
             pip install --upgrade pip setuptools
-            pip install -r requirements.txt -r requirements-test.txt
+            pip install -r requirements.txt
+            pip install -r requirements-test.txt
             python setup.py build_ext --inplace
             python setup.py install
       - name: Test with pytest
