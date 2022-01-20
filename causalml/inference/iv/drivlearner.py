@@ -14,6 +14,7 @@ from causalml.propensity import compute_propensity_score
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold
 from tqdm import tqdm
+from xgboost import XGBRegressor
 
 logger = logging.getLogger("causalml")
 
@@ -432,7 +433,7 @@ class BaseDRIVLearner(object):
         treatment,
         y,
         p=None,
-        pz=None,
+        pZ=None,
         bootstrap_ci=False,
         n_bootstraps=1000,
         bootstrap_size=10000,

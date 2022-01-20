@@ -5,6 +5,7 @@ import pandas as pd
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold
 from tqdm import tqdm
+from xgboost import XGBRegressor
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.explainer import Explainer
