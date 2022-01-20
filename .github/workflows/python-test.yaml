@@ -10,7 +10,7 @@ jobs:
       # You can use PyPy versions in python-version.
       # For example, pypy2 and pypy3
       matrix:
-        python-version: ["3.6", "3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.6", "3.7", "3.8", "3.9"]  # "3.10"]
 
     steps:
       - uses: actions/checkout@v2
@@ -23,7 +23,7 @@ jobs:
         run: python --version
       - name: Install dependencies
         run: |
-            pip install --upgrade pip setuptools wheel scipy
+            pip install --upgrade pip setuptools wheel
             pip install -r requirements.txt -r requirements-test.txt
             python setup.py build_ext --inplace
             python setup.py install
