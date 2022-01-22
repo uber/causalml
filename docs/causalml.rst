@@ -83,7 +83,6 @@ causalml.propensity module
     :undoc-members:
     :show-inheritance:
 
-
 causalml.metrics module
 -----------------------
 
@@ -93,11 +92,19 @@ causalml.metrics module
     :undoc-members:
     :show-inheritance:
 
-
 causalml.feature_selection module
 -----------------------
 
 .. automodule:: causalml.feature_selection
+    :members:
+    :imported-members:
+    :undoc-members:
+    :show-inheritance:
+
+causalml.features module
+--------------------------
+
+.. automodule:: causalml.features
     :members:
     :undoc-members:
     :show-inheritance:
