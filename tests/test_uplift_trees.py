@@ -124,6 +124,28 @@ def test_UpliftTreeClassifier(generate_classification_data):
     # random
     assert cumgain['uplift_tree'].sum() > cumgain['Random'].sum()
 
+    # Check if the total count is split correctly, at least for control group in the first level
+    def validate_cnt(cur_tree):
+        parent_control_cnt = cur_tree.nodeSummary[0][1]
+        next_level_control_cnt = 0
+        # assume the depth is at least 2
+        assert cur_tree.trueBranch or cur_tree.falseBranch
+        if cur_tree.trueBranch:
+            next_level_control_cnt += cur_tree.trueBranch.nodeSummary[0][1]
+        if cur_tree.falseBranch:
+            next_level_control_cnt += cur_tree.falseBranch.nodeSummary[0][1]
+        return [parent_control_cnt, next_level_control_cnt]
+
+    counts = validate_cnt(uplift_model.fitted_uplift_tree)
+    assert (counts[0] > 0 and counts[0] == counts[1])
+
+    # Check if it works as expected after filling with validation data
+    uplift_model.fill(df_test[x_names].values,
+                      treatment=df_test['treatment_group_key'].values,
+                      y=df_test[CONVERSION].values)
+    counts = validate_cnt(uplift_model.fitted_uplift_tree)
+    assert (counts[0] > 0 and counts[0] == counts[1])
+
 
 def test_UpliftTreeClassifier_feature_importance(generate_classification_data):
     # test if feature importance is working as expected
