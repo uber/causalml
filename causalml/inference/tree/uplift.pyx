@@ -340,7 +340,7 @@ class UpliftTreeClassifier:
 
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_idx = np.zeros_like(treatment)
-        for i, tr in enumerate(self.classes_, 1):
+        for i, tr in enumerate(self.classes_[1:], 1):
             treatment_idx[treatment == tr] = i
 
         self.pruneTree(X, treatment_idx, y,
@@ -528,7 +528,7 @@ class UpliftTreeClassifier:
 
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_idx = np.zeros_like(treatment)
-        for i, tr in enumerate(self.classes_, 1):
+        for i, tr in enumerate(self.classes_[1:], 1):
             treatment_idx[treatment == tr] = i
 
         self.fillTree(X, treatment_idx, y, tree=self.fitted_uplift_tree)
