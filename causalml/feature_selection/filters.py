@@ -22,16 +22,15 @@ class FilterSelect:
         """
         Conduct F-test of the interaction between treatment and one feature.
 
-        Parameters
-        ----------
-        data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-        treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0) 
-        feature_name (string): feature name, as one column in the data DataFrame
-        y_name (string): name of the outcome variable
+        Args:
+            data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
+            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            feature_name (string): feature name, as one column in the data DataFrame
+            y_name (string): name of the outcome variable
 
-        Returns
-        ----------
-        (pd.DataFrame): a data frame containing the feature importance statistics
+        Returns:
+            F_test_result : pd.DataFrame
+                a data frame containing the feature importance statistics
         """
         Y = data[y_name]
         X = data[[treatment_indicator, feature_name]]
@@ -57,16 +56,15 @@ class FilterSelect:
         """
         Rank features based on the F-statistics of the interaction.
 
-        Parameters
-        ----------
-        data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-        treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0) 
-        features (list of string): list of feature names, that are columns in the data DataFrame
-        y_name (string): name of the outcome variable
+        Args:
+            data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
+            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            features (list of string): list of feature names, that are columns in the data DataFrame
+            y_name (string): name of the outcome variable
 
-        Returns
-        ----------
-        (pd.DataFrame): a data frame containing the feature importance statistics
+        Returns:
+            all_result : pd.DataFrame
+                a data frame containing the feature importance statistics
         """
         all_result = pd.DataFrame()
         for x_name_i in features: 
@@ -86,16 +84,15 @@ class FilterSelect:
         """
         Conduct LR (Likelihood Ratio) test of the interaction between treatment and one feature.
 
-        Parameters
-        ----------
-        data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-        treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0) 
-        feature_name (string): feature name, as one column in the data DataFrame
-        y_name (string): name of the outcome variable
+        Args:
+            data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
+            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            feature_name (string): feature name, as one column in the data DataFrame
+            y_name (string): name of the outcome variable
 
-        Returns
-        ----------
-        (pd.DataFrame): a data frame containing the feature importance statistics
+        Returns:
+            LR_test_result : pd.DataFrame
+                a data frame containing the feature importance statistics
         """
         Y = data[y_name]
         
@@ -130,16 +127,15 @@ class FilterSelect:
         """
         Rank features based on the LRT-statistics of the interaction.
 
-        Parameters
-        ----------
-        data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-        treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0) 
-        feature_name (string): feature name, as one column in the data DataFrame
-        y_name (string): name of the outcome variable
+        Args:
+            data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
+            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            feature_name (string): feature name, as one column in the data DataFrame
+            y_name (string): name of the outcome variable
 
-        Returns
-        ----------
-        (pd.DataFrame): a data frame containing the feature importance statistics
+        Returns:
+            all_result : pd.DataFrame
+                a data frame containing the feature importance statistics
         """
         all_result = pd.DataFrame()
         for x_name_i in features: 
@@ -223,10 +219,9 @@ class FilterSelect:
         """
         Calculate KL Divergence for binary classification.
 
-        Parameters
-        ----------
-        pk (float): Probability of class 1 in treatment group
-        qk (float): Probability of class 1 in control group
+        Args:
+            pk (float): Probability of class 1 in treatment group
+            qk (float): Probability of class 1 in control group
         """
         if qk < 0.1**6:
             qk = 0.1**6
@@ -240,10 +235,9 @@ class FilterSelect:
         Calculate the multi-treatment unconditional D (one node)
         with KL Divergence as split Evaluation function.
 
-        Parameters
-        ----------
-        nodeSummary (dict): a dictionary containing the statistics for a tree node sample
-        control_group (string, optional, default='control'): the name for control group 
+        Args:
+            nodeSummary (dict): a dictionary containing the statistics for a tree node sample
+            control_group (string, optional, default='control'): the name for control group
 
         Notes
         -----
@@ -264,10 +258,9 @@ class FilterSelect:
         Calculate the multi-treatment unconditional D (one node)
         with Euclidean Distance as split Evaluation function.
 
-        Parameters
-        ----------
-        nodeSummary (dict): a dictionary containing the statistics for a tree node sample
-        control_group (string, optional, default='control'): the name for control group        
+        Args:
+            nodeSummary (dict): a dictionary containing the statistics for a tree node sample
+            control_group (string, optional, default='control'): the name for control group
         """
         if control_group not in nodeSummary:
             return 0
@@ -284,11 +277,9 @@ class FilterSelect:
         Calculate the multi-treatment unconditional D (one node)
         with Chi-Square as split Evaluation function.
 
-        Parameters
-        ----------
-        nodeSummary (dict): a dictionary containing the statistics for a tree node sample
-        control_group (string, optional, default='control'): the name for control group 
-
+        Args:
+            nodeSummary (dict): a dictionary containing the statistics for a tree node sample
+            control_group (string, optional, default='control'): the name for control group
         """
         if control_group not in nodeSummary:
             return 0
@@ -310,24 +301,24 @@ class FilterSelect:
         """
         Calculate the chosen divergence measure for one feature.
 
-        Parameters
-        ----------
-        data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-        treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0) 
-        feature_name (string): feature name, as one column in the data DataFrame
-        y_name (string): name of the outcome variable
-        method (string, optional, default = 'KL'): taking one of the following values {'F', 'LR', 'KL', 'ED', 'Chi'}
-                The feature selection method to be used to rank the features.  
-                'F' for F-test 
-                'LR' for likelihood ratio test
-                'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square respectively
-        experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in the DataFrame, which contains the treatment and control assignment label
-        control_group (string, optional, default = 'control'): name for control group, value in the experiment group column
-        n_bins (int, optional, default = 10): number of bins to be used for bin-based uplift filter methods
-        null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then exception will be raised
-        Returns
-        ----------
-        (pd.DataFrame): a data frame containing the feature importance statistics
+        Args:
+            data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
+            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            feature_name (string): feature name, as one column in the data DataFrame
+            y_name (string): name of the outcome variable
+            method (string, optional, default = 'KL'): taking one of the following values {'F', 'LR', 'KL', 'ED', 'Chi'}
+                    The feature selection method to be used to rank the features.
+                    'F' for F-test
+                    'LR' for likelihood ratio test
+                    'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square respectively
+            experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in the DataFrame, which contains the treatment and control assignment label
+            control_group (string, optional, default = 'control'): name for control group, value in the experiment group column
+            n_bins (int, optional, default = 10): number of bins to be used for bin-based uplift filter methods
+            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then exception will be raised
+
+        Returns:
+            D_result : pd.DataFrame
+                a data frame containing the feature importance statistics
         """
         # [TODO] Application to categorical features
 
@@ -387,25 +378,24 @@ class FilterSelect:
         """
         Rank features based on the chosen divergence measure.
 
-        Parameters
-        ----------
-        data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-        treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0) 
-        features (list of string): list of feature names, that are columns in the data DataFrame
-        y_name (string): name of the outcome variable
-        method (string, optional, default = 'KL'): taking one of the following values {'F', 'LR', 'KL', 'ED', 'Chi'}
-                The feature selection method to be used to rank the features.  
-                'F' for F-test 
-                'LR' for likelihood ratio test
-                'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square respectively
-        experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in the DataFrame, which contains the treatment and control assignment label
-        control_group (string, optional, default = 'control'): name for control group, value in the experiment group column
-        n_bins (int, optional, default = 10): number of bins to be used for bin-based uplift filter methods
-        null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then exception will be raised
+        Args:
+            data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
+            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            features (list of string): list of feature names, that are columns in the data DataFrame
+            y_name (string): name of the outcome variable
+            method (string, optional, default = 'KL'): taking one of the following values {'F', 'LR', 'KL', 'ED', 'Chi'}
+                    The feature selection method to be used to rank the features.
+                    'F' for F-test
+                    'LR' for likelihood ratio test
+                    'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square respectively
+            experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in the DataFrame, which contains the treatment and control assignment label
+            control_group (string, optional, default = 'control'): name for control group, value in the experiment group column
+            n_bins (int, optional, default = 10): number of bins to be used for bin-based uplift filter methods
+            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then exception will be raised
 
-        Returns
-        ----------
-        (pd.DataFrame): a data frame containing the feature importance statistics
+        Returns:
+            all_result : pd.DataFrame
+                a data frame containing the feature importance statistics
         """
         
         all_result = pd.DataFrame()
@@ -434,8 +424,7 @@ class FilterSelect:
         """
         Rank features based on the chosen statistic of the interaction.
 
-        Parameters
-        ----------
+        Args:
             data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
             features (list of string): list of feature names, that are columns in the data DataFrame
             y_name (string): name of the outcome variable
@@ -449,10 +438,10 @@ class FilterSelect:
             treatment_group (string): name for treatment group, value in the experiment group column
             n_bins (int, optional): number of bins to be used for bin-based uplift filter methods
             null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If value is None and null is present then exception will be raised
-        
-        Returns
-        ----------
-            (pd.DataFrame): a data frame with following columns: ['method', 'feature', 'rank', 'score', 'p_value', 'misc']
+
+        Returns:
+            all_result : pd.DataFrame
+                a data frame with following columns: ['method', 'feature', 'rank', 'score', 'p_value', 'misc']
         """
         
         if method == 'F':
