@@ -1321,7 +1321,7 @@ class UpliftRandomForestClassifier:
         self.n_class = len(self.classes_)
 
         self.uplift_forest = (
-            Parallel(n_jobs=self.n_jobs)
+            Parallel(n_jobs=self.n_jobs, backend="threading")
             (delayed(self.bootstrap)(X, treatment, y, tree) for tree in self.uplift_forest)
         )
 
