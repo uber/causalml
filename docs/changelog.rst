@@ -3,6 +3,16 @@
 Changelog
 =========
 
+0.12.1 (Feb 2022)
+-----------------
+This patch includes two bug fixes for UpliftRandomForestClassifier as follows:
+
+Updates
+~~~~~~~~~~~~~
+- `#462 <https://github.com/uber/causalml/pull/462>`_ by @paullo0106: Use the correct treatment_idx for fillTree() when applying validation data set
+- `#468 <https://github.com/uber/causalml/pull/468>`_ by @jeongyoonlee: Switch the joblib backend for UpliftRandomForestClassifier to threading to avoid memory copy across trees
+
+
 0.12.0 (Jan 2022)
 -----------------
 - CausalML surpassed `637K downloads <https://pepy.tech/project/causalml>`_ on PyPI and `2,500 stars <https://github.com/uber/causalml/stargazers>`_ on Github!
