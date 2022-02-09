@@ -1,7 +1,7 @@
 setuptools>=41.0.0
 pip>=10.0
 numpy>=1.18.5
-scipy==1.4.1
+scipy>=1.4.1
 matplotlib
 pandas>=0.24.1
 scikit-learn>=0.22.0
