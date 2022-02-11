@@ -12,17 +12,22 @@ from xgboost import XGBRegressor
 from scipy.stats import entropy
 import warnings
 
-from causalml.inference.meta import BaseXRegressor, BaseRRegressor, BaseSRegressor, BaseTRegressor
+from causalml.inference.meta import (
+    BaseXRegressor,
+    BaseRRegressor,
+    BaseSRegressor,
+    BaseTRegressor,
+)
 from causalml.inference.tree import CausalTreeRegressor
 from causalml.propensity import ElasticNetPropensityModel
 from causalml.metrics import plot_gain, get_cumgain
 
 
-plt.style.use('fivethirtyeight')
-warnings.filterwarnings('ignore')
+plt.style.use("fivethirtyeight")
+warnings.filterwarnings("ignore")
 
-KEY_GENERATED_DATA = 'generated_data'
-KEY_ACTUAL = 'Actuals'
+KEY_GENERATED_DATA = "generated_data"
+KEY_ACTUAL = "Actuals"
 
 RANDOM_SEED = 42
 
@@ -42,7 +47,14 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
 
     preds_dict = {}
     preds_dict[KEY_ACTUAL] = tau
-    preds_dict[KEY_GENERATED_DATA] = {'y': y, 'X': X, 'w': w, 'tau': tau, 'b': b, 'e': e}
+    preds_dict[KEY_GENERATED_DATA] = {
+        "y": y,
+        "X": X,
+        "w": w,
+        "tau": tau,
+        "b": b,
+        "e": e,
+    }
 
     # Predict p_hat because e would not be directly observed in real-life
     p_model = ElasticNetPropensityModel()
@@ -51,22 +63,30 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
     if estimators:
         for name, learner in estimators.items():
             try:
-                preds_dict[name] = learner.fit_predict(X=X, treatment=w, y=y, p=p_hat).flatten()
+                preds_dict[name] = learner.fit_predict(
+                    X=X, treatment=w, y=y, p=p_hat
+                ).flatten()
             except TypeError:
                 preds_dict[name] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
     else:
-        for base_learner, label_l in zip([BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
-                                         ['S', 'T', 'X', 'R']):
-            for model, label_m in zip([LinearRegression, XGBRegressor], ['LR', 'XGB']):
+        for base_learner, label_l in zip(
+            [BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
+            ["S", "T", "X", "R"],
+        ):
+            for model, label_m in zip([LinearRegression, XGBRegressor], ["LR", "XGB"]):
                 learner = base_learner(model())
-                model_name = '{} Learner ({})'.format(label_l, label_m)
+                model_name = "{} Learner ({})".format(label_l, label_m)
                 try:
-                    preds_dict[model_name] = learner.fit_predict(X=X, treatment=w, y=y, p=p_hat).flatten()
+                    preds_dict[model_name] = learner.fit_predict(
+                        X=X, treatment=w, y=y, p=p_hat
+                    ).flatten()
                 except TypeError:
-                    preds_dict[model_name] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
+                    preds_dict[model_name] = learner.fit_predict(
+                        X=X, treatment=w, y=y
+                    ).flatten()
 
         learner = CausalTreeRegressor(random_state=RANDOM_SEED)
-        preds_dict['Causal Tree'] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
+        preds_dict["Causal Tree"] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
 
     return preds_dict
 
@@ -82,14 +102,22 @@ def get_synthetic_summary(synthetic_data_func, n=1000, k=1, estimators={}):
     summaries = []
 
     for i in range(k):
-        synthetic_preds = get_synthetic_preds(synthetic_data_func, n=n, estimators=estimators)
+        synthetic_preds = get_synthetic_preds(
+            synthetic_data_func, n=n, estimators=estimators
+        )
         actuals = synthetic_preds[KEY_ACTUAL]
-        synthetic_summary = pd.DataFrame({label: [preds.mean(), mse(preds, actuals)] for label, preds
-                                          in synthetic_preds.items() if label != KEY_GENERATED_DATA},
-                                         index=['ATE', 'MSE']).T
+        synthetic_summary = pd.DataFrame(
+            {
+                label: [preds.mean(), mse(preds, actuals)]
+                for label, preds in synthetic_preds.items()
+                if label != KEY_GENERATED_DATA
+            },
+            index=["ATE", "MSE"],
+        ).T
 
-        synthetic_summary['Abs % Error of ATE'] = np.abs((synthetic_summary['ATE'] /
-                                                          synthetic_summary.loc[KEY_ACTUAL, 'ATE']) - 1)
+        synthetic_summary["Abs % Error of ATE"] = np.abs(
+            (synthetic_summary["ATE"] / synthetic_summary.loc[KEY_ACTUAL, "ATE"]) - 1
+        )
 
         for label in synthetic_summary.index:
             stacked_values = np.hstack((synthetic_preds[label], actuals))
@@ -98,17 +126,17 @@ def get_synthetic_summary(synthetic_data_func, n=1000, k=1, estimators={}):
             bins = np.linspace(stacked_low, stacked_high, 100)
 
             distr = np.histogram(synthetic_preds[label], bins=bins)[0]
-            distr = np.clip(distr/distr.sum(), 0.001, 0.999)
+            distr = np.clip(distr / distr.sum(), 0.001, 0.999)
             true_distr = np.histogram(actuals, bins=bins)[0]
-            true_distr = np.clip(true_distr/true_distr.sum(), 0.001, 0.999)
+            true_distr = np.clip(true_distr / true_distr.sum(), 0.001, 0.999)
 
             kl = entropy(distr, true_distr)
-            synthetic_summary.loc[label, 'KL Divergence'] = kl
+            synthetic_summary.loc[label, "KL Divergence"] = kl
 
         summaries.append(synthetic_summary)
 
     summary = sum(summaries) / k
-    return summary[['Abs % Error of ATE', 'MSE', 'KL Divergence']]
+    return summary[["Abs % Error of ATE", "MSE", "KL Divergence"]]
 
 
 def scatter_plot_summary(synthetic_summary, k, drop_learners=[], drop_cols=[]):
@@ -125,8 +153,8 @@ def scatter_plot_summary(synthetic_summary, k, drop_learners=[], drop_cols=[]):
 
     fig, ax = plt.subplots()
     fig.set_size_inches(12, 8)
-    xs = plot_data['Abs % Error of ATE']
-    ys = plot_data['MSE']
+    xs = plot_data["Abs % Error of ATE"]
+    ys = plot_data["MSE"]
 
     ax.scatter(xs, ys)
 
@@ -134,14 +162,26 @@ def scatter_plot_summary(synthetic_summary, k, drop_learners=[], drop_cols=[]):
     xlim = ax.get_xlim()
 
     for i, txt in enumerate(plot_data.index):
-        ax.annotate(txt, (xs[i] - np.random.binomial(1, 0.5)*xlim[1]*0.04, ys[i] - ylim[1]*0.03))
+        ax.annotate(
+            txt,
+            (
+                xs[i] - np.random.binomial(1, 0.5) * xlim[1] * 0.04,
+                ys[i] - ylim[1] * 0.03,
+            ),
+        )
 
-    ax.set_xlabel('Abs % Error of ATE')
-    ax.set_ylabel('MSE')
-    ax.set_title('Learner Performance (averaged over k={} simulations)'.format(k))
+    ax.set_xlabel("Abs % Error of ATE")
+    ax.set_ylabel("MSE")
+    ax.set_title("Learner Performance (averaged over k={} simulations)".format(k))
 
 
-def bar_plot_summary(synthetic_summary, k, drop_learners=[], drop_cols=[], sort_cols=['MSE', 'Abs % Error of ATE']):
+def bar_plot_summary(
+    synthetic_summary,
+    k,
+    drop_learners=[],
+    drop_cols=[],
+    sort_cols=["MSE", "Abs % Error of ATE"],
+):
     """Generates a bar plot comparing learner performance.
 
     Args:
@@ -154,13 +194,21 @@ def bar_plot_summary(synthetic_summary, k, drop_learners=[], drop_cols=[], sort_
     plot_data = synthetic_summary.sort_values(sort_cols, ascending=True)
     plot_data = plot_data.drop(drop_learners + [KEY_ACTUAL]).drop(drop_cols, axis=1)
 
-    plot_data.plot(kind='bar', figsize=(12, 8))
+    plot_data.plot(kind="bar", figsize=(12, 8))
     plt.xticks(rotation=30)
-    plt.title('Learner Performance (averaged over k={} simulations)'.format(k))
+    plt.title("Learner Performance (averaged over k={} simulations)".format(k))
 
 
-def distr_plot_single_sim(synthetic_preds, kind='kde', drop_learners=[], bins=50, histtype='step', alpha=1, linewidth=1,
-               bw_method=1):
+def distr_plot_single_sim(
+    synthetic_preds,
+    kind="kde",
+    drop_learners=[],
+    bins=50,
+    histtype="step",
+    alpha=1,
+    linewidth=1,
+    bw_method=1,
+):
     """Plots the distribution of each learner's predictions (for a single simulation).
     Kernel Density Estimation (kde) and actual histogram plots supported.
 
@@ -185,22 +233,46 @@ def distr_plot_single_sim(synthetic_preds, kind='kde', drop_learners=[], bins=50
 
     # Plotting
     plt.figure(figsize=(12, 8))
-    colors = ['black', 'red', 'blue', 'green', 'cyan', 'brown', 'grey', 'pink', 'orange', 'yellow']
+    colors = [
+        "black",
+        "red",
+        "blue",
+        "green",
+        "cyan",
+        "brown",
+        "grey",
+        "pink",
+        "orange",
+        "yellow",
+    ]
     for i, (k, v) in enumerate(preds_for_plot.items()):
         if k in learners:
-            if kind == 'kde':
+            if kind == "kde":
                 v = pd.Series(v.flatten())
                 v = v[v.between(global_lower, global_upper)]
-                v.plot(kind='kde', bw_method=bw_method, label=k, linewidth=linewidth, color=colors[i])
-            elif kind == 'hist':
-                plt.hist(v, bins=np.linspace(global_lower, global_upper, bins), label=k, histtype=histtype,
-                         alpha=alpha, linewidth=linewidth, color=colors[i])
+                v.plot(
+                    kind="kde",
+                    bw_method=bw_method,
+                    label=k,
+                    linewidth=linewidth,
+                    color=colors[i],
+                )
+            elif kind == "hist":
+                plt.hist(
+                    v,
+                    bins=np.linspace(global_lower, global_upper, bins),
+                    label=k,
+                    histtype=histtype,
+                    alpha=alpha,
+                    linewidth=linewidth,
+                    color=colors[i],
+                )
             else:
                 pass
 
     plt.xlim(global_lower, global_upper)
-    plt.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-    plt.title('Distribution from a Single Simulation')
+    plt.legend(loc="center left", bbox_to_anchor=(1, 0.5))
+    plt.title("Distribution from a Single Simulation")
 
 
 def scatter_plot_single_sim(synthetic_preds):
@@ -220,18 +292,25 @@ def scatter_plot_single_sim(synthetic_preds):
     axes = np.ravel(axes)
 
     for i, (label, preds) in enumerate(preds_for_plot.items()):
-        axes[i].scatter(preds_for_plot[KEY_ACTUAL], preds, s=2, label='Predictions')
+        axes[i].scatter(preds_for_plot[KEY_ACTUAL], preds, s=2, label="Predictions")
         axes[i].set_title(label, size=12)
-        axes[i].set_xlabel('Actual', size=10)
-        axes[i].set_ylabel('Prediction', size=10)
+        axes[i].set_xlabel("Actual", size=10)
+        axes[i].set_ylabel("Prediction", size=10)
         xlim = axes[i].get_xlim()
         ylim = axes[i].get_xlim()
-        axes[i].plot([xlim[0], xlim[1]], [ylim[0], ylim[1]], label='Perfect Model', linewidth=1, color='grey')
-        axes[i].legend(loc=2, prop={'size': 10})
+        axes[i].plot(
+            [xlim[0], xlim[1]],
+            [ylim[0], ylim[1]],
+            label="Perfect Model",
+            linewidth=1,
+            color="grey",
+        )
+        axes[i].legend(loc=2, prop={"size": 10})
 
 
-def get_synthetic_preds_holdout(synthetic_data_func, n=1000, valid_size=0.2,
-                                estimators={}):
+def get_synthetic_preds_holdout(
+    synthetic_data_func, n=1000, valid_size=0.2, estimators={}
+):
     """Generate predictions for synthetic data using specified function (single simulation) for train and holdout
 
     Args:
@@ -248,8 +327,22 @@ def get_synthetic_preds_holdout(synthetic_data_func, n=1000, valid_size=0.2,
     """
     y, X, w, tau, b, e = synthetic_data_func(n=n)
 
-    X_train, X_val, y_train, y_val, w_train, w_val, tau_train, tau_val, b_train, b_val, e_train, e_val = \
-        train_test_split(X, y, w, tau, b, e, test_size=valid_size, random_state=RANDOM_SEED, shuffle=True)
+    (
+        X_train,
+        X_val,
+        y_train,
+        y_val,
+        w_train,
+        w_val,
+        tau_train,
+        tau_val,
+        b_train,
+        b_val,
+        e_train,
+        e_val,
+    ) = train_test_split(
+        X, y, w, tau, b, e, test_size=valid_size, random_state=RANDOM_SEED, shuffle=True
+    )
 
     preds_dict_train = {}
     preds_dict_valid = {}
@@ -257,51 +350,63 @@ def get_synthetic_preds_holdout(synthetic_data_func, n=1000, valid_size=0.2,
     preds_dict_train[KEY_ACTUAL] = tau_train
     preds_dict_valid[KEY_ACTUAL] = tau_val
 
-    preds_dict_train['generated_data'] = {
-        'y': y_train,
-        'X': X_train,
-        'w': w_train,
-        'tau': tau_train,
-        'b': b_train,
-        'e': e_train}
-    preds_dict_valid['generated_data'] = {
-        'y': y_val,
-        'X': X_val,
-        'w': w_val,
-        'tau': tau_val,
-        'b': b_val,
-        'e': e_val}
+    preds_dict_train["generated_data"] = {
+        "y": y_train,
+        "X": X_train,
+        "w": w_train,
+        "tau": tau_train,
+        "b": b_train,
+        "e": e_train,
+    }
+    preds_dict_valid["generated_data"] = {
+        "y": y_val,
+        "X": X_val,
+        "w": w_val,
+        "tau": tau_val,
+        "b": b_val,
+        "e": e_val,
+    }
 
     # Predict p_hat because e would not be directly observed in real-life
     p_model = ElasticNetPropensityModel()
     p_hat_train = p_model.fit_predict(X_train, w_train)
     p_hat_val = p_model.fit_predict(X_val, w_val)
 
-    for base_learner, label_l in zip([BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
-                                     ['S', 'T', 'X', 'R']):
-        for model, label_m in zip([LinearRegression, XGBRegressor], ['LR', 'XGB']):
+    for base_learner, label_l in zip(
+        [BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
+        ["S", "T", "X", "R"],
+    ):
+        for model, label_m in zip([LinearRegression, XGBRegressor], ["LR", "XGB"]):
             # RLearner will need to fit on the p_hat
-            if label_l != 'R':
+            if label_l != "R":
                 learner = base_learner(model())
                 # fit the model on training data only
                 learner.fit(X=X_train, treatment=w_train, y=y_train)
                 try:
-                    preds_dict_train['{} Learner ({})'.format(
-                        label_l, label_m)] = learner.predict(X=X_train, p=p_hat_train).flatten()
-                    preds_dict_valid['{} Learner ({})'.format(
-                        label_l, label_m)] = learner.predict(X=X_val, p=p_hat_val).flatten()
+                    preds_dict_train[
+                        "{} Learner ({})".format(label_l, label_m)
+                    ] = learner.predict(X=X_train, p=p_hat_train).flatten()
+                    preds_dict_valid[
+                        "{} Learner ({})".format(label_l, label_m)
+                    ] = learner.predict(X=X_val, p=p_hat_val).flatten()
                 except TypeError:
-                    preds_dict_train['{} Learner ({})'.format(
-                        label_l, label_m)] = learner.predict(X=X_train, treatment=w_train, y=y_train).flatten()
-                    preds_dict_valid['{} Learner ({})'.format(
-                        label_l, label_m)] = learner.predict(X=X_val, treatment=w_val, y=y_val).flatten()
+                    preds_dict_train[
+                        "{} Learner ({})".format(label_l, label_m)
+                    ] = learner.predict(
+                        X=X_train, treatment=w_train, y=y_train
+                    ).flatten()
+                    preds_dict_valid[
+                        "{} Learner ({})".format(label_l, label_m)
+                    ] = learner.predict(X=X_val, treatment=w_val, y=y_val).flatten()
             else:
                 learner = base_learner(model())
                 learner.fit(X=X_train, p=p_hat_train, treatment=w_train, y=y_train)
-                preds_dict_train['{} Learner ({})'.format(
-                    label_l, label_m)] = learner.predict(X=X_train).flatten()
-                preds_dict_valid['{} Learner ({})'.format(
-                    label_l, label_m)] = learner.predict(X=X_val).flatten()
+                preds_dict_train[
+                    "{} Learner ({})".format(label_l, label_m)
+                ] = learner.predict(X=X_train).flatten()
+                preds_dict_valid[
+                    "{} Learner ({})".format(label_l, label_m)
+                ] = learner.predict(X=X_val).flatten()
 
     return preds_dict_train, preds_dict_valid
 
@@ -327,23 +432,43 @@ def get_synthetic_summary_holdout(synthetic_data_func, n=1000, valid_size=0.2, k
     summaries_validation = []
 
     for i in range(k):
-        preds_dict_train, preds_dict_valid = get_synthetic_preds_holdout(synthetic_data_func, n=n,
-                                                                         valid_size=valid_size)
+        preds_dict_train, preds_dict_valid = get_synthetic_preds_holdout(
+            synthetic_data_func, n=n, valid_size=valid_size
+        )
         actuals_train = preds_dict_train[KEY_ACTUAL]
         actuals_validation = preds_dict_valid[KEY_ACTUAL]
 
-        synthetic_summary_train = pd.DataFrame({label: [preds.mean(), mse(preds, actuals_train)] for label, preds
-                                                in preds_dict_train.items() if KEY_GENERATED_DATA not in label.lower()},
-                                               index=['ATE', 'MSE']).T
-        synthetic_summary_train['Abs % Error of ATE'] = np.abs(
-            (synthetic_summary_train['ATE']/synthetic_summary_train.loc[KEY_ACTUAL, 'ATE']) - 1)
+        synthetic_summary_train = pd.DataFrame(
+            {
+                label: [preds.mean(), mse(preds, actuals_train)]
+                for label, preds in preds_dict_train.items()
+                if KEY_GENERATED_DATA not in label.lower()
+            },
+            index=["ATE", "MSE"],
+        ).T
+        synthetic_summary_train["Abs % Error of ATE"] = np.abs(
+            (
+                synthetic_summary_train["ATE"]
+                / synthetic_summary_train.loc[KEY_ACTUAL, "ATE"]
+            )
+            - 1
+        )
 
-        synthetic_summary_validation = pd.DataFrame({label: [preds.mean(), mse(preds, actuals_validation)]
-                                                     for label, preds in preds_dict_valid.items()
-                                                     if KEY_GENERATED_DATA not in label.lower()},
-                                                    index=['ATE', 'MSE']).T
-        synthetic_summary_validation['Abs % Error of ATE'] = np.abs(
-            (synthetic_summary_validation['ATE']/synthetic_summary_validation.loc[KEY_ACTUAL, 'ATE']) - 1)
+        synthetic_summary_validation = pd.DataFrame(
+            {
+                label: [preds.mean(), mse(preds, actuals_validation)]
+                for label, preds in preds_dict_valid.items()
+                if KEY_GENERATED_DATA not in label.lower()
+            },
+            index=["ATE", "MSE"],
+        ).T
+        synthetic_summary_validation["Abs % Error of ATE"] = np.abs(
+            (
+                synthetic_summary_validation["ATE"]
+                / synthetic_summary_validation.loc[KEY_ACTUAL, "ATE"]
+            )
+            - 1
+        )
 
         # calculate kl divergence for training
         for label in synthetic_summary_train.index:
@@ -353,12 +478,12 @@ def get_synthetic_summary_holdout(synthetic_data_func, n=1000, valid_size=0.2, k
             bins = np.linspace(stacked_low, stacked_high, 100)
 
             distr = np.histogram(preds_dict_train[label], bins=bins)[0]
-            distr = np.clip(distr/distr.sum(), 0.001, 0.999)
+            distr = np.clip(distr / distr.sum(), 0.001, 0.999)
             true_distr = np.histogram(actuals_train, bins=bins)[0]
-            true_distr = np.clip(true_distr/true_distr.sum(), 0.001, 0.999)
+            true_distr = np.clip(true_distr / true_distr.sum(), 0.001, 0.999)
 
             kl = entropy(distr, true_distr)
-            synthetic_summary_train.loc[label, 'KL Divergence'] = kl
+            synthetic_summary_train.loc[label, "KL Divergence"] = kl
 
         # calculate kl divergence for validation
         for label in synthetic_summary_validation.index:
@@ -368,24 +493,32 @@ def get_synthetic_summary_holdout(synthetic_data_func, n=1000, valid_size=0.2, k
             bins = np.linspace(stacked_low, stacked_high, 100)
 
             distr = np.histogram(preds_dict_valid[label], bins=bins)[0]
-            distr = np.clip(distr/distr.sum(), 0.001, 0.999)
+            distr = np.clip(distr / distr.sum(), 0.001, 0.999)
             true_distr = np.histogram(actuals_validation, bins=bins)[0]
-            true_distr = np.clip(true_distr/true_distr.sum(), 0.001, 0.999)
+            true_distr = np.clip(true_distr / true_distr.sum(), 0.001, 0.999)
 
             kl = entropy(distr, true_distr)
-            synthetic_summary_validation.loc[label, 'KL Divergence'] = kl
+            synthetic_summary_validation.loc[label, "KL Divergence"] = kl
 
         summaries_train.append(synthetic_summary_train)
         summaries_validation.append(synthetic_summary_validation)
 
     summary_train = sum(summaries_train) / k
     summary_validation = sum(summaries_validation) / k
-    return (summary_train[['Abs % Error of ATE', 'MSE', 'KL Divergence']],
-            summary_validation[['Abs % Error of ATE', 'MSE', 'KL Divergence']])
+    return (
+        summary_train[["Abs % Error of ATE", "MSE", "KL Divergence"]],
+        summary_validation[["Abs % Error of ATE", "MSE", "KL Divergence"]],
+    )
 
 
-def scatter_plot_summary_holdout(train_summary, validation_summary, k, label=['Train', 'Validation'], drop_learners=[],
-                                 drop_cols=[]):
+def scatter_plot_summary_holdout(
+    train_summary,
+    validation_summary,
+    k,
+    label=["Train", "Validation"],
+    drop_learners=[],
+    drop_cols=[],
+):
     """Generates a scatter plot comparing learner performance by training and validation.
 
     Args:
@@ -401,15 +534,17 @@ def scatter_plot_summary_holdout(train_summary, validation_summary, k, label=['T
     validation_summary = validation_summary.drop(drop_learners).drop(drop_cols, axis=1)
 
     plot_data = pd.concat([train_summary, validation_summary])
-    plot_data['label'] = [i.replace('Train', '') for i in plot_data.index]
-    plot_data['label'] = [i.replace('Validation', '') for i in plot_data.label]
+    plot_data["label"] = [i.replace("Train", "") for i in plot_data.index]
+    plot_data["label"] = [i.replace("Validation", "") for i in plot_data.label]
 
     fig, ax = plt.subplots()
     fig.set_size_inches(12, 8)
-    xs = plot_data['Abs % Error of ATE']
-    ys = plot_data['MSE']
-    group = np.array([label[0]] * train_summary.shape[0] + [label[1]] * validation_summary.shape[0])
-    cdict = {label[0]: 'red', label[1]: 'blue'}
+    xs = plot_data["Abs % Error of ATE"]
+    ys = plot_data["MSE"]
+    group = np.array(
+        [label[0]] * train_summary.shape[0] + [label[1]] * validation_summary.shape[0]
+    )
+    cdict = {label[0]: "red", label[1]: "blue"}
 
     for g in np.unique(group):
         ix = np.where(group == g)[0].tolist()
@@ -418,14 +553,16 @@ def scatter_plot_summary_holdout(train_summary, validation_summary, k, label=['T
     for i, txt in enumerate(plot_data.label[:10]):
         ax.annotate(txt, (xs[i] + 0.005, ys[i]))
 
-    ax.set_xlabel('Abs % Error of ATE')
-    ax.set_ylabel('MSE')
-    ax.set_title('Learner Performance (averaged over k={} simulations)'.format(k))
-    ax.legend(loc='center left', bbox_to_anchor=(1.1, 0.5))
+    ax.set_xlabel("Abs % Error of ATE")
+    ax.set_ylabel("MSE")
+    ax.set_title("Learner Performance (averaged over k={} simulations)".format(k))
+    ax.legend(loc="center left", bbox_to_anchor=(1.1, 0.5))
     plt.show()
 
 
-def bar_plot_summary_holdout(train_summary, validation_summary, k, drop_learners=[], drop_cols=[]):
+def bar_plot_summary_holdout(
+    train_summary, validation_summary, k, drop_learners=[], drop_cols=[]
+):
     """Generates a bar plot comparing learner performance by training and validation
 
     Args:
@@ -437,26 +574,36 @@ def bar_plot_summary_holdout(train_summary, validation_summary, k, drop_learners
         drop_cols (list, optional): list of metrics (str) to omit when plotting
     """
     train_summary = train_summary.drop([KEY_ACTUAL])
-    train_summary['Learner'] = train_summary.index
+    train_summary["Learner"] = train_summary.index
 
     validation_summary = validation_summary.drop([KEY_ACTUAL])
-    validation_summary['Learner'] = validation_summary.index
+    validation_summary["Learner"] = validation_summary.index
 
-    for metric in ['Abs % Error of ATE', 'MSE', 'KL Divergence']:
+    for metric in ["Abs % Error of ATE", "MSE", "KL Divergence"]:
         plot_data_sub = pd.DataFrame(train_summary.Learner).reset_index(drop=True)
-        plot_data_sub['train'] = train_summary[metric].values
-        plot_data_sub['validation'] = validation_summary[metric].values
-        plot_data_sub = plot_data_sub.set_index('Learner')
+        plot_data_sub["train"] = train_summary[metric].values
+        plot_data_sub["validation"] = validation_summary[metric].values
+        plot_data_sub = plot_data_sub.set_index("Learner")
         plot_data_sub = plot_data_sub.drop(drop_learners).drop(drop_cols, axis=1)
-        plot_data_sub = plot_data_sub.sort_values('train', ascending=True)
+        plot_data_sub = plot_data_sub.sort_values("train", ascending=True)
 
-        plot_data_sub.plot(kind='bar', color=['red', 'blue'], figsize=(12, 8))
+        plot_data_sub.plot(kind="bar", color=["red", "blue"], figsize=(12, 8))
         plt.xticks(rotation=30)
-        plt.title('Learner Performance of {} (averaged over k={} simulations)'.format(metric, k))
+        plt.title(
+            "Learner Performance of {} (averaged over k={} simulations)".format(
+                metric, k
+            )
+        )
 
 
-def get_synthetic_auuc(synthetic_preds, drop_learners=[], outcome_col='y', treatment_col='w',
-                       treatment_effect_col='tau', plot=True):
+def get_synthetic_auuc(
+    synthetic_preds,
+    drop_learners=[],
+    outcome_col="y",
+    treatment_col="w",
+    treatment_effect_col="tau",
+    plot=True,
+):
     """Get auuc values for cumulative gains of model estimates in quantiles.
 
     For details, reference get_cumgain() and plot_gain()
@@ -476,24 +623,37 @@ def get_synthetic_auuc(synthetic_preds, drop_learners=[], outcome_col='y', treat
     synthetic_preds_df = pd.DataFrame(synthetic_preds_df)
     synthetic_preds_df = synthetic_preds_df.drop(drop_learners, axis=1)
 
-    synthetic_preds_df['y'] = generated_data[outcome_col]
-    synthetic_preds_df['w'] = generated_data[treatment_col]
+    synthetic_preds_df["y"] = generated_data[outcome_col]
+    synthetic_preds_df["w"] = generated_data[treatment_col]
     if treatment_effect_col in generated_data.keys():
-        synthetic_preds_df['tau'] = generated_data[treatment_effect_col]
+        synthetic_preds_df["tau"] = generated_data[treatment_effect_col]
 
-    assert ((outcome_col in synthetic_preds_df.columns) and
-            (treatment_col in synthetic_preds_df.columns) or
-            treatment_effect_col in synthetic_preds_df.columns)
+    assert (
+        (outcome_col in synthetic_preds_df.columns)
+        and (treatment_col in synthetic_preds_df.columns)
+        or treatment_effect_col in synthetic_preds_df.columns
+    )
 
-    cumlift = get_cumgain(synthetic_preds_df, outcome_col='y', treatment_col='w',
-                          treatment_effect_col='tau')
+    cumlift = get_cumgain(
+        synthetic_preds_df,
+        outcome_col="y",
+        treatment_col="w",
+        treatment_effect_col="tau",
+    )
     auuc_df = pd.DataFrame(cumlift.columns)
-    auuc_df.columns = ['Learner']
-    auuc_df['cum_gain_auuc'] = [auc(cumlift.index.values/100, cumlift[learner].values) for learner in cumlift.columns]
-    auuc_df = auuc_df.sort_values('cum_gain_auuc', ascending=False)
+    auuc_df.columns = ["Learner"]
+    auuc_df["cum_gain_auuc"] = [
+        auc(cumlift.index.values / 100, cumlift[learner].values)
+        for learner in cumlift.columns
+    ]
+    auuc_df = auuc_df.sort_values("cum_gain_auuc", ascending=False)
 
     if plot:
-        plot_gain(synthetic_preds_df, outcome_col=outcome_col,
-                  treatment_col=treatment_col, treatment_effect_col=treatment_effect_col)
+        plot_gain(
+            synthetic_preds_df,
+            outcome_col=outcome_col,
+            treatment_col=treatment_col,
+            treatment_effect_col=treatment_effect_col,
+        )
 
     return auuc_df

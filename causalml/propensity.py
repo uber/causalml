@@ -8,7 +8,7 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 import xgboost as xgb
 
 
-logger = logging.getLogger('causalml')
+logger = logging.getLogger("causalml")
 
 
 class PropensityModel(metaclass=ABCMeta):
@@ -51,9 +51,7 @@ class PropensityModel(metaclass=ABCMeta):
         Returns:
             (numpy.ndarray): Propensity scores between 0 and 1.
         """
-        return np.clip(
-            self.model.predict_proba(X)[:, 1], *self.clip_bounds
-        )
+        return np.clip(self.model.predict_proba(X)[:, 1], *self.clip_bounds)
 
     def fit_predict(self, X, y):
         """
@@ -68,7 +66,7 @@ class PropensityModel(metaclass=ABCMeta):
         """
         self.fit(X, y)
         propensity_scores = self.predict(X)
-        logger.info('AUC score: {:.6f}'.format(auc(y, propensity_scores)))
+        logger.info("AUC score: {:.6f}".format(auc(y, propensity_scores)))
         return propensity_scores
 
 
@@ -80,16 +78,18 @@ class LogisticRegressionPropensityModel(PropensityModel):
     @property
     def _model(self):
         kwargs = {
-            'penalty': 'elasticnet',
-            'solver': 'saga',
-            'Cs': np.logspace(1e-3, 1 - 1e-3, 4),
-            'l1_ratios': np.linspace(1e-3, 1 - 1e-3, 4),
-            'cv': StratifiedKFold(
-                n_splits=self.model_kwargs.pop('n_fold') if 'n_fold' in self.model_kwargs else 4,
+            "penalty": "elasticnet",
+            "solver": "saga",
+            "Cs": np.logspace(1e-3, 1 - 1e-3, 4),
+            "l1_ratios": np.linspace(1e-3, 1 - 1e-3, 4),
+            "cv": StratifiedKFold(
+                n_splits=self.model_kwargs.pop("n_fold")
+                if "n_fold" in self.model_kwargs
+                else 4,
                 shuffle=True,
-                random_state=self.model_kwargs.get('random_state', 42)
+                random_state=self.model_kwargs.get("random_state", 42),
             ),
-            'random_state': 42,
+            "random_state": 42,
         }
         kwargs.update(self.model_kwargs)
 
@@ -110,25 +110,22 @@ class GradientBoostedPropensityModel(PropensityModel):
     https://xgboost.readthedocs.io/en/latest/python/python_api.html
     """
 
-    def __init__(
-        self,
-        early_stop=False,
-        clip_bounds=(1e-3, 1 - 1e-3),
-        **model_kwargs
-    ):
-        super(GradientBoostedPropensityModel, self).__init__(clip_bounds, **model_kwargs)
+    def __init__(self, early_stop=False, clip_bounds=(1e-3, 1 - 1e-3), **model_kwargs):
+        super(GradientBoostedPropensityModel, self).__init__(
+            clip_bounds, **model_kwargs
+        )
         self.early_stop = early_stop
 
     @property
     def _model(self):
         kwargs = {
-            'max_depth': 8,
-            'learning_rate': 0.1,
-            'n_estimators': 100,
-            'objective': 'binary:logistic',
-            'nthread': -1,
-            'colsample_bytree': 0.8,
-            'random_state': 42,
+            "max_depth": 8,
+            "learning_rate": 0.1,
+            "n_estimators": 100,
+            "objective": "binary:logistic",
+            "nthread": -1,
+            "colsample_bytree": 0.8,
+            "random_state": 42,
         }
         kwargs.update(self.model_kwargs)
 
@@ -152,7 +149,7 @@ class GradientBoostedPropensityModel(PropensityModel):
                 X_train,
                 y_train,
                 eval_set=[(X_val, y_val)],
-                early_stopping_rounds=early_stopping_rounds
+                early_stopping_rounds=early_stopping_rounds,
             )
         else:
             super(GradientBoostedPropensityModel, self).fit(X, y)
@@ -169,10 +166,9 @@ class GradientBoostedPropensityModel(PropensityModel):
         """
         if self.early_stop:
             return np.clip(
-                self.model.predict_proba(
-                    X,
-                    ntree_limit=self.model.best_ntree_limit
-                )[:, 1],
+                self.model.predict_proba(X, ntree_limit=self.model.best_ntree_limit)[
+                    :, 1
+                ],
                 *self.clip_bounds
             )
         else:
@@ -197,7 +193,9 @@ def calibrate(ps, treatment):
     return gam.predict_proba(ps)
 
 
-def compute_propensity_score(X, treatment, p_model=None, X_pred=None, treatment_pred=None, calibrate_p=True):
+def compute_propensity_score(
+    X, treatment, p_model=None, X_pred=None, treatment_pred=None, calibrate_p=True
+):
     """Generate propensity score if user didn't provide
 
     Args:
@@ -227,12 +225,12 @@ def compute_propensity_score(X, treatment, p_model=None, X_pred=None, treatment_
         p = p_model.predict(X_pred)
 
     if calibrate_p:
-        logger.info('Calibrating propensity scores.')
+        logger.info("Calibrating propensity scores.")
         p = calibrate(p, treatment_pred)
 
     # force the p values within the range
     eps = np.finfo(float).eps
-    p = np.where(p < 0 + eps, 0 + eps*1.001, p)
-    p = np.where(p > 1 - eps, 1 - eps*1.001, p)
+    p = np.where(p < 0 + eps, 0 + eps * 1.001, p)
+    p = np.where(p > 1 - eps, 1 - eps * 1.001, p)
 
     return p, p_model

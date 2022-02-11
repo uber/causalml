@@ -7,7 +7,7 @@ import warnings
 
 
 class CounterfactualUnitSelector:
-    '''
+    """
     A highly experimental implementation of the counterfactual unit selection
     model proposed by Li and Pearl (2019).
 
@@ -51,10 +51,17 @@ class CounterfactualUnitSelector:
     ----------
     Li, Ang, and Judea Pearl. 2019. “Unit Selection Based on Counterfactual
     Logic.” https://ftp.cs.ucla.edu/pub/stat_ser/r488.pdf.
-    '''
+    """
 
-    def __init__(self, learner, nevertaker_payoff, alwaystaker_payoff,
-                 complier_payoff, defier_payoff, organic_conversion=None):
+    def __init__(
+        self,
+        learner,
+        nevertaker_payoff,
+        alwaystaker_payoff,
+        complier_payoff,
+        defier_payoff,
+        organic_conversion=None,
+    ):
 
         self.learner = learner
         self.nevertaker_payoff = nevertaker_payoff
@@ -64,9 +71,9 @@ class CounterfactualUnitSelector:
         self.organic_conversion = organic_conversion
 
     def fit(self, data, treatment, outcome):
-        '''
+        """
         Fits the class.
-        '''
+        """
 
         if self._gain_equality_check():
 
@@ -78,10 +85,10 @@ class CounterfactualUnitSelector:
             self._fit_condprob_models(data, treatment, outcome)
 
     def predict(self, data, treatment, outcome):
-        '''
+        """
         Predicts an individual-level payoff. If gain equality is satisfied, uses
         the exact function; if not, uses the midpoint between bounds.
-        '''
+        """
 
         if self._gain_equality_check():
 
@@ -94,17 +101,19 @@ class CounterfactualUnitSelector:
         return est_payoff
 
     def _gain_equality_check(self):
-        '''
+        """
         Checks if gain equality is satisfied. If so, the optimization task can
         be simplified.
-        '''
+        """
 
-        return self.complier_payoff + self.defier_payoff == \
-            self.alwaystaker_payoff + self.nevertaker_payoff
+        return (
+            self.complier_payoff + self.defier_payoff
+            == self.alwaystaker_payoff + self.nevertaker_payoff
+        )
 
     @staticmethod
     def _make_segments(data, treatment, outcome):
-        '''
+        """
         Constructs the following segments:
 
         * AC = Pr(Y = 1, W = 1 /mid X)
@@ -114,22 +123,22 @@ class CounterfactualUnitSelector:
 
         where the names of the outcomes correspond the combinations of
         the relevant segments, eg AC = Always-taker or Complier.
-        '''
+        """
 
-        segments = np.empty(data.shape[0], dtype='object')
+        segments = np.empty(data.shape[0], dtype="object")
 
-        segments[(data[treatment] == 1) & (data[outcome] == 1)] = 'AC'
-        segments[(data[treatment] == 0) & (data[outcome] == 1)] = 'AD'
-        segments[(data[treatment] == 1) & (data[outcome] == 0)] = 'ND'
-        segments[(data[treatment] == 0) & (data[outcome] == 0)] = 'NC'
+        segments[(data[treatment] == 1) & (data[outcome] == 1)] = "AC"
+        segments[(data[treatment] == 0) & (data[outcome] == 1)] = "AD"
+        segments[(data[treatment] == 1) & (data[outcome] == 0)] = "ND"
+        segments[(data[treatment] == 0) & (data[outcome] == 0)] = "NC"
 
         return segments
 
     def _fit_segment_model(self, data, treatment, outcome):
-        '''
+        """
         Fits a classifier for estimating the probabilities for the unit
-        segment combinations.        
-        '''
+        segment combinations.
+        """
 
         model = clone(self.learner)
 
@@ -139,10 +148,10 @@ class CounterfactualUnitSelector:
         self.segment_model = model.fit(X, y)
 
     def _fit_condprob_models(self, data, treatment, outcome):
-        '''
+        """
         Fits two classifiers to estimate conversion probabilities conditional
         on the treatment.
-        '''
+        """
 
         trt_learner = clone(self.learner)
         ctr_learner = clone(self.learner)
@@ -150,16 +159,16 @@ class CounterfactualUnitSelector:
         treated = data[treatment] == 1
 
         X = data.drop([treatment, outcome], axis=1)
-        y = data['outcome']
+        y = data["outcome"]
 
         self.trt_model = trt_learner.fit(X[treated], y[treated])
         self.ctr_model = ctr_learner.fit(X[~treated], y[~treated])
 
     def _get_exact_benefit(self, data, treatment, outcome):
-        '''
+        """
         Calculates the exact benefit function of Theorem 4 in Li and Pearl (2019).
         Returns the exact benefit.
-        '''
+        """
         beta = self.complier_payoff
         gamma = self.alwaystaker_payoff
         theta = self.nevertaker_payoff
@@ -169,13 +178,16 @@ class CounterfactualUnitSelector:
         segment_prob = self.segment_model.predict_proba(X)
         segment_name = self.segment_model.classes_
 
-        benefit = (beta - theta) * segment_prob[:, segment_name == 'AC'] + \
-            (gamma - beta) * segment_prob[:, segment_name == 'AD'] + theta
+        benefit = (
+            (beta - theta) * segment_prob[:, segment_name == "AC"]
+            + (gamma - beta) * segment_prob[:, segment_name == "AD"]
+            + theta
+        )
 
         return benefit
 
     def _obj_func_midp(self, data, treatment, outcome):
-        '''
+        """
         Calculates bounds for the objective function. Returns the midpoint
         between bounds.
 
@@ -209,7 +221,7 @@ class CounterfactualUnitSelector:
 
         pr_y_x : float
             Organic probability of conversion.
-        '''
+        """
 
         X = data.drop([treatment, outcome], axis=1)
 
@@ -218,18 +230,20 @@ class CounterfactualUnitSelector:
         theta = self.nevertaker_payoff
         delta = self.defier_payoff
 
-        pr_y0_w1, pr_y1_w1 = np.split(self.trt_model.predict_proba(X),
-                                      indices_or_sections=2, axis=1)
-        pr_y0_w0, pr_y1_w0 = np.split(self.ctr_model.predict_proba(X),
-                                      indices_or_sections=2, axis=1)
+        pr_y0_w1, pr_y1_w1 = np.split(
+            self.trt_model.predict_proba(X), indices_or_sections=2, axis=1
+        )
+        pr_y0_w0, pr_y1_w0 = np.split(
+            self.ctr_model.predict_proba(X), indices_or_sections=2, axis=1
+        )
 
         segment_prob = self.segment_model.predict_proba(X)
         segment_name = self.segment_model.classes_
 
-        pr_y1w1_x = segment_prob[:, segment_name == 'AC']
-        pr_y0w0_x = segment_prob[:, segment_name == 'NC']
-        pr_y1w0_x = segment_prob[:, segment_name == 'AD']
-        pr_y0w1_x = segment_prob[:, segment_name == 'ND']
+        pr_y1w1_x = segment_prob[:, segment_name == "AC"]
+        pr_y0w0_x = segment_prob[:, segment_name == "NC"]
+        pr_y1w0_x = segment_prob[:, segment_name == "AD"]
+        pr_y0w1_x = segment_prob[:, segment_name == "ND"]
 
         if self.organic_conversion is not None:
 
@@ -239,22 +253,41 @@ class CounterfactualUnitSelector:
 
             pr_y_x = pr_y1_w0
             warnings.warn(
-                'Probability of organic conversion estimated from control observations.')
+                "Probability of organic conversion estimated from control observations."
+            )
 
         p1 = (beta - theta) * pr_y1_w1 + delta * pr_y1_w0 + theta * pr_y0_w0
         p2 = gamma * pr_y1_w1 + delta * pr_y0_w1 + (beta - gamma) * pr_y0_w0
-        p3 = (gamma - delta) * pr_y1_w1 + delta * pr_y1_w0 + theta * \
-            pr_y0_w0 + (beta - gamma - theta + delta) * (pr_y1w1_x + pr_y0w0_x)
-        p4 = (beta - theta) * pr_y1_w1 - (beta - gamma - theta) * pr_y1_w0 + \
-            theta * pr_y0_w0 + (beta - gamma - theta + delta) * \
-            (pr_y1w0_x + pr_y0w1_x)
+        p3 = (
+            (gamma - delta) * pr_y1_w1
+            + delta * pr_y1_w0
+            + theta * pr_y0_w0
+            + (beta - gamma - theta + delta) * (pr_y1w1_x + pr_y0w0_x)
+        )
+        p4 = (
+            (beta - theta) * pr_y1_w1
+            - (beta - gamma - theta) * pr_y1_w0
+            + theta * pr_y0_w0
+            + (beta - gamma - theta + delta) * (pr_y1w0_x + pr_y0w1_x)
+        )
         p5 = (gamma - delta) * pr_y1_w1 + delta * pr_y1_w0 + theta * pr_y0_w0
-        p6 = (beta - theta) * pr_y1_w1 - (beta - gamma - theta) * pr_y1_w0 + \
-            theta * pr_y0_w0
-        p7 = (gamma - delta) * pr_y1_w1 - (beta - gamma - theta) * pr_y1_w0 + \
-            theta * pr_y0_w0 + (beta - gamma - theta + delta) * pr_y_x
-        p8 = (beta - theta) * pr_y1_w1 + delta * pr_y1_w0 + theta * \
-            pr_y0_w0 - (beta - gamma - theta + delta) * pr_y_x
+        p6 = (
+            (beta - theta) * pr_y1_w1
+            - (beta - gamma - theta) * pr_y1_w0
+            + theta * pr_y0_w0
+        )
+        p7 = (
+            (gamma - delta) * pr_y1_w1
+            - (beta - gamma - theta) * pr_y1_w0
+            + theta * pr_y0_w0
+            + (beta - gamma - theta + delta) * pr_y_x
+        )
+        p8 = (
+            (beta - theta) * pr_y1_w1
+            + delta * pr_y1_w0
+            + theta * pr_y0_w0
+            - (beta - gamma - theta + delta) * pr_y_x
+        )
 
         params_1 = np.concatenate((p1, p2, p3, p4), axis=1)
         params_2 = np.concatenate((p5, p6, p7, p8), axis=1)
