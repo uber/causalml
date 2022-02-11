@@ -462,7 +462,7 @@ class SensitivitySelectionBias(Sensitivity):
             ate, ate_lb, ate_ub = self.get_ate_ci(X, p, treatment, preds_adj)
 
             s_preds_residul = preds_adj - s_preds
-            sens["rsqs"] = a ** 2 * np.var(treatment) / np.var(s_preds_residul)
+            sens["rsqs"] = a**2 * np.var(treatment) / np.var(s_preds_residul)
             sens["New ATE"] = ate
             sens["New ATE LB"] = ate_lb
             sens["New ATE UB"] = ate_ub

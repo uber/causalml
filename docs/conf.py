@@ -69,8 +69,8 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = u"causalml"
-copyright = u"2019 Uber Technologies, Inc."
+project = "causalml"
+copyright = "2019 Uber Technologies, Inc."
 author = "CausalML"
 
 # The version info for the project you're documenting, acts as replacement
@@ -221,7 +221,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ("index", "causalml.tex", u"causalml Documentation", u"Someone at Uber", "manual"),
+    ("index", "causalml.tex", "causalml Documentation", "Someone at Uber", "manual"),
 ]
 
 # The name of an image file (relative to this directory) to place at
@@ -249,7 +249,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [("index", "causalml", u"causalml Documentation", [author], 1)]
+man_pages = [("index", "causalml", "causalml Documentation", [author], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
@@ -264,7 +264,7 @@ texinfo_documents = [
     (
         "index",
         "causalml",
-        u"causalml Documentation",
+        "causalml Documentation",
         author,
         "causalml",
         "One line description of project.",
