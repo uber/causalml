@@ -1238,7 +1238,7 @@ class UpliftRandomForestClassifier:
 
     n_jobs: int, optional (default=-1)
         The parallelization parameter to define how many parallel jobs need to be created.
-        This is passed on to joblib library for parallelizing uplift-tree creation.
+        This is passed on to joblib library for parallelizing uplift-tree creation and prediction.
 
     Outputs
     ----------
