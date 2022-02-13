@@ -1366,7 +1366,14 @@ class UpliftRandomForestClassifier:
 
         '''
         # Make predictions with all trees and take the average
-        y_pred_ensemble = sum([tree.predict(X=X) for tree in self.uplift_forest]) / len(self.uplift_forest)
+
+        if self.n_jobs != 1:
+            y_pred_ensemble = sum(
+                Parallel(n_jobs=self.n_jobs, prefer="threads")
+                (delayed(tree.predict)(X=X) for tree in self.uplift_forest)
+            ) / len(self.uplift_forest)
+        else:
+            y_pred_ensemble = sum([tree.predict(X=X) for tree in self.uplift_forest]) / len(self.uplift_forest)
 
         # Summarize results into dataframe
         df_res = pd.DataFrame(y_pred_ensemble, columns=self.classes_)
