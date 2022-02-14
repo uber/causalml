@@ -37,7 +37,7 @@ Mechanism 1
 | This generates a complex outcome regression model with easy treatment effect with input variables :math:`X_i \sim Unif(0, 1)^d`.
 | The treatment flag is a binomial variable, whose d.g.p. is:
 |
-|   :math:`P(W_i = 1 | X_i) = trim_{0.1}(sin(\pi X_{i1} X_{i2})
+|   :math:`P(W_i = 1 | X_i) = trim_{0.1}(sin(\pi X_{i1} X_{i2})`
 |
 | With :
 |   :math:`trim_\eta(x)=\max (\eta,\min (x,1-\eta))`
