@@ -1240,6 +1240,10 @@ class UpliftRandomForestClassifier:
         The parallelization parameter to define how many parallel jobs need to be created.
         This is passed on to joblib library for parallelizing uplift-tree creation and prediction.
 
+    joblib_prefer: str, optional (default="threads")
+        The preferred backend for joblib (passed as `prefer` to joblib.Parallel). See the joblib
+        documentation for valid values.
+
     Outputs
     ----------
     df_res: pandas dataframe
@@ -1256,7 +1260,8 @@ class UpliftRandomForestClassifier:
                  n_reg=10,
                  evaluationFunction='KL',
                  normalization=True,
-                 n_jobs=-1):
+                 n_jobs=-1,
+                 joblib_prefer: str = "threads"):
 
         """
         Initialize the UpliftRandomForestClassifier class.
@@ -1272,6 +1277,7 @@ class UpliftRandomForestClassifier:
         self.control_name = control_name
         self.normalization = normalization
         self.n_jobs = n_jobs
+        self.joblib_prefer = joblib_prefer
 
         assert control_name is not None and isinstance(control_name, str), \
             f"control_group should be string but {control_name} is passed"
@@ -1321,7 +1327,7 @@ class UpliftRandomForestClassifier:
         self.n_class = len(self.classes_)
 
         self.uplift_forest = (
-            Parallel(n_jobs=self.n_jobs, prefer="threads")
+            Parallel(n_jobs=self.n_jobs, prefer=self.joblib_prefer)
             (delayed(self.bootstrap)(X, treatment, y, tree) for tree in self.uplift_forest)
         )
 
@@ -1369,7 +1375,7 @@ class UpliftRandomForestClassifier:
 
         if self.n_jobs != 1:
             y_pred_ensemble = sum(
-                Parallel(n_jobs=self.n_jobs, prefer="threads")
+                Parallel(n_jobs=self.n_jobs, prefer=self.joblib_prefer)
                 (delayed(tree.predict)(X=X) for tree in self.uplift_forest)
             ) / len(self.uplift_forest)
         else:
