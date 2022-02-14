@@ -18,7 +18,8 @@ def test_make_uplift_classification(generate_classification_data):
 
 
 @pytest.mark.parametrize("backend", ['loky', 'threading', 'multiprocessing'])
-def test_UpliftRandomForestClassifier(generate_classification_data, backend):
+@pytest.mark.parametrize("joblib_prefer", ['threads', 'processes'])
+def test_UpliftRandomForestClassifier(generate_classification_data, backend, joblib_prefer):
     df, x_names = generate_classification_data()
     df_train, df_test = train_test_split(df,
                                          test_size=0.2,
@@ -29,7 +30,8 @@ def test_UpliftRandomForestClassifier(generate_classification_data, backend):
         uplift_model = UpliftRandomForestClassifier(
             min_samples_leaf=50,
             control_name=TREATMENT_NAMES[0],
-            random_state=RANDOM_SEED
+            random_state=RANDOM_SEED,
+            joblib_prefer=joblib_prefer
         )
 
         uplift_model.fit(df_train[x_names].values,
