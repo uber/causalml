@@ -18,7 +18,8 @@ def test_make_uplift_classification(generate_classification_data):
 
 
 @pytest.mark.parametrize("backend", ['loky', 'threading', 'multiprocessing'])
-def test_UpliftRandomForestClassifier(generate_classification_data, backend):
+@pytest.mark.parametrize("joblib_prefer", ['threads', 'processes'])
+def test_UpliftRandomForestClassifier(generate_classification_data, backend, joblib_prefer):
     df, x_names = generate_classification_data()
     df_train, df_test = train_test_split(df,
                                          test_size=0.2,
@@ -29,14 +30,29 @@ def test_UpliftRandomForestClassifier(generate_classification_data, backend):
         uplift_model = UpliftRandomForestClassifier(
             min_samples_leaf=50,
             control_name=TREATMENT_NAMES[0],
-            random_state=RANDOM_SEED
+            random_state=RANDOM_SEED,
+            joblib_prefer=joblib_prefer
         )
 
         uplift_model.fit(df_train[x_names].values,
                          treatment=df_train['treatment_group_key'].values,
                          y=df_train[CONVERSION].values)
 
-        y_pred = uplift_model.predict(df_test[x_names].values)
+        predictions = {}
+        predictions["single"] = uplift_model.predict(df_test[x_names].values)
+        with parallel_backend("loky", n_jobs=2):
+            predictions["loky_2"] = uplift_model.predict(df_test[x_names].values)
+        with parallel_backend("threading", n_jobs=2):
+            predictions["threading_2"] = uplift_model.predict(df_test[x_names].values)
+        with parallel_backend("multiprocessing", n_jobs=2):
+            predictions["multiprocessing_2"] = uplift_model.predict(df_test[x_names].values)
+
+        # assert that the predictions coincide for single and all parallel computations
+        iterator = iter(predictions.values())
+        first = next(iterator)
+        assert all(np.array_equal(first, rest) for rest in iterator)
+
+        y_pred = list(predictions.values())[0]
         result = pd.DataFrame(y_pred, columns=uplift_model.classes_[1:])
 
         best_treatment = np.where((result < 0).all(axis=1),
