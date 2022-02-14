@@ -16,7 +16,7 @@ def generate_unmatched_data(generate_regression_data):
         if not generated:
             y, X, treatment, tau, b, e = generate_regression_data()
 
-            features = ['x{}'.format(i) for i in range(X.shape[1])]
+            features = ["x{}".format(i) for i in range(X.shape[1])]
             df = pd.DataFrame(X, columns=features)
             df[TREATMENT_COL] = treatment
 
@@ -38,14 +38,14 @@ def generate_unmatched_data(generate_regression_data):
 def test_nearest_neighbor_match_by_group(generate_unmatched_data):
     df, features = generate_unmatched_data()
 
-    psm = NearestNeighborMatch(replace=False,
-                               ratio=1.,
-                               random_state=RANDOM_SEED)
+    psm = NearestNeighborMatch(replace=False, ratio=1.0, random_state=RANDOM_SEED)
 
-    matched = psm.match_by_group(data=df,
-                                 treatment_col=TREATMENT_COL,
-                                 score_cols=[SCORE_COL],
-                                 groupby_col=GROUP_COL)
+    matched = psm.match_by_group(
+        data=df,
+        treatment_col=TREATMENT_COL,
+        score_cols=[SCORE_COL],
+        groupby_col=GROUP_COL,
+    )
 
     assert sum(matched[TREATMENT_COL] == 0) == sum(matched[TREATMENT_COL] != 0)
 
@@ -53,12 +53,14 @@ def test_nearest_neighbor_match_by_group(generate_unmatched_data):
 def test_match_optimizer(generate_unmatched_data):
     df, features = generate_unmatched_data()
 
-    optimizer = MatchOptimizer(treatment_col=TREATMENT_COL,
-                               ps_col=SCORE_COL,
-                               matching_covariates=[SCORE_COL],
-                               min_users_per_group=100,
-                               smd_cols=[SCORE_COL],
-                               dev_cols_transformations={SCORE_COL: np.mean})
+    optimizer = MatchOptimizer(
+        treatment_col=TREATMENT_COL,
+        ps_col=SCORE_COL,
+        matching_covariates=[SCORE_COL],
+        min_users_per_group=100,
+        smd_cols=[SCORE_COL],
+        dev_cols_transformations={SCORE_COL: np.mean},
+    )
 
     matched = optimizer.search_best_match(df)
 

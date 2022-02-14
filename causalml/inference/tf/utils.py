@@ -42,7 +42,7 @@ def regression_loss(concat_true, concat_pred):
     y0_pred = concat_pred[:, 0]
     y1_pred = concat_pred[:, 1]
 
-    loss0 = tf.reduce_sum((1. - t_true) * tf.square(y_true - y0_pred))
+    loss0 = tf.reduce_sum((1.0 - t_true) * tf.square(y_true - y0_pred))
     loss1 = tf.reduce_sum(t_true * tf.square(y_true - y1_pred))
 
     return loss0 + loss1
@@ -60,7 +60,9 @@ def dragonnet_loss_binarycross(concat_true, concat_pred):
     Returns:
         - (float): aggregated regression + classification loss
     """
-    return regression_loss(concat_true, concat_pred) + binary_classification_loss(concat_true, concat_pred)
+    return regression_loss(concat_true, concat_pred) + binary_classification_loss(
+        concat_true, concat_pred
+    )
 
 
 def treatment_accuracy(concat_true, concat_pred):
@@ -96,7 +98,7 @@ def track_epsilon(concat_true, concat_pred):
     return tf.abs(tf.reduce_mean(epsilons))
 
 
-def make_tarreg_loss(ratio=1., dragonnet_loss=dragonnet_loss_binarycross):
+def make_tarreg_loss(ratio=1.0, dragonnet_loss=dragonnet_loss_binarycross):
     """
     Given a specified loss function, returns the same loss function with targeted regularization.
 
@@ -106,6 +108,7 @@ def make_tarreg_loss(ratio=1., dragonnet_loss=dragonnet_loss_binarycross):
     Returns:
         (function): loss function with targeted regularization, weighted by specified ratio
     """
+
     def tarreg_ATE_unbounded_domain_loss(concat_true, concat_pred):
         """
         Returns the loss function (specified in outer function) with targeted regularization.
@@ -141,6 +144,7 @@ class EpsilonLayer(Layer):
     """
     Custom keras layer to allow epsilon to be learned during training process.
     """
+
     def __init__(self):
         """
         Inherits keras' Layer object.
@@ -151,10 +155,9 @@ class EpsilonLayer(Layer):
         """
         Creates a trainable weight variable for this layer.
         """
-        self.epsilon = self.add_weight(name='epsilon',
-                                       shape=[1, 1],
-                                       initializer='RandomNormal',
-                                       trainable=True)
+        self.epsilon = self.add_weight(
+            name="epsilon", shape=[1, 1], initializer="RandomNormal", trainable=True
+        )
         super(EpsilonLayer, self).build(input_shape)
 
     def call(self, inputs, **kwargs):

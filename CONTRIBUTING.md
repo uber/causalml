@@ -5,10 +5,16 @@ To contribute to it, please follow guidelines here.
 
 The codebase is hosted on Github at https://github.com/uber/causalml.
 
-All code need to follow the [PEP8 style guide](https://www.python.org/dev/peps/pep-0008/) with a few exceptions listed in [tox.ini](./tox.ini).
+We use [`black`](https://black.readthedocs.io/en/stable/index.html) as a formatter to keep the coding style and format across all Python files consistent and compliant with [PEP8](https://www.python.org/dev/peps/pep-0008/). We recommend that you add `black` to your IDE as a formatter (see the [instruction](https://black.readthedocs.io/en/stable/integrations/editors.html)) or run `black` on the command line before submitting a PR as follows:
+```bash
+# move to the top directory of the causalml repository
+$ cd causalml 
+$ pip install -U black
+$ black .
+```
 
-Before contributing, please review outstanding issues.
-If you'd like to contribute to something else, open an issue for discussion first.
+As a start, please check out outstanding [issues](https://github.com/uber/causalml/issues).
+If you'd like to contribute to something else, open a new issue for discussion first.
 
 ## Development Workflow :computer:
 

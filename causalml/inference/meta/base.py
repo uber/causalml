@@ -8,26 +8,46 @@ from causalml.inference.meta.utils import check_p_conditions, convert_pd_to_np
 from causalml.propensity import compute_propensity_score
 
 
-logger = logging.getLogger('causalml')
+logger = logging.getLogger("causalml")
 
 
 class BaseLearner(metaclass=ABCMeta):
-
     @abstractclassmethod
     def fit(self, X, treatment, y, p=None):
         pass
 
     @abstractclassmethod
-    def predict(self, X, treatment=None, y=None, p=None, return_components=False, verbose=True):
+    def predict(
+        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+    ):
         pass
 
-    def fit_predict(self, X, treatment, y, p=None, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
-                    return_components=False, verbose=True):
+    def fit_predict(
+        self,
+        X,
+        treatment,
+        y,
+        p=None,
+        return_ci=False,
+        n_bootstraps=1000,
+        bootstrap_size=10000,
+        return_components=False,
+        verbose=True,
+    ):
         self.fit(X, treatment, y, p)
         return self.predict(X, treatment, y, p, return_components, verbose)
 
     @abstractclassmethod
-    def estimate_ate(self, X, treatment, y, p=None, bootstrap_ci=False, n_bootstraps=1000, bootstrap_size=10000):
+    def estimate_ate(
+        self,
+        X,
+        treatment,
+        y,
+        p=None,
+        bootstrap_ci=False,
+        n_bootstraps=1000,
+        bootstrap_size=10000,
+    ):
         pass
 
     def bootstrap(self, X, treatment, y, p=None, size=10000):
@@ -62,7 +82,9 @@ class BaseLearner(metaclass=ABCMeta):
             treatment_name = t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+            p = {
+                treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()
+            }
 
         return p
 
@@ -80,7 +102,7 @@ class BaseLearner(metaclass=ABCMeta):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
         """
-        logger.info('Generating propensity score')
+        logger.info("Generating propensity score")
         p = dict()
         p_model = dict()
         for group in self.t_groups:
@@ -89,15 +111,28 @@ class BaseLearner(metaclass=ABCMeta):
             X_filt = X[mask]
             w_filt = (treatment_filt == group).astype(int)
             w = (treatment == group).astype(int)
-            propensity_model = self.model_p if hasattr(self, 'model_p') else None
-            p[group], p_model[group] = compute_propensity_score(X=X_filt, treatment=w_filt,
-                                                                p_model=propensity_model,
-                                                                X_pred=X, treatment_pred=w)
+            propensity_model = self.model_p if hasattr(self, "model_p") else None
+            p[group], p_model[group] = compute_propensity_score(
+                X=X_filt,
+                treatment=w_filt,
+                p_model=propensity_model,
+                X_pred=X,
+                treatment_pred=w,
+            )
         self.propensity_model = p_model
         self.propensity = p
 
-    def get_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True,
-                       test_size=0.3, random_state=None):
+    def get_importance(
+        self,
+        X=None,
+        tau=None,
+        model_tau_feature=None,
+        features=None,
+        method="auto",
+        normalize=True,
+        test_size=0.3,
+        random_state=None,
+    ):
         """
         Builds a model (using X to predict estimated/actual tau), and then calculates feature importances
         based on a specified method.
@@ -123,10 +158,18 @@ class BaseLearner(metaclass=ABCMeta):
                                    permutation importance)
             random_state (int/RandomState instance/None): random state used in permutation importance estimation
         """
-        explainer = Explainer(method=method, control_name=self.control_name,
-                              X=X, tau=tau, model_tau=model_tau_feature,
-                              features=features, classes=self._classes, normalize=normalize,
-                              test_size=test_size, random_state=random_state)
+        explainer = Explainer(
+            method=method,
+            control_name=self.control_name,
+            X=X,
+            tau=tau,
+            model_tau=model_tau_feature,
+            features=features,
+            classes=self._classes,
+            normalize=normalize,
+            test_size=test_size,
+            random_state=random_state,
+        )
         return explainer.get_importance()
 
     def get_shap_values(self, X=None, model_tau_feature=None, tau=None, features=None):
@@ -138,13 +181,28 @@ class BaseLearner(metaclass=ABCMeta):
             model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
         """
-        explainer = Explainer(method='shapley', control_name=self.control_name,
-                              X=X, tau=tau, model_tau=model_tau_feature,
-                              features=features, classes=self._classes)
+        explainer = Explainer(
+            method="shapley",
+            control_name=self.control_name,
+            X=X,
+            tau=tau,
+            model_tau=model_tau_feature,
+            features=features,
+            classes=self._classes,
+        )
         return explainer.get_shap_values()
 
-    def plot_importance(self, X=None, tau=None, model_tau_feature=None, features=None, method='auto', normalize=True,
-                        test_size=0.3, random_state=None):
+    def plot_importance(
+        self,
+        X=None,
+        tau=None,
+        model_tau_feature=None,
+        features=None,
+        method="auto",
+        normalize=True,
+        test_size=0.3,
+        random_state=None,
+    ):
         """
         Builds a model (using X to predict estimated/actual tau), and then plots feature importances
         based on a specified method.
@@ -170,13 +228,29 @@ class BaseLearner(metaclass=ABCMeta):
                                    permutation importance)
             random_state (int/RandomState instance/None): random state used in permutation importance estimation
         """
-        explainer = Explainer(method=method, control_name=self.control_name,
-                              X=X, tau=tau, model_tau=model_tau_feature,
-                              features=features, classes=self._classes, normalize=normalize,
-                              test_size=test_size, random_state=random_state)
+        explainer = Explainer(
+            method=method,
+            control_name=self.control_name,
+            X=X,
+            tau=tau,
+            model_tau=model_tau_feature,
+            features=features,
+            classes=self._classes,
+            normalize=normalize,
+            test_size=test_size,
+            random_state=random_state,
+        )
         explainer.plot_importance()
 
-    def plot_shap_values(self, X=None, tau=None, model_tau_feature=None, features=None, shap_dict=None, **kwargs):
+    def plot_shap_values(
+        self,
+        X=None,
+        tau=None,
+        model_tau_feature=None,
+        features=None,
+        shap_dict=None,
+        **kwargs
+    ):
         """
         Plots distribution of shapley values.
 
@@ -192,13 +266,30 @@ class BaseLearner(metaclass=ABCMeta):
             shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
         """
         override_checks = False if shap_dict is None else True
-        explainer = Explainer(method='shapley', control_name=self.control_name,
-                              X=X, tau=tau, model_tau=model_tau_feature,
-                              features=features, override_checks=override_checks, classes=self._classes)
+        explainer = Explainer(
+            method="shapley",
+            control_name=self.control_name,
+            X=X,
+            tau=tau,
+            model_tau=model_tau_feature,
+            features=features,
+            override_checks=override_checks,
+            classes=self._classes,
+        )
         explainer.plot_shap_values(shap_dict=shap_dict)
 
-    def plot_shap_dependence(self, treatment_group, feature_idx, X, tau, model_tau_feature=None, features=None,
-                             shap_dict=None, interaction_idx='auto', **kwargs):
+    def plot_shap_dependence(
+        self,
+        treatment_group,
+        feature_idx,
+        X,
+        tau,
+        model_tau_feature=None,
+        features=None,
+        shap_dict=None,
+        interaction_idx="auto",
+        **kwargs
+    ):
         """
         Plots dependency of shapley values for a specified feature, colored by an interaction feature.
 
@@ -225,12 +316,20 @@ class BaseLearner(metaclass=ABCMeta):
                 the SHAP interaction values).
         """
         override_checks = False if shap_dict is None else True
-        explainer = Explainer(method='shapley', control_name=self.control_name,
-                              X=X, tau=tau, model_tau=model_tau_feature,
-                              features=features, override_checks=override_checks,
-                              classes=self._classes)
-        explainer.plot_shap_dependence(treatment_group=treatment_group,
-                                       feature_idx=feature_idx,
-                                       shap_dict=shap_dict,
-                                       interaction_idx=interaction_idx,
-                                       **kwargs)
+        explainer = Explainer(
+            method="shapley",
+            control_name=self.control_name,
+            X=X,
+            tau=tau,
+            model_tau=model_tau_feature,
+            features=features,
+            override_checks=override_checks,
+            classes=self._classes,
+        )
+        explainer.plot_shap_dependence(
+            treatment_group=treatment_group,
+            feature_idx=feature_idx,
+            shap_dict=shap_dict,
+            interaction_idx=interaction_idx,
+            **kwargs
+        )

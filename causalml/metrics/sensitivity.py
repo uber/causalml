@@ -5,7 +5,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 from importlib import import_module
 
-logger = logging.getLogger('sensitivity')
+logger = logging.getLogger("sensitivity")
 
 
 def one_sided(alpha, p, treatment):
@@ -76,14 +76,23 @@ def alignment_att(alpha, p, treatment):
 
 
 class Sensitivity(object):
-    """ A Sensitivity Check class to support Placebo Treatment, Irrelevant Additional Confounder
+    """A Sensitivity Check class to support Placebo Treatment, Irrelevant Additional Confounder
     and Subset validation refutation methods to verify causal inference.
 
     Reference: https://github.com/microsoft/dowhy/blob/master/dowhy/causal_refuters/
     """
 
-    def __init__(self, df, inference_features, p_col, treatment_col, outcome_col,
-                learner, *args, **kwargs):
+    def __init__(
+        self,
+        df,
+        inference_features,
+        p_col,
+        treatment_col,
+        outcome_col,
+        learner,
+        *args,
+        **kwargs,
+    ):
         """Initialize.
 
         Args:
@@ -135,13 +144,20 @@ class Sensitivity(object):
 
         learner = self.learner
         from ..inference.meta.tlearner import BaseTLearner
+
         if isinstance(learner, BaseTLearner):
-            ate, ate_lower, ate_upper = learner.estimate_ate(X=X, treatment=treatment, y=y)
+            ate, ate_lower, ate_upper = learner.estimate_ate(
+                X=X, treatment=treatment, y=y
+            )
         else:
             try:
-                ate, ate_lower, ate_upper = learner.estimate_ate(X=X, p=p, treatment=treatment, y=y)
+                ate, ate_lower, ate_upper = learner.estimate_ate(
+                    X=X, p=p, treatment=treatment, y=y
+                )
             except TypeError:
-                ate, ate_lower, ate_upper = learner.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True)
+                ate, ate_lower, ate_upper = learner.estimate_ate(
+                    X=X, treatment=treatment, y=y, return_ci=True
+                )
         return ate[0], ate_lower[0], ate_upper[0]
 
     @staticmethod
@@ -153,18 +169,29 @@ class Sensitivity(object):
             (class): Sensitivy Class
         """
 
-        method_list = ['Placebo Treatment', 'Random Cause', 'Subset Data', 'Random Replace', 'Selection Bias']
-        class_name = 'Sensitivity' + method_name.replace(' ', '')
+        method_list = [
+            "Placebo Treatment",
+            "Random Cause",
+            "Subset Data",
+            "Random Replace",
+            "Selection Bias",
+        ]
+        class_name = "Sensitivity" + method_name.replace(" ", "")
 
         try:
-            getattr(import_module('causalml.metrics.sensitivity'), class_name)
-            return getattr(import_module('causalml.metrics.sensitivity'), class_name)
+            getattr(import_module("causalml.metrics.sensitivity"), class_name)
+            return getattr(import_module("causalml.metrics.sensitivity"), class_name)
         except AttributeError:
-            raise AttributeError('{} is not an existing method for sensitiviy analysis.'.format(method_name) +
-                              ' Select one of {}'.format(method_list))
+            raise AttributeError(
+                "{} is not an existing method for sensitiviy analysis.".format(
+                    method_name
+                )
+                + " Select one of {}".format(method_list)
+            )
 
-    def sensitivity_analysis(self, methods, sample_size=None,
-                             confound='one_sided', alpha_range=None):
+    def sensitivity_analysis(
+        self, methods, sample_size=None, confound="one_sided", alpha_range=None
+    ):
         """Return the sensitivity data by different method
 
         Args:
@@ -181,8 +208,8 @@ class Sensitivity(object):
         """
         if alpha_range is None:
             y = self.df[self.outcome_col]
-            iqr = y.quantile(.75) - y.quantile(.25)
-            alpha_range = np.linspace(-iqr/2, iqr/2, 11)
+            iqr = y.quantile(0.75) - y.quantile(0.25)
+            alpha_range = np.linspace(-iqr / 2, iqr / 2, 11)
             if 0 not in alpha_range:
                 alpha_range = np.append(alpha_range, 0)
         else:
@@ -190,14 +217,25 @@ class Sensitivity(object):
 
         alpha_range.sort()
 
-        summary_df = pd.DataFrame(columns=['Method', 'ATE', 'New ATE', 'New ATE LB', 'New ATE UB'])
+        summary_df = pd.DataFrame(
+            columns=["Method", "ATE", "New ATE", "New ATE LB", "New ATE UB"]
+        )
         for method in methods:
             sens = self.get_class_object(method)
-            sens = sens(self.df, self.inference_features, self.p_col, self.treatment_col, self.outcome_col,
-                        self.learner, sample_size=sample_size, confound=confound, alpha_range=alpha_range)
+            sens = sens(
+                self.df,
+                self.inference_features,
+                self.p_col,
+                self.treatment_col,
+                self.outcome_col,
+                self.learner,
+                sample_size=sample_size,
+                confound=confound,
+                alpha_range=alpha_range,
+            )
 
-            if method == 'Subset Data':
-                method = method + '(sample size @{})'.format(sample_size)
+            if method == "Subset Data":
+                method = method + "(sample size @{})".format(sample_size)
 
             sens_df = sens.summary(method=method)
             summary_df = summary_df.append(sens_df)
@@ -223,9 +261,16 @@ class Sensitivity(object):
         ate = preds.mean()
         ate_new, ate_new_lower, ate_new_upper = self.sensitivity_estimate()
 
-        sensitivity_summary = pd.DataFrame([method_name, ate,
-                                            ate_new, ate_new_lower, ate_new_upper]).T
-        sensitivity_summary.columns = ['Method', 'ATE', 'New ATE', 'New ATE LB', 'New ATE UB']
+        sensitivity_summary = pd.DataFrame(
+            [method_name, ate, ate_new, ate_new_lower, ate_new_upper]
+        ).T
+        sensitivity_summary.columns = [
+            "Method",
+            "ATE",
+            "New ATE",
+            "New ATE LB",
+            "New ATE UB",
+        ]
         return sensitivity_summary
 
     def sensitivity_estimate(self):
@@ -233,8 +278,7 @@ class Sensitivity(object):
 
 
 class SensitivityPlaceboTreatment(Sensitivity):
-    """Replaces the treatment variable with a new variable randomly generated.
-    """
+    """Replaces the treatment variable with a new variable randomly generated."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -259,8 +303,7 @@ class SensitivityPlaceboTreatment(Sensitivity):
 
 
 class SensitivityRandomCause(Sensitivity):
-    """Adds an irrelevant random covariate to the dataframe.
-    """
+    """Adds an irrelevant random covariate to the dataframe."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -280,22 +323,24 @@ class SensitivityRandomCause(Sensitivity):
 
 
 class SensitivityRandomReplace(Sensitivity):
-    """Replaces a random covariate with an irrelevant variable.
-    """
+    """Replaces a random covariate with an irrelevant variable."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if 'replaced_feature' not in kwargs:
+        if "replaced_feature" not in kwargs:
             replaced_feature_index = np.random.randint(len(self.inference_features))
             self.replaced_feature = self.inference_features[replaced_feature_index]
         else:
             self.replaced_feature = kwargs["replaced_feature"]
 
     def sensitivity_estimate(self):
-        """Replaces a random covariate with an irrelevant variable.
-        """
+        """Replaces a random covariate with an irrelevant variable."""
 
-        logger.info('Replace feature {} with an random irrelevant variable'.format(self.replaced_feature))
+        logger.info(
+            "Replace feature {} with an random irrelevant variable".format(
+                self.replaced_feature
+            )
+        )
         df_new = self.df.copy()
         num_rows = self.df.shape[0]
         df_new[self.replaced_feature] = np.random.randn(num_rows)
@@ -305,18 +350,19 @@ class SensitivityRandomReplace(Sensitivity):
         treatment_new = df_new[self.treatment_col].values
         y_new = df_new[self.outcome_col].values
 
-        ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(X_new, p_new, treatment_new, y_new)
+        ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(
+            X_new, p_new, treatment_new, y_new
+        )
         return ate_new, ate_new_lower, ate_new_upper
 
 
 class SensitivitySubsetData(Sensitivity):
-    """Takes a random subset of size sample_size of the data.
-    """
+    """Takes a random subset of size sample_size of the data."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sample_size = kwargs["sample_size"]
-        assert (self.sample_size is not None)
+        assert self.sample_size is not None
 
     def sensitivity_estimate(self):
         df_new = self.df.sample(frac=self.sample_size).copy()
@@ -326,7 +372,9 @@ class SensitivitySubsetData(Sensitivity):
         treatment_new = df_new[self.treatment_col].values
         y_new = df_new[self.outcome_col].values
 
-        ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(X_new, p_new, treatment_new, y_new)
+        ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(
+            X_new, p_new, treatment_new, y_new
+        )
         return ate_new, ate_new_lower, ate_new_upper
 
 
@@ -342,8 +390,14 @@ class SensitivitySelectionBias(Sensitivity):
 
     """
 
-    def __init__(self, *args, confound='one_sided', alpha_range=None,
-                 sensitivity_features=None, **kwargs):
+    def __init__(
+        self,
+        *args,
+        confound="one_sided",
+        alpha_range=None,
+        sensitivity_features=None,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         """Initialize.
 
@@ -353,17 +407,21 @@ class SensitivitySelectionBias(Sensitivity):
             sensitivity_features (list of str): ): a list of columns that to check each individual partial r-square
         """
 
-        logger.info('Only works for linear outcome models right now. Check back soon.')
-        confounding_functions = {'one_sided': one_sided,
-                                 'alignment': alignment,
-                                 'one_sided_att': one_sided_att,
-                                 'alignment_att': alignment_att}
+        logger.info("Only works for linear outcome models right now. Check back soon.")
+        confounding_functions = {
+            "one_sided": one_sided,
+            "alignment": alignment,
+            "one_sided_att": one_sided_att,
+            "alignment_att": alignment_att,
+        }
 
         try:
             confound_func = confounding_functions[confound]
         except KeyError:
-            raise NotImplementedError(f'Confounding function, {confound} is not implemented. \
-                                        Use one of {confounding_functions.keys()}')
+            raise NotImplementedError(
+                f"Confounding function, {confound} is not implemented. \
+                                        Use one of {confounding_functions.keys()}"
+            )
 
         self.confound = confound_func
 
@@ -374,8 +432,8 @@ class SensitivitySelectionBias(Sensitivity):
 
         if alpha_range is None:
             y = self.df[self.outcome_col]
-            iqr = y.quantile(.75) - y.quantile(.25)
-            self.alpha_range = np.linspace(-iqr/2, iqr/2, 11)
+            iqr = y.quantile(0.75) - y.quantile(0.25)
+            self.alpha_range = np.linspace(-iqr / 2, iqr / 2, 11)
             if 0 not in self.alpha_range:
                 self.alpha_range = np.append(self.alpha_range, 0)
         else:
@@ -397,17 +455,17 @@ class SensitivitySelectionBias(Sensitivity):
         sens_df = pd.DataFrame()
         for a in alpha_range:
             sens = defaultdict(list)
-            sens['alpha'] = a
+            sens["alpha"] = a
             adj = confound(a, p, treatment)
             preds_adj = y - adj
             s_preds = self.get_prediction(X, p, treatment, preds_adj)
             ate, ate_lb, ate_ub = self.get_ate_ci(X, p, treatment, preds_adj)
 
             s_preds_residul = preds_adj - s_preds
-            sens['rsqs'] = a**2*np.var(treatment)/np.var(s_preds_residul)
-            sens['New ATE'] = ate
-            sens['New ATE LB'] = ate_lb
-            sens['New ATE UB'] = ate_ub
+            sens["rsqs"] = a**2 * np.var(treatment) / np.var(s_preds_residul)
+            sens["New ATE"] = ate
+            sens["New ATE LB"] = ate_lb
+            sens["New ATE UB"] = ate_ub
             sens_df = sens_df.append(pd.DataFrame(sens, index=[0]))
 
         rss = np.sum(np.square(y - preds))
@@ -417,14 +475,14 @@ class SensitivitySelectionBias(Sensitivity):
             X_new = df_new[self.inference_features].drop(feature, axis=1).copy()
             y_new_preds = self.get_prediction(X_new, p, treatment, y)
             rss_new = np.sum(np.square(y - y_new_preds))
-            partial_rsqs.append(((rss_new - rss)/rss))
+            partial_rsqs.append(((rss_new - rss) / rss))
 
         partial_rsqs_df = pd.DataFrame([self.sensitivity_features, partial_rsqs]).T
-        partial_rsqs_df.columns = ['feature', 'partial_rsqs']
+        partial_rsqs_df.columns = ["feature", "partial_rsqs"]
 
         return sens_df, partial_rsqs_df
 
-    def summary(self, method='Selection Bias'):
+    def summary(self, method="Selection Bias"):
         """Summary report for Selection Bias Method
         Args:
             method_name (str): sensitivity analysis method
@@ -434,14 +492,22 @@ class SensitivitySelectionBias(Sensitivity):
 
         method_name = method
         sensitivity_summary = self.causalsens()[0]
-        sensitivity_summary['Method'] = [method_name + ' (alpha@' + str(round(i, 5)) + ', with r-sqaure:'
-                                         for i in sensitivity_summary.alpha]
-        sensitivity_summary['Method'] = sensitivity_summary['Method'] + sensitivity_summary['rsqs'].round(5).astype(str)
-        sensitivity_summary['ATE'] = sensitivity_summary[sensitivity_summary.alpha == 0]['New ATE']
-        return sensitivity_summary[['Method', 'ATE', 'New ATE', 'New ATE LB', 'New ATE UB']]
+        sensitivity_summary["Method"] = [
+            method_name + " (alpha@" + str(round(i, 5)) + ", with r-sqaure:"
+            for i in sensitivity_summary.alpha
+        ]
+        sensitivity_summary["Method"] = sensitivity_summary[
+            "Method"
+        ] + sensitivity_summary["rsqs"].round(5).astype(str)
+        sensitivity_summary["ATE"] = sensitivity_summary[
+            sensitivity_summary.alpha == 0
+        ]["New ATE"]
+        return sensitivity_summary[
+            ["Method", "ATE", "New ATE", "New ATE LB", "New ATE UB"]
+        ]
 
     @staticmethod
-    def plot(sens_df, partial_rsqs_df=None, type='raw', ci=False, partial_rsqs=False):
+    def plot(sens_df, partial_rsqs_df=None, type="raw", ci=False, partial_rsqs=False):
         """Plot the results of a sensitivity analysis against unmeasured
         Args:
             sens_df (pandas.DataFrame): a data frame output from causalsens
@@ -449,48 +515,70 @@ class SensitivitySelectionBias(Sensitivity):
             type (str, optional): the type of plot to draw, 'raw' or 'r.squared' are supported
             ci (bool, optional): whether plot confidence intervals
             partial_rsqs (bool, optional): whether plot partial rsquare results
-         """
+        """
 
-        if type == 'raw' and not ci:
+        if type == "raw" and not ci:
             fig, ax = plt.subplots()
-            y_max = round(sens_df['New ATE UB'].max()*1.1, 4)
-            y_min = round(sens_df['New ATE LB'].min()*0.9, 4)
-            x_max = round(sens_df.alpha.max()*1.1, 4)
-            x_min = round(sens_df.alpha.min()*0.9, 4)
+            y_max = round(sens_df["New ATE UB"].max() * 1.1, 4)
+            y_min = round(sens_df["New ATE LB"].min() * 0.9, 4)
+            x_max = round(sens_df.alpha.max() * 1.1, 4)
+            x_min = round(sens_df.alpha.min() * 0.9, 4)
             plt.ylim(y_min, y_max)
             plt.xlim(x_min, x_max)
-            ax.plot(sens_df.alpha, sens_df['New ATE'])
-        elif type == 'raw' and ci:
+            ax.plot(sens_df.alpha, sens_df["New ATE"])
+        elif type == "raw" and ci:
             fig, ax = plt.subplots()
-            y_max = round(sens_df['New ATE UB'].max()*1.1, 4)
-            y_min = round(sens_df['New ATE LB'].min()*0.9, 4)
-            x_max = round(sens_df.alpha.max()*1.1, 4)
-            x_min = round(sens_df.alpha.min()*0.9, 4)
+            y_max = round(sens_df["New ATE UB"].max() * 1.1, 4)
+            y_min = round(sens_df["New ATE LB"].min() * 0.9, 4)
+            x_max = round(sens_df.alpha.max() * 1.1, 4)
+            x_min = round(sens_df.alpha.min() * 0.9, 4)
             plt.ylim(y_min, y_max)
             plt.xlim(x_min, x_max)
-            ax.fill_between(sens_df.alpha, sens_df['New ATE LB'], sens_df['New ATE UB'], color='gray', alpha=0.5)
-            ax.plot(sens_df.alpha, sens_df['New ATE'])
-        elif type == 'r.squared' and ci:
+            ax.fill_between(
+                sens_df.alpha,
+                sens_df["New ATE LB"],
+                sens_df["New ATE UB"],
+                color="gray",
+                alpha=0.5,
+            )
+            ax.plot(sens_df.alpha, sens_df["New ATE"])
+        elif type == "r.squared" and ci:
             fig, ax = plt.subplots()
-            y_max = round(sens_df['New ATE UB'].max()*1.1, 4)
-            y_min = round(sens_df['New ATE LB'].min()*0.9, 4)
+            y_max = round(sens_df["New ATE UB"].max() * 1.1, 4)
+            y_min = round(sens_df["New ATE LB"].min() * 0.9, 4)
             plt.ylim(y_min, y_max)
-            ax.fill_between(sens_df.rsqs, sens_df['New ATE LB'], sens_df['New ATE UB'], color='gray', alpha=0.5)
-            ax.plot(sens_df.rsqs, sens_df['New ATE'])
+            ax.fill_between(
+                sens_df.rsqs,
+                sens_df["New ATE LB"],
+                sens_df["New ATE UB"],
+                color="gray",
+                alpha=0.5,
+            )
+            ax.plot(sens_df.rsqs, sens_df["New ATE"])
             if partial_rsqs:
-                plt.scatter(partial_rsqs_df.partial_rsqs,
-                        list(sens_df[sens_df.alpha == 0]['New ATE']) * partial_rsqs_df.shape[0],
-                        marker='x', color="red", linewidth=10)
-        elif type == 'r.squared' and not ci:
+                plt.scatter(
+                    partial_rsqs_df.partial_rsqs,
+                    list(sens_df[sens_df.alpha == 0]["New ATE"])
+                    * partial_rsqs_df.shape[0],
+                    marker="x",
+                    color="red",
+                    linewidth=10,
+                )
+        elif type == "r.squared" and not ci:
             fig, ax = plt.subplots()
-            y_max = round(sens_df['New ATE UB'].max()*1.1, 4)
-            y_min = round(sens_df['New ATE LB'].min()*0.9, 4)
+            y_max = round(sens_df["New ATE UB"].max() * 1.1, 4)
+            y_min = round(sens_df["New ATE LB"].min() * 0.9, 4)
             plt.ylim(y_min, y_max)
-            plt.plot(sens_df.rsqs, sens_df['New ATE'])
+            plt.plot(sens_df.rsqs, sens_df["New ATE"])
             if partial_rsqs:
-                plt.scatter(partial_rsqs_df.partial_rsqs,
-                        list(sens_df[sens_df.alpha == 0]['New ATE']) * partial_rsqs_df.shape[0],
-                        marker='x', color="red", linewidth=10)
+                plt.scatter(
+                    partial_rsqs_df.partial_rsqs,
+                    list(sens_df[sens_df.alpha == 0]["New ATE"])
+                    * partial_rsqs_df.shape[0],
+                    marker="x",
+                    color="red",
+                    linewidth=10,
+                )
 
     @staticmethod
     def partial_rsqs_confounding(sens_df, feature_name, partial_rsqs_value, range=0.01):
@@ -506,16 +594,27 @@ class SensitivitySelectionBias(Sensitivity):
 
         rsqs_dict = []
         for i in sens_df.rsqs:
-            if partial_rsqs_value - partial_rsqs_value*range < i < partial_rsqs_value + partial_rsqs_value*range:
+            if (
+                partial_rsqs_value - partial_rsqs_value * range
+                < i
+                < partial_rsqs_value + partial_rsqs_value * range
+            ):
                 rsqs_dict.append(i)
 
         if rsqs_dict:
             confounding_min = sens_df[sens_df.rsqs.isin(rsqs_dict)].alpha.min()
             confounding_max = sens_df[sens_df.rsqs.isin(rsqs_dict)].alpha.max()
-            logger.info('Only works for linear outcome models right now. Check back soon.')
-            logger.info('For feature {} with partial rsquare {} confounding amount with possible values: {}, {}'.format(
-                        feature_name, partial_rsqs_value, confounding_min, confounding_max))
+            logger.info(
+                "Only works for linear outcome models right now. Check back soon."
+            )
+            logger.info(
+                "For feature {} with partial rsquare {} confounding amount with possible values: {}, {}".format(
+                    feature_name, partial_rsqs_value, confounding_min, confounding_max
+                )
+            )
             return [confounding_min, confounding_max]
         else:
-            logger.info('Cannot find correponding rsquare value within the range for input, please edit confounding', 'values vector or use a larger range and try again')
-
+            logger.info(
+                "Cannot find correponding rsquare value within the range for input, please edit confounding",
+                "values vector or use a larger range and try again",
+            )

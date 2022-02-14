@@ -8,13 +8,25 @@ from copy import deepcopy
 
 from causalml.inference.meta.utils import convert_pd_to_np
 
-VALID_METHODS = ('auto', 'permutation', 'shapley')
+VALID_METHODS = ("auto", "permutation", "shapley")
 
 
 class Explainer(object):
-    def __init__(self, method, control_name, X, tau, classes, model_tau=None,
-                 features=None, normalize=True, test_size=0.3, random_state=None, override_checks=False,
-                 r_learners=None):
+    def __init__(
+        self,
+        method,
+        control_name,
+        X,
+        tau,
+        classes,
+        model_tau=None,
+        features=None,
+        normalize=True,
+        test_size=0.3,
+        random_state=None,
+        override_checks=False,
+        r_learners=None,
+    ):
         """
         The Explainer class handles all feature explanation/interpretation functions, including plotting
         feature importances, shapley value distributions, and shapley value dependency plots.
@@ -52,7 +64,9 @@ class Explainer(object):
         if self.tau is not None and self.tau.ndim == 1:
             self.tau = self.tau.reshape(-1, 1)
         self.classes = classes
-        self.model_tau = LGBMRegressor(importance_type='gain') if model_tau is None else model_tau
+        self.model_tau = (
+            LGBMRegressor(importance_type="gain") if model_tau is None else model_tau
+        )
         self.features = features
         self.normalize = normalize
         self.test_size = test_size
@@ -72,15 +86,21 @@ class Explainer(object):
             - X, tau, and classes are specified
             - model_tau has feature_importances_ attribute after fitting
         """
-        assert self.method in VALID_METHODS, 'Current supported methods: {}'.format(', '.join(VALID_METHODS))
+        assert self.method in VALID_METHODS, "Current supported methods: {}".format(
+            ", ".join(VALID_METHODS)
+        )
 
-        assert all(obj is not None for obj in (self.X, self.tau, self.classes)), \
-            "X, tau, and classes must be provided."
+        assert all(
+            obj is not None for obj in (self.X, self.tau, self.classes)
+        ), "X, tau, and classes must be provided."
 
         model_test = deepcopy(self.model_tau)
-        model_test.fit([[0], [1]], [0, 1])  # Fit w/ dummy data to check for feature_importances_ below
-        assert hasattr(model_test, "feature_importances_"), \
-            "model_tau must have the feature_importances_ method (after fitting)"
+        model_test.fit(
+            [[0], [1]], [0, 1]
+        )  # Fit w/ dummy data to check for feature_importances_ below
+        assert hasattr(
+            model_test, "feature_importances_"
+        ), "model_tau must have the feature_importances_ method (after fitting)"
 
     def create_feature_names(self):
         """
@@ -88,24 +108,28 @@ class Explainer(object):
         """
         if self.features is None:
             num_features = self.X.shape[1]
-            self.features = ['Feature_{:03d}'.format(i) for i in range(num_features)]
+            self.features = ["Feature_{:03d}".format(i) for i in range(num_features)]
 
     def build_new_tau_models(self):
         """
         Builds tau models (using X to predict estimated/actual tau) for each treatment group.
         """
-        if self.method in ('permutation'):
-            self.X_train, self.X_test, self.tau_train, self.tau_test = train_test_split(self.X,
-                                                                                        self.tau,
-                                                                                        test_size=self.test_size,
-                                                                                        random_state=self.random_state)
+        if self.method in ("permutation"):
+            self.X_train, self.X_test, self.tau_train, self.tau_test = train_test_split(
+                self.X,
+                self.tau,
+                test_size=self.test_size,
+                random_state=self.random_state,
+            )
         else:
             self.X_train, self.tau_train = self.X, self.tau
 
         if self.r_learners is not None:
             self.models_tau = deepcopy(self.r_learners)
         else:
-            self.models_tau = {group: deepcopy(self.model_tau) for group in self.classes}
+            self.models_tau = {
+                group: deepcopy(self.model_tau) for group in self.classes
+            }
             for group, idx in self.classes.items():
                 self.models_tau[group].fit(self.X_train, self.tau_train[:, idx])
 
@@ -113,11 +137,16 @@ class Explainer(object):
         """
         Calculates feature importances for each treatment group, based on specified method in __init__.
         """
-        importance_catalog = {'auto': self.default_importance, 'permutation': self.perm_importance}
+        importance_catalog = {
+            "auto": self.default_importance,
+            "permutation": self.perm_importance,
+        }
         importance_dict = importance_catalog[self.method]()
 
-        importance_dict = {group: pd.Series(array, index=self.features).sort_values(ascending=False)
-                           for group, array in importance_dict.items()}
+        importance_dict = {
+            group: pd.Series(array, index=self.features).sort_values(ascending=False)
+            for group, array in importance_dict.items()
+        }
         return importance_dict
 
     def default_importance(self):
@@ -130,7 +159,9 @@ class Explainer(object):
         for group, idx in self.classes.items():
             importance_dict[group] = self.models_tau[group].feature_importances_
             if self.normalize:
-                importance_dict[group] = importance_dict[group] / importance_dict[group].sum()
+                importance_dict[group] = (
+                    importance_dict[group] / importance_dict[group].sum()
+                )
 
         return importance_dict
 
@@ -144,10 +175,12 @@ class Explainer(object):
             self.X_test, self.tau_test = self.X, self.tau
         for group, idx in self.classes.items():
             perm_estimator = self.models_tau[group]
-            importance_dict[group] = permutation_importance(estimator=perm_estimator,
-                                                            X=self.X_test,
-                                                            y=self.tau_test[:, idx],
-                                                            random_state=self.random_state).importances_mean
+            importance_dict[group] = permutation_importance(
+                estimator=perm_estimator,
+                X=self.X_test,
+                y=self.tau_test[:, idx],
+                random_state=self.random_state,
+            ).importances_mean
 
         return importance_dict
 
@@ -159,13 +192,15 @@ class Explainer(object):
         for group, mod in self.models_tau.items():
             explainer = shap.TreeExplainer(mod)
             if self.r_learners is not None:
-                explainer.model.original_model.params['objective'] = None  # hacky way of running shap without error
+                explainer.model.original_model.params[
+                    "objective"
+                ] = None  # hacky way of running shap without error
             shap_values = explainer.shap_values(self.X)
             shap_dict[group] = shap_values
 
         return shap_dict
 
-    def plot_importance(self, importance_dict=None, title_prefix=''):
+    def plot_importance(self, importance_dict=None, title_prefix=""):
         """
         Calculates and plots feature importances for each treatment group, based on specified method in __init__.
         Skips the calculation part if importance_dict is given.
@@ -174,10 +209,10 @@ class Explainer(object):
             importance_dict = self.get_importance()
         for group, series in importance_dict.items():
             plt.figure()
-            series.sort_values().plot(kind='barh', figsize=(12, 8))
+            series.sort_values().plot(kind="barh", figsize=(12, 8))
             title = group
-            if title_prefix != '':
-                title = '{} - {}'.format(title_prefix, title)
+            if title_prefix != "":
+                title = "{} - {}".format(title_prefix, title)
             plt.title(title)
 
     def plot_shap_values(self, shap_dict=None):
@@ -192,29 +227,42 @@ class Explainer(object):
             plt.title(group)
             shap.summary_plot(values, features=self.X, feature_names=self.features)
 
-    def plot_shap_dependence(self, treatment_group, feature_idx, shap_dict=None, interaction_idx='auto', **kwargs):
+    def plot_shap_dependence(
+        self,
+        treatment_group,
+        feature_idx,
+        shap_dict=None,
+        interaction_idx="auto",
+        **kwargs
+    ):
         """
-        Plots dependency of shapley values for a specified feature, colored by an interaction feature.
-        Skips the calculation part if shap_dict is given.
+         Plots dependency of shapley values for a specified feature, colored by an interaction feature.
+         Skips the calculation part if shap_dict is given.
 
-        This plots the value of the feature on the x-axis and the SHAP value of the same feature
-        on the y-axis. This shows how the model depends on the given feature, and is like a
-        richer extension of the classical partial dependence plots. Vertical dispersion of the
-        data points represents interaction effects.
+         This plots the value of the feature on the x-axis and the SHAP value of the same feature
+         on the y-axis. This shows how the model depends on the given feature, and is like a
+         richer extension of the classical partial dependence plots. Vertical dispersion of the
+         data points represents interaction effects.
 
-       Args:
-            treatment_group (str or int): name of treatment group to create dependency plot on
-            feature_idx (str or int): feature index / name to create dependency plot on
-            shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
-            interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
-                If "auto" then shap.common.approximate_interactions is used to pick what seems to be the
-                strongest interaction (note that to find to true strongest interaction you need to compute
-                the SHAP interaction values).
+        Args:
+             treatment_group (str or int): name of treatment group to create dependency plot on
+             feature_idx (str or int): feature index / name to create dependency plot on
+             shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
+             interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
+                 If "auto" then shap.common.approximate_interactions is used to pick what seems to be the
+                 strongest interaction (note that to find to true strongest interaction you need to compute
+                 the SHAP interaction values).
         """
         if shap_dict is None:
             shap_dict = self.get_shap_values()
 
         shap_values = shap_dict[treatment_group]
 
-        shap.dependence_plot(feature_idx, shap_values, self.X, interaction_index=interaction_idx,
-                             feature_names=self.features, **kwargs)
+        shap.dependence_plot(
+            feature_idx,
+            shap_values,
+            self.X,
+            interaction_index=interaction_idx,
+            feature_names=self.features,
+            **kwargs
+        )

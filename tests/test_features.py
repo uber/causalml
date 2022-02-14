@@ -9,9 +9,13 @@ def generate_categorical_data():
 
     def _generate_data():
         if not generated:
-            df = pd.DataFrame({'cat1': ['a', 'a', 'b', 'a', 'c', 'b', 'd'],
-                               'cat2': ['aa', 'aa', 'aa', 'bb', 'bb', 'bb', 'cc'],
-                               'num1': [1, 2, 1, 2, 1, 1, 1]})
+            df = pd.DataFrame(
+                {
+                    "cat1": ["a", "a", "b", "a", "c", "b", "d"],
+                    "cat2": ["aa", "aa", "aa", "bb", "bb", "bb", "cc"],
+                    "num1": [1, 2, 1, 2, 1, 1, 1],
+                }
+            )
 
         return df
 
@@ -28,7 +32,7 @@ def test_load_data(generate_categorical_data):
 
 def test_LabelEncoder(generate_categorical_data):
     df = generate_categorical_data()
-    cat_cols = [col for col in df.columns if df[col].dtype == 'object']
+    cat_cols = [col for col in df.columns if df[col].dtype == "object"]
     n_category = 0
     for col in cat_cols:
         n_category += df[col].nunique()
@@ -44,7 +48,7 @@ def test_LabelEncoder(generate_categorical_data):
 
 def test_OneHotEncoder(generate_categorical_data):
     df = generate_categorical_data()
-    cat_cols = [col for col in df.columns if df[col].dtype == 'object']
+    cat_cols = [col for col in df.columns if df[col].dtype == "object"]
     n_category = 0
     for col in cat_cols:
         n_category += df[col].nunique()

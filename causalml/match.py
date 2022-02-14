@@ -8,7 +8,7 @@ from sklearn.neighbors import NearestNeighbors
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import check_random_state
 
-logger = logging.getLogger('causalml')
+logger = logging.getLogger("causalml")
 
 
 def smd(feature, treatment):
@@ -28,7 +28,7 @@ def smd(feature, treatment):
     """
     t = feature[treatment == 1]
     c = feature[treatment == 0]
-    return (t.mean() - c.mean()) / np.sqrt(.5 * (t.var() + c.var()))
+    return (t.mean() - c.mean()) / np.sqrt(0.5 * (t.var() + c.var()))
 
 
 def create_table_one(data, treatment_col, features):
@@ -48,26 +48,25 @@ def create_table_one(data, treatment_col, features):
             the treatment and control groups, and the SMD between two groups
             for the features.
     """
-    t1 = pd.pivot_table(data[features + [treatment_col]],
-                        columns=treatment_col,
-                        aggfunc=[lambda x: '{:.2f} ({:.2f})'.format(x.mean(),
-                                                                    x.std())])
+    t1 = pd.pivot_table(
+        data[features + [treatment_col]],
+        columns=treatment_col,
+        aggfunc=[lambda x: "{:.2f} ({:.2f})".format(x.mean(), x.std())],
+    )
     t1.columns = t1.columns.droplevel(level=0)
-    t1['SMD'] = data[features].apply(
-        lambda x: smd(x, data[treatment_col])
-    ).round(4)
+    t1["SMD"] = data[features].apply(lambda x: smd(x, data[treatment_col])).round(4)
 
-    n_row = pd.pivot_table(data[[features[0], treatment_col]],
-                           columns=treatment_col,
-                           aggfunc=['count'])
+    n_row = pd.pivot_table(
+        data[[features[0], treatment_col]], columns=treatment_col, aggfunc=["count"]
+    )
     n_row.columns = n_row.columns.droplevel(level=0)
-    n_row['SMD'] = ''
-    n_row.index = ['n']
+    n_row["SMD"] = ""
+    n_row.index = ["n"]
 
     t1 = pd.concat([n_row, t1], axis=0)
-    t1.columns.name = ''
-    t1.columns = ['Control', 'Treatment', 'SMD']
-    t1.index.name = 'Variable'
+    t1.columns.name = ""
+    t1.columns = ["Control", "Treatment", "SMD"]
+    t1.index.name = "Variable"
 
     return t1
 
@@ -89,8 +88,15 @@ class NearestNeighborMatch(object):
             None means 1 unless in a joblib.parallel_backend context. -1 means using all processors
     """
 
-    def __init__(self, caliper=.2, replace=False, ratio=1, shuffle=True,
-                 random_state=None, n_jobs=-1):
+    def __init__(
+        self,
+        caliper=0.2,
+        replace=False,
+        ratio=1,
+        shuffle=True,
+        random_state=None,
+        n_jobs=-1,
+    ):
         """Initialize a propensity score matching model.
 
         Args:
@@ -124,7 +130,7 @@ class NearestNeighborMatch(object):
             (pandas.DataFrame): The subset of data consisting of matched
                 treatment and control group data.
         """
-        assert type(score_cols) is list, 'score_cols must be a list'
+        assert type(score_cols) is list, "score_cols must be a list"
         treatment = data.loc[data[treatment_col] == 1, score_cols]
         control = data.loc[data[treatment_col] == 0, score_cols]
 
@@ -133,15 +139,19 @@ class NearestNeighborMatch(object):
         if self.replace:
             scaler = StandardScaler()
             scaler.fit(data[score_cols])
-            treatment_scaled = pd.DataFrame(scaler.transform(treatment),
-                                            index=treatment.index)
-            control_scaled = pd.DataFrame(scaler.transform(control),
-                                          index=control.index)
+            treatment_scaled = pd.DataFrame(
+                scaler.transform(treatment), index=treatment.index
+            )
+            control_scaled = pd.DataFrame(
+                scaler.transform(control), index=control.index
+            )
 
             # SD is the same as caliper because we use a StandardScaler above
             sdcal = self.caliper
 
-            matching_model = NearestNeighbors(n_neighbors=self.ratio, n_jobs=self.n_jobs)
+            matching_model = NearestNeighbors(
+                n_neighbors=self.ratio, n_jobs=self.n_jobs
+            )
             matching_model.fit(control_scaled)
             distances, indices = matching_model.kneighbors(treatment_scaled)
 
@@ -150,19 +160,18 @@ class NearestNeighborMatch(object):
             # the (n_obs * self.ratio, 1) matrices and data frame.
             distances = distances.T.flatten()
             indices = indices.T.flatten()
-            treatment_scaled = pd.concat([treatment_scaled] * self.ratio,
-                                         axis=0)
+            treatment_scaled = pd.concat([treatment_scaled] * self.ratio, axis=0)
 
-            cond = (distances / np.sqrt(len(score_cols)) ) < sdcal
+            cond = (distances / np.sqrt(len(score_cols))) < sdcal
             # Deduplicate the indices of the treatment group
             t_idx_matched = np.unique(treatment_scaled.loc[cond].index)
             # XXX: Should we deduplicate the indices of the control group too?
             c_idx_matched = np.array(control_scaled.iloc[indices[cond]].index)
         else:
             assert len(score_cols) == 1, (
-                'Matching on multiple columns is only supported using the '
-                'replacement method (if matching on multiple columns, set '
-                'replace=True).'
+                "Matching on multiple columns is only supported using the "
+                "replacement method (if matching on multiple columns, set "
+                "replace=True)."
             )
             # unpack score_cols for the single-variable matching case
             score_col = score_cols[0]
@@ -174,19 +183,22 @@ class NearestNeighborMatch(object):
 
             t_idx_matched = []
             c_idx_matched = []
-            control['unmatched'] = True
+            control["unmatched"] = True
 
             for t_idx in t_indices:
-                dist = np.abs(control.loc[control.unmatched, score_col]
-                              - treatment.loc[t_idx, score_col])
+                dist = np.abs(
+                    control.loc[control.unmatched, score_col]
+                    - treatment.loc[t_idx, score_col]
+                )
                 c_idx_min = dist.idxmin()
                 if dist[c_idx_min] <= sdcal:
                     t_idx_matched.append(t_idx)
                     c_idx_matched.append(c_idx_min)
-                    control.loc[c_idx_min, 'unmatched'] = False
+                    control.loc[c_idx_min, "unmatched"] = False
 
-        return data.loc[np.concatenate([np.array(t_idx_matched),
-                                        np.array(c_idx_matched)])]
+        return data.loc[
+            np.concatenate([np.array(t_idx_matched), np.array(c_idx_matched)])
+        ]
 
     def match_by_group(self, data, treatment_col, score_cols, groupby_col):
         """Find matches from the control group stratified by groupby_col, by
@@ -204,20 +216,31 @@ class NearestNeighborMatch(object):
                 treatment and control group data.
         """
         matched = data.groupby(groupby_col).apply(
-            lambda x: self.match(data=x, treatment_col=treatment_col,
-                                 score_cols=score_cols)
+            lambda x: self.match(
+                data=x, treatment_col=treatment_col, score_cols=score_cols
+            )
         )
         return matched.reset_index(level=0, drop=True)
 
 
 class MatchOptimizer(object):
-    def __init__(self, treatment_col='is_treatment', ps_col='pihat',
-                 user_col=None, matching_covariates=['pihat'], max_smd=0.1,
-                 max_deviation=0.1, caliper_range=(0.01, 0.5),
-                 max_pihat_range=(0.95, 0.999), max_iter_per_param=5,
-                 min_users_per_group=1000, smd_cols=['pihat'],
-                 dev_cols_transformations={'pihat': np.mean},
-                 dev_factor=1., verbose=True):
+    def __init__(
+        self,
+        treatment_col="is_treatment",
+        ps_col="pihat",
+        user_col=None,
+        matching_covariates=["pihat"],
+        max_smd=0.1,
+        max_deviation=0.1,
+        caliper_range=(0.01, 0.5),
+        max_pihat_range=(0.95, 0.999),
+        max_iter_per_param=5,
+        min_users_per_group=1000,
+        smd_cols=["pihat"],
+        dev_cols_transformations={"pihat": np.mean},
+        dev_factor=1.0,
+        verbose=True,
+    ):
         """Finds the set of parameters that gives the best matching result.
 
         Score = (number of features with SMD > max_smd)
@@ -262,17 +285,15 @@ class MatchOptimizer(object):
         self.matching_covariates = matching_covariates
         self.max_smd = max_smd
         self.max_deviation = max_deviation
-        self.caliper_range = np.linspace(*caliper_range,
-                                         num=max_iter_per_param)
-        self.max_pihat_range = np.linspace(*max_pihat_range,
-                                           num=max_iter_per_param)
+        self.caliper_range = np.linspace(*caliper_range, num=max_iter_per_param)
+        self.max_pihat_range = np.linspace(*max_pihat_range, num=max_iter_per_param)
         self.max_iter_per_param = max_iter_per_param
         self.min_users_per_group = min_users_per_group
         self.smd_cols = smd_cols
         self.dev_factor = dev_factor
         self.dev_cols_transformations = dev_cols_transformations
         self.best_params = {}
-        self.best_score = 1e7   # ideal score is 0
+        self.best_score = 1e7  # ideal score is 0
         self.verbose = verbose
         self.pass_all = False
 
@@ -280,46 +301,79 @@ class MatchOptimizer(object):
         matcher = NearestNeighborMatch(caliper=caliper, replace=True)
         df_matched = matcher.match(
             data=self.df[self.df[self.ps_col] < pihat_threshold],
-            treatment_col=self.treatment_col, score_cols=score_cols
+            treatment_col=self.treatment_col,
+            score_cols=score_cols,
         )
         return df_matched
 
-    def check_table_one(self, tableone, matched, score_cols, pihat_threshold,
-                        caliper):
+    def check_table_one(self, tableone, matched, score_cols, pihat_threshold, caliper):
         # check if better than past runs
-        smd_values = np.abs(tableone[tableone.index != 'n']['SMD'].astype(float))
+        smd_values = np.abs(tableone[tableone.index != "n"]["SMD"].astype(float))
         num_cols_over_smd = (smd_values >= self.max_smd).sum()
-        self.cols_to_fix = smd_values[smd_values >= self.max_smd].sort_values(ascending=False).index.values
+        self.cols_to_fix = (
+            smd_values[smd_values >= self.max_smd]
+            .sort_values(ascending=False)
+            .index.values
+        )
         if self.user_col is None:
-            num_users_per_group = matched.reset_index().groupby(self.treatment_col)['index'].count().min()
+            num_users_per_group = (
+                matched.reset_index().groupby(self.treatment_col)["index"].count().min()
+            )
         else:
-            num_users_per_group = matched.groupby(self.treatment_col)[self.user_col].count().min()
-        deviations = [np.abs(self.original_stats[col] / matched[matched[self.treatment_col] == 1][col].mean() - 1)
-                      for col in self.dev_cols_transformations.keys()]
+            num_users_per_group = (
+                matched.groupby(self.treatment_col)[self.user_col].count().min()
+            )
+        deviations = [
+            np.abs(
+                self.original_stats[col]
+                / matched[matched[self.treatment_col] == 1][col].mean()
+                - 1
+            )
+            for col in self.dev_cols_transformations.keys()
+        ]
 
         score = num_cols_over_smd
-        score += len([col for col in self.smd_cols if smd_values.loc[col] >= self.max_smd])
-        score += np.sum([dev*10*self.dev_factor for dev in deviations])
+        score += len(
+            [col for col in self.smd_cols if smd_values.loc[col] >= self.max_smd]
+        )
+        score += np.sum([dev * 10 * self.dev_factor for dev in deviations])
 
         # check if can be considered as best score
         if score < self.best_score and num_users_per_group > self.min_users_per_group:
             self.best_score = score
-            self.best_params = {'score_cols': score_cols.copy(), 'pihat': pihat_threshold, 'caliper': caliper}
+            self.best_params = {
+                "score_cols": score_cols.copy(),
+                "pihat": pihat_threshold,
+                "caliper": caliper,
+            }
             self.best_matched = matched.copy()
         if self.verbose:
-            logger.info('\tScore: {:.03f} (Best Score: {:.03f})\n'.format(score, self.best_score))
+            logger.info(
+                "\tScore: {:.03f} (Best Score: {:.03f})\n".format(
+                    score, self.best_score
+                )
+            )
 
         # check if passes all criteria
-        self.pass_all = ((num_users_per_group > self.min_users_per_group) and (num_cols_over_smd == 0) and
-                         all(dev < self.max_deviation for dev in deviations))
+        self.pass_all = (
+            (num_users_per_group > self.min_users_per_group)
+            and (num_cols_over_smd == 0)
+            and all(dev < self.max_deviation for dev in deviations)
+        )
 
     def match_and_check(self, score_cols, pihat_threshold, caliper):
         if self.verbose:
-            logger.info('Preparing match for: caliper={:.03f}, '
-                        'pihat_threshold={:.03f}, '
-                        'score_cols={}'.format(caliper, pihat_threshold, score_cols))
-        df_matched = self.single_match(score_cols=score_cols, pihat_threshold=pihat_threshold, caliper=caliper)
-        tableone = create_table_one(df_matched, self.treatment_col, self.matching_covariates)
+            logger.info(
+                "Preparing match for: caliper={:.03f}, "
+                "pihat_threshold={:.03f}, "
+                "score_cols={}".format(caliper, pihat_threshold, score_cols)
+            )
+        df_matched = self.single_match(
+            score_cols=score_cols, pihat_threshold=pihat_threshold, caliper=caliper
+        )
+        tableone = create_table_one(
+            df_matched, self.treatment_col, self.matching_covariates
+        )
         self.check_table_one(tableone, df_matched, score_cols, pihat_threshold, caliper)
 
     def search_best_match(self, df):
@@ -327,11 +381,13 @@ class MatchOptimizer(object):
 
         self.original_stats = {}
         for col, trans in self.dev_cols_transformations.items():
-            self.original_stats[col] = trans(self.df[self.df[self.treatment_col] == 1][col])
+            self.original_stats[col] = trans(
+                self.df[self.df[self.treatment_col] == 1][col]
+            )
 
         # search best max pihat
         if self.verbose:
-            logger.info('SEARCHING FOR BEST PIHAT')
+            logger.info("SEARCHING FOR BEST PIHAT")
         score_cols = [self.ps_col]
         caliper = self.caliper_range[-1]
         for pihat_threshold in self.max_pihat_range:
@@ -339,9 +395,9 @@ class MatchOptimizer(object):
 
         # search best score_cols
         if self.verbose:
-            logger.info('SEARCHING FOR BEST SCORE_COLS')
-        pihat_threshold = self.best_params['pihat']
-        caliper = self.caliper_range[int(self.caliper_range.shape[0]/2)]
+            logger.info("SEARCHING FOR BEST SCORE_COLS")
+        pihat_threshold = self.best_params["pihat"]
+        caliper = self.caliper_range[int(self.caliper_range.shape[0] / 2)]
         score_cols = [self.ps_col]
         while not self.pass_all:
             if len(self.cols_to_fix) == 0:
@@ -354,20 +410,20 @@ class MatchOptimizer(object):
 
         # search best caliper
         if self.verbose:
-            logger.info('SEARCHING FOR BEST CALIPER')
-        score_cols = self.best_params['score_cols']
-        pihat_threshold = self.best_params['pihat']
+            logger.info("SEARCHING FOR BEST CALIPER")
+        score_cols = self.best_params["score_cols"]
+        pihat_threshold = self.best_params["pihat"]
         for caliper in self.caliper_range:
             self.match_and_check(score_cols, pihat_threshold, caliper)
 
         # summarize
         if self.verbose:
-            logger.info('\n-----\nBest params are:\n{}'.format(self.best_params))
+            logger.info("\n-----\nBest params are:\n{}".format(self.best_params))
 
         return self.best_matched
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
 
     from .features import TREATMENT_COL, SCORE_COL, GROUPBY_COL, PROPENSITY_FEATURES
     from .features import PROPENSITY_FEATURE_TRANSFORMATIONS, MATCHING_COVARIATES
@@ -375,49 +431,64 @@ if __name__ == '__main__':
     from .propensity import ElasticNetPropensityModel
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input-file', required=True, dest='input_file')
-    parser.add_argument('--output-file', required=True, dest='output_file')
-    parser.add_argument('--treatment-col', default=TREATMENT_COL, dest='treatment_col')
-    parser.add_argument('--groupby-col', default=GROUPBY_COL, dest='groupby_col')
-    parser.add_argument('--feature-cols', nargs='+', default=PROPENSITY_FEATURES,
-                        dest='feature_cols')
-    parser.add_argument('--caliper', type=float, default=.2)
-    parser.add_argument('--replace', default=False, action='store_true')
-    parser.add_argument('--ratio', type=int, default=1)
+    parser.add_argument("--input-file", required=True, dest="input_file")
+    parser.add_argument("--output-file", required=True, dest="output_file")
+    parser.add_argument("--treatment-col", default=TREATMENT_COL, dest="treatment_col")
+    parser.add_argument("--groupby-col", default=GROUPBY_COL, dest="groupby_col")
+    parser.add_argument(
+        "--feature-cols", nargs="+", default=PROPENSITY_FEATURES, dest="feature_cols"
+    )
+    parser.add_argument("--caliper", type=float, default=0.2)
+    parser.add_argument("--replace", default=False, action="store_true")
+    parser.add_argument("--ratio", type=int, default=1)
 
     args = parser.parse_args()
 
     logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
-    logger.info('Loading data from {}'.format(args.input_file))
+    logger.info("Loading data from {}".format(args.input_file))
     df = pd.read_csv(args.input_file)
     df[args.treatment_col] = df[args.treatment_col].astype(int)
-    logger.info('shape: {}\n{}'.format(df.shape, df.head()))
+    logger.info("shape: {}\n{}".format(df.shape, df.head()))
 
     pm = ElasticNetPropensityModel(random_state=42)
     w = df[args.treatment_col].values
-    X = load_data(data=df,
-                  features=args.feature_cols,
-                  transformations=PROPENSITY_FEATURE_TRANSFORMATIONS)
+    X = load_data(
+        data=df,
+        features=args.feature_cols,
+        transformations=PROPENSITY_FEATURE_TRANSFORMATIONS,
+    )
 
-    logger.info('Scoring with a propensity model: {}'.format(pm))
+    logger.info("Scoring with a propensity model: {}".format(pm))
     df[SCORE_COL] = pm.fit_predict(X, w)
 
-    logger.info('Balance before matching:\n{}'.format(create_table_one(data=df,
-                                                                       treatment_col=args.treatment_col,
-                                                                       features=MATCHING_COVARIATES)))
-    logger.info('Matching based on the propensity score with the nearest neighbor model')
-    psm = NearestNeighborMatch(replace=args.replace,
-                               ratio=args.ratio,
-                               random_state=42)
-    matched = psm.match_by_group(data=df,
-                                 treatment_col=args.treatment_col,
-                                 score_cols=[SCORE_COL],
-                                 groupby_col=args.groupby_col)
-    logger.info('shape: {}\n{}'.format(matched.shape, matched.head()))
+    logger.info(
+        "Balance before matching:\n{}".format(
+            create_table_one(
+                data=df, treatment_col=args.treatment_col, features=MATCHING_COVARIATES
+            )
+        )
+    )
+    logger.info(
+        "Matching based on the propensity score with the nearest neighbor model"
+    )
+    psm = NearestNeighborMatch(replace=args.replace, ratio=args.ratio, random_state=42)
+    matched = psm.match_by_group(
+        data=df,
+        treatment_col=args.treatment_col,
+        score_cols=[SCORE_COL],
+        groupby_col=args.groupby_col,
+    )
+    logger.info("shape: {}\n{}".format(matched.shape, matched.head()))
 
-    logger.info('Balance after matching:\n{}'.format(create_table_one(data=matched,
-                                                                      treatment_col=args.treatment_col,
-                                                                      features=MATCHING_COVARIATES)))
+    logger.info(
+        "Balance after matching:\n{}".format(
+            create_table_one(
+                data=matched,
+                treatment_col=args.treatment_col,
+                features=MATCHING_COVARIATES,
+            )
+        )
+    )
     matched.to_csv(args.output_file, index=False)
-    logger.info('Matched data saved as {}'.format(args.output_file))
+    logger.info("Matched data saved as {}".format(args.output_file))
