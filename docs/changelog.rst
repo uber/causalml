@@ -3,6 +3,17 @@
 Changelog
 =========
 
+0.12.2 (Feb 2022)
+-----------------
+This patch includes three updates by @tonkolviktor and @heiderich as follows. We also start using `black <https://black.readthedocs.io/en/stable/integrations/index.html>`_, a Python formatter. Please check out the updated `contribution guideline <https://github.com/uber/causalml/blob/master/CONTRIBUTING.md>`_ to learn how to use it.
+
+Updates
+~~~~~~~~~~~~~
+- `#473 <https://github.com/uber/causalml/pull/477>`_ by @tonkolviktor: Open up the scipy dependency version
+- `#476 <https://github.com/uber/causalml/pull/476>`_ by @heiderich: Use preferred backend for joblib instead of hard-coding it
+- `#477 <https://github.com/uber/causalml/pull/477>`_ by @heiderich: Allow parallel prediction for UpliftRandomForestClassifier and make the joblib's preferred backend configurable
+
+
 0.12.1 (Feb 2022)
 -----------------
 This patch includes two bug fixes for UpliftRandomForestClassifier as follows:
