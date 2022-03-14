@@ -3,6 +3,15 @@
 Changelog
 =========
 
+0.12.3 (Feb 2022)
+-----------------
+This patch is to release a version without the constraint for Shap to be abled to use for Conda.
+
+Updates
+~~~~~~~~~~~~~
+- `#483 <https://github.com/uber/causalml/pull/483>`_ by @ppstacy: Modify the requirement version of Shap
+
+
 0.12.2 (Feb 2022)
 -----------------
 This patch includes three updates by @tonkolviktor and @heiderich as follows. We also start using `black <https://black.readthedocs.io/en/stable/integrations/index.html>`_, a Python formatter. Please check out the updated `contribution guideline <https://github.com/uber/causalml/blob/master/CONTRIBUTING.md>`_ to learn how to use it.
