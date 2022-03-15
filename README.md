@@ -51,7 +51,7 @@ The package currently supports the following methods
 Installation with `conda` is recommended. `conda` environment files for Python 3.6, 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
 
 ## Install using `conda`:
-### Install using from `conda-forge` channel
+### Install from `conda-forge`
 Directly install from the conda-forge channel using conda.
 
 ```sh
