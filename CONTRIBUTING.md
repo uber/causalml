@@ -94,3 +94,18 @@ In your PR, please include:
 - References
 
 Please add the core Causal ML contributors as reviewers.
+
+## Maintain in `conda-forge`  :snake:
+
+We are supporting to install the package through `conda`, in order to maintain the packages in conda we need to keep the package's version in conda's recipe repository [here](https://github.com/conda-forge/causalml-feedstock) in sync with `CausalML`. You can follow the [instruction](https://conda-forge.org/#update_recipe) from conda or below steps:
+
+1. After a new release of the package, fork the repo.
+2. Create a new branch from the master branch.
+3. Edit the recipe:
+    - Update the version number [here](https://github.com/conda-forge/causalml-feedstock/blob/main/recipe/meta.yaml#L2) in `meta.yaml`
+    - Generate the new sha256 hash and update it [here](https://github.com/conda-forge/causalml-feedstock/blob/main/recipe/meta.yaml#L11):  the sha256 hash can get from PyPi; look for the SHA256 link next to the download link on PyPi package’s files page, e.g. https://pypi.org/project/causalml/#files
+    - Reset the build number to 0
+    - Update the dependencies if needed
+4. Submit the PR and the recipe will automatically be built; 
+
+Once the recipe is ready it will be merged. The recipe will then automatically be built and uploaded to the conda-forge channel.
