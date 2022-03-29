@@ -7,7 +7,7 @@ import pandas as pd
 
 
 def cat_group(dfx, kpix, n_group=10):
-    '''
+    """
     Category Reduction for Categorical Variables
 
     Args
@@ -25,7 +25,7 @@ def cat_group(dfx, kpix, n_group=10):
     Returns
     -------
     The transformed categorical feature value list.
-    '''
+    """
     if dfx[kpix].nunique() > n_group:
         # get the top categories
         top = dfx[kpix].isin(dfx[kpix].value_counts().index[:n_group])
@@ -36,7 +36,7 @@ def cat_group(dfx, kpix, n_group=10):
 
 
 def cat_transform(dfx, kpix, kpi1):
-    '''
+    """
     Encoding string features.
 
     Args
@@ -58,9 +58,9 @@ def cat_transform(dfx, kpix, kpi1):
 
     kpi1 : list
         The updated feature names containing the new dummy feature names.
-    '''
+    """
     df_dummy = pd.get_dummies(dfx[kpix].values)
-    new_col_names = ['%s_%s' % (kpix, x) for x in df_dummy.columns]
+    new_col_names = ["%s_%s" % (kpix, x) for x in df_dummy.columns]
     df_dummy.columns = new_col_names
     dfx = pd.concat([dfx, df_dummy], axis=1)
     for new_col in new_col_names:
@@ -72,7 +72,7 @@ def cat_transform(dfx, kpix, kpi1):
 
 
 def cv_fold_index(n, i, k, random_seed=2018):
-    '''
+    """
     Encoding string features.
 
     Args
@@ -94,7 +94,7 @@ def cv_fold_index(n, i, k, random_seed=2018):
 
     kpi1 : list
         The updated feature names containing the new dummy feature names.
-    '''
+    """
     np.random.seed(random_seed)
     rlist = np.random.choice(a=range(k), size=n, replace=True)
     fold_i_index = np.where(rlist == i)[0]
@@ -102,8 +102,8 @@ def cv_fold_index(n, i, k, random_seed=2018):
 
 
 # Categorize continuous variable
-def cat_continuous(x, granularity='Medium'):
-    '''
+def cat_continuous(x, granularity="Medium"):
+    """
     Categorize (bin) continuous variable based on percentile.
 
     Args
@@ -119,72 +119,109 @@ def cat_continuous(x, granularity='Medium'):
     -------
     res : list
         List of percentile bins for the feature value.
-    '''
-    if granularity == 'High':
-        lspercentile = [np.percentile(x, 5),
-                        np.percentile(x, 10),
-                        np.percentile(x, 15),
-                        np.percentile(x, 20),
-                        np.percentile(x, 25),
-                        np.percentile(x, 30),
-                        np.percentile(x, 35),
-                        np.percentile(x, 40),
-                        np.percentile(x, 45),
-                        np.percentile(x, 50),
-                        np.percentile(x, 55),
-                        np.percentile(x, 60),
-                        np.percentile(x, 65),
-                        np.percentile(x, 70),
-                        np.percentile(x, 75),
-                        np.percentile(x, 80),
-                        np.percentile(x, 85),
-                        np.percentile(x, 90),
-                        np.percentile(x, 95),
-                        np.percentile(x, 99)
-                        ]
-        res = ['> p90 (%s)' % (lspercentile[8]) if z > lspercentile[8] else
-               '<= p10 (%s)' % (lspercentile[0]) if z <= lspercentile[0] else
-               '<= p20 (%s)' % (lspercentile[1]) if z <= lspercentile[1] else
-               '<= p30 (%s)' % (lspercentile[2]) if z <= lspercentile[2] else
-               '<= p40 (%s)' % (lspercentile[3]) if z <= lspercentile[3] else
-               '<= p50 (%s)' % (lspercentile[4]) if z <= lspercentile[4] else
-               '<= p60 (%s)' % (lspercentile[5]) if z <= lspercentile[5] else
-               '<= p70 (%s)' % (lspercentile[6]) if z <= lspercentile[6] else
-               '<= p80 (%s)' % (lspercentile[7]) if z <= lspercentile[7] else
-               '<= p90 (%s)' % (lspercentile[8]) if z <= lspercentile[8] else
-               '> p90 (%s)' % (lspercentile[8]) for z in x]
-    elif granularity == 'Medium':
-        lspercentile = [np.percentile(x, 10),
-                        np.percentile(x, 20),
-                        np.percentile(x, 30),
-                        np.percentile(x, 40),
-                        np.percentile(x, 50),
-                        np.percentile(x, 60),
-                        np.percentile(x, 70),
-                        np.percentile(x, 80),
-                        np.percentile(x, 90)
-                        ]
-        res = ['<= p10 (%s)' % (lspercentile[0]) if z <= lspercentile[0] else
-               '<= p20 (%s)' % (lspercentile[1]) if z <= lspercentile[1] else
-               '<= p30 (%s)' % (lspercentile[2]) if z <= lspercentile[2] else
-               '<= p40 (%s)' % (lspercentile[3]) if z <= lspercentile[3] else
-               '<= p50 (%s)' % (lspercentile[4]) if z <= lspercentile[4] else
-               '<= p60 (%s)' % (lspercentile[5]) if z <= lspercentile[5] else
-               '<= p70 (%s)' % (lspercentile[6]) if z <= lspercentile[6] else
-               '<= p80 (%s)' % (lspercentile[7]) if z <= lspercentile[7] else
-               '<= p90 (%s)' % (lspercentile[8]) if z <= lspercentile[8] else
-               '> p90 (%s)' % (lspercentile[8]) for z in x]
+    """
+    if granularity == "High":
+        lspercentile = [
+            np.percentile(x, 5),
+            np.percentile(x, 10),
+            np.percentile(x, 15),
+            np.percentile(x, 20),
+            np.percentile(x, 25),
+            np.percentile(x, 30),
+            np.percentile(x, 35),
+            np.percentile(x, 40),
+            np.percentile(x, 45),
+            np.percentile(x, 50),
+            np.percentile(x, 55),
+            np.percentile(x, 60),
+            np.percentile(x, 65),
+            np.percentile(x, 70),
+            np.percentile(x, 75),
+            np.percentile(x, 80),
+            np.percentile(x, 85),
+            np.percentile(x, 90),
+            np.percentile(x, 95),
+            np.percentile(x, 99),
+        ]
+        res = [
+            "> p90 (%s)" % (lspercentile[8])
+            if z > lspercentile[8]
+            else "<= p10 (%s)" % (lspercentile[0])
+            if z <= lspercentile[0]
+            else "<= p20 (%s)" % (lspercentile[1])
+            if z <= lspercentile[1]
+            else "<= p30 (%s)" % (lspercentile[2])
+            if z <= lspercentile[2]
+            else "<= p40 (%s)" % (lspercentile[3])
+            if z <= lspercentile[3]
+            else "<= p50 (%s)" % (lspercentile[4])
+            if z <= lspercentile[4]
+            else "<= p60 (%s)" % (lspercentile[5])
+            if z <= lspercentile[5]
+            else "<= p70 (%s)" % (lspercentile[6])
+            if z <= lspercentile[6]
+            else "<= p80 (%s)" % (lspercentile[7])
+            if z <= lspercentile[7]
+            else "<= p90 (%s)" % (lspercentile[8])
+            if z <= lspercentile[8]
+            else "> p90 (%s)" % (lspercentile[8])
+            for z in x
+        ]
+    elif granularity == "Medium":
+        lspercentile = [
+            np.percentile(x, 10),
+            np.percentile(x, 20),
+            np.percentile(x, 30),
+            np.percentile(x, 40),
+            np.percentile(x, 50),
+            np.percentile(x, 60),
+            np.percentile(x, 70),
+            np.percentile(x, 80),
+            np.percentile(x, 90),
+        ]
+        res = [
+            "<= p10 (%s)" % (lspercentile[0])
+            if z <= lspercentile[0]
+            else "<= p20 (%s)" % (lspercentile[1])
+            if z <= lspercentile[1]
+            else "<= p30 (%s)" % (lspercentile[2])
+            if z <= lspercentile[2]
+            else "<= p40 (%s)" % (lspercentile[3])
+            if z <= lspercentile[3]
+            else "<= p50 (%s)" % (lspercentile[4])
+            if z <= lspercentile[4]
+            else "<= p60 (%s)" % (lspercentile[5])
+            if z <= lspercentile[5]
+            else "<= p70 (%s)" % (lspercentile[6])
+            if z <= lspercentile[6]
+            else "<= p80 (%s)" % (lspercentile[7])
+            if z <= lspercentile[7]
+            else "<= p90 (%s)" % (lspercentile[8])
+            if z <= lspercentile[8]
+            else "> p90 (%s)" % (lspercentile[8])
+            for z in x
+        ]
     else:
-        lspercentile = [np.percentile(x, 15), np.percentile(x, 50), np.percentile(x, 85)]
-        res = ['1-Very Low' if z < lspercentile[0] else
-               '2-Low' if z < lspercentile[1] else
-               '3-High' if z < lspercentile[2] else
-               '4-Very High' for z in x]
+        lspercentile = [
+            np.percentile(x, 15),
+            np.percentile(x, 50),
+            np.percentile(x, 85),
+        ]
+        res = [
+            "1-Very Low"
+            if z < lspercentile[0]
+            else "2-Low"
+            if z < lspercentile[1]
+            else "3-High"
+            if z < lspercentile[2]
+            else "4-Very High"
+            for z in x
+        ]
     return res
 
 
 def kpi_transform(dfx, kpi_combo, kpi_combo_new):
-    '''
+    """
     Feature transformation from continuous feature to binned features for a list of features
 
     Args
@@ -203,7 +240,7 @@ def kpi_transform(dfx, kpi_combo, kpi_combo_new):
     -------
     dfx : DataFrame
         Updated DataFrame containing the new features.
-    '''
+    """
     for j in range(len(kpi_combo)):
         if type(dfx[kpi_combo[j]].values[0]) is str:
             dfx[kpi_combo_new[j]] = dfx[kpi_combo[j]].values
@@ -211,71 +248,10 @@ def kpi_transform(dfx, kpi_combo, kpi_combo_new):
         else:
             if len(kpi_combo) > 1:
                 dfx[kpi_combo_new[j]] = cat_continuous(
-                    dfx[kpi_combo[j]].values, granularity='Low'
+                    dfx[kpi_combo[j]].values, granularity="Low"
                 )
             else:
                 dfx[kpi_combo_new[j]] = cat_continuous(
-                    dfx[kpi_combo[j]].values, granularity='High'
+                    dfx[kpi_combo[j]].values, granularity="High"
                 )
     return dfx
-
-
-def kl_divergence(pk, qk):
-    '''
-    Calculate KL Divergence for binary classification.
-
-    sum(np.array(pk) * np.log(np.array(pk) / np.array(qk)))
-
-    Args
-    ----
-    pk : float
-        The probability of 1 in one distribution.
-    qk : float
-        The probability of 1 in the other distribution.
-
-    Returns
-    -------
-    S : float
-        The KL divergence.
-    '''
-
-    if qk == 0:
-        return 0.
-
-    eps = 1e-6
-    qk = np.clip(qk, eps, 1 - eps)
-
-    if pk == 0:
-        S = -np.log(1 - qk)
-    elif pk == 1:
-        S = -np.log(qk)
-    else:
-        S = pk * np.log(pk / qk) + (1 - pk) * np.log((1 - pk) / (1 - qk))
-
-    return S
-
-
-def entropyH(p, q=None):
-    '''
-    Entropy
-
-    Entropy calculation for normalization.
-
-    Args
-    ----
-    p : float
-        The probability used in the entropy calculation.
-
-    q : float, optional, (default = None)
-        The second probability used in the entropy calculation.
-
-    Returns
-    -------
-    entropy : float
-    '''
-    if q is None and p > 0:
-        return -p * np.log(p)
-    elif q > 0:
-        return -p * np.log(q)
-    else:
-        return 0

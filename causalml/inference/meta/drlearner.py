@@ -5,6 +5,7 @@ import pandas as pd
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold
 from tqdm import tqdm
+from xgboost import XGBRegressor
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.explainer import Explainer
@@ -202,7 +203,9 @@ class BaseDRLearner(BaseLearner):
                 )
                 self.models_tau[group][ifold].fit(X_filt, dr)
 
-    def predict(self, X, treatment=None, y=None, p=None, return_components=False, verbose=True):
+    def predict(
+        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+    ):
         """Predict treatment effects.
 
         Args:
@@ -223,8 +226,12 @@ class BaseDRLearner(BaseLearner):
             models_tau = self.models_tau[group]
             _te = np.r_[[model.predict(X) for model in models_tau]].mean(axis=0)
             te[:, i] = np.ravel(_te)
-            yhat_cs[group] = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
-            yhat_ts[group] = np.r_[[model.predict(X) for model in self.models_mu_t[group]]].mean(axis=0)
+            yhat_cs[group] = np.r_[
+                [model.predict(X) for model in self.models_mu_c]
+            ].mean(axis=0)
+            yhat_ts[group] = np.r_[
+                [model.predict(X) for model in self.models_mu_t[group]]
+            ].mean(axis=0)
 
             if (y is not None) and (treatment is not None) and verbose:
                 mask = (treatment == group) | (treatment == self.control_name)
@@ -355,7 +362,9 @@ class BaseDRLearner(BaseLearner):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, p, return_components=True, seed=seed)
+        te, yhat_cs, yhat_ts = self.fit_predict(
+            X, treatment, y, p, return_components=True, seed=seed
+        )
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         if p is None:
@@ -388,13 +397,14 @@ class BaseDRLearner(BaseLearner):
 
             # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
             # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
-            se = np.sqrt((
-                (y_filt[w == 0] - yhat_c[w == 0]).var()
-                / (1 - prob_treatment) +
-                (y_filt[w == 1] - yhat_t[w == 1]).var()
-                / prob_treatment +
-                (yhat_t - yhat_c).var()
-            ) / y_filt.shape[0])
+            se = np.sqrt(
+                (
+                    (y_filt[w == 0] - yhat_c[w == 0]).var() / (1 - prob_treatment)
+                    + (y_filt[w == 1] - yhat_t[w == 1]).var() / prob_treatment
+                    + (yhat_t - yhat_c).var()
+                )
+                / y_filt.shape[0]
+            )
 
             _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
             _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -416,7 +426,9 @@ class BaseDRLearner(BaseLearner):
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
             for n in tqdm(range(n_bootstraps)):
-                cate_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size, seed=seed)
+                cate_b = self.bootstrap(
+                    X, treatment, y, p, size=bootstrap_size, seed=seed
+                )
                 ate_bootstraps[:, n] = cate_b.mean()
 
             ate_lower = np.percentile(
@@ -440,13 +452,15 @@ class BaseDRRegressor(BaseDRLearner):
     A parent class for DR-learner regressor classes.
     """
 
-    def __init__(self,
-                 learner=None,
-                 control_outcome_learner=None,
-                 treatment_outcome_learner=None,
-                 treatment_effect_learner=None,
-                 ate_alpha=.05,
-                 control_name=0):
+    def __init__(
+        self,
+        learner=None,
+        control_outcome_learner=None,
+        treatment_outcome_learner=None,
+        treatment_effect_learner=None,
+        ate_alpha=0.05,
+        control_name=0,
+    ):
         """Initialize an DR-learner regressor.
 
         Args:
@@ -465,11 +479,15 @@ class BaseDRRegressor(BaseDRLearner):
             treatment_outcome_learner=treatment_outcome_learner,
             treatment_effect_learner=treatment_effect_learner,
             ate_alpha=ate_alpha,
-            control_name=control_name)
+            control_name=control_name,
+        )
+
 
 class XGBDRRegressor(BaseDRRegressor):
-    def __init__(self, ate_alpha=.05, control_name=0, *args, **kwargs):
+    def __init__(self, ate_alpha=0.05, control_name=0, *args, **kwargs):
         """Initialize a DR-learner with two XGBoost models."""
-        super().__init__(learner=XGBRegressor(*args, **kwargs),
-                         ate_alpha=ate_alpha,
-                         control_name=control_name)
+        super().__init__(
+            learner=XGBRegressor(*args, **kwargs),
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+        )

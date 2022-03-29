@@ -3,21 +3,39 @@ import pandas as pd
 from sklearn.datasets import make_classification
 
 
-def make_uplift_classification(n_samples=1000,
-                               treatment_name=['control', 'treatment1', 'treatment2', 'treatment3'],
-                               y_name='conversion',
-                               n_classification_features=10,
-                               n_classification_informative=5,
-                               n_classification_redundant=0,
-                               n_classification_repeated=0,
-                               n_uplift_increase_dict={'treatment1': 2, 'treatment2': 2, 'treatment3': 2},
-                               n_uplift_decrease_dict={'treatment1': 0, 'treatment2': 0, 'treatment3': 0},
-                               delta_uplift_increase_dict={'treatment1': 0.02, 'treatment2': 0.05, 'treatment3': 0.1},
-                               delta_uplift_decrease_dict={'treatment1': 0., 'treatment2': 0., 'treatment3': 0.},
-                               n_uplift_increase_mix_informative_dict={'treatment1': 1, 'treatment2': 1, 'treatment3': 1},
-                               n_uplift_decrease_mix_informative_dict={'treatment1': 0, 'treatment2': 0, 'treatment3': 0},
-                               positive_class_proportion=0.5,
-                               random_seed=20190101):
+def make_uplift_classification(
+    n_samples=1000,
+    treatment_name=["control", "treatment1", "treatment2", "treatment3"],
+    y_name="conversion",
+    n_classification_features=10,
+    n_classification_informative=5,
+    n_classification_redundant=0,
+    n_classification_repeated=0,
+    n_uplift_increase_dict={"treatment1": 2, "treatment2": 2, "treatment3": 2},
+    n_uplift_decrease_dict={"treatment1": 0, "treatment2": 0, "treatment3": 0},
+    delta_uplift_increase_dict={
+        "treatment1": 0.02,
+        "treatment2": 0.05,
+        "treatment3": 0.1,
+    },
+    delta_uplift_decrease_dict={
+        "treatment1": 0.0,
+        "treatment2": 0.0,
+        "treatment3": 0.0,
+    },
+    n_uplift_increase_mix_informative_dict={
+        "treatment1": 1,
+        "treatment2": 1,
+        "treatment3": 1,
+    },
+    n_uplift_decrease_mix_informative_dict={
+        "treatment1": 0,
+        "treatment2": 0,
+        "treatment3": 0,
+    },
+    positive_class_proportion=0.5,
+    random_seed=20190101,
+):
     """Generate a synthetic dataset for classification uplift modeling problem.
 
     Parameters
@@ -90,33 +108,44 @@ def make_uplift_classification(n_samples=1000,
     for ti in treatment_name:
         treatment_list += [ti] * n_samples
     treatment_list = np.random.permutation(treatment_list)
-    df_res['treatment_group_key'] = treatment_list
+    df_res["treatment_group_key"] = treatment_list
 
     # generate features and labels
-    X1, Y1 = make_classification(n_samples=n_all, n_features=n_classification_features,
-                                 n_informative=n_classification_informative, n_redundant=n_classification_redundant,
-                                 n_repeated=n_classification_repeated, n_clusters_per_class=1,
-                                 weights=[1-positive_class_proportion, positive_class_proportion])
+    X1, Y1 = make_classification(
+        n_samples=n_all,
+        n_features=n_classification_features,
+        n_informative=n_classification_informative,
+        n_redundant=n_classification_redundant,
+        n_repeated=n_classification_repeated,
+        n_clusters_per_class=1,
+        weights=[1 - positive_class_proportion, positive_class_proportion],
+    )
 
     x_name = []
     x_informative_name = []
     for xi in range(n_classification_informative):
-        x_name_i = 'x' + str(len(x_name)+1) + '_informative'
+        x_name_i = "x" + str(len(x_name) + 1) + "_informative"
         x_name.append(x_name_i)
         x_informative_name.append(x_name_i)
         df_res[x_name_i] = X1[:, xi]
     for xi in range(n_classification_redundant):
-        x_name_i = 'x' + str(len(x_name)+1) + '_redundant'
+        x_name_i = "x" + str(len(x_name) + 1) + "_redundant"
         x_name.append(x_name_i)
-        df_res[x_name_i] = X1[:, n_classification_informative+xi]
+        df_res[x_name_i] = X1[:, n_classification_informative + xi]
     for xi in range(n_classification_repeated):
-        x_name_i = 'x' + str(len(x_name)+1) + '_repeated'
+        x_name_i = "x" + str(len(x_name) + 1) + "_repeated"
         x_name.append(x_name_i)
-        df_res[x_name_i] = X1[:, n_classification_informative+n_classification_redundant+xi]
+        df_res[x_name_i] = X1[
+            :, n_classification_informative + n_classification_redundant + xi
+        ]
 
-    for xi in range(n_classification_features - n_classification_informative - n_classification_redundant
-                    - n_classification_repeated):
-        x_name_i = 'x' + str(len(x_name)+1) + '_irrelevant'
+    for xi in range(
+        n_classification_features
+        - n_classification_informative
+        - n_classification_redundant
+        - n_classification_repeated
+    ):
+        x_name_i = "x" + str(len(x_name) + 1) + "_irrelevant"
         x_name.append(x_name_i)
         df_res[x_name_i] = np.random.normal(0, 1, n_all)
 
@@ -127,57 +156,87 @@ def make_uplift_classification(n_samples=1000,
 
     # generate uplift (positive)
     for treatment_key_i in treatment_name:
-        treatment_index = df_res.index[df_res['treatment_group_key'] == treatment_key_i].tolist()
-        if treatment_key_i in n_uplift_increase_dict and n_uplift_increase_dict[treatment_key_i] > 0:
+        treatment_index = df_res.index[
+            df_res["treatment_group_key"] == treatment_key_i
+        ].tolist()
+        if (
+            treatment_key_i in n_uplift_increase_dict
+            and n_uplift_increase_dict[treatment_key_i] > 0
+        ):
             x_uplift_increase_name = []
-            adjust_class_proportion = (delta_uplift_increase_dict[treatment_key_i]) / (1-positive_class_proportion)
-            X_increase, Y_increase = make_classification(n_samples=n_all,
-                                                         n_features=n_uplift_increase_dict[treatment_key_i],
-                                                         n_informative=n_uplift_increase_dict[treatment_key_i],
-                                                         n_redundant=0,
-                                                         n_clusters_per_class=1,
-                                                         weights=[1-adjust_class_proportion, adjust_class_proportion])
+            adjust_class_proportion = (delta_uplift_increase_dict[treatment_key_i]) / (
+                1 - positive_class_proportion
+            )
+            X_increase, Y_increase = make_classification(
+                n_samples=n_all,
+                n_features=n_uplift_increase_dict[treatment_key_i],
+                n_informative=n_uplift_increase_dict[treatment_key_i],
+                n_redundant=0,
+                n_clusters_per_class=1,
+                weights=[1 - adjust_class_proportion, adjust_class_proportion],
+            )
             for xi in range(n_uplift_increase_dict[treatment_key_i]):
-                x_name_i = 'x' + str(len(x_name)+1) + '_uplift_increase'
+                x_name_i = "x" + str(len(x_name) + 1) + "_uplift_increase"
                 x_name.append(x_name_i)
                 x_uplift_increase_name.append(x_name_i)
                 df_res[x_name_i] = X_increase[:, xi]
             Y[treatment_index] = Y[treatment_index] + Y_increase[treatment_index]
             if n_uplift_increase_mix_informative_dict[treatment_key_i] > 0:
-                for xi in range(n_uplift_increase_mix_informative_dict[treatment_key_i]):
-                    x_name_i = 'x' + str(len(x_name)+1) + '_increase_mix'
+                for xi in range(
+                    n_uplift_increase_mix_informative_dict[treatment_key_i]
+                ):
+                    x_name_i = "x" + str(len(x_name) + 1) + "_increase_mix"
                     x_name.append(x_name_i)
-                    df_res[x_name_i] = (np.random.uniform(-1, 1) * df_res[np.random.choice(x_informative_name)]
-                                        + np.random.uniform(-1, 1) * df_res[np.random.choice(x_uplift_increase_name)])
+                    df_res[x_name_i] = (
+                        np.random.uniform(-1, 1)
+                        * df_res[np.random.choice(x_informative_name)]
+                        + np.random.uniform(-1, 1)
+                        * df_res[np.random.choice(x_uplift_increase_name)]
+                    )
 
     # generate uplift (negative)
     for treatment_key_i in treatment_name:
-        treatment_index = df_res.index[df_res['treatment_group_key'] == treatment_key_i].tolist()
-        if treatment_key_i in n_uplift_decrease_dict and n_uplift_decrease_dict[treatment_key_i] > 0:
+        treatment_index = df_res.index[
+            df_res["treatment_group_key"] == treatment_key_i
+        ].tolist()
+        if (
+            treatment_key_i in n_uplift_decrease_dict
+            and n_uplift_decrease_dict[treatment_key_i] > 0
+        ):
             x_uplift_decrease_name = []
-            adjust_class_proportion = (delta_uplift_decrease_dict[treatment_key_i]) / (1-positive_class_proportion)
-            X_decrease, Y_decrease = make_classification(n_samples=n_all,
-                                                         n_features=n_uplift_decrease_dict[treatment_key_i],
-                                                         n_informative=n_uplift_decrease_dict[treatment_key_i],
-                                                         n_redundant=0,
-                                                         n_clusters_per_class=1,
-                                                         weights=[1-adjust_class_proportion, adjust_class_proportion])
+            adjust_class_proportion = (delta_uplift_decrease_dict[treatment_key_i]) / (
+                1 - positive_class_proportion
+            )
+            X_decrease, Y_decrease = make_classification(
+                n_samples=n_all,
+                n_features=n_uplift_decrease_dict[treatment_key_i],
+                n_informative=n_uplift_decrease_dict[treatment_key_i],
+                n_redundant=0,
+                n_clusters_per_class=1,
+                weights=[1 - adjust_class_proportion, adjust_class_proportion],
+            )
             for xi in range(n_uplift_decrease_dict[treatment_key_i]):
-                x_name_i = 'x' + str(len(x_name)+1) + '_uplift_decrease'
+                x_name_i = "x" + str(len(x_name) + 1) + "_uplift_decrease"
                 x_name.append(x_name_i)
                 x_uplift_decrease_name.append(x_name_i)
                 df_res[x_name_i] = X_decrease[:, xi]
             Y[treatment_index] = Y[treatment_index] - Y_decrease[treatment_index]
             if n_uplift_decrease_mix_informative_dict[treatment_key_i] > 0:
-                for xi in range(n_uplift_decrease_mix_informative_dict[treatment_key_i]):
-                    x_name_i = 'x' + str(len(x_name)+1) + '_decrease_mix'
+                for xi in range(
+                    n_uplift_decrease_mix_informative_dict[treatment_key_i]
+                ):
+                    x_name_i = "x" + str(len(x_name) + 1) + "_decrease_mix"
                     x_name.append(x_name_i)
-                    df_res[x_name_i] = (np.random.uniform(-1, 1) * df_res[np.random.choice(x_informative_name)]
-                                        + np.random.uniform(-1, 1) * df_res[np.random.choice(x_uplift_decrease_name)])
+                    df_res[x_name_i] = (
+                        np.random.uniform(-1, 1)
+                        * df_res[np.random.choice(x_informative_name)]
+                        + np.random.uniform(-1, 1)
+                        * df_res[np.random.choice(x_uplift_decrease_name)]
+                    )
 
     # truncate Y
     Y = np.clip(Y, 0, 1)
 
     df_res[y_name] = Y
-    df_res['treatment_effect'] = Y - Y1
+    df_res["treatment_effect"] = Y - Y1
     return df_res, x_name
