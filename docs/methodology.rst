@@ -217,6 +217,57 @@ The counterfactual value estimation method implemented in the package predicts t
 
 where :math:`Y_w` is the probability of a favourable event (such as conversion) under a given treatment :math:`w`, :math:`v` is the value of the favourable event, :math:`cc_w` is the cost of the treatment triggered in case of a favourable event, and :math:`ic_w` is the cost associated with the treatment whether or not the outcome is favourable. This method builds upon the ideas discussed in :cite:`zhao2019uplift`.
 
+Probabilities of causation
+--------------------------
+
+A cause is said to be *necessary* for an outcome if the outcome would not have occurred in the absence of the cause. A cause is said to be *sufficient* for an outcome if the outcome would have occurred in the presence of the cause. A cause is said to be *necessary and sufficient* if both of the above two conditions hold. :cite:`tian2000probabilities` show that we can calculate bounds for the probability that a cause is of each of the above three types.
+
+To understand how the bounds for the probabilities of causation are calculated, we need special notation to represent counterfactual quantities. Let :math:`y_t` represent the proposition “:math:`y` would occur if the treatment group was set to ‘treatment’”, :math:`y^{\prime}_c` represent the proposition “:math:`y` would not occur if the treatment group was set to ‘control’”, and similarly for the remaining two combinations of the (by assumption) binary outcome and treatment variables.
+
+Then the probability that the treatment is *sufficient* for :math:`y` to occur can be defined as
+
+.. math::
+
+    PS = P(y_t \mid c, y^{\prime})
+
+This is the probability that the :math:`y` would occur if the treatment was set to :math:`t` when in fact the treatment was set to control and the outcome did not occur.
+
+The probability that the treatment is *necessary* for :math:`y` to occur can be defined as
+
+.. math::
+    PN = P(y^'_c \mid t, y)
+
+This is the probability that :math:`y` would not occur if the treatment was set to control, while in actuality both :math:`y` occurs and the treatment takes place.
+
+Finally, the probability that the treatment is both necessary and sufficient is defined as 
+
+.. math::
+    PNS = P(y_t, y^'_c)
+
+and states that :math:`y` would occur if the treatment took place; and :math:`y` would not occur if the treatment did not take place. PNS is related with PN and PS as follows:
+
+.. math::
+    PNS = P(t, y)PN + P(c, y^')PS
+
+In bounding the above three quantities, we utilize observational data in addition to experimental data. The observational data is characterized in terms of the joint probabilities:
+
+.. math::
+    P_{TY} = {P(t, y),  P(c, y), P(t, y^'), P(c, y^')}
+
+Given this, :cite:`tian2000probabilities` use the program developed in :cite:`balke1995probabilistic` to obtain sharp bounds of the above three quantities. The main idea in this program is to turn the bounding task into a linear programming problem (for a modern implementation of their approach see `here <https://cran.r-project.org/web/packages/causaloptim/vignettes/vertexenum-speed.html>`_).
+
+Using the linear programming approach and given certain constraints together with observational data, :cite:`tian2000probabilities` find that the shar lower bound for PNS is given by
+
+.. math::
+    max\{0, P(y_t) - P(y_c), P(y) - P(y_c), P(y_t) - P(y)\}
+
+and the sharp upper bound is given by
+
+.. math::
+    min\{P(y_t), P(y^{\prime}_c), P(t, y) + P(c, y^{\prime}), P(y_t) - P(y_c) + P(t, y^{\prime}) + P(c, y)\}
+
+They use a similar routine to find the bounds for PS and PN. The `get_pns_bounds()` function calculates the bounds for each of the three probabilities of causation using the results in :cite:`tian2000probabilities`.
+
 Selected traditional methods
 ----------------------------
 
