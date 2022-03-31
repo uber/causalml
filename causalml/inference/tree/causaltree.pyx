@@ -199,7 +199,7 @@ cdef class CausalMSE(RegressionCriterion):
         impurity_right[0] = (right_tr_var / right_tr + right_ct_var / right_ct) - right_tau * right_tau
 
 
-class CausalTreeRegressor(object):
+class CausalTreeRegressor:
     """A Causal Tree regressor class.
 
     The Causal Tree is a decision tree regressor with a split criteria for treatment effects instead of

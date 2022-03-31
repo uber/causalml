@@ -2,7 +2,7 @@ import numpy as np
 
 
 def get_treatment_costs(treatment, control_name, cc_dict, ic_dict):
-    '''
+    """
     Set the conversion and impression costs based on a dict of parameters.
 
     Calculate the actual cost of targeting a user with the actual treatment
@@ -32,7 +32,7 @@ def get_treatment_costs(treatment, control_name, cc_dict, ic_dict):
 
     conditions : list, len = len(set(treatment))
         A list of experimental conditions.
-    '''
+    """
 
     # Set the conversion costs of the treatments
     conversion_cost = np.zeros((len(treatment), len(cc_dict.keys())))
@@ -53,9 +53,15 @@ def get_treatment_costs(treatment, control_name, cc_dict, ic_dict):
     return conversion_cost, impression_cost, conditions_sorted
 
 
-def get_actual_value(treatment, observed_outcome, conversion_value,
-                     conditions, conversion_cost, impression_cost):
-    '''
+def get_actual_value(
+    treatment,
+    observed_outcome,
+    conversion_value,
+    conditions,
+    conversion_cost,
+    impression_cost,
+):
+    """
     Set the conversion and impression costs based on a dict of parameters.
 
     Calculate the actual value of targeting a user with the actual treatment group
@@ -88,11 +94,13 @@ def get_actual_value(treatment, observed_outcome, conversion_value,
 
     conversion_value : array, shape = (num_samples, )
         Array of payoffs from converting a user.
-    '''
+    """
 
-    cost_filter = [actual_group == possible_group
-                   for actual_group in treatment
-                   for possible_group in conditions]
+    cost_filter = [
+        actual_group == possible_group
+        for actual_group in treatment
+        for possible_group in conditions
+    ]
 
     conversion_cost_flat = conversion_cost.flatten()
     actual_cc = conversion_cost_flat[cost_filter]
@@ -100,14 +108,13 @@ def get_actual_value(treatment, observed_outcome, conversion_value,
     actual_ic = impression_cost_flat[cost_filter]
 
     # Calculate the actual value of having a user in their actual treatment
-    actual_value = (conversion_value - actual_cc) * \
-        observed_outcome - actual_ic
+    actual_value = (conversion_value - actual_cc) * observed_outcome - actual_ic
 
     return actual_value
 
 
 def get_uplift_best(cate, conditions):
-    '''
+    """
     Takes the CATE prediction from a learner, adds the control
     outcome array and finds the name of the argmax conditon.
 
@@ -122,7 +129,7 @@ def get_uplift_best(cate, conditions):
     -------
     uplift_recomm_name : array, shape = (num_samples, )
         The experimental group recommended by the learner.
-    '''
+    """
     cate_with_control = np.c_[np.zeros(cate.shape[0]), cate]
     uplift_best_idx = np.argmax(cate_with_control, axis=1)
     uplift_best_name = [conditions[idx] for idx in uplift_best_idx]

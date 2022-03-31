@@ -12,13 +12,13 @@ from causalml.inference.meta.utils import check_treatment_vector, convert_pd_to_
 from causalml.metrics import regression_metrics, classification_metrics
 
 
-logger = logging.getLogger('causalml')
+logger = logging.getLogger("causalml")
 
 
 class StatsmodelsOLS:
     """A sklearn style wrapper class for statsmodels' OLS."""
 
-    def __init__(self, cov_type='HC1', alpha=.05):
+    def __init__(self, cov_type="HC1", alpha=0.05):
         """Initialize a statsmodels' OLS wrapper class object.
         Args:
             cov_type (str, optional): covariance estimator type.
@@ -34,14 +34,14 @@ class StatsmodelsOLS:
             y (np.array): a label vector
         """
         # Append ones. The first column is for the treatment indicator.
-        X = sm.add_constant(X, prepend=False, has_constant='add')
+        X = sm.add_constant(X, prepend=False, has_constant="add")
         self.model = sm.OLS(y, X).fit(cov_type=self.cov_type)
         self.coefficients = self.model.params
         self.conf_ints = self.model.conf_int(alpha=self.alpha)
 
     def predict(self, X):
         # Append ones. The first column is for the treatment indicator.
-        X = sm.add_constant(X, prepend=False, has_constant='add')
+        X = sm.add_constant(X, prepend=False, has_constant="add")
         return self.model.predict(X)
 
 
@@ -65,8 +65,7 @@ class BaseSLearner(BaseLearner):
         self.control_name = control_name
 
     def __repr__(self):
-        return '{}(model={})'.format(self.__class__.__name__,
-                                     self.model.__repr__())
+        return "{}(model={})".format(self.__class__.__name__, self.model.__repr__())
 
     def fit(self, X, treatment, y, p=None):
         """Fit the inference model
@@ -92,7 +91,9 @@ class BaseSLearner(BaseLearner):
             X_new = np.hstack((w.reshape((-1, 1)), X_filt))
             self.models[group].fit(X_new, y_filt)
 
-    def predict(self, X, treatment=None, y=None, p=None, return_components=False, verbose=True):
+    def predict(
+        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+    ):
         """Predict treatment effects.
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
@@ -128,7 +129,7 @@ class BaseSLearner(BaseLearner):
                 yhat[w == 0] = yhat_cs[group][mask][w == 0]
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
-                logger.info('Error metrics for group {}'.format(group))
+                logger.info("Error metrics for group {}".format(group))
                 regression_metrics(y_filt, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
@@ -140,8 +141,18 @@ class BaseSLearner(BaseLearner):
         else:
             return te, yhat_cs, yhat_ts
 
-    def fit_predict(self, X, treatment, y, p=None, return_ci=False, n_bootstraps=1000, bootstrap_size=10000,
-                    return_components=False, verbose=True):
+    def fit_predict(
+        self,
+        X,
+        treatment,
+        y,
+        p=None,
+        return_ci=False,
+        n_bootstraps=1000,
+        bootstrap_size=10000,
+        return_components=False,
+        verbose=True,
+    ):
         """Fit the inference model of the S learner and predict treatment effects.
         Args:
             X (np.matrix, np.array, or pd.Dataframe): a feature matrix
@@ -166,15 +177,19 @@ class BaseSLearner(BaseLearner):
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_global = deepcopy(self.models)
-            te_bootstraps = np.zeros(shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps))
+            te_bootstraps = np.zeros(
+                shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps)
+            )
 
-            logger.info('Bootstrap Confidence Intervals')
+            logger.info("Bootstrap Confidence Intervals")
             for i in tqdm(range(n_bootstraps)):
                 te_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
 
-            te_lower = np.percentile(te_bootstraps, (self.ate_alpha/2)*100, axis=2)
-            te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
+            te_upper = np.percentile(
+                te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2
+            )
 
             # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
@@ -183,8 +198,17 @@ class BaseSLearner(BaseLearner):
 
             return (te, te_lower, te_upper)
 
-    def estimate_ate(self, X, treatment, y, p=None, return_ci=False, bootstrap_ci=False,
-                     n_bootstraps=1000, bootstrap_size=10000):
+    def estimate_ate(
+        self,
+        X,
+        treatment,
+        y,
+        p=None,
+        return_ci=False,
+        bootstrap_ci=False,
+        n_bootstraps=1000,
+        bootstrap_size=10000,
+    ):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
@@ -217,13 +241,14 @@ class BaseSLearner(BaseLearner):
             yhat_c = yhat_cs[group][mask]
             yhat_t = yhat_ts[group][mask]
 
-            se = np.sqrt((
-                (y_filt[w == 0] - yhat_c[w == 0]).var()
-                / (1 - prob_treatment) +
-                (y_filt[w == 1] - yhat_t[w == 1]).var()
-                / prob_treatment +
-                (yhat_t - yhat_c).var()
-            ) / y_filt.shape[0])
+            se = np.sqrt(
+                (
+                    (y_filt[w == 0] - yhat_c[w == 0]).var() / (1 - prob_treatment)
+                    + (y_filt[w == 1] - yhat_t[w == 1]).var() / prob_treatment
+                    + (yhat_t - yhat_c).var()
+                )
+                / y_filt.shape[0]
+            )
 
             _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
             _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -241,15 +266,19 @@ class BaseSLearner(BaseLearner):
             _classes_global = self._classes
             models_global = deepcopy(self.models)
 
-            logger.info('Bootstrap Confidence Intervals for ATE')
+            logger.info("Bootstrap Confidence Intervals for ATE")
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
             for n in tqdm(range(n_bootstraps)):
                 ate_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
                 ate_bootstraps[:, n] = ate_b.mean()
 
-            ate_lower = np.percentile(ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1)
-            ate_upper = np.percentile(ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1)
+            ate_lower = np.percentile(
+                ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1
+            )
+            ate_upper = np.percentile(
+                ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1
+            )
 
             # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
@@ -271,9 +300,8 @@ class BaseSRegressor(BaseSLearner):
             control_name (str or int, optional): name of control group
         """
         super().__init__(
-            learner=learner,
-            ate_alpha=ate_alpha,
-            control_name=control_name)
+            learner=learner, ate_alpha=ate_alpha, control_name=control_name
+        )
 
 
 class BaseSClassifier(BaseSLearner):
@@ -289,11 +317,12 @@ class BaseSClassifier(BaseSLearner):
             control_name (str or int, optional): name of control group
         """
         super().__init__(
-            learner=learner,
-            ate_alpha=ate_alpha,
-            control_name=control_name)
+            learner=learner, ate_alpha=ate_alpha, control_name=control_name
+        )
 
-    def predict(self, X, treatment=None, y=None, p=None, return_components=False, verbose=True):
+    def predict(
+        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+    ):
         """Predict treatment effects.
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
@@ -329,7 +358,7 @@ class BaseSClassifier(BaseSLearner):
                 yhat[w == 0] = yhat_cs[group][mask][w == 0]
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
-                logger.info('Error metrics for group {}'.format(group))
+                logger.info("Error metrics for group {}".format(group))
                 classification_metrics(y_filt, yhat, w)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
@@ -343,7 +372,7 @@ class BaseSClassifier(BaseSLearner):
 
 
 class LRSRegressor(BaseSRegressor):
-    def __init__(self, ate_alpha=.05, control_name=0):
+    def __init__(self, ate_alpha=0.05, control_name=0):
         """Initialize an S-learner with a linear regression model.
         Args:
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate

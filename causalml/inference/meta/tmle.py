@@ -6,11 +6,15 @@ from scipy.special import expit, logit
 from scipy.stats import norm
 from sklearn.preprocessing import MinMaxScaler
 
-from causalml.inference.meta.utils import check_treatment_vector, check_p_conditions, convert_pd_to_np
+from causalml.inference.meta.utils import (
+    check_treatment_vector,
+    check_p_conditions,
+    convert_pd_to_np,
+)
 from causalml.propensity import calibrate
 
 
-logger = logging.getLogger('causalml')
+logger = logging.getLogger("causalml")
 
 
 def logit_tmle(x, y, a, h0, h1):
@@ -25,8 +29,12 @@ def logit_tmle_grad(x, y, a, h0, h1):
 
 def logit_tmle_hess(x, y, a, h0, h1):
     p = expit(a + x[0] * h0 + x[1] * h1)
-    return np.array([[np.mean(p * (1 - p) * h0 * h0), np.mean(p * (1 - p) * h0 * h1)],
-                     [np.mean(p * (1 - p) * h0 * h1), np.mean(p * (1 - p) * h1 * h1)]])
+    return np.array(
+        [
+            [np.mean(p * (1 - p) * h0 * h0), np.mean(p * (1 - p) * h0 * h1)],
+            [np.mean(p * (1 - p) * h0 * h1), np.mean(p * (1 - p) * h1 * h1)],
+        ]
+    )
 
 
 def simple_tmle(y, w, q0w, q1w, p, alpha=0.0001):
@@ -56,14 +64,31 @@ def simple_tmle(y, w, q0w, q1w, p, alpha=0.0001):
 
     h1 = w / p
     h0 = (1 - w) / (1 - p)
-    sol = minimize(logit_tmle, np.zeros(2), args=(ystar, intercept, h0, h1),
-                   method="Newton-CG", jac=logit_tmle_grad, hess=logit_tmle_hess)
+    sol = minimize(
+        logit_tmle,
+        np.zeros(2),
+        args=(ystar, intercept, h0, h1),
+        method="Newton-CG",
+        jac=logit_tmle_grad,
+        hess=logit_tmle_hess,
+    )
 
-    qawstar = scaler.inverse_transform(expit(intercept + sol.x[0] * h0 + sol.x[1] * h1).reshape(-1, 1)).flatten()
-    q0star = scaler.inverse_transform(expit(logit(q0) + sol.x[0] / (1 - p)).reshape(-1, 1)).flatten()
-    q1star = scaler.inverse_transform(expit(logit(q1) + sol.x[1] / p).reshape(-1, 1)).flatten()
+    qawstar = scaler.inverse_transform(
+        expit(intercept + sol.x[0] * h0 + sol.x[1] * h1).reshape(-1, 1)
+    ).flatten()
+    q0star = scaler.inverse_transform(
+        expit(logit(q0) + sol.x[0] / (1 - p)).reshape(-1, 1)
+    ).flatten()
+    q1star = scaler.inverse_transform(
+        expit(logit(q1) + sol.x[1] / p).reshape(-1, 1)
+    ).flatten()
 
-    ic = (w / p - (1 - w) / (1 - p)) * (y - qawstar) + q1star - q0star - np.mean(q1star - q0star)
+    ic = (
+        (w / p - (1 - w) / (1 - p)) * (y - qawstar)
+        + q1star
+        - q0star
+        - np.mean(q1star - q0star)
+    )
 
     return np.mean(q1star - q0star), np.sqrt(np.var(ic) / np.size(y))
 
@@ -74,7 +99,14 @@ class TMLELearner(object):
     Ref: Gruber, S., & Van Der Laan, M. J. (2009). Targeted maximum likelihood estimation: A gentle introduction.
     """
 
-    def __init__(self, learner, ate_alpha=.05, control_name=0, cv=None, calibrate_propensity=True):
+    def __init__(
+        self,
+        learner,
+        ate_alpha=0.05,
+        control_name=0,
+        cv=None,
+        calibrate_propensity=True,
+    ):
         """Initialize a TMLE learner.
 
         Args:
@@ -90,7 +122,9 @@ class TMLELearner(object):
         self.calibrate_propensity = calibrate_propensity
 
     def __repr__(self):
-        return '{}(model={}, cv={})'.format(self.__class__.__name__, self.model_tau.__repr__(), self.cv)
+        return "{}(model={}, cv={})".format(
+            self.__class__.__name__, self.model_tau.__repr__(), self.cv
+        )
 
     def estimate_ate(self, X, treatment, y, p, segment=None, return_ci=False):
         """Estimate the Average Treatment Effect (ATE).
@@ -118,30 +152,38 @@ class TMLELearner(object):
             treatment_name = self.t_groups[0]
             p = {treatment_name: convert_pd_to_np(p)}
         elif isinstance(p, dict):
-            p = {treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()}
+            p = {
+                treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()
+            }
 
         ate = []
         ate_lb = []
         ate_ub = []
 
         for i, group in enumerate(self.t_groups):
-            logger.info('Estimating ATE for group {}.'.format(group))
+            logger.info("Estimating ATE for group {}.".format(group))
             w_group = (treatment == group).astype(int)
             p_group = p[group]
 
             if self.calibrate_propensity:
-                logger.info('Calibrating propensity scores.')
+                logger.info("Calibrating propensity scores.")
                 p_group = calibrate(p_group, w_group)
 
             yhat_c = np.zeros_like(y, dtype=float)
             yhat_t = np.zeros_like(y, dtype=float)
             if self.cv:
                 for i_fold, (i_trn, i_val) in enumerate(self.cv.split(X, y), 1):
-                    logger.info('Training an outcome model for CV #{}'.format(i_fold))
-                    self.model_tau.fit(np.hstack((X[i_trn], w_group[i_trn].reshape(-1, 1))), y[i_trn])
+                    logger.info("Training an outcome model for CV #{}".format(i_fold))
+                    self.model_tau.fit(
+                        np.hstack((X[i_trn], w_group[i_trn].reshape(-1, 1))), y[i_trn]
+                    )
 
-                    yhat_c[i_val] = self.model_tau.predict(np.hstack((X[i_val], np.zeros((len(i_val), 1)))))
-                    yhat_t[i_val] = self.model_tau.predict(np.hstack((X[i_val], np.ones((len(i_val), 1)))))
+                    yhat_c[i_val] = self.model_tau.predict(
+                        np.hstack((X[i_val], np.zeros((len(i_val), 1))))
+                    )
+                    yhat_t[i_val] = self.model_tau.predict(
+                        np.hstack((X[i_val], np.ones((len(i_val), 1))))
+                    )
 
             else:
                 self.model_tau.fit(np.hstack((X, w_group.reshape(-1, 1))), y)
@@ -150,21 +192,29 @@ class TMLELearner(object):
                 yhat_t = self.model_tau.predict(np.hstack((X, np.ones((len(y), 1)))))
 
             if segment is None:
-                logger.info('Training the TMLE learner.')
+                logger.info("Training the TMLE learner.")
                 _ate, se = simple_tmle(y, w_group, yhat_c, yhat_t, p_group)
                 _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
                 _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
             else:
-                assert segment.shape[0] == X.shape[0] and segment.ndim == 1, 'Segment must be the 1-d np.array of int.'
+                assert (
+                    segment.shape[0] == X.shape[0] and segment.ndim == 1
+                ), "Segment must be the 1-d np.array of int."
                 segments = np.unique(segment)
 
                 _ate = []
                 _ate_lb = []
                 _ate_ub = []
                 for s in sorted(segments):
-                    logger.info('Training the TMLE learner for segment {}.'.format(s))
-                    filt = (segment == s) & (yhat_c < np.quantile(yhat_c, q=.99))
-                    _ate_s, se = simple_tmle(y[filt], w_group[filt], yhat_c[filt], yhat_t[filt], p_group[filt])
+                    logger.info("Training the TMLE learner for segment {}.".format(s))
+                    filt = (segment == s) & (yhat_c < np.quantile(yhat_c, q=0.99))
+                    _ate_s, se = simple_tmle(
+                        y[filt],
+                        w_group[filt],
+                        yhat_c[filt],
+                        yhat_t[filt],
+                        p_group[filt],
+                    )
                     _ate_lb_s = _ate_s - se * norm.ppf(1 - self.ate_alpha / 2)
                     _ate_ub_s = _ate_s + se * norm.ppf(1 - self.ate_alpha / 2)
 

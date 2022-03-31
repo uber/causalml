@@ -35,8 +35,19 @@ if pyro_logger.handlers:
 
 
 class CEVAE:
-    def __init__(self, outcome_dist="studentt", latent_dim=20, hidden_dim=200, num_epochs=50, num_layers=3,
-                 batch_size=100, learning_rate=1e-3, learning_rate_decay=0.1, num_samples=1000, weight_decay=1e-4):
+    def __init__(
+        self,
+        outcome_dist="studentt",
+        latent_dim=20,
+        hidden_dim=200,
+        num_epochs=50,
+        num_layers=3,
+        batch_size=100,
+        learning_rate=1e-3,
+        learning_rate_decay=0.1,
+        num_samples=1000,
+        weight_decay=1e-4,
+    ):
         """
         Initializes CEVAE.
 
@@ -78,20 +89,24 @@ class CEVAE:
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
-        self.cevae = CEVAEModel(outcome_dist=self.outcome_dist,
-                           feature_dim=X.shape[-1],
-                           latent_dim=self.latent_dim,
-                           hidden_dim=self.hidden_dim,
-                           num_layers=self.num_layers)
+        self.cevae = CEVAEModel(
+            outcome_dist=self.outcome_dist,
+            feature_dim=X.shape[-1],
+            latent_dim=self.latent_dim,
+            hidden_dim=self.hidden_dim,
+            num_layers=self.num_layers,
+        )
 
-        self.cevae.fit(x=torch.tensor(X, dtype=torch.float),
-                       t=torch.tensor(treatment, dtype=torch.float),
-                       y=torch.tensor(y, dtype=torch.float),
-                       num_epochs=self.num_epochs,
-                       batch_size=self.batch_size,
-                       learning_rate=self.learning_rate,
-                       learning_rate_decay=self.learning_rate_decay,
-                       weight_decay=self.weight_decay)
+        self.cevae.fit(
+            x=torch.tensor(X, dtype=torch.float),
+            t=torch.tensor(treatment, dtype=torch.float),
+            y=torch.tensor(y, dtype=torch.float),
+            num_epochs=self.num_epochs,
+            batch_size=self.batch_size,
+            learning_rate=self.learning_rate,
+            learning_rate_decay=self.learning_rate_decay,
+            weight_decay=self.weight_decay,
+        )
 
     def predict(self, X, treatment=None, y=None, p=None):
         """
@@ -102,9 +117,15 @@ class CEVAE:
         Returns:
             (np.ndarray): Predictions of treatment effects.
         """
-        return self.cevae.ite(torch.tensor(X, dtype=torch.float),
-                              num_samples=self.num_samples,
-                              batch_size=self.batch_size).cpu().numpy()
+        return (
+            self.cevae.ite(
+                torch.tensor(X, dtype=torch.float),
+                num_samples=self.num_samples,
+                batch_size=self.batch_size,
+            )
+            .cpu()
+            .numpy()
+        )
 
     def fit_predict(self, X, treatment, y, p=None):
         """
