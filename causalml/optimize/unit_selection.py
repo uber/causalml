@@ -159,7 +159,7 @@ class CounterfactualUnitSelector:
         treated = data[treatment] == 1
 
         X = data.drop([treatment, outcome], axis=1)
-        y = data["outcome"]
+        y = data[outcome]
 
         self.trt_model = trt_learner.fit(X[treated], y[treated])
         self.ctr_model = ctr_learner.fit(X[~treated], y[~treated])
