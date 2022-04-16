@@ -1,3 +1,4 @@
+import inspect
 from copy import deepcopy
 import logging
 import numpy as np
@@ -488,9 +489,14 @@ class BaseRClassifier(BaseRLearner):
                         group
                     )
                 )
-            self.models_tau[group].fit(
-                X_filt, (y_filt - yhat_filt) / (w - p_filt), sample_weight=weight
-            )
+            if 'sample_weight' in inspect.getargspec(self.models_tau[group].fit).args:
+                self.models_tau[group].fit(
+                    X_filt, (y_filt - yhat_filt) / (w - p_filt), sample_weight=weight
+                )
+            else:
+                self.models_tau[group].fit(
+                    X_filt, (y_filt - yhat_filt) / (w - p_filt)
+                )                
 
     def predict(self, X, p=None):
         """Predict treatment effects.
