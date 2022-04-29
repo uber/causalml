@@ -516,7 +516,7 @@ class XGBRRegressor(BaseRRegressor):
         early_stopping=True,
         test_size=0.3,
         early_stopping_rounds=30,
-        effect_learner_objective="rank:pairwise",
+        effect_learner_objective="reg:squarederror",
         effect_learner_n_estimators=500,
         random_state=42,
         *args,
@@ -531,7 +531,7 @@ class XGBRRegressor(BaseRRegressor):
             early_stopping_rounds (int, optional): validation metric needs to improve at least once in every
                                                    early_stopping_rounds round(s) to continue training
             effect_learner_objective (str, optional): the learning objective for the effect learner
-                                                      (default = 'rank:pairwise')
+                                                      (default = 'reg:squarederror')
             effect_learner_n_estimators (int, optional): number of trees to fit for the effect learner (default = 500)
         """
 
