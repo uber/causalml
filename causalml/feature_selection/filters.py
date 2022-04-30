@@ -47,7 +47,7 @@ class FilterSelect:
             {
                 "feature": feature_name,  # for the interaction, not the main effect
                 "method": "F-statistic",
-                "score": F_test.fvalue[0][0],
+                "score": float(F_test.fvalue),
                 "p_value": F_test.pvalue,
                 "misc": "df_num: {}, df_denom: {}".format(
                     F_test.df_num, F_test.df_denom
