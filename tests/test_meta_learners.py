@@ -840,18 +840,24 @@ def test_BaseRClassifier_with_sample_weights(generate_classification_data):
     # higher than it would be under random targeting
     assert cumgain["tau_pred"].sum() > cumgain["Random"].sum()
 
+
+def test_XGBRegressor_with_sample_weights(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    weights = np.random.rand(y.shape[0])
+
     # Check if XGBRRegressor successfully produces treatment effect estimation
     # when sample_weight is passed
     uplift_model = XGBRRegressor()
     uplift_model.fit(
-        X=df_train[x_names].values,
-        p=df_train["propensity_score"].values,
-        treatment=df_train["treatment_group_key"].values,
-        y=df_train[CONVERSION].values,
-        sample_weight=df_train["sample_weights"],
+        X=X,
+        p=e,
+        treatment=treatment,
+        y=y,
+        sample_weight=weights,
     )
-    tau_pred = uplift_model.predict(X=df_test[x_names].values)
-    assert len(tau_pred) == len(df_test["sample_weights"].values)
+    tau_pred = uplift_model.predict(X=X)
+    assert len(tau_pred) == len(weights)
 
 
 def test_pandas_input(generate_regression_data):
