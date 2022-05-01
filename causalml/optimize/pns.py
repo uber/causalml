@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 
 
-def get_pns_bounds(data_exp, data_obs, T, Y, type='PNS'):
-    '''
+def get_pns_bounds(data_exp, data_obs, T, Y, type="PNS"):
+    """
     Args
     ----
     data_exp : DataFrame
@@ -29,47 +29,49 @@ def get_pns_bounds(data_exp, data_obs, T, Y, type='PNS'):
     of an intervention.
 
     The experimental and observational data are either assumed to come to the same population,
-    or from random samples of the population. If the data are from a sample, the bounds may 
+    or from random samples of the population. If the data are from a sample, the bounds may
     be incorrectly calculated because the relevant quantities in the Tian-Pearl equations are
     defined e.g. as P(YifT), not P(YifT \mid S) where S corresponds to sample selection.
     Bareinboim and Pearl (https://www.pnas.org/doi/10.1073/pnas.1510507113) discuss conditions
     under which P(YifT) can be recovered from P(YifT \mid S).
-    '''
+    """
 
     # Probabilities calculated from observational data
     Y1 = data_obs[Y].mean()
-    T1Y0 = data_obs.loc[(data_obs[T] == 1) & (data_obs[Y] == 0)].shape[0] / data_obs.shape[0]
-    T1Y1 = data_obs.loc[(data_obs[T] == 1) & (data_obs[Y] == 1)].shape[0] / data_obs.shape[0]
-    T0Y0 = data_obs.loc[(data_obs[T] == 0) & (data_obs[Y] == 0)].shape[0] / data_obs.shape[0]
-    T0Y1 = data_obs.loc[(data_obs[T] == 0) & (data_obs[Y] == 1)].shape[0] / data_obs.shape[0]
+    T1Y0 = (
+        data_obs.loc[(data_obs[T] == 1) & (data_obs[Y] == 0)].shape[0]
+        / data_obs.shape[0]
+    )
+    T1Y1 = (
+        data_obs.loc[(data_obs[T] == 1) & (data_obs[Y] == 1)].shape[0]
+        / data_obs.shape[0]
+    )
+    T0Y0 = (
+        data_obs.loc[(data_obs[T] == 0) & (data_obs[Y] == 0)].shape[0]
+        / data_obs.shape[0]
+    )
+    T0Y1 = (
+        data_obs.loc[(data_obs[T] == 0) & (data_obs[Y] == 1)].shape[0]
+        / data_obs.shape[0]
+    )
 
     # Probabilities calculated from experimental data
     Y1doT1 = data_exp.loc[data_exp[T] == 1, Y].mean()
     Y1doT0 = data_exp.loc[data_exp[T] == 0, Y].mean()
     Y0doT0 = 1 - Y1doT0
 
-    if type == 'PNS':
+    if type == "PNS":
 
-        lb_args = [
-            0,
-            Y1doT1 - Y1doT0,
-            Y1 - Y1doT0,
-            Y1doT1 - Y1
-        ]
+        lb_args = [0, Y1doT1 - Y1doT0, Y1 - Y1doT0, Y1doT1 - Y1]
 
-        ub_args = [
-            Y1doT1,
-            Y0doT0,
-            T1Y1 + T0Y0,
-            Y1doT1 - Y1doT0 + T1Y0 + T0Y1
-        ]
+        ub_args = [Y1doT1, Y0doT0, T1Y1 + T0Y0, Y1doT1 - Y1doT0 + T1Y0 + T0Y1]
 
-    if type == 'PN':
+    if type == "PN":
 
         lb_args = [0, (Y1 - Y1doT0) / T1Y1]
         ub_args = [1, (Y0doT0 - T0Y0) / T1Y1]
 
-    if type == 'PS':
+    if type == "PS":
 
         lb_args = [0, (Y1doT1 - Y1) / T0Y0]
         ub_args = [1, (Y1doT1 - T1Y1) / T0Y0]
