@@ -42,7 +42,7 @@ extensions = [
     ),
 ]
 
-packages = find_packages()
+packages = find_packages(exclude=["tests", "tests.*"])
 
 setup(
     name="causalml",
