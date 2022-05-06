@@ -11,6 +11,7 @@ from scipy import stats
 from sklearn.impute import SimpleImputer
 import warnings
 
+
 class FilterSelect:
     """A class for feature importance methods."""
 
@@ -18,7 +19,7 @@ class FilterSelect:
         return
 
     @staticmethod
-    def _filter_F_one_feature(data, treatment_indicator, feature_name, y_name, order = 1):
+    def _filter_F_one_feature(data, treatment_indicator, feature_name, y_name, order=1):
         """
         Conduct F-test of the interaction between treatment and one feature.
 
@@ -28,7 +29,7 @@ class FilterSelect:
             feature_name (string): feature name, as one column in the data DataFrame
             y_name (string): name of the outcome variable
             order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
-            order= 3 will calculate feature importance up to cubic forms.              
+            order= 3 will calculate feature importance up to cubic forms.
 
         Returns:
             F_test_result : pd.DataFrame
@@ -41,41 +42,57 @@ class FilterSelect:
             [treatment_indicator, feature_name]
         ].product(axis=1)
 
-        if order not in [1,2,3]:
-            raise Exception("ValueError: order argument only takes value 1,2,3.") 
+        if order not in [1, 2, 3]:
+            raise Exception("ValueError: order argument only takes value 1,2,3.")
 
-        if order ==1:
+        if order == 1:
             pass
         elif order == 2:
-            x_tmp_name = '{}_o{}'.format(feature_name, order)
-            X[x_tmp_name] = X[[feature_name]]**order
-            X['{}-{}'.format(treatment_indicator, x_tmp_name)] = X[[treatment_indicator, x_tmp_name]].product(axis=1)
+            x_tmp_name = "{}_o{}".format(feature_name, order)
+            X[x_tmp_name] = X[[feature_name]] ** order
+            X["{}-{}".format(treatment_indicator, x_tmp_name)] = X[
+                [treatment_indicator, x_tmp_name]
+            ].product(axis=1)
         elif order == 3:
-            x_tmp_name = '{}_o{}'.format(feature_name, 2)
-            X[x_tmp_name] = X[[feature_name]]**2
-            X['{}-{}'.format(treatment_indicator, x_tmp_name)] = X[[treatment_indicator, x_tmp_name]].product(axis=1)
+            x_tmp_name = "{}_o{}".format(feature_name, 2)
+            X[x_tmp_name] = X[[feature_name]] ** 2
+            X["{}-{}".format(treatment_indicator, x_tmp_name)] = X[
+                [treatment_indicator, x_tmp_name]
+            ].product(axis=1)
 
-            x_tmp_name = '{}_o{}'.format(feature_name, order)
-            X[x_tmp_name] = X[[feature_name]]**order
-            X['{}-{}'.format(treatment_indicator, x_tmp_name)] = X[[treatment_indicator, x_tmp_name]].product(axis=1)
+            x_tmp_name = "{}_o{}".format(feature_name, order)
+            X[x_tmp_name] = X[[feature_name]] ** order
+            X["{}-{}".format(treatment_indicator, x_tmp_name)] = X[
+                [treatment_indicator, x_tmp_name]
+            ].product(axis=1)
 
         model = sm.OLS(Y, X)
         result = model.fit()
 
-        if order==1:
+        if order == 1:
             F_test = result.f_test(np.array([0, 0, 0, 1]))
-        elif order ==2:
-            F_test = result.f_test(np.array([[0, 0, 0, 1, 0, 0],[0, 0, 0, 0, 0, 1]]))
-        elif order==3:
-            F_test = result.f_test(np.array([[0, 0, 0, 1,0,0,0,0],[0, 0, 0, 0,0,1,0,0],[0, 0, 0, 0,0,0,0,1]]))
+        elif order == 2:
+            F_test = result.f_test(np.array([[0, 0, 0, 1, 0, 0], [0, 0, 0, 0, 0, 1]]))
+        elif order == 3:
+            F_test = result.f_test(
+                np.array(
+                    [
+                        [0, 0, 0, 1, 0, 0, 0, 0],
+                        [0, 0, 0, 0, 0, 1, 0, 0],
+                        [0, 0, 0, 0, 0, 0, 0, 1],
+                    ]
+                )
+            )
 
         F_test_result = pd.DataFrame(
             {
                 "feature": feature_name,  # for the interaction, not the main effect
-                "method": 'F{} Filter'.format(order),
+                "method": "F{} Filter".format(order),
                 "score": float(F_test.fvalue),
                 "p_value": F_test.pvalue,
-                'misc': 'df_num: {}, df_denom: {}, order:{}'.format(F_test.df_num, F_test.df_denom, order), 
+                "misc": "df_num: {}, df_denom: {}, order:{}".format(
+                    F_test.df_num, F_test.df_denom, order
+                ),
             },
             index=[0],
         ).reset_index(drop=True)
@@ -92,14 +109,14 @@ class FilterSelect:
             features (list of string): list of feature names, that are columns in the data DataFrame
             y_name (string): name of the outcome variable
             order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
-            order= 3 will calculate feature importance up to cubic forms.  
+            order= 3 will calculate feature importance up to cubic forms.
 
         Returns:
             all_result : pd.DataFrame
                 a data frame containing the feature importance statistics
         """
-        if order not in [1,2,3]:
-            raise Exception("ValueError: order argument only takes value 1,2,3.") 
+        if order not in [1, 2, 3]:
+            raise Exception("ValueError: order argument only takes value 1,2,3.")
 
         all_result = pd.DataFrame()
         for x_name_i in features:
@@ -108,7 +125,7 @@ class FilterSelect:
                 treatment_indicator=treatment_indicator,
                 feature_name=x_name_i,
                 y_name=y_name,
-                order=order
+                order=order,
             )
             all_result = pd.concat([all_result, one_result])
 
@@ -130,7 +147,7 @@ class FilterSelect:
             feature_name (string): feature name, as one column in the data DataFrame
             y_name (string): name of the outcome variable
             order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
-            order= 3 will calculate feature importance up to cubic forms.  
+            order= 3 will calculate feature importance up to cubic forms.
 
         Returns:
             LR_test_result : pd.DataFrame
@@ -139,31 +156,39 @@ class FilterSelect:
         Y = data[y_name]
 
         # Restricted model
-        x_name_r = ['const', treatment_indicator, feature_name]
+        x_name_r = ["const", treatment_indicator, feature_name]
         x_name_f = x_name_r.copy()
         X = data[[treatment_indicator, feature_name]]
         X = sm.add_constant(X)
 
-        X['{}-{}'.format(treatment_indicator, feature_name)] = X[[treatment_indicator, feature_name]].product(axis=1)
-        x_name_f.append('{}-{}'.format(treatment_indicator, feature_name))
+        X["{}-{}".format(treatment_indicator, feature_name)] = X[
+            [treatment_indicator, feature_name]
+        ].product(axis=1)
+        x_name_f.append("{}-{}".format(treatment_indicator, feature_name))
 
         if order == 2:
-            x_tmp_name = '{}_o{}'.format(feature_name, order)
-            X[x_tmp_name] = X[[feature_name]]**order
-            X['{}-{}'.format(treatment_indicator, x_tmp_name)] = X[[treatment_indicator, x_tmp_name]].product(axis=1)
+            x_tmp_name = "{}_o{}".format(feature_name, order)
+            X[x_tmp_name] = X[[feature_name]] ** order
+            X["{}-{}".format(treatment_indicator, x_tmp_name)] = X[
+                [treatment_indicator, x_tmp_name]
+            ].product(axis=1)
             x_name_r.append(x_tmp_name)
-            x_name_f+=[x_tmp_name,'{}-{}'.format(treatment_indicator, x_tmp_name)]
+            x_name_f += [x_tmp_name, "{}-{}".format(treatment_indicator, x_tmp_name)]
         elif order == 3:
-            x_tmp_name = '{}_o{}'.format(feature_name, 2)
-            X[x_tmp_name] = X[[feature_name]]**2
-            X['{}-{}'.format(treatment_indicator, x_tmp_name)] = X[[treatment_indicator, x_tmp_name]].product(axis=1)
+            x_tmp_name = "{}_o{}".format(feature_name, 2)
+            X[x_tmp_name] = X[[feature_name]] ** 2
+            X["{}-{}".format(treatment_indicator, x_tmp_name)] = X[
+                [treatment_indicator, x_tmp_name]
+            ].product(axis=1)
             x_name_r.append(x_tmp_name)
-            x_name_f+=[x_tmp_name,'{}-{}'.format(treatment_indicator, x_tmp_name)]
-            x_tmp_name = '{}_o{}'.format(feature_name, order)
-            X[x_tmp_name] = X[[feature_name]]**order
-            X['{}-{}'.format(treatment_indicator, x_tmp_name)] = X[[treatment_indicator, x_tmp_name]].product(axis=1)
+            x_name_f += [x_tmp_name, "{}-{}".format(treatment_indicator, x_tmp_name)]
+            x_tmp_name = "{}_o{}".format(feature_name, order)
+            X[x_tmp_name] = X[[feature_name]] ** order
+            X["{}-{}".format(treatment_indicator, x_tmp_name)] = X[
+                [treatment_indicator, x_tmp_name]
+            ].product(axis=1)
             x_name_r.append(x_tmp_name)
-            x_name_f+=[x_tmp_name,'{}-{}'.format(treatment_indicator, x_tmp_name)]
+            x_name_f += [x_tmp_name, "{}-{}".format(treatment_indicator, x_tmp_name)]
 
         # Full model (with interaction)
         model_r = sm.Logit(Y, X[x_name_r])
@@ -176,17 +201,22 @@ class FilterSelect:
         LR_df = len(result_f.params) - len(result_r.params)
         LR_pvalue = 1 - stats.chi2.cdf(LR_stat, df=LR_df)
 
-        LR_test_result = pd.DataFrame({
-            'feature': feature_name, # for the interaction, not the main effect
-            'method': 'LR{} Filter'.format(order),
-            'score': LR_stat, 
-            'p_value': LR_pvalue,
-            'misc': 'df: {}, order: {}'.format(LR_df, order), 
-        }, index=[0]).reset_index(drop=True)
+        LR_test_result = pd.DataFrame(
+            {
+                "feature": feature_name,  # for the interaction, not the main effect
+                "method": "LR{} Filter".format(order),
+                "score": LR_stat,
+                "p_value": LR_pvalue,
+                "misc": "df: {}, order: {}".format(LR_df, order),
+            },
+            index=[0],
+        ).reset_index(drop=True)
 
         return LR_test_result
 
-    def filter_LR(self, data, treatment_indicator, features, y_name, order=1, disp=True):
+    def filter_LR(
+        self, data, treatment_indicator, features, y_name, order=1, disp=True
+    ):
         """
         Rank features based on the LRT-statistics of the interaction.
 
@@ -196,14 +226,14 @@ class FilterSelect:
             feature_name (string): feature name, as one column in the data DataFrame
             y_name (string): name of the outcome variable
             order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
-            order= 3 will calculate feature importance up to cubic forms.  
+            order= 3 will calculate feature importance up to cubic forms.
 
         Returns:
             all_result : pd.DataFrame
                 a data frame containing the feature importance statistics
         """
-        if order not in [1,2,3]:
-            raise Exception("ValueError: order argument only takes value 1,2,3.") 
+        if order not in [1, 2, 3]:
+            raise Exception("ValueError: order argument only takes value 1,2,3.")
 
         all_result = pd.DataFrame()
         for x_name_i in features:
@@ -533,7 +563,7 @@ class FilterSelect:
         n_bins=5,
         null_impute=None,
         order=1,
-        disp=False
+        disp=False,
     ):
         """
         Rank features based on the chosen statistic of the interaction.
@@ -553,7 +583,7 @@ class FilterSelect:
             n_bins (int, optional): number of bins to be used for bin-based uplift filter methods
             null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If value is None and null is present then exception will be raised
             order (int): the order of feature to be evaluated with the treatment effect for F filter and LR filter, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
-            order= 3 will calculate feature importance up to cubic forms.  
+            order= 3 will calculate feature importance up to cubic forms.
             disp (bool): Set to True to print convergence messages for Logistic regression convergence in LR method.
 
         Returns:
@@ -574,7 +604,7 @@ class FilterSelect:
                 treatment_indicator="treatment_indicator",
                 features=features,
                 y_name=y_name,
-                order=order
+                order=order,
             )
         elif method == "LR":
             data = data[
@@ -590,7 +620,7 @@ class FilterSelect:
                 treatment_indicator="treatment_indicator",
                 features=features,
                 y_name=y_name,
-                order=order
+                order=order,
             )
         else:
             all_result = self.filter_D(
