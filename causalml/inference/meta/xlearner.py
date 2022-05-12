@@ -303,6 +303,7 @@ class BaseXLearner(BaseLearner):
         bootstrap_ci=False,
         n_bootstraps=1000,
         bootstrap_size=10000,
+        pretrain=False,
     ):
         """Estimate the Average Treatment Effect (ATE).
 
@@ -316,12 +317,18 @@ class BaseXLearner(BaseLearner):
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
+            pretrain (bool): whether a model has been fit, default False.
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        te, dhat_cs, dhat_ts = self.fit_predict(
-            X, treatment, y, p, return_components=True
-        )
+        if pretrain:
+            te, dhat_cs, dhat_ts = self.predict(
+                X, treatment, y, p, return_components=True
+            )
+        else:
+            te, dhat_cs, dhat_ts = self.fit_predict(
+                X, treatment, y, p, return_components=True
+            )
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         if p is None:
