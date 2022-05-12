@@ -229,7 +229,9 @@ class BaseSLearner(BaseLearner):
         if pretrain:
             te, yhat_cs, yhat_ts = self.fit(X, treatment, y, return_components=True)
         else:
-            te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, return_components=True)
+            te, yhat_cs, yhat_ts = self.fit_predict(
+                X, treatment, y, return_components=True
+            )
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])

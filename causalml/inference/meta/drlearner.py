@@ -338,8 +338,8 @@ class BaseDRLearner(BaseLearner):
     def estimate_ate(
         self,
         X,
-        treatment=None,
-        y=None,
+        treatment,
+        y,
         p=None,
         bootstrap_ci=False,
         n_bootstraps=1000,
@@ -351,8 +351,8 @@ class BaseDRLearner(BaseLearner):
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): only needed when pretrain=False, a treatment vector
-            y (np.array or pd.Series): only needed when pretrain=False, an outcome vector
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
