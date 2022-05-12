@@ -88,6 +88,12 @@ def test_BaseSLearner(generate_regression_data):
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, return_ci=True, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
 
 def test_BaseSRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
@@ -100,6 +106,12 @@ def test_BaseSRegressor(generate_regression_data):
     )
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
@@ -134,6 +146,12 @@ def test_LRSRegressor(generate_regression_data):
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
 
 def test_BaseTLearner(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
@@ -144,6 +162,12 @@ def test_BaseTLearner(generate_regression_data):
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
@@ -189,6 +213,12 @@ def test_BaseTRegressor(generate_regression_data):
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
         X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10
@@ -221,6 +251,12 @@ def test_MLPTRegressor(generate_regression_data):
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
@@ -255,6 +291,12 @@ def test_XGBTRegressor(generate_regression_data):
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
         X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10
@@ -287,6 +329,12 @@ def test_BaseXLearner(generate_regression_data):
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, p=e, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
@@ -334,6 +382,12 @@ def test_BaseXRegressor(generate_regression_data):
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, p=e, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
         X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10
@@ -366,6 +420,14 @@ def test_BaseXLearner_without_p(generate_regression_data):
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert ate_p_pt == ate_p
+    assert lb_pt == lb
+    assert ub_pt == ub
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
@@ -400,6 +462,12 @@ def test_BaseXRegressor_without_p(generate_regression_data):
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
         X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10
@@ -432,6 +500,12 @@ def test_BaseRLearner(generate_regression_data):
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, p=e, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
@@ -478,6 +552,12 @@ def test_BaseRRegressor(generate_regression_data):
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, p=e, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
         X=X, treatment=treatment, y=y, p=e, return_ci=True, n_bootstraps=10
@@ -511,6 +591,12 @@ def test_BaseRLearner_without_p(generate_regression_data):
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
         X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10
@@ -543,6 +629,12 @@ def test_BaseRRegressor_without_p(generate_regression_data):
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check pre-train model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(
@@ -907,6 +999,12 @@ def test_BaseDRLearner(generate_regression_data):
     ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=e)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+    # check pretrain model
+    ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, p=e, pretrain=True
+    )
+    assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
     # check the accuracy of the CATE estimation with the bootstrap CI
     cate_p, _, _ = learner.fit_predict(

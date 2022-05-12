@@ -366,7 +366,7 @@ class BaseDRLearner(BaseLearner):
         """
         if pretrain:
             te, yhat_cs, yhat_ts = self.predict(
-                X, treatment, y, p, return_components=True, seed=seed
+                X, treatment, y, p, return_components=True
             )
         else:
             te, yhat_cs, yhat_ts = self.fit_predict(

@@ -227,7 +227,7 @@ class BaseSLearner(BaseLearner):
 
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         if pretrain:
-            te, yhat_cs, yhat_ts = self.fit(X, treatment, y, return_components=True)
+            te, yhat_cs, yhat_ts = self.predict(X, treatment, y, return_components=True)
         else:
             te, yhat_cs, yhat_ts = self.fit_predict(
                 X, treatment, y, return_components=True
