@@ -245,20 +245,21 @@ class BaseRLearner(BaseLearner):
     def estimate_ate(
         self,
         X,
-        treatment,
-        y,
+        treatment=None,
+        y=None,
         p=None,
         sample_weight=None,
         bootstrap_ci=False,
         n_bootstraps=1000,
         bootstrap_size=10000,
+        pretrain=False,
     ):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
+            treatment (np.array or pd.Series): only needed when pretrain=False, a treatment vector
+            y (np.array or pd.Series):only needed when pretrain=False, an outcome vector
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
@@ -267,11 +268,17 @@ class BaseRLearner(BaseLearner):
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
+            pretrain (bool): whether a model has been fit, default False.
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        te = self.fit_predict(X, treatment, y, p, sample_weight, return_ci=False)
+        if pretrain:
+            te = self.predict(X, p)
+        else:
+            if not len(treatment) or not len(y):
+                raise ValueError("treatmeng and y must be provided when pretrain=False")
+            te = self.fit_predict(X, treatment, y, p, sample_weight, return_ci=False)
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])

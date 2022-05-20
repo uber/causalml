@@ -208,6 +208,7 @@ class BaseSLearner(BaseLearner):
         bootstrap_ci=False,
         n_bootstraps=1000,
         bootstrap_size=10000,
+        pretrain=False,
     ):
         """Estimate the Average Treatment Effect (ATE).
 
@@ -219,11 +220,18 @@ class BaseSLearner(BaseLearner):
             bootstrap_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
+            pretrain (bool): whether a model has been fit, default False.
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
+
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        te, yhat_cs, yhat_ts = self.fit_predict(X, treatment, y, return_components=True)
+        if pretrain:
+            te, yhat_cs, yhat_ts = self.predict(X, treatment, y, return_components=True)
+        else:
+            te, yhat_cs, yhat_ts = self.fit_predict(
+                X, treatment, y, return_components=True
+            )
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -380,7 +388,7 @@ class LRSRegressor(BaseSRegressor):
         """
         super().__init__(StatsmodelsOLS(alpha=ate_alpha), ate_alpha, control_name)
 
-    def estimate_ate(self, X, treatment, y, p=None):
+    def estimate_ate(self, X, treatment, y, p=None, pretrain=False):
         """Estimate the Average Treatment Effect (ATE).
         Args:
             X (np.matrix, np.array, or pd.Dataframe): a feature matrix
@@ -390,7 +398,8 @@ class LRSRegressor(BaseSRegressor):
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        self.fit(X, treatment, y)
+        if not pretrain:
+            self.fit(X, treatment, y)
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
