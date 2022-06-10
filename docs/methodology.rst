@@ -113,7 +113,7 @@ where :math:`\hat{e}^{(-i)}(X_i)`, etc. denote the out-of-fold held-out predicti
 Doubly Robust (DR) learner
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-DR-learner :cite:`kennedy2020optimal` estiamtes the CATE via cross-fitting a doubly-robust score function in two stages as follows. We start by randomly split the data :math:`\{Y, X, W\}` into 3 partitions :math:`\{Y^i, X^i, W^i\}, i=\{1,2,3\}`.
+DR-learner :cite:`kennedy2020optimal` estimates the CATE via cross-fitting a doubly-robust score function in two stages as follows. We start by randomly split the data :math:`\{Y, X, W\}` into 3 partitions :math:`\{Y^i, X^i, W^i\}, i=\{1,2,3\}`.
 
 **Stage 1**
 
@@ -369,7 +369,7 @@ See :cite:`10.1257/jep.15.4.69` for a detailed discussion of the method.
 LATE
 ~~~~
 
-In many situations the treatment :math:`W` may depend on user's own choice and cannot be administered directly in an experimental setting. However one can randomly assign users into treatment/control groups so that users in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where users may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. Similar to the section of Value optimization methods, in general there are 3 types of users in this situation,
+In many situations the treatment :math:`W` may depend on subject's own choice and cannot be administered directly in an experimental setting. However one can randomly assign users into treatment/control groups so that users in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where users may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. Similar to the section of Value optimization methods, in general there are 3 types of users in this situation,
 
 * **Compliers** Those who will take the treatment if and only if they are assigned to the treatment group.
 * **Always-Taker** Those who will take the treatment regardless which group they are assigned to.
