@@ -235,24 +235,34 @@ def get_qini(
 
     qini = []
     for i, col in enumerate(model_names):
-        df = df.sort_values(col, ascending=False).reset_index(drop=True)
-        df.index = df.index + 1
-        df["cumsum_tr"] = df[treatment_col].cumsum()
+        sorted_df = df.sort_values(col, ascending=False).reset_index(drop=True)
+        sorted_df.index = sorted_df.index + 1
+        sorted_df["cumsum_tr"] = sorted_df[treatment_col].cumsum()
 
-        if treatment_effect_col in df.columns:
+        if treatment_effect_col in sorted_df.columns:
             # When treatment_effect_col is given, use it to calculate the average treatment effects
             # of cumulative population.
-            l = df[treatment_effect_col].cumsum() / df.index * df["cumsum_tr"]
+            l = (
+                sorted_df[treatment_effect_col].cumsum()
+                / sorted_df.index
+                * sorted_df["cumsum_tr"]
+            )
         else:
             # When treatment_effect_col is not given, use outcome_col and treatment_col
             # to calculate the average treatment_effects of cumulative population.
-            df["cumsum_ct"] = df.index.values - df["cumsum_tr"]
-            df["cumsum_y_tr"] = (df[outcome_col] * df[treatment_col]).cumsum()
-            df["cumsum_y_ct"] = (df[outcome_col] * (1 - df[treatment_col])).cumsum()
+            sorted_df["cumsum_ct"] = sorted_df.index.values - sorted_df["cumsum_tr"]
+            sorted_df["cumsum_y_tr"] = (
+                sorted_df[outcome_col] * sorted_df[treatment_col]
+            ).cumsum()
+            sorted_df["cumsum_y_ct"] = (
+                sorted_df[outcome_col] * (1 - sorted_df[treatment_col])
+            ).cumsum()
 
             l = (
-                df["cumsum_y_tr"]
-                - df["cumsum_y_ct"] * df["cumsum_tr"] / df["cumsum_ct"]
+                sorted_df["cumsum_y_tr"]
+                - sorted_df["cumsum_y_ct"]
+                * sorted_df["cumsum_tr"]
+                / sorted_df["cumsum_ct"]
             )
 
         qini.append(l)
