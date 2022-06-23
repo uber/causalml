@@ -8,14 +8,10 @@ from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 
 
-cdef class CausalMSE(RegressionCriterion):
+cdef class CausalRegressionCriterion(RegressionCriterion):
     """
-    Mean squared error impurity criterion for Causal Tree
-    CausalTreeMSE = right_effect + left_effect
-    where,
-    effect = alpha * tau^2 - (1 - alpha) * (1 + train_to_est_ratio) * (VAR_tr / p + VAR_cont / (1 - p))
+    Base class for causal tree criterion
     """
-
     cdef void node_value(self, double * dest) nogil:
         """Compute the node value of samples[start:end] into dest."""
 
@@ -24,7 +20,6 @@ cdef class CausalMSE(RegressionCriterion):
 
         cdef SIZE_t i
         cdef SIZE_t p
-        cdef SIZE_t k
         cdef DOUBLE_t is_treated
         cdef DOUBLE_t y_ik
 
@@ -35,7 +30,6 @@ cdef class CausalMSE(RegressionCriterion):
         cdef double node_tr = 0.0
         cdef double node_ct_sum = 0.0
         cdef double node_tr_sum = 0.0
-        cdef double one_over_eps = 1e5
         cdef double eps = 1e-5
 
         for p in range(start, end):
@@ -43,7 +37,6 @@ cdef class CausalMSE(RegressionCriterion):
 
             if sample_weight != NULL:
                 # the weights of 1 and 1 + eps are used for treatment and control respectively
-                # is_treated = (sample_weight[i] - 1.0) * one_over_eps
                 is_treated = sample_weight[i] - eps
 
             # assume that there is only one output (k = 0)
@@ -57,188 +50,11 @@ cdef class CausalMSE(RegressionCriterion):
         # save the average of treatment effects within a node as a value for the node
         dest[0] = node_tr_sum / node_tr - node_ct_sum / node_ct
 
-    cdef double node_impurity(self) nogil:
-        """
-        Evaluate the impurity of the current node, i.e. the impurity of samples[start:end].
-        """
-
-        cdef double * sum_total = self.sum_total
-        cdef double impurity
-        cdef SIZE_t start = self.start
-        cdef SIZE_t end = self.end
-
-        cdef SIZE_t i
-        cdef SIZE_t p
-        cdef DOUBLE_t is_treated
-        cdef DOUBLE_t y_ik
-
-        cdef SIZE_t * samples = self.samples
-        cdef DOUBLE_t * sample_weight = self.sample_weight
-
-        cdef double node_tr = 0.0
-        cdef double node_ct = 0.0
-        cdef double node_sum = self.sum_total[0]
-        cdef double node_tr_sum = 0.0
-        cdef double node_sq_sum = 0.0
-        cdef double node_tr_sq_sum = 0.0
-        cdef double tr_var
-        cdef double ct_var
-        cdef double one_over_eps = 1e5
-        cdef double eps = 1e-5
-
-        for p in range(start, end):
-            i = samples[p]
-
-            if sample_weight != NULL:
-                # the weights of 1 and 1 + eps are used for treatment and control respectively
-                # is_treated = (sample_weight[i] - 1.0) * one_over_eps
-
-                is_treated = sample_weight[i] - eps
-
-            # assume that there is only one output (k = 0)
-            y_ik = self.y[i, 0]
-
-            node_tr += is_treated
-            node_ct += (1. - is_treated)
-            node_tr_sum += y_ik * is_treated
-            node_sq_sum += y_ik * y_ik
-            node_tr_sq_sum += y_ik * y_ik * is_treated
-
-        # The average causal effect
-        node_tau = node_tr_sum / node_tr - (node_sum - node_tr_sum) / node_ct
-        # Outcome variance for treated
-        tr_var = node_tr_sq_sum / node_tr - node_tr_sum * node_tr_sum / (node_tr * node_tr)
-        # Outcome variance for control
-        ct_var = ((node_sq_sum - node_tr_sq_sum) / node_ct -
-                  (node_sum - node_tr_sum) * (node_sum - node_tr_sum) / (node_ct * node_ct))
-
-        impurity = (tr_var / node_tr + ct_var / node_ct) - node_tau * node_tau
-
-        return impurity
-
-    cdef void children_impurity(self, double * impurity_left, double * impurity_right) nogil:
-        """
-        Evaluate the impurity in children nodes, i.e. the impurity of the
-           left child (samples[start:pos]) and the impurity the right child
-           (samples[pos:end]).
-        """
-
-        cdef DOUBLE_t * sample_weight = self.sample_weight
-        cdef SIZE_t * samples = self.samples
-        cdef SIZE_t start = self.start
-        cdef SIZE_t pos = self.pos
-        cdef SIZE_t end = self.end
-
-        cdef double * sum_left = self.sum_left
-        cdef double * sum_right = self.sum_right
-
-        cdef SIZE_t i
-        cdef SIZE_t p
-        cdef DOUBLE_t is_treated
-        cdef DOUBLE_t y_ik
-
-        cdef double right_tr = 0.0
-        cdef double right_ct = 0.0
-        cdef double right_sum = 0.0
-        cdef double right_tr_sum = 0.0
-        cdef double right_sq_sum = 0.0
-        cdef double right_tr_sq_sum = 0.0
-        cdef double right_tr_var
-        cdef double right_ct_var
-
-        cdef double left_tr = 0.0
-        cdef double left_ct = 0.0
-        cdef double left_sum = 0.0
-        cdef double left_tr_sum = 0.0
-        cdef double left_sq_sum = 0.0
-        cdef double left_tr_sq_sum = 0.0
-        cdef double left_tr_var
-        cdef double left_ct_var
-
-        cdef double eps = 1e-5
-
-        for p in range(start, end):
-            i = samples[p]
-
-            if sample_weight != NULL:
-                # the weights of 1 and 1 + eps are used for control and treatment respectively
-                is_treated = sample_weight[i] - eps
-
-            # assume that there is only one output (k = 0)
-            y_ik = self.y[i, 0]
-
-            if p < pos:
-                left_tr += is_treated
-                left_ct += 1. - is_treated
-                left_sum += y_ik
-                left_tr_sum += y_ik * is_treated
-                left_sq_sum += y_ik * y_ik
-                left_tr_sq_sum += y_ik * y_ik * is_treated
-            else:
-                right_tr += is_treated
-                right_ct += 1. - is_treated
-                right_sum += y_ik
-                right_tr_sum += y_ik * is_treated
-                right_sq_sum += y_ik * y_ik
-                right_tr_sq_sum += y_ik * y_ik * is_treated
-
-        right_tau = right_tr_sum / right_tr - (sum_right[0] - right_tr_sum) / right_ct
-        right_tr_var = right_tr_sq_sum / right_tr - right_tr_sum * right_tr_sum / (right_tr * right_tr)
-        right_ct_var = ((right_sq_sum - right_tr_sq_sum) / right_ct -
-                        (right_sum - right_tr_sum) * (right_sum - right_tr_sum) / (right_ct * right_ct))
-
-        left_tau = left_tr_sum / left_tr - (sum_left[0] - left_tr_sum) / left_ct
-        left_tr_var = left_tr_sq_sum / left_tr - left_tr_sum * left_tr_sum / (left_tr * left_tr)
-        left_ct_var = ((left_sq_sum - left_tr_sq_sum) / left_ct -
-                       (left_sum - left_tr_sum) * (left_sum - left_tr_sum) / (left_ct * left_ct))
-
-        impurity_left[0] = (left_tr_var / left_tr + left_ct_var / left_ct) - left_tau * left_tau
-        impurity_right[0] = (right_tr_var / right_tr + right_ct_var / right_ct) - right_tau * right_tau
-
-cdef class StandardMSE(RegressionCriterion):
+cdef class StandardMSE(CausalRegressionCriterion):
     """
     Standard MSE with treatment effect estimates
     Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_criterion.pyx
     """
-
-    cdef void node_value(self, double * dest) nogil:
-        """Compute the node value of samples[start:end] into dest."""
-
-        cdef SIZE_t start = self.start
-        cdef SIZE_t end = self.end
-
-        cdef SIZE_t i
-        cdef SIZE_t p
-        cdef DOUBLE_t is_treated
-        cdef DOUBLE_t y_ik
-
-        cdef SIZE_t * samples = self.samples
-        cdef DOUBLE_t * sample_weight = self.sample_weight
-
-        cdef double node_ct = 0.0
-        cdef double node_tr = 0.0
-        cdef double node_ct_sum = 0.0
-        cdef double node_tr_sum = 0.0
-        cdef double eps = 1e-5
-
-        for p in range(start, end):
-            i = samples[p]
-
-            if sample_weight != NULL:
-                # the weights of 1 and 1 + eps are used for treatment and control respectively
-                is_treated = sample_weight[i] - eps
-
-            # assume that there is only one output (k = 0)
-            # y_ik = self.y[i, 0]
-            y_ik = self.y[i, 0]
-
-            node_tr += is_treated
-            node_ct += 1. - is_treated
-            node_tr_sum += y_ik * is_treated
-            node_ct_sum += y_ik * (1. - is_treated)
-
-        # save the average of treatment effects within a node as a value for the node
-        dest[0] = node_tr_sum / node_tr - node_ct_sum / node_ct
 
     cdef double node_impurity(self) nogil:
         """Evaluate the impurity of the current node.
@@ -322,3 +138,148 @@ cdef class StandardMSE(RegressionCriterion):
 
         impurity_left[0] /= self.n_outputs
         impurity_right[0] /= self.n_outputs
+
+cdef class CausalMSE(CausalRegressionCriterion):
+    """
+    Mean squared error impurity criterion for Causal Tree
+    CausalTreeMSE = right_effect + left_effect
+    where,
+    effect = alpha * tau^2 - (1 - alpha) * (1 + train_to_est_ratio) * (VAR_tr / p + VAR_cont / (1 - p))
+    """
+
+    cdef double node_impurity(self) nogil:
+        """
+        Evaluate the impurity of the current node, i.e. the impurity of samples[start:end].
+        """
+
+        cdef double * sum_total = self.sum_total
+        cdef double impurity
+        cdef SIZE_t start = self.start
+        cdef SIZE_t end = self.end
+
+        cdef SIZE_t i
+        cdef SIZE_t p
+        cdef DOUBLE_t is_treated
+        cdef DOUBLE_t y_ik
+
+        cdef SIZE_t * samples = self.samples
+        cdef DOUBLE_t * sample_weight = self.sample_weight
+
+        cdef double node_tr = 0.0
+        cdef double node_ct = 0.0
+        cdef double node_sum = self.sum_total[0]
+        cdef double node_tr_sum = 0.0
+        cdef double node_sq_sum = 0.0
+        cdef double node_tr_sq_sum = 0.0
+        cdef double tr_var
+        cdef double ct_var
+        cdef double eps = 1e-5
+
+        for p in range(start, end):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                # It is enough to add eps to get zero values for control
+                # treatment: 1 + eps, control: eps
+                is_treated = sample_weight[i] - eps
+
+            # assume that there is only one output (k = 0)
+            y_ik = self.y[i, 0]
+
+            node_tr += is_treated
+            node_ct += (1. - is_treated)
+            node_tr_sum += y_ik * is_treated
+            node_sq_sum += y_ik * y_ik
+            node_tr_sq_sum += y_ik * y_ik * is_treated
+
+        # The average causal effect
+        node_tau = node_tr_sum / node_tr - (node_sum - node_tr_sum) / node_ct
+        # Outcome variance for treated
+        tr_var = node_tr_sq_sum / node_tr - node_tr_sum * node_tr_sum / (node_tr * node_tr)
+        # Outcome variance for control
+        ct_var = ((node_sq_sum - node_tr_sq_sum) / node_ct -
+                  (node_sum - node_tr_sum) * (node_sum - node_tr_sum) / (node_ct * node_ct))
+
+        impurity = (tr_var / node_tr + ct_var / node_ct) - node_tau * node_tau
+
+        return impurity
+
+    cdef void children_impurity(self, double * impurity_left, double * impurity_right) nogil:
+        """
+        Evaluate the impurity in children nodes, i.e. the impurity of the
+           left child (samples[start:pos]) and the impurity the right child
+           (samples[pos:end]).
+        """
+
+        cdef DOUBLE_t * sample_weight = self.sample_weight
+        cdef SIZE_t * samples = self.samples
+        cdef SIZE_t start = self.start
+        cdef SIZE_t pos = self.pos
+        cdef SIZE_t end = self.end
+
+        cdef double * sum_left = self.sum_left
+        cdef double * sum_right = self.sum_right
+
+        cdef SIZE_t i
+        cdef SIZE_t p
+        cdef DOUBLE_t is_treated
+        cdef DOUBLE_t y_ik
+
+        cdef double right_tr = 0.0
+        cdef double right_ct = 0.0
+        cdef double right_sum = 0.0
+        cdef double right_tr_sum = 0.0
+        cdef double right_sq_sum = 0.0
+        cdef double right_tr_sq_sum = 0.0
+        cdef double right_tr_var
+        cdef double right_ct_var
+
+        cdef double left_tr = 0.0
+        cdef double left_ct = 0.0
+        cdef double left_sum = 0.0
+        cdef double left_tr_sum = 0.0
+        cdef double left_sq_sum = 0.0
+        cdef double left_tr_sq_sum = 0.0
+        cdef double left_tr_var
+        cdef double left_ct_var
+
+        cdef double eps = 1e-5
+
+        for p in range(start, end):
+            i = samples[p]
+
+            if sample_weight != NULL:
+                # It is enough to add eps to get zero values for control
+                # treatment: 1 + eps, control: eps
+                is_treated = sample_weight[i] - eps
+
+            # assume that there is only one output (k = 0)
+            y_ik = self.y[i, 0]
+
+            if p < pos:
+                left_tr += is_treated
+                left_ct += 1. - is_treated
+                left_sum += y_ik
+                left_tr_sum += y_ik * is_treated
+                left_sq_sum += y_ik * y_ik
+                left_tr_sq_sum += y_ik * y_ik * is_treated
+            else:
+                right_tr += is_treated
+                right_ct += 1. - is_treated
+                right_sum += y_ik
+                right_tr_sum += y_ik * is_treated
+                right_sq_sum += y_ik * y_ik
+                right_tr_sq_sum += y_ik * y_ik * is_treated
+
+        right_tau = right_tr_sum / right_tr - (sum_right[0] - right_tr_sum) / right_ct
+        right_tr_var = right_tr_sq_sum / right_tr - right_tr_sum * right_tr_sum / (right_tr * right_tr)
+        right_ct_var = ((right_sq_sum - right_tr_sq_sum) / right_ct -
+                        (right_sum - right_tr_sum) * (right_sum - right_tr_sum) / (right_ct * right_ct))
+
+        left_tau = left_tr_sum / left_tr - (sum_left[0] - left_tr_sum) / left_ct
+        left_tr_var = left_tr_sq_sum / left_tr - left_tr_sum * left_tr_sum / (left_tr * left_tr)
+        left_ct_var = ((left_sq_sum - left_tr_sq_sum) / left_ct -
+                       (left_sum - left_tr_sum) * (left_sum - left_tr_sum) / (left_ct * left_ct))
+
+        impurity_left[0] = (left_tr_var / left_tr + left_ct_var / left_ct) - left_tau * left_tau
+        impurity_right[0] = (right_tr_var / right_tr + right_ct_var / right_ct) - right_tau * right_tau
