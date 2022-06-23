@@ -10,7 +10,7 @@ from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 
 cdef class CausalMSE(RegressionCriterion):
     """
-    Negative mean squared error impurity criterion for Causal Tree
+    Mean squared error impurity criterion for Causal Tree
     CausalTreeMSE = right_effect + left_effect
     where,
     effect = alpha * tau^2 - (1 - alpha) * (1 + train_to_est_ratio) * (VAR_tr / p + VAR_cont / (1 - p))
@@ -198,6 +198,7 @@ cdef class CausalMSE(RegressionCriterion):
 cdef class StandardMSE(RegressionCriterion):
     """
     Standard MSE with treatment effect estimates
+    Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_criterion.pyx
     """
 
     cdef void node_value(self, double * dest) nogil:

@@ -300,6 +300,7 @@ def timeit(exclude_kwargs: tuple = ()) -> Callable:
     Returns: Callable
 
     """
+
     def wrapper(f: Callable):
         def wrapped(*args, **kw):
             ts = time.time()

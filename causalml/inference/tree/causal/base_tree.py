@@ -21,6 +21,11 @@ CRITERIA_REG.update(CAUSAL_TREES_CRITERIA)
 
 
 class BaseCausalDecisionTree(BaseDecisionTree):
+    """
+    Modified base class BaseDecisionTree for causal trees
+    Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_classes.py
+    """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
