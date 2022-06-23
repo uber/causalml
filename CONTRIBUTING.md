@@ -80,10 +80,12 @@ $ python setup.py build_ext --inplace
 
 Before submitting a PR, make sure the change to pass all tests and test coverage to be at least 70%.
 ```bash
-# Compile cython code
-$ python setup.py clean --all build_ext --force --inplace
-# Run tests
 $ pytest -vs tests/ --cov causalml/
+```
+
+You can also run tests via make:
+```bash
+$ make test
 ```
 
 
