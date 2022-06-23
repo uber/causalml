@@ -206,10 +206,4 @@ def simulate_hidden_confounder(n=10000, p=5, sigma=1.0, adj=0.0):
     t0_t1 = np.array([[0.0], [1.0]])
     y_t0, y_t1 = expit(3 * (z + 2 * (2 * t0_t1 - 2)))
     tau = y_t1 - y_t0
-    return (
-        y,
-        X,
-        w,
-        tau,
-        b,
-    )
+    return y, X, w, tau, b, e
