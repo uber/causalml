@@ -18,7 +18,7 @@ from causalml.inference.meta import (
     BaseSRegressor,
     BaseTRegressor,
 )
-from causalml.inference.tree import CausalTreeRegressor
+from causalml.inference.tree.causal.causaltree import CausalTreeRegressor
 from causalml.propensity import ElasticNetPropensityModel
 from causalml.metrics import plot_gain, get_cumgain
 
