@@ -35,7 +35,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         max_depth: int = None,
         min_samples_split: Union[int, float] = 2,
         min_weight_fraction_leaf: float = 0.0,
-        max_features: int = None,
+        max_features: Union[int, float, str] = None,
         max_leaf_nodes: int = None,
         min_impurity_split: float = float("-inf"),
         min_impurity_decrease: float = float("-inf"),
@@ -47,14 +47,14 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         """
         Initialize a Causal Tree
         Args:
-            criterion: ({"causal_nmse", "mse", "friedman_mse", "mae", "poisson"}, default="causal_nmse")
+            criterion: ({"causal_mse", "standard_mse"}, default="causal_mse")
                 The function to measure the quality of a split.
             splitter: ({"best", "random"}, default="best")
                 The strategy used to choose the split at each node. Supported
                 strategies are "best" to choose the best split and "random" to choose
                 the best random split.
             alpha: (float): the confidence level alpha of the ATE estimate and ITE bootstrap estimates
-            control_name: (str or int: name of control group
+            control_name: (str or int): name of control group
             max_depth: (int, default=None)
                 The maximum depth of the tree. If None, then nodes are expanded until
                 all leaves are pure or until all leaves contain less than
@@ -96,7 +96,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 subtree with the largest cost complexity that is smaller than
                 ``ccp_alpha`` will be chosen. By default, no pruning is performed. See
                 :ref:`minimal_cost_complexity_pruning` for details.
-            min_samples_leaf: (int or float), default=1
+            min_samples_leaf: (int or float), default=100
                 The minimum number of samples required to be at a leaf node.
                 A split point at any depth will only be considered if it leaves at
                 least ``min_samples_leaf`` training samples in each of the left and
@@ -111,8 +111,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 Used to pick randomly the `max_features` used at each split.
                 See :term:`Glossary <random_state>` for details.
             leaves_groups_cnt: (bool), count treatment groups for each leaf
-
-
         """
 
         self.criterion = criterion
@@ -157,7 +155,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         treatment: np.ndarray = None,
         sample_weight: np.ndarray = None,
         check_input=False,
-    ) -> None:
+    ):
         """
         Fit CausalTreeRegressor
         Args:
@@ -166,7 +164,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             treatment: : (np.ndarray), treatment vector
             sample_weight: (np.ndarray), sample_weight
             check_input: (bool)
-        Returns: features, outcome, sample weights
+        Returns:
+            self
         """
 
         if (
@@ -196,6 +195,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             self._leaves_groups_cnt = self._count_groups_distribution(
                 X=X, treatment=treatment
             )
+        return self
 
     def fit_predict(
         self,
@@ -433,28 +433,81 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
 class CausalRandomForestRegressor(ForestRegressor):
     def __init__(
         self,
-        n_estimators=100,
+        n_estimators: int = 100,
         *,
-        control_name=0,
-        criterion="causal_mse",
+        control_name: Union[int, str] = 0,
+        criterion: str = "causal_mse",
         alpha: float = 0.05,
-        max_depth=None,
-        min_samples_split=2,
-        min_samples_leaf=100,
-        min_weight_fraction_leaf=0.0,
-        max_features=1.0,
-        max_leaf_nodes=None,
-        min_impurity_split=float("-inf"),
-        min_impurity_decrease=float("-inf"),
-        bootstrap=True,
-        oob_score=False,
-        n_jobs=None,
-        random_state=None,
-        verbose=0,
-        warm_start=False,
-        ccp_alpha=0.0,
-        max_samples=None,
+        max_depth: int = None,
+        min_samples_split: int = 2,
+        min_samples_leaf: int = 100,
+        min_weight_fraction_leaf: float = 0.0,
+        max_features: Union[int, float, str] = 1.0,
+        max_leaf_nodes: int = None,
+        min_impurity_split: float = float("-inf"),
+        min_impurity_decrease: float = float("-inf"),
+        bootstrap: bool = True,
+        oob_score: bool = False,
+        n_jobs: int = None,
+        random_state: int = None,
+        verbose: int = 0,
+        warm_start: bool = False,
+        ccp_alpha: float = 0.0,
+        max_samples: int = None,
     ):
+        """
+        Initialize Random Forest of CausalTreeRegressors
+
+        Args:
+            n_estimators: (int, default=100)
+                    Number of trees in the forest
+            control_name: (str or int)
+                    Name of control group
+            criterion: ({"causal_mse", "standard_mse"}, default="causal_mse"):
+                    Function to measure the quality of a split.
+            alpha: (float)
+                    The confidence level alpha of the ATE estimate and ITE bootstrap estimates
+            max_depth: (int, default=None)
+                    The maximum depth of the tree.
+            min_samples_split: (int or float, default=2)
+                The minimum number of samples required to split an internal node:
+            min_samples_leaf: (int or float), default=100
+                The minimum number of samples required to be at a leaf node.
+            min_weight_fraction_leaf: (float, default=0.0)
+                The minimum weighted fraction of the sum total of weights (of all
+                the input samples) required to be at a leaf node.
+            max_features: (int, float or {"auto", "sqrt", "log2"}, default=None)
+                The number of features to consider when looking for the best split
+            max_leaf_nodes: (int, default=None)
+                Grow a tree with ``max_leaf_nodes`` in best-first fashion.
+            min_impurity_split : (float, default=float("-inf"))
+                Threshold for early stopping in tree growth.
+            min_impurity_decrease: (float, default=float("-inf")))
+                A node will be split if this split induces a decrease of the impurity
+                greater than or equal to this value.
+            bootstrap : (bool, default=True)
+                Whether bootstrap samples are used when building trees.
+            oob_score : bool, default=False
+                Whether to use out-of-bag samples to estimate the generalization score.
+            n_jobs : int, default=None
+                    The number of jobs to run in parallel.
+            random_state : (int, RandomState instance or None, default=None)
+                    Controls both the randomness of the bootstrapping of the samples used
+                    when building trees (if ``bootstrap=True``) and the sampling of the
+                    features to consider when looking for the best split at each node
+                    (if ``max_features < n_features``).
+            verbose : (int, default=0)
+                    Controls the verbosity when fitting and predicting.
+            warm_start : (bool, default=False)
+                    When set to ``True``, reuse the solution of the previous call to fit
+                    and add more estimators to the ensemble, otherwise, just fit a whole
+                    new forest.
+            ccp_alpha : (non-negative float, default=0.0)
+                    Complexity parameter used for Minimal Cost-Complexity Pruning.
+            max_samples : (int or float, default=None)
+                    If bootstrap is True, the number of samples to draw from X
+                    to train each base estimator.
+        """
         super().__init__(
             base_estimator=CausalTreeRegressor(
                 control_name=control_name, criterion=criterion
@@ -504,6 +557,7 @@ class CausalRandomForestRegressor(ForestRegressor):
             treatment: (np.ndarray), treatment vector
             y: (np.ndarray), outcome vector
         Returns:
+             self
         """
         X, y, w = self.base_estimator._prepare_data(X=X, y=y, treatment=treatment)
         return super().fit(X=X, y=y, sample_weight=w)
