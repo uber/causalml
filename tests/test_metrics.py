@@ -3,7 +3,7 @@ from numpy import isclose
 from causalml.metrics.visualize import qini_score
 
 
-def test_get_qini():
+def test_qini_score():
     test_df = pd.DataFrame(
         {
             "y": [0, 0, 0, 0, 1, 0, 0, 1, 1, 1],
