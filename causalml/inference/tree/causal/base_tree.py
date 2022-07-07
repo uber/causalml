@@ -178,16 +178,9 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             min_weight_leaf = self.min_weight_fraction_leaf * np.sum(sample_weight)
 
         min_impurity_split = self.min_impurity_split
-        if min_impurity_split is not None:
-            warnings.warn(
-                "The min_impurity_split parameter is deprecated. Its default "
-                "value has changed from 1e-7 to 0 in version 0.23, and it "
-                "will be removed in 1.0 (renaming of 0.25). Use the "
-                "min_impurity_decrease parameter instead.",
-                FutureWarning,
-            )
 
-        else:
+        # min_impurity_split is deprecated
+        if min_impurity_split is None:
             min_impurity_split = 0
 
         if X_idx_sorted != "deprecated":
