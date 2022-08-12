@@ -14,3 +14,4 @@ _build/
 *.c
 *.so
 .coverage*
+*.html

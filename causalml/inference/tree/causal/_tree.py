@@ -177,12 +177,6 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         else:
             min_weight_leaf = self.min_weight_fraction_leaf * np.sum(sample_weight)
 
-        min_impurity_split = self.min_impurity_split
-
-        # min_impurity_split is deprecated
-        if min_impurity_split is None:
-            min_impurity_split = 0
-
         if X_idx_sorted != "deprecated":
             warnings.warn(
                 "The parameter 'X_idx_sorted' is deprecated and has no "
@@ -227,7 +221,6 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 min_weight_leaf,
                 max_depth,
                 self.min_impurity_decrease,
-                min_impurity_split,
             )
         else:
             builder = BestFirstTreeBuilder(
@@ -238,7 +231,6 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 max_depth,
                 max_leaf_nodes,
                 self.min_impurity_decrease,
-                min_impurity_split,
             )
 
         builder.build(self.tree_, X, y, sample_weight)
