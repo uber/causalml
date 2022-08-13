@@ -4,7 +4,7 @@ import warnings
 from math import ceil
 
 import numpy as np
-from sklearn.tree._classes import BestFirstTreeBuilder, DepthFirstTreeBuilder
+from sklearn.tree._classes import BestFirstTreeBuilder
 from sklearn.tree._classes import CRITERIA_REG
 from sklearn.tree._classes import DTYPE, DOUBLE
 from sklearn.tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
@@ -14,6 +14,7 @@ from sklearn.tree._criterion import Criterion
 from sklearn.tree._splitter import Splitter
 from sklearn.utils.validation import _check_sample_weight
 
+from .builder import DepthFirstCausalTreeBuilder
 from .criterion import StandardMSE, CausalMSE
 
 CAUSAL_TREES_CRITERIA = {"causal_mse": CausalMSE, "standard_mse": StandardMSE}
@@ -177,12 +178,6 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         else:
             min_weight_leaf = self.min_weight_fraction_leaf * np.sum(sample_weight)
 
-        min_impurity_split = self.min_impurity_split
-
-        # min_impurity_split is deprecated
-        if min_impurity_split is None:
-            min_impurity_split = 0
-
         if X_idx_sorted != "deprecated":
             warnings.warn(
                 "The parameter 'X_idx_sorted' is deprecated and has no "
@@ -220,14 +215,13 @@ class BaseCausalDecisionTree(BaseDecisionTree):
 
         # Use BestFirst if max_leaf_nodes given; use DepthFirst otherwise
         if max_leaf_nodes < 0:
-            builder = DepthFirstTreeBuilder(
+            builder = DepthFirstCausalTreeBuilder(
                 splitter,
                 min_samples_split,
                 min_samples_leaf,
                 min_weight_leaf,
                 max_depth,
                 self.min_impurity_decrease,
-                min_impurity_split,
             )
         else:
             builder = BestFirstTreeBuilder(
@@ -238,7 +232,6 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 max_depth,
                 max_leaf_nodes,
                 self.min_impurity_decrease,
-                min_impurity_split,
             )
 
         builder.build(self.tree_, X, y, sample_weight)

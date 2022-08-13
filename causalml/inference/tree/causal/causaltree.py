@@ -37,7 +37,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         min_weight_fraction_leaf: float = 0.0,
         max_features: Union[int, float, str] = None,
         max_leaf_nodes: int = None,
-        min_impurity_split: float = float("-inf"),
         min_impurity_decrease: float = float("-inf"),
         ccp_alpha: float = 0.0,
         min_samples_leaf: int = 100,
@@ -61,7 +60,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 min_samples_split samples.
             min_samples_split: (int or float, default=2)
                 The minimum number of samples required to split an internal node:
-
                 - If int, then consider `min_samples_split` as the minimum number.
                 - If float, then `min_samples_split` is a fraction and
                   `ceil(min_samples_split * n_samples)` are the minimum
@@ -85,9 +83,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 Grow a tree with ``max_leaf_nodes`` in best-first fashion.
                 Best nodes are defined as relative reduction in impurity.
                 If None then unlimited number of leaf nodes.
-            min_impurity_split : (float, default=float("-inf"))
-                Threshold for early stopping in tree growth. A node will split
-                if its impurity is above the threshold, otherwise it is a leaf.
             min_impurity_decrease: (float, default=float("-inf")))
                 A node will be split if this split induces a decrease of the impurity
                 greater than or equal to this value.
@@ -123,7 +118,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         self.max_features = max_features
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
-        self.min_impurity_split = min_impurity_split
         self.ccp_alpha = ccp_alpha
         self.min_samples_leaf = min_samples_leaf
         self.random_state = random_state
@@ -142,7 +136,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             max_features=max_features,
             max_leaf_nodes=max_leaf_nodes,
             min_impurity_decrease=min_impurity_decrease,
-            min_impurity_split=min_impurity_split,
             ccp_alpha=ccp_alpha,
             min_samples_leaf=min_samples_leaf,
             random_state=random_state,
@@ -168,13 +161,11 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             self
         """
 
-        if (
-            self.criterion == "causal_mse"
-            and self.min_impurity_split != float("-inf")
-            and self.min_impurity_decrease != float("-inf")
+        if self.criterion == "causal_mse" and self.min_impurity_decrease != float(
+            "-inf"
         ):
             raise ValueError(
-                "min_impurity_split, min_impurity_decrease must be set to -inf for causal_mse criterion"
+                "min_impurity_decrease must be set to -inf for causal_mse criterion"
             )
 
         if treatment is None and sample_weight is None:
@@ -341,9 +332,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         """
         _rnd = np.random.RandomState(seed=seed)
         idxs = _rnd.choice(np.arange(0, X.shape[0]), size=sample_size)
-        X_b = X[idxs]
-        treatment_b = treatment[idxs]
-        y_b = y[idxs]
+        X_b, y_b, treatment_b = X[idxs], y[idxs], treatment[idxs]
         self.fit(X=X_b, treatment=treatment_b, y=y_b)
         te_b = self.predict(X=X)
         return te_b
@@ -444,7 +433,6 @@ class CausalRandomForestRegressor(ForestRegressor):
         min_weight_fraction_leaf: float = 0.0,
         max_features: Union[int, float, str] = 1.0,
         max_leaf_nodes: int = None,
-        min_impurity_split: float = float("-inf"),
         min_impurity_decrease: float = float("-inf"),
         bootstrap: bool = True,
         oob_score: bool = False,
@@ -480,8 +468,6 @@ class CausalRandomForestRegressor(ForestRegressor):
                 The number of features to consider when looking for the best split
             max_leaf_nodes: (int, default=None)
                 Grow a tree with ``max_leaf_nodes`` in best-first fashion.
-            min_impurity_split : (float, default=float("-inf"))
-                Threshold for early stopping in tree growth.
             min_impurity_decrease: (float, default=float("-inf")))
                 A node will be split if this split induces a decrease of the impurity
                 greater than or equal to this value.
@@ -521,7 +507,6 @@ class CausalRandomForestRegressor(ForestRegressor):
                 "min_weight_fraction_leaf",
                 "max_features",
                 "max_leaf_nodes",
-                "min_impurity_split",
                 "min_impurity_decrease",
                 "ccp_alpha",
                 "min_samples_leaf",
@@ -544,7 +529,6 @@ class CausalRandomForestRegressor(ForestRegressor):
         self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
         self.max_leaf_nodes = max_leaf_nodes
-        self.min_impurity_split = min_impurity_split
         self.min_impurity_decrease = min_impurity_decrease
         self.ccp_alpha = ccp_alpha
         self.alpha = alpha

@@ -35,6 +35,13 @@ extensions = [
         extra_compile_args=["-O3"],
     ),
     Extension(
+        "causalml.inference.tree.causal.builder",
+        ["causalml/inference/tree/causal/builder.pyx"],
+        libraries=[],
+        include_dirs=[np_get_include()],
+        extra_compile_args=["-O3"],
+    ),
+    Extension(
         "causalml.inference.tree.uplift",
         ["causalml/inference/tree/uplift.pyx"],
         libraries=[],
