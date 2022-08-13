@@ -1,15 +1,17 @@
-.PHONY: build
-build: clean
+.PHONY: build_ext
+build_ext: clean
 	python setup.py build_ext --force --inplace
+
+.PHONY: build
+build: build_ext
 	python setup.py bdist_wheel
 
 .PHONY: install
-install:
+install: build_ext
 	pip install .
 
 .PHONY: test
-test:
-	python setup.py clean --all build_ext --force --inplace
+test: build_ext
 	pytest -vs --cov causalml/
 	python setup.py clean --all
 
@@ -17,8 +19,3 @@ test:
 clean:
 	python setup.py clean --all
 	rm -rf ./build ./dist ./causalml.egg-info
-
-
-
-
-
