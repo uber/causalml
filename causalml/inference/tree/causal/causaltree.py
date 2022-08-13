@@ -13,7 +13,7 @@ from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 from causalml.inference.meta.utils import check_treatment_vector
-from .base_tree import BaseCausalDecisionTree
+from ._tree import BaseCausalDecisionTree
 from ..utils import get_tree_leaves_mask, timeit
 
 logger = logging.getLogger("causalml")
