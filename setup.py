@@ -54,7 +54,7 @@ setup(
     long_description_content_type="text/markdown",
     url="https://github.com/uber/causalml",
     packages=packages,
-    python_requires=">=3.6",
+    python_requires=">=3.7",
     classifiers=[
         "Programming Language :: Python",
         "License :: OSI Approved :: Apache Software License",
