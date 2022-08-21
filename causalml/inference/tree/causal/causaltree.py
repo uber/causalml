@@ -1,4 +1,5 @@
 import logging
+import sys
 from typing import Union
 
 import forestci as fci
@@ -293,7 +294,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             )
 
         pool = PPool(nodes=n_jobs)
-        pool.restart()
+        if "pytest" in sys.modules:
+            pool.restart(force=True)
 
         bootstrap_estimates = np.array(
             list(
@@ -303,7 +305,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 )
             )
         )
-
         pool.close()
         pool.join()
         return bootstrap_estimates
