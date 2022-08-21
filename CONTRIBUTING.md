@@ -83,6 +83,11 @@ Before submitting a PR, make sure the change to pass all tests and test coverage
 $ pytest -vs tests/ --cov causalml/
 ```
 
+You can also run tests via make:
+```bash
+$ make test
+```
+
 
 ## Submission :tada:
 

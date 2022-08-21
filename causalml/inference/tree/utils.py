@@ -2,6 +2,9 @@
 Utility functions for uplift trees.
 """
 
+import time
+from typing import Callable
+
 import numpy as np
 import pandas as pd
 
@@ -255,3 +258,61 @@ def kpi_transform(dfx, kpi_combo, kpi_combo_new):
                     dfx[kpi_combo[j]].values, granularity="High"
                 )
     return dfx
+
+
+def get_tree_leaves_mask(tree) -> np.ndarray:
+    """
+    Get mask array for tree leaves
+    Args:
+        tree: CausalTreeRegressor
+              Tree object
+    Returns: np.ndarray
+             Mask array
+
+    """
+    n_nodes = tree.tree_.node_count
+    children_left = tree.tree_.children_left
+    children_right = tree.tree_.children_right
+
+    node_depth = np.zeros(shape=n_nodes, dtype=np.int64)
+    is_leaves = np.zeros(shape=n_nodes, dtype=bool)
+    stack = [(0, 0)]
+    while len(stack) > 0:
+
+        node_id, depth = stack.pop()
+        node_depth[node_id] = depth
+
+        is_split_node = children_left[node_id] != children_right[node_id]
+
+        if is_split_node:
+            stack.append((children_left[node_id], depth + 1))
+            stack.append((children_right[node_id], depth + 1))
+        else:
+            is_leaves[node_id] = True
+    return is_leaves
+
+
+def timeit(exclude_kwargs: tuple = ()) -> Callable:
+    """
+    timeit decorator
+    Args:
+        exclude_kwargs: (tuple), keyword arguments that should be excluded from display
+    Returns: Callable
+
+    """
+
+    def wrapper(f: Callable):
+        def wrapped(*args, **kw):
+            ts = time.time()
+            result = f(*args, **kw)
+            te = time.time()
+            display_kw = {k: v for k, v in kw.items() if k not in exclude_kwargs}
+            print(
+                f"Function: %s Kwargs:%r Elapsed time: %2.4f"
+                % (f.__name__, display_kw, te - ts)
+            )
+            return result
+
+        return wrapped
+
+    return wrapper

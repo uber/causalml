@@ -1,4 +1,6 @@
 setuptools>=41.0.0
+forestci==0.6
+pathos==0.2.9
 pip>=10.0
 numpy>=1.18.5
 scipy>=1.4.1

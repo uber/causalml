@@ -1,14 +1,13 @@
 import logging
+
 import numpy as np
 from scipy.special import expit, logit
-
 
 logger = logging.getLogger("causalml")
 
 
 def synthetic_data(mode=1, n=1000, p=5, sigma=1.0, adj=0.0):
     """ Synthetic data in Nie X. and Wager S. (2018) 'Quasi-Oracle Estimation of Heterogeneous Treatment Effects'
-
     Args:
         mode (int, optional): mode of the simulation: \
             1 for difficult nuisance components and an easy treatment effect. \
@@ -21,10 +20,8 @@ def synthetic_data(mode=1, n=1000, p=5, sigma=1.0, adj=0.0):
         sigma (float): standard deviation of the error term
         adj (float): adjustment term for the distribution of propensity, e. Higher values shift the distribution to 0.
                      It does not apply to mode == 2 or 3.
-
     Returns:
         (tuple): Synthetically generated samples with the following outputs:
-
             - y ((n,)-array): outcome variable.
             - X ((n,p)-ndarray): independent variables.
             - w ((n,)-array): treatment flag with value 0 or 1.
@@ -50,16 +47,13 @@ def synthetic_data(mode=1, n=1000, p=5, sigma=1.0, adj=0.0):
 def simulate_nuisance_and_easy_treatment(n=1000, p=5, sigma=1.0, adj=0.0):
     """Synthetic data with a difficult nuisance components and an easy treatment effect
         From Setup A in Nie X. and Wager S. (2018) 'Quasi-Oracle Estimation of Heterogeneous Treatment Effects'
-
     Args:
         n (int, optional): number of observations
         p (int optional): number of covariates (>=5)
         sigma (float): standard deviation of the error term
         adj (float): adjustment term for the distribution of propensity, e. Higher values shift the distribution to 0.
-
     Returns:
         (tuple): Synthetically generated samples with the following outputs:
-
             - y ((n,)-array): outcome variable.
             - X ((n,p)-ndarray): independent variables.
             - w ((n,)-array): treatment flag with value 0 or 1.
@@ -92,17 +86,13 @@ def simulate_nuisance_and_easy_treatment(n=1000, p=5, sigma=1.0, adj=0.0):
 def simulate_randomized_trial(n=1000, p=5, sigma=1.0, adj=0.0):
     """Synthetic data of a randomized trial
         From Setup B in Nie X. and Wager S. (2018) 'Quasi-Oracle Estimation of Heterogeneous Treatment Effects'
-
     Args:
         n (int, optional): number of observations
         p (int optional): number of covariates (>=5)
         sigma (float): standard deviation of the error term
         adj (float): no effect. added for consistency
-
-
     Returns:
         (tuple): Synthetically generated samples with the following outputs:
-
             - y ((n,)-array): outcome variable.
             - X ((n,p)-ndarray): independent variables.
             - w ((n,)-array): treatment flag with value 0 or 1.
@@ -127,16 +117,13 @@ def simulate_randomized_trial(n=1000, p=5, sigma=1.0, adj=0.0):
 def simulate_easy_propensity_difficult_baseline(n=1000, p=5, sigma=1.0, adj=0.0):
     """Synthetic data with easy propensity and a difficult baseline
         From Setup C in Nie X. and Wager S. (2018) 'Quasi-Oracle Estimation of Heterogeneous Treatment Effects'
-
     Args:
         n (int, optional): number of observations
         p (int optional): number of covariates (>=3)
         sigma (float): standard deviation of the error term
         adj (float): no effect. added for consistency
-
     Returns:
         (tuple): Synthetically generated samples with the following outputs:
-
             - y ((n,)-array): outcome variable.
             - X ((n,p)-ndarray): independent variables.
             - w ((n,)-array): treatment flag with value 0 or 1.
@@ -159,16 +146,13 @@ def simulate_easy_propensity_difficult_baseline(n=1000, p=5, sigma=1.0, adj=0.0)
 def simulate_unrelated_treatment_control(n=1000, p=5, sigma=1.0, adj=0.0):
     """Synthetic data with unrelated treatment and control groups.
         From Setup D in Nie X. and Wager S. (2018) 'Quasi-Oracle Estimation of Heterogeneous Treatment Effects'
-
     Args:
         n (int, optional): number of observations
         p (int optional): number of covariates (>=3)
         sigma (float): standard deviation of the error term
         adj (float): adjustment term for the distribution of propensity, e. Higher values shift the distribution to 0.
-
     Returns:
         (tuple): Synthetically generated samples with the following outputs:
-
             - y ((n,)-array): outcome variable.
             - X ((n,p)-ndarray): independent variables.
             - w ((n,)-array): treatment flag with value 0 or 1.
@@ -197,16 +181,13 @@ def simulate_unrelated_treatment_control(n=1000, p=5, sigma=1.0, adj=0.0):
 def simulate_hidden_confounder(n=10000, p=5, sigma=1.0, adj=0.0):
     """Synthetic dataset with a hidden confounder biasing treatment.
         From Louizos et al. (2018) "Causal Effect Inference with Deep Latent-Variable Models"
-
     Args:
         n (int, optional): number of observations
         p (int optional): number of covariates (>=3)
         sigma (float): standard deviation of the error term
         adj (float): no effect. added for consistency
-
     Returns:
         (tuple): Synthetically generated samples with the following outputs:
-
             - y ((n,)-array): outcome variable.
             - X ((n,p)-ndarray): independent variables.
             - w ((n,)-array): treatment flag with value 0 or 1.

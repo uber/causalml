@@ -4,8 +4,14 @@ Problem.
 """
 
 from collections import defaultdict
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pydotplus
+import seaborn as sns
+
+from .utils import get_tree_leaves_mask
+from . import CausalTreeRegressor
 
 
 def uplift_tree_string(decisionTree, x_names):
@@ -279,3 +285,25 @@ def uplift_tree_plot(decisionTree, x_names):
     dot_data = "\n".join(lsDot)
     graph = pydotplus.graph_from_dot_data(dot_data)
     return graph
+
+
+def plot_dist_tree_leaves_values(
+    tree: CausalTreeRegressor, title: str = "Leaves values distribution"
+) -> None:
+    """
+    Create distplot for tree leaves values
+    Args:
+        tree: (CausalTreeRegressor), Tree object
+        figsize: (tuple), figure size
+        title: (str), plot title
+
+    Returns: None
+
+    """
+    tree_leaves_mask = get_tree_leaves_mask(tree)
+    leaves_values = tree.tree_.value.reshape(
+        -1,
+    )[tree_leaves_mask]
+    sns.distplot(leaves_values)
+    plt.title(title)
+    plt.show()

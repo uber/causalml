@@ -17,18 +17,26 @@ except ImportError:
 
 import causalml
 
-
 with open("README.md", "r", encoding="utf-8") as f:
     long_description = f.read()
-
 
 with open("requirements.txt") as f:
     requirements = f.readlines()
 
+with open("requirements-test.txt") as f:
+    requirements_test = f.readlines()
+
 extensions = [
     Extension(
-        "causalml.inference.tree.causaltree",
-        ["causalml/inference/tree/causaltree.pyx"],
+        "causalml.inference.tree.causal.criterion",
+        ["causalml/inference/tree/causal/criterion.pyx"],
+        libraries=[],
+        include_dirs=[np_get_include()],
+        extra_compile_args=["-O3"],
+    ),
+    Extension(
+        "causalml.inference.tree.causal.builder",
+        ["causalml/inference/tree/causal/builder.pyx"],
         libraries=[],
         include_dirs=[np_get_include()],
         extra_compile_args=["-O3"],
@@ -68,6 +76,7 @@ setup(
         "scikit-learn>=0.22.0",
     ],
     install_requires=requirements,
+    tests_require=requirements_test,
     ext_modules=cythonize(extensions, annotate=True),
     include_dirs=[np_get_include()],
     extras_require={"tf": ["tensorflow>=2.4.0"]},
