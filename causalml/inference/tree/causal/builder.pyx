@@ -1,3 +1,9 @@
+# cython: cdivision=True
+# cython: boundscheck=False
+# cython: wraparound=False
+# cython: language_level=3
+# cython: linetrace=True
+
 from sklearn.tree._tree cimport Tree, TreeBuilder
 from sklearn.tree._tree cimport Splitter, SplitRecord
 from sklearn.tree._utils cimport StackRecord, Stack
