@@ -28,9 +28,6 @@ class Data:
         for i in range(self.X.shape[1]):
             if self.X[:, i].size > 1:
                 self.available_predictors_for_split.append(i)
-                
-#         if self.treatment is not None:
-#             self.available_predictors_for_split[-1] = discrete_unique_values(self.treatment)
             
 class Node:
     def __init__(self, 
