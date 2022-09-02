@@ -1,5 +1,5 @@
 name = "causalml"
-__version__ = "0.12.3"
+__version__ = "0.13.0"
 __all__ = [
     "dataset",
     "features",
