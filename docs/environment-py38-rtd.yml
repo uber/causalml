@@ -1,9 +1,13 @@
-name: causalml
+name: causalml-rtd-py38
 channels:
+  - conda-forge
   - defaults
 dependencies:
   - pip=22.1.2
   - python=3.8
+  - sphinx
+  - sphinx_rtd_theme
+  - sphinxcontrib-bibtex<2.0.0
   - pip:
     - cython==0.29.32
     - dill==0.3.5.1
