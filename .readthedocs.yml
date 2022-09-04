@@ -9,7 +9,7 @@ build:
   tools:
     python: "3.8"
   jobs:
-    post_create_environment:
+    pre_install:
       - python setup.py build_ext --force --inplace
 
 python:
