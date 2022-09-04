@@ -1,21 +1,18 @@
 # Required
 version: 2
 
-conda:
-  environment: docs/environment-py38-rtd.yml
-
 build:
   os: "ubuntu-22.04"
   tools:
     python: "3.8"
-  jobs:
-    pre_install:
-      - python setup.py build_ext --force --inplace
-
-python:
-  install:
-    - method: setuptools
-      path: .
+  commands:
+    - cat docs/environment-py38-rtd.yml
+    - conda env create --quiet --name latest --file docs/environment-py38-rtd.yml
+    - conda activate latest
+    - python setup.py build_ext --force --inplace
+    - python setup.py install
+    - cat docs/conf.py
+    - python -m sphinx -T -E -b html -d _build/doctrees -D language=en . _build/html
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
