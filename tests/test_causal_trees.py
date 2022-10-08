@@ -15,7 +15,7 @@ class CausalTreeBase:
     control_name: int or str = 0
 
     def prepare_data(self, generate_regression_data) -> tuple:
-        y, X, treatment, tau, b, e = generate_regression_data()
+        y, X, treatment, tau, b, e = generate_regression_data(mode=2)
         df = pd.DataFrame(X)
         feature_names = [f"feature_{i}" for i in range(X.shape[1])]
         df.columns = feature_names

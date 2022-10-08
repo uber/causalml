@@ -8,14 +8,13 @@ from .const import RANDOM_SEED, N_SAMPLE, TREATMENT_NAMES, CONVERSION
 
 
 @pytest.fixture(scope="module")
-def generate_regression_data():
-
+def generate_regression_data(mode: int = 1, p: int = 8, sigma: float = 0.1):
     generated = False
 
-    def _generate_data():
+    def _generate_data(mode: int = mode, p: int = p, sigma: float = sigma):
         if not generated:
             np.random.seed(RANDOM_SEED)
-            data = synthetic_data(mode=1, n=N_SAMPLE, p=8, sigma=0.1)
+            data = synthetic_data(mode=mode, n=N_SAMPLE, p=p, sigma=sigma)
 
         return data
 
@@ -24,7 +23,6 @@ def generate_regression_data():
 
 @pytest.fixture(scope="module")
 def generate_classification_data():
-
     generated = False
 
     def _generate_data():
@@ -44,7 +42,6 @@ def generate_classification_data():
 
 @pytest.fixture(scope="module")
 def generate_classification_data_two_treatments():
-
     generated = False
 
     def _generate_data():
