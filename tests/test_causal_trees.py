@@ -79,7 +79,7 @@ class TestCausalTreeRegressor(CausalTreeBase):
     @pytest.mark.parametrize("bootstrap_size", (500, 800))
     @pytest.mark.parametrize("n_bootstraps", (1000,))
     def test_fit_predict(
-            self, generate_regression_data, return_ci, bootstrap_size, n_bootstraps
+        self, generate_regression_data, return_ci, bootstrap_size, n_bootstraps
     ):
         y, X, treatment, tau, b, e = generate_regression_data(mode=1)
         ctree = self.prepare_causal_tree()
