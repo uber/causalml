@@ -234,7 +234,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             )
             te_lower = np.percentile(te_bootstraps, (self.alpha / 2) * 100, axis=0)
             te_upper = np.percentile(te_bootstraps, (1 - self.alpha / 2) * 100, axis=0)
-            te = te_bootstraps.mean(axis=0)
             return te, te_lower, te_upper
         else:
             return te
