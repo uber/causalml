@@ -6,49 +6,227 @@
 
 from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
+from libc.string cimport memset
+from libc.string cimport memcpy
+
+
+cdef struct NodeInfo:
+    double count        # the number of obs
+    double tr_count     # the number of treatment obs
+    double ct_count     # the number of control obs
+    double tr_y_sum     # the sum of outcomes among treatment obs
+    double ct_y_sum     # the sum of outcomes among control obs
+    double y_sq_sum     # the squared sum of outcomes
+    double tr_y_sq_sum  # the squared sum of outcomes among treatment obs
+    double ct_y_sq_sum  # the squared sum of outcomes among control obs
+
+
+cdef struct SplitState:
+    NodeInfo node   # current node state
+    NodeInfo right  # right split state
+    NodeInfo left   # left split state
 
 
 cdef class CausalRegressionCriterion(RegressionCriterion):
     """
     Base class for causal tree criterion
     """
-    cdef void node_value(self, double * dest) nogil:
-        """Compute the node value of samples[start:end] into dest."""
+    cdef SplitState state
+    cdef double eps
 
-        cdef SIZE_t start = self.start
-        cdef SIZE_t end = self.end
+    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
+                    double weighted_n_samples, SIZE_t* samples, SIZE_t start,
+                    SIZE_t end) nogil except -1:
+        """Initialize the criterion.
+        This initializes the criterion at node samples[start:end] and children
+        samples[start:start] and samples[start:end].
+        """
+        # Initialize fields
+        self.y = y
+        self.sample_weight = sample_weight
+        self.samples = samples
+        self.start = start
+        self.end = end
+        self.n_node_samples = end - start
+        # For compatibility with sklearn functions
+        self.weighted_n_samples = weighted_n_samples
+        self.weighted_n_node_samples = 0.
 
         cdef SIZE_t i
         cdef SIZE_t p
         cdef DOUBLE_t is_treated
-        cdef DOUBLE_t y_ik
+        cdef SIZE_t k = 0
+        cdef DOUBLE_t w = 1.0
 
-        cdef SIZE_t * samples = self.samples
-        cdef DOUBLE_t * sample_weight = self.sample_weight
-
-        cdef double node_ct = 0.0
-        cdef double node_tr = 0.0
-        cdef double node_ct_sum = 0.0
-        cdef double node_tr_sum = 0.0
-        cdef double eps = 1e-5
+        memset(&self.sum_total[0], 0, self.n_outputs * sizeof(double))
+        self.sq_sum_total = 0.
+        self.eps = 1e-5
+        self.state.node = [0., 0., 0., 0., 0., 0., 0., 0.]
+        self.state.left = [0., 0., 0., 0., 0., 0., 0., 0.]
+        self.state.right = [0., 0., 0., 0., 0., 0., 0., 0.]
 
         for p in range(start, end):
             i = samples[p]
+            is_treated = sample_weight[i] - self.eps
 
-            if sample_weight != NULL:
-                # the weights of 1 and 1 + eps are used for treatment and control respectively
-                is_treated = sample_weight[i] - eps
+            self.sum_total[k] += self.y[i, k]
+            self.sq_sum_total += self.y[i, k] * self.y[i, k]
+            self.weighted_n_node_samples += w
 
-            # assume that there is only one output (k = 0)
-            y_ik = self.y[i, 0]
+            self.state.node.tr_count += is_treated
+            self.state.node.tr_y_sum += is_treated * self.y[i, k]
+            self.state.node.tr_y_sq_sum += is_treated * self.y[i, k] * self.y[i, k]
 
-            node_tr += is_treated
-            node_ct += 1. - is_treated
-            node_tr_sum += y_ik * is_treated
-            node_ct_sum += y_ik * (1. - is_treated)
+        self.state.node.ct_count = self.weighted_n_node_samples - self.state.node.tr_count
+        self.state.node.ct_y_sum = self.sum_total[k] - self.state.node.tr_y_sum
+        self.state.node.ct_y_sq_sum = self.sq_sum_total - self.state.node.tr_y_sq_sum
 
-        # save the average of treatment effects within a node as a value for the node
-        dest[0] = node_tr_sum / node_tr - node_ct_sum / node_ct
+        # Reset to pos=start
+        self.reset()
+        return 0
+
+    cdef int reset(self) nogil except -1:
+        """Reset the criterion at pos=start."""
+        cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
+
+        memset(&self.sum_left[0], 0, n_bytes)
+        memcpy(&self.sum_right[0], &self.sum_total[0], n_bytes)
+
+        self.state.left.y_sq_sum = 0.
+        self.state.left.tr_y_sq_sum = 0.
+        self.state.left.tr_y_sum = 0.
+        self.state.left.ct_y_sq_sum = 0.
+        self.state.left.ct_y_sum = 0.
+
+        self.state.right.y_sq_sum = self.sq_sum_total
+        self.state.right.tr_y_sq_sum = self.state.node.tr_y_sq_sum
+        self.state.right.tr_y_sum = self.state.node.tr_y_sum
+        self.state.right.ct_y_sq_sum = self.state.node.ct_y_sq_sum
+        self.state.right.ct_y_sum = self.state.node.ct_y_sum
+
+        self.state.left.count = 0.
+        self.state.left.tr_count = 0.
+        self.state.left.ct_count = 0.
+
+        self.state.right.count = self.state.node.tr_count + self.state.node.ct_count
+        self.state.right.tr_count = self.state.node.tr_count
+        self.state.right.ct_count = self.state.node.ct_count
+
+        # For compatibility with sklearn functions
+        self.weighted_n_left = 0.
+        self.weighted_n_right = self.weighted_n_node_samples
+
+        self.pos = self.start
+
+        return 0
+
+    cdef int reverse_reset(self) nogil except -1:
+        """Reset the criterion at pos=end."""
+        cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
+        memset(&self.sum_right[0], 0, n_bytes)
+        memcpy(&self.sum_left[0], &self.sum_total[0], n_bytes)
+
+        self.state.right.y_sq_sum = 0.
+        self.state.right.tr_y_sq_sum = 0.
+        self.state.right.tr_y_sum = 0.
+        self.state.right.ct_y_sq_sum = 0.
+        self.state.right.ct_y_sum = 0.
+
+        self.state.left.y_sq_sum = self.sq_sum_total
+        self.state.left.tr_y_sq_sum = self.state.node.tr_y_sq_sum
+        self.state.left.tr_y_sum = self.state.node.tr_y_sum
+        self.state.left.ct_y_sq_sum = self.state.node.ct_y_sq_sum
+        self.state.left.ct_y_sum = self.state.node.ct_y_sum
+
+        self.state.right.count = 0.
+        self.state.right.tr_count = 0.
+        self.state.right.ct_count = 0.
+
+        self.state.left.count = self.state.node.tr_count + self.state.node.ct_count
+        self.state.left.tr_count = self.state.node.tr_count
+        self.state.left.ct_count = self.state.node.ct_count
+
+        self.weighted_n_right = 0.0
+        self.weighted_n_left = self.weighted_n_node_samples
+
+        self.pos = self.end
+
+        return 0
+
+    cdef int update(self, SIZE_t new_pos) nogil except -1:
+        """Updated statistics by moving samples[pos:new_pos] to the left."""
+        cdef double * sample_weight = self.sample_weight
+        cdef SIZE_t * samples = self.samples
+
+        cdef SIZE_t pos = self.pos
+        cdef SIZE_t end = self.end
+        cdef SIZE_t i
+        cdef SIZE_t p
+        cdef SIZE_t k = 0
+        cdef DOUBLE_t w = 1.0
+
+        """
+        Update statistics up to new_pos
+
+        Given that:
+            sum_total[x] = sum_left[x] + sum_right[x]
+        we are going to update sum_left from the direction that require the least amount of computations,
+        i.e. from pos to new_pos or from end to new_pos
+        """
+        if (new_pos - pos) <= (end - new_pos):
+            for p in range(pos, new_pos):
+                i = samples[p]
+                is_treated = sample_weight[i] - self.eps
+
+                self.sum_left[k] += self.y[i, k]
+                self.state.left.tr_y_sum += is_treated * self.y[i, k]
+                self.state.left.tr_y_sq_sum += is_treated * self.y[i, k] * self.y[i, k]
+                self.state.left.ct_y_sum += (1. - is_treated) * self.y[i, k]
+                self.state.left.ct_y_sq_sum += (1. - is_treated) * self.y[i, k] * self.y[i, k]
+                self.state.left.tr_count += is_treated
+                self.state.left.ct_count += (1. - is_treated)
+
+                self.weighted_n_left += w
+        else:
+            self.reverse_reset()
+
+            for p in range(end - 1, new_pos - 1, -1):
+                i = samples[p]
+                is_treated = sample_weight[i] - self.eps
+
+                self.sum_left[k] -= self.y[i, k]
+                self.state.left.tr_y_sum -= is_treated * self.y[i, k]
+                self.state.left.tr_y_sq_sum -= is_treated * self.y[i, k] * self.y[i, k]
+                self.state.left.ct_y_sum -= (1. - is_treated) * self.y[i, k]
+                self.state.left.ct_y_sq_sum -= (1. - is_treated) * self.y[i, k] * self.y[i, k]
+                self.state.left.tr_count -= is_treated
+                self.state.left.ct_count -= (1. - is_treated)
+
+                self.weighted_n_left -= w
+
+        self.state.left.count = self.state.left.tr_count + self.state.left.ct_count
+        self.state.right.tr_count = self.state.node.tr_count - self.state.left.tr_count
+        self.state.right.ct_count = self.state.node.ct_count - self.state.left.ct_count
+        self.state.right.count = self.state.right.tr_count + self.state.right.ct_count
+
+        self.state.right.tr_y_sum = self.state.node.tr_y_sum - self.state.left.tr_y_sum
+        self.state.right.ct_y_sum = self.state.node.ct_y_sum - self.state.left.ct_y_sum
+
+        self.state.right.tr_y_sq_sum = self.state.node.tr_y_sq_sum - self.state.left.tr_y_sq_sum
+        self.state.right.ct_y_sq_sum = self.state.node.ct_y_sq_sum - self.state.left.ct_y_sq_sum
+
+        self.weighted_n_right = self.weighted_n_node_samples - self.weighted_n_left
+        self.sum_right[k] = self.sum_total[k] - self.sum_left[k]
+        self.pos = new_pos
+
+        return 0
+
+    cdef void node_value(self, double * dest) nogil:
+        """Compute the node value of samples[start:end] into dest."""
+        # Save the average of treatment effects within a node as a value for the node
+        dest[0] = self.state.node.tr_y_sum / self.state.node.tr_count - \
+                  self.state.node.ct_y_sum / self.state.node.ct_count
+
 
 cdef class StandardMSE(CausalRegressionCriterion):
     """
@@ -65,9 +243,9 @@ cdef class StandardMSE(CausalRegressionCriterion):
         cdef double impurity
         cdef SIZE_t k
 
-        impurity = self.sq_sum_total / self.weighted_n_node_samples
+        impurity = self.sq_sum_total / self.n_node_samples
         for k in range(self.n_outputs):
-            impurity -= (self.sum_total[k] / self.weighted_n_node_samples) ** 2.0
+            impurity -= (self.sum_total[k] / self.n_node_samples) ** 2.0
 
         return impurity / self.n_outputs
 
@@ -120,9 +298,6 @@ cdef class StandardMSE(CausalRegressionCriterion):
         for p in range(start, pos):
             i = samples[p]
 
-            if sample_weight != NULL:
-                w = sample_weight[i]
-
             for k in range(self.n_outputs):
                 y_ik = self.y[i, k]
                 sq_sum_left += w * y_ik * y_ik
@@ -151,58 +326,30 @@ cdef class CausalMSE(CausalRegressionCriterion):
         """
         Evaluate the impurity of the current node, i.e. the impurity of samples[start:end].
         """
-
-        cdef double * sum_total = self.sum_total
         cdef double impurity
-        cdef SIZE_t start = self.start
-        cdef SIZE_t end = self.end
-
-        cdef SIZE_t i
-        cdef SIZE_t p
-        cdef DOUBLE_t is_treated
-        cdef DOUBLE_t y_ik
-
-        cdef SIZE_t * samples = self.samples
-        cdef DOUBLE_t * sample_weight = self.sample_weight
-
-        cdef double node_tr = 0.0
-        cdef double node_ct = 0.0
-        cdef double node_sum = self.sum_total[0]
-        cdef double node_tr_sum = 0.0
-        cdef double node_sq_sum = 0.0
-        cdef double node_tr_sq_sum = 0.0
+        cdef double node_tau
         cdef double tr_var
         cdef double ct_var
-        cdef double eps = 1e-5
 
-        for p in range(start, end):
-            i = samples[p]
-
-            if sample_weight != NULL:
-                # It is enough to add eps to get zero values for control
-                # treatment: 1 + eps, control: eps
-                is_treated = sample_weight[i] - eps
-
-            # assume that there is only one output (k = 0)
-            y_ik = self.y[i, 0]
-
-            node_tr += is_treated
-            node_ct += (1. - is_treated)
-            node_tr_sum += y_ik * is_treated
-            node_sq_sum += y_ik * y_ik
-            node_tr_sq_sum += y_ik * y_ik * is_treated
-
-        # The average causal effect
-        node_tau = node_tr_sum / node_tr - (node_sum - node_tr_sum) / node_ct
-        # Outcome variance for treated
-        tr_var = node_tr_sq_sum / node_tr - node_tr_sum * node_tr_sum / (node_tr * node_tr)
-        # Outcome variance for control
-        ct_var = ((node_sq_sum - node_tr_sq_sum) / node_ct -
-                  (node_sum - node_tr_sum) * (node_sum - node_tr_sum) / (node_ct * node_ct))
-
-        impurity = (tr_var / node_tr + ct_var / node_ct) - node_tau * node_tau
+        node_tau = self.get_tau(self.state.node)
+        tr_var = self.get_variance(
+            self.state.node.tr_y_sum,
+            self.state.node.tr_y_sq_sum,
+            self.state.node.tr_count
+        )
+        ct_var = self.get_variance(
+            self.state.node.ct_y_sum,
+            self.state.node.ct_y_sq_sum,
+            self.state.node.ct_count)
+        impurity = (tr_var / self.state.node.tr_count + ct_var / self.state.node.ct_count) - node_tau * node_tau
 
         return impurity
+
+    cdef double get_tau(self, NodeInfo info) nogil:
+        return info.tr_y_sum / info.tr_count - info.ct_y_sum / info.ct_count
+
+    cdef double get_variance(self, double y_sum, double y_sq_sum, double count) nogil:
+        return  y_sq_sum / count - (y_sum * y_sum) / (count * count)
 
     cdef void children_impurity(self, double * impurity_left, double * impurity_right) nogil:
         """
@@ -211,75 +358,24 @@ cdef class CausalMSE(CausalRegressionCriterion):
            (samples[pos:end]).
         """
 
-        cdef DOUBLE_t * sample_weight = self.sample_weight
-        cdef SIZE_t * samples = self.samples
-        cdef SIZE_t start = self.start
-        cdef SIZE_t pos = self.pos
-        cdef SIZE_t end = self.end
-
-        cdef double * sum_left = self.sum_left
-        cdef double * sum_right = self.sum_right
-
-        cdef SIZE_t i
-        cdef SIZE_t p
-        cdef DOUBLE_t is_treated
-        cdef DOUBLE_t y_ik
-
-        cdef double right_tr = 0.0
-        cdef double right_ct = 0.0
-        cdef double right_sum = 0.0
-        cdef double right_tr_sum = 0.0
-        cdef double right_sq_sum = 0.0
-        cdef double right_tr_sq_sum = 0.0
         cdef double right_tr_var
         cdef double right_ct_var
-
-        cdef double left_tr = 0.0
-        cdef double left_ct = 0.0
-        cdef double left_sum = 0.0
-        cdef double left_tr_sum = 0.0
-        cdef double left_sq_sum = 0.0
-        cdef double left_tr_sq_sum = 0.0
         cdef double left_tr_var
         cdef double left_ct_var
 
-        cdef double eps = 1e-5
+        right_tau = self.get_tau(self.state.right)
+        right_tr_var = self.get_variance(
+            self.state.right.tr_y_sum , self.state.right.tr_y_sq_sum, self.state.right.tr_count)
+        right_ct_var = self.get_variance(
+            self.state.right.ct_y_sum, self.state.right.ct_y_sq_sum, self.state.right.ct_count)
 
-        for p in range(start, end):
-            i = samples[p]
+        left_tau = self.get_tau(self.state.left)
+        left_tr_var = self.get_variance(
+            self.state.left.tr_y_sum , self.state.left.tr_y_sq_sum, self.state.left.tr_count)
+        left_ct_var = self.get_variance(
+            self.state.left.ct_y_sum, self.state.left.ct_y_sq_sum, self.state.left.ct_count)
 
-            if sample_weight != NULL:
-                # It is enough to add eps to get zero values for control
-                # treatment: 1 + eps, control: eps
-                is_treated = sample_weight[i] - eps
-
-            # assume that there is only one output (k = 0)
-            y_ik = self.y[i, 0]
-
-            if p < pos:
-                left_tr += is_treated
-                left_ct += 1. - is_treated
-                left_sum += y_ik
-                left_tr_sum += y_ik * is_treated
-                left_sq_sum += y_ik * y_ik
-                left_tr_sq_sum += y_ik * y_ik * is_treated
-            else:
-                right_tr += is_treated
-                right_ct += 1. - is_treated
-                right_sum += y_ik
-                right_tr_sum += y_ik * is_treated
-                right_sq_sum += y_ik * y_ik
-                right_tr_sq_sum += y_ik * y_ik * is_treated
-
-        right_tau = right_tr_sum / right_tr - (sum_right[0] - right_tr_sum) / right_ct
-        right_tr_var = right_tr_sq_sum / right_tr - right_tr_sum * right_tr_sum / (right_tr * right_tr)
-        right_ct_var = ((right_sq_sum - right_tr_sq_sum) / right_ct -
-                        (right_sum - right_tr_sum) * (right_sum - right_tr_sum) / (right_ct * right_ct))
-
-        left_tau = left_tr_sum / left_tr - (sum_left[0] - left_tr_sum) / left_ct
-        left_tr_var = left_tr_sq_sum / left_tr - left_tr_sum * left_tr_sum / (left_tr * left_tr)
-        left_ct_var = ((left_sq_sum - left_tr_sq_sum) / left_ct -
-                       (left_sum - left_tr_sum) * (left_sum - left_tr_sum) / (left_ct * left_ct))
-
-        impurity_left[0] = (left_tr_var / left_tr + left_ct_var / left_ct) - left_tau * left_tau
-        impurity_right[0] = (right_tr_var / right_tr + right_ct_var / right_ct) - right_tau * right_tau
+        impurity_left[0] = (left_tr_var / self.state.left.tr_count + left_ct_var / self.state.left.ct_count) - \
+                           left_tau * left_tau
+        impurity_right[0] = (right_tr_var / self.state.right.tr_count + right_ct_var / self.state.right.ct_count) - \
+                            right_tau * right_tau
