@@ -279,24 +279,24 @@ This is the probability that the :math:`y` would occur if the treatment was set 
 The probability that the treatment is *necessary* for :math:`y` to occur can be defined as
 
 .. math::
-    PN = P(y^'_c \mid t, y)
+    PN = P(y^{\prime}_c \mid t, y)
 
 This is the probability that :math:`y` would not occur if the treatment was set to control, while in actuality both :math:`y` occurs and the treatment takes place.
 
 Finally, the probability that the treatment is both necessary and sufficient is defined as 
 
 .. math::
-    PNS = P(y_t, y^'_c)
+    PNS = P(y_t, y^{\prime}_c)
 
 and states that :math:`y` would occur if the treatment took place; and :math:`y` would not occur if the treatment did not take place. PNS is related with PN and PS as follows:
 
 .. math::
-    PNS = P(t, y)PN + P(c, y^')PS
+    PNS = P(t, y)PN + P(c, y^{\prime})PS
 
 In bounding the above three quantities, we utilize observational data in addition to experimental data. The observational data is characterized in terms of the joint probabilities:
 
 .. math::
-    P_{TY} = {P(t, y),  P(c, y), P(t, y^'), P(c, y^')}
+    P_{TY} = {P(t, y),  P(c, y), P(t, y^{\prime}), P(c, y^{\prime})}
 
 Given this, :cite:`tian2000probabilities` use the program developed in :cite:`balke1995probabilistic` to obtain sharp bounds of the above three quantities. The main idea in this program is to turn the bounding task into a linear programming problem (for a modern implementation of their approach see `here <https://cran.r-project.org/web/packages/causaloptim/vignettes/vertexenum-speed.html>`_).
 
