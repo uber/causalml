@@ -199,7 +199,7 @@ class UpliftTreeClassifier:
     ----------
 
     evaluationFunction : string
-        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP'.
+        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT'.
 
     max_features: int, optional (default=None)
         The number of features to consider when looking for the best split.
@@ -244,6 +244,8 @@ class UpliftTreeClassifier:
             self.evaluationFunction = self.evaluate_Chi
         elif evaluationFunction == 'DDP':
             self.evaluationFunction = self.evaluate_DDP
+        elif evaluationFunction == 'IT':
+            self.evaluationFunction = self.evaluate_IT
         else:
             self.evaluationFunction = self.evaluate_CTS
         self.fitted_uplift_tree = None
@@ -752,6 +754,69 @@ class UpliftTreeClassifier:
         return d_res
 
     @staticmethod
+    def evaluate_IT(leftNodeSummary, rightNodeSummary, w_l, w_r):
+        '''
+        Calculate Squared T-Statistic as split evaluation criterion for a given node
+
+        Args
+        ----
+        leftNodeSummary : list of list
+            The left node summary statistics.
+        rightNodeSummary : list of list
+            The right node summary statistics.
+        w_l: array-like, shape = [num_samples]
+            An array containing the treatment for each unit in the left node
+        w_r: array-like, shape = [num_samples]
+            An array containing the treatment for each unit in the right node
+
+        Returns
+        -------
+        g_s : Squared T-Statistic
+        '''
+
+        assert np.unique(w_l).shape[0] < 3, "Interaction Tree method expects a binary treatment indicator but found multiple treatment indicators in the left node"
+        assert np.unique(w_r).shape[0] < 3, "Interaction Tree method expects a binary treatment indicator but found multiple treatment indicators in the right node"
+
+        g_s = 0
+
+        ## Control Group
+        # Sample mean in left & right child node
+        y_l_0 = leftNodeSummary[0][0]
+        y_r_0 = rightNodeSummary[0][0]
+        # Sample size left & right child node
+        n_3 = leftNodeSummary[0][1]
+        n_4 = rightNodeSummary[0][1]
+        # Sample variance in left & right child node (p*(p-1) for bernoulli)
+        s_3 = y_l_0*(1-y_l_0)
+        s_4 = y_r_0*(1-y_r_0)
+
+        for treatment_left, treatment_right in zip(leftNodeSummary[1:], rightNodeSummary[1:]):
+            ## Treatment Group
+            # Sample mean in left & right child node
+            y_l_1 = treatment_left[0]
+            y_r_1 = treatment_right[0]
+            # Sample size left & right child node
+            n_1 = treatment_left[1]
+            n_2 = treatment_right[1]
+            # Sample variance in left & right child node
+            s_1 = y_l_1*(1-y_l_1)
+            s_2 = y_r_1*(1-y_r_1)
+
+            sum_n = np.sum([n_1 - 1, n_2 - 1, n_3 - 1, n_4 - 1])
+            w_1 = (n_1 - 1) / sum_n
+            w_2 = (n_2 - 1) / sum_n
+            w_3 = (n_3 - 1) / sum_n
+            w_4 = (n_4 - 1) / sum_n
+
+            # Pooled estimator of the constant variance
+            sigma = np.sqrt(np.sum([w_1 * s_1, w_2 * s_2, w_3 * s_3, w_4 * s_4]))
+
+            # Squared t-statistic
+            g_s = np.power(((y_l_1 - y_l_0) - (y_r_1 - y_r_0)) / (sigma * np.sqrt(np.sum([1 / n_1, 1 / n_2, 1 / n_3, 1 / n_4]))), 2)
+
+        return g_s
+
+    @staticmethod
     def evaluate_CTS(nodeSummary):
         '''
         Calculate CTS (conditional treatment selection) as split evaluation criterion for a given node.
@@ -931,7 +996,11 @@ class UpliftTreeClassifier:
                                                     min_samples_treatment=min_samples_treatment,
                                                     n_reg=n_reg,
                                                     parentNodeSummary=parentNodeSummary)
-        currentScore = self.evaluationFunction(currentNodeSummary)
+
+        if self.evaluationFunction == self.evaluate_IT:
+            currentScore = 0
+        else:
+            currentScore = self.evaluationFunction(currentNodeSummary)
 
         # Prune Stats
         maxAbsDiff = 0
@@ -1023,6 +1092,9 @@ class UpliftTreeClassifier:
                     rightScore2 = self.evaluationFunction(rightNodeSummary)
                     gain = np.abs(leftScore1 - rightScore2)
                     gain_for_imp = np.abs(len(X_l) * leftScore1 - len(X_r) * rightScore2)
+                elif self.evaluationFunction == self.evaluate_IT:
+                    gain = self.evaluationFunction(leftNodeSummary, rightNodeSummary, w_l, w_r)
+                    gain_for_imp = gain * len(X)
                 else:
                     leftScore1 = self.evaluationFunction(leftNodeSummary)
                     rightScore2 = self.evaluationFunction(rightNodeSummary)
