@@ -32,20 +32,21 @@ The package currently supports the following methods
     * Uplift tree/random forests on Contextual Treatment Selection [[3]](#Literature)
     * Uplift tree/random forests on DDP [[4]](#Literature)
     * Interaction Tree [[5]](#Literature)
-    * Causal Tree [[6]](#Literature) - Work-in-progress
+    * Conditional Interaction Tree [[6]](#Literature)
+    * Causal Tree [[7]](#Literature) - Work-in-progress
 * **Meta-learner algorithms**
-    * S-learner [[7]](#Literature)
-    * T-learner [[7]](#Literature)
-    * X-learner [[7]](#Literature)
-    * R-learner [[8]](#Literature)
-    * Doubly Robust (DR) learner [[9]](#Literature)
-    * TMLE learner [[10]](#Literature)
+    * S-learner [[8]](#Literature)
+    * T-learner [[8]](#Literature)
+    * X-learner [[8]](#Literature)
+    * R-learner [[9]](#Literature)
+    * Doubly Robust (DR) learner [[10]](#Literature)
+    * TMLE learner [[11]](#Literature)
 * **Instrumental variables algorithms**
     * 2-Stage Least Squares (2SLS)
-    * Doubly Robust (DR) IV [[11]](#Literature)
+    * Doubly Robust (DR) IV [[12]](#Literature)
 * **Neural-network-based algorithms**
-    * CEVAE [[12]](#Literature)
-    * DragonNet [[13]](#Literature) - with `causalml[tf]` installation (see [Installation](#installation))
+    * CEVAE [[13]](#Literature)
+    * DragonNet [[14]](#Literature) - with `causalml[tf]` installation (see [Installation](#installation))
 
 
 # Installation
@@ -276,16 +277,17 @@ Bibtex:
 3. Zhao, Yan, Xiao Fang, and David Simchi-Levi. "Uplift modeling with multiple treatments and general response types." Proceedings of the 2017 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics, 2017.
 4. Hansotia, Behram, and Brad Rukstales. "Incremental value modeling." Journal of Interactive Marketing 16.3 (2002): 35-46.
 5. Su, Xiaogang, et al. "Subgroup analysis via recursive partitioning." Journal of Machine Learning Research 10.2 (2009).
-6. Athey, Susan, and Guido Imbens. "Recursive partitioning for heterogeneous causal effects." Proceedings of the National Academy of Sciences 113.27 (2016): 7353-7360.
-7. Künzel, Sören R., et al. "Metalearners for estimating heterogeneous treatment effects using machine learning." Proceedings of the national academy of sciences 116.10 (2019): 4156-4165.
-8. Nie, Xinkun, and Stefan Wager. "Quasi-oracle estimation of heterogeneous treatment effects." arXiv preprint arXiv:1712.04912 (2017).
-9. Bang, Heejung, and James M. Robins. "Doubly robust estimation in missing data and causal inference models." Biometrics 61.4 (2005): 962-973.
-10. Van Der Laan, Mark J., and Daniel Rubin. "Targeted maximum likelihood learning." The international journal of biostatistics 2.1 (2006).
-11. Kennedy, Edward H. "Optimal doubly robust estimation of heterogeneous causal effects." arXiv preprint arXiv:2004.14497 (2020).
-12. Louizos, Christos, et al. "Causal effect inference with deep latent-variable models." arXiv preprint arXiv:1705.08821 (2017).
-13. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
-14. Zhao, Zhenyu, Yumin Zhang, Totte Harinen, and Mike Yung. "Feature Selection Methods for Uplift Modeling." arXiv preprint arXiv:2005.03447 (2020).
-15. Zhao, Zhenyu, and Totte Harinen. "Uplift modeling for multiple treatments with cost optimization." In 2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA), pp. 422-431. IEEE, 2019.
+6. Su, Xiaogang, et al. "Facilitating score and causal inference trees for large observational studies." Journal of Machine Learning Research 13 (2012): 2955.
+7. Athey, Susan, and Guido Imbens. "Recursive partitioning for heterogeneous causal effects." Proceedings of the National Academy of Sciences 113.27 (2016): 7353-7360.
+8. Künzel, Sören R., et al. "Metalearners for estimating heterogeneous treatment effects using machine learning." Proceedings of the national academy of sciences 116.10 (2019): 4156-4165.
+9. Nie, Xinkun, and Stefan Wager. "Quasi-oracle estimation of heterogeneous treatment effects." arXiv preprint arXiv:1712.04912 (2017).
+10. Bang, Heejung, and James M. Robins. "Doubly robust estimation in missing data and causal inference models." Biometrics 61.4 (2005): 962-973.
+11. Van Der Laan, Mark J., and Daniel Rubin. "Targeted maximum likelihood learning." The international journal of biostatistics 2.1 (2006).
+12. Kennedy, Edward H. "Optimal doubly robust estimation of heterogeneous causal effects." arXiv preprint arXiv:2004.14497 (2020).
+13. Louizos, Christos, et al. "Causal effect inference with deep latent-variable models." arXiv preprint arXiv:1705.08821 (2017).
+14. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
+15. Zhao, Zhenyu, Yumin Zhang, Totte Harinen, and Mike Yung. "Feature Selection Methods for Uplift Modeling." arXiv preprint arXiv:2005.03447 (2020).
+16. Zhao, Zhenyu, and Totte Harinen. "Uplift modeling for multiple treatments with cost optimization." In 2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA), pp. 422-431. IEEE, 2019.
  
 
 ## Related projects

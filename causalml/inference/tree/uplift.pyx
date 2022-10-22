@@ -199,7 +199,7 @@ class UpliftTreeClassifier:
     ----------
 
     evaluationFunction : string
-        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT'.
+        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT'.
 
     max_features: int, optional (default=None)
         The number of features to consider when looking for the best split.
@@ -246,6 +246,8 @@ class UpliftTreeClassifier:
             self.evaluationFunction = self.evaluate_DDP
         elif evaluationFunction == 'IT':
             self.evaluationFunction = self.evaluate_IT
+        elif evaluationFunction == 'CIT':
+            self.evaluationFunction = self.evaluate_CIT
         else:
             self.evaluationFunction = self.evaluate_CTS
         self.fitted_uplift_tree = None
@@ -817,6 +819,81 @@ class UpliftTreeClassifier:
         return g_s
 
     @staticmethod
+    def evaluate_CIT(currentNodeSummary, leftNodeSummary, rightNodeSummary, y_l, y_r, w_l, w_r, y, w):
+        '''
+        Calculate likelihood ratio test statistic as split evaluation criterion for a given node
+        Args
+        ----
+        currentNodeSummary: list of lists
+            The parent node summary statistics
+        leftNodeSummary : list of lists
+            The left node summary statistics.
+        rightNodeSummary : list of lists
+            The right node summary statistics.
+        y_l: array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit in the left node
+        y_r: array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit in the right node
+        w_l: array-like, shape = [num_samples]
+            An array containing the treatment for each unit in the left node
+        w_r: array-like, shape = [num_samples]
+            An array containing the treatment for each unit in the right node
+        y: array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit
+        w: array-like, shape = [num_samples]
+            An array containing the treatment for each unit
+        Returns
+        -------
+        lrt : Likelihood ratio test statistic
+        '''
+
+        assert np.unique(w).shape[0] < 3, "Conditional Interaction Tree method expects a binary treatment indicator but found multiple treatment indicators"
+
+        lrt = 0
+
+        # Control sample size left & right child node
+        n_l_t_0 = leftNodeSummary[0][1]
+        n_r_t_0 = rightNodeSummary[0][1]
+
+        for treatment_left, treatment_right in zip(leftNodeSummary[1:], rightNodeSummary[1:]):
+            # Treatment sample size left & right child node
+            n_l_t_1 = treatment_left[1]
+            n_r_t_1 = treatment_right[1]
+
+            # Total size of left & right node
+            n_l_t = n_l_t_1 + n_l_t_0
+            n_r_t = n_r_t_1 + n_r_t_0
+
+            # Total size of parent node
+            n_t = n_l_t + n_r_t
+
+            # Total treatment & control size in parent node
+            n_t_1 = n_l_t_1 + n_r_t_1
+            n_t_0 = n_l_t_0 + n_r_t_0
+
+            # Standard squared error of left child node
+            sse_tau_l = np.sum(np.power(y_l[w_l == 1] - treatment_left[0], 2)) + np.sum(
+                np.power(y_l[w_l == 0] - treatment_left[0], 2))
+
+            # Standard squared error of right child node
+            sse_tau_r = np.sum(np.power(y_r[w_r == 1] - treatment_right[0], 2)) + np.sum(
+                np.power(y_r[w_r == 0] - treatment_right[0], 2))
+
+            # Standard squared error of parent child node
+            sse_tau = np.sum(np.power(y[w == 1] - currentNodeSummary[1][0], 2)) + np.sum(
+                np.power(y[w == 0] - currentNodeSummary[0][0], 2))
+
+            # Maximized log-likelihood function
+            i_tau_l = - (n_l_t / 2) * np.log(n_l_t * sse_tau_l) + n_l_t_1 * np.log(n_l_t_1) + n_l_t_0 * np.log(n_l_t_0)
+            i_tau_r = - (n_r_t / 2) * np.log(n_r_t * sse_tau_r) + n_r_t_1 * np.log(n_r_t_1) + n_r_t_0 * np.log(n_r_t_0)
+            i_tau = - (n_t / 2) * np.log(n_t * sse_tau) + n_t_1 * np.log(n_t_1) + n_t_0 * np.log(n_t_0)
+
+            # Likelihood ration test statistic
+            lrt = 2 * (i_tau_l + i_tau_r - i_tau)
+
+        return lrt
+
+    @staticmethod
     def evaluate_CTS(nodeSummary):
         '''
         Calculate CTS (conditional treatment selection) as split evaluation criterion for a given node.
@@ -997,7 +1074,7 @@ class UpliftTreeClassifier:
                                                     n_reg=n_reg,
                                                     parentNodeSummary=parentNodeSummary)
 
-        if self.evaluationFunction == self.evaluate_IT:
+        if self.evaluationFunction == self.evaluate_IT or self.evaluationFunction == self.evaluate_CIT:
             currentScore = 0
         else:
             currentScore = self.evaluationFunction(currentNodeSummary)
@@ -1094,6 +1171,9 @@ class UpliftTreeClassifier:
                     gain_for_imp = np.abs(len(X_l) * leftScore1 - len(X_r) * rightScore2)
                 elif self.evaluationFunction == self.evaluate_IT:
                     gain = self.evaluationFunction(leftNodeSummary, rightNodeSummary, w_l, w_r)
+                    gain_for_imp = gain * len(X)
+                elif self.evaluationFunction == self.evaluate_CIT:
+                    gain = self.evaluationFunction(currentNodeSummary, leftNodeSummary, rightNodeSummary, y_l, y_r, w_l, w_r, y, treatment_idx)
                     gain_for_imp = gain * len(X)
                 else:
                     leftScore1 = self.evaluationFunction(leftNodeSummary)
@@ -1278,7 +1358,7 @@ class UpliftRandomForestClassifier:
         The number of trees in the uplift random forest.
 
     evaluationFunction : string
-        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP'.
+        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT'.
 
     max_features: int, optional (default=10)
         The number of features to consider when looking for the best split.
