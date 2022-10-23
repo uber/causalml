@@ -1502,6 +1502,9 @@ class UpliftRandomForestClassifier:
      True if the honest approach based on "Athey, S., & Imbens, G. (2016). Recursive partitioning for
      heterogeneous causal effects." shall be used.
 
+    estimation_sample_size: float (default=0.5)
+         Sample size for estimating the CATE score in the leaves if honesty == True.
+
     n_jobs: int, optional (default=-1)
         The parallelization parameter to define how many parallel jobs need to be created.
         This is passed on to joblib library for parallelizing uplift-tree creation and prediction.
@@ -1527,6 +1530,7 @@ class UpliftRandomForestClassifier:
                  evaluationFunction='KL',
                  normalization=True,
                  honesty=False,
+                 estimation_sample_size=0.5,
                  n_jobs=-1,
                  joblib_prefer: str = "threads"):
 
