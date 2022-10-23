@@ -218,10 +218,8 @@ where :math:`\Delta\Delta P^*` is defined as :math:`\Delta\Delta P - |E[Y(1) - Y
 :math:`I(\phi, \phi_l, \phi_r)` is defined as:
 
 .. math::
-    I(\phi, \phi_l, \phi_r) = H(\frac{n_t(\phi)} {n(\phi)}, \frac{n_c(\phi)}{n(\phi)}) * 2 \frac{1+\Delta\Delta P^*}{3} +  \\
-    \frac{n_t(\phi)}{n(\phi)} H(\frac{n_t(\phi_l)}{n(\phi)}, \frac{n_t(\phi_r)}{n(\phi)})
-    + \frac{n_c(\phi)}{n(\phi)} * H(\frac{n_c(\phi_l)}{n(\phi)}, \frac{n_c(\phi_r)}{n(\phi)})
-    + \frac{1}{2}
+    I(\phi, \phi_l, \phi_r) = H(\frac{n_t(\phi)} {n(\phi)}, \frac{n_c(\phi)}{n(\phi)}) * 2 \frac{1+\Delta\Delta P^*}{3} + \frac{n_t(\phi)}{n(\phi)} H(\frac{n_t(\phi_l)}{n(\phi)}, \frac{n_t(\phi_r)}{n(\phi)}) \\
+    + \frac{n_c(\phi)}{n(\phi)} * H(\frac{n_c(\phi_l)}{n(\phi)}, \frac{n_c(\phi_r)}{n(\phi)}) + \frac{1}{2}
 
 where the entropy H is defined as :math:`H(p,q)=(-p*log_2(p)) + (-q*log_2(q))` and where :math:`\phi` is a subset of the feature space
 associated with the current decision node, and :math:`\phi_l` and :math:`\phi_r` are the left and right child nodes, respectively.
@@ -270,7 +268,7 @@ and :math:`\hat{y_{t0}}` and :math:`\hat{y_{t1}}` are the sample average respons
 :math:`\tau`, respectively.
 
 Note that this implementation deviates from the original implementation in that (1) the pruning techniques and (2) the validation method
-for determining the best tree size are different. 
+for determining the best tree size are different.
 
 CTS
 ~~~
