@@ -246,6 +246,9 @@ where :math:`\sigma=\sum_{i=4}^4w_is_i^2` is a pooled estimator of the constant 
 Further, :math:`y^L_1`, :math:`s^2_1`, and :math:`n_1` are the the sample mean, the sample variance, and the sample size
 for the treatment group in the left child node ,respectively. Similar notation applies to the other quantities.
 
+Note that this implementation deviates from the original implementation in that (1) the pruning techniques and (2) the validation method
+for determining the best tree size are different.
+
 CIT
 ~~~
 
@@ -265,6 +268,9 @@ that are assigned to the treatment group, respectively. :math:`SSE_{\tau}` is de
 
 and :math:`\hat{y_{t0}}` and :math:`\hat{y_{t1}}` are the sample average responses of the control and treatment groups in node
 :math:`\tau`, respectively.
+
+Note that this implementation deviates from the original implementation in that (1) the pruning techniques and (2) the validation method
+for determining the best tree size are different. 
 
 CTS
 ~~~
