@@ -163,9 +163,9 @@ def UpliftTreeClassifierTesting(df, x_names, evaluation_function):
     )
 
     # Check if the cumulative gain of UpLift Random Forest is higher than
-    # random (sometimes IT is not better than random)
-    # if evaluation_function != 'IT':
-    #     assert cumgain["uplift_tree"].sum() > cumgain["Random"].sum()
+    # random (sometimes IT and IDDP are not better than random)
+    if evaluation_function != 'IT' and evaluation_function != 'IDDP':
+         assert cumgain["uplift_tree"].sum() > cumgain["Random"].sum()
 
     # Check if the total count is split correctly, at least for control group in the first level
     def validate_cnt(cur_tree):
