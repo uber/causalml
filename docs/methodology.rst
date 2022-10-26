@@ -79,7 +79,7 @@ Impute the user level treatment effects, :math:`D^1_i` and :math:`D^0_j` for use
 
 .. math::
    D^1_i = Y^1_i - \hat\mu_0(X^1_i) \\
-   D^0_i = \hat\mu_1(X^0_i) - Y^0_i
+   D^0_j = \hat\mu_1(X^0_j) - Y^0_j
 
 then estimate :math:`\tau_1(x) = E[D^1|X=x]`, and :math:`\tau_0(x) = E[D^0|X=x]` using machine learning models.
 
