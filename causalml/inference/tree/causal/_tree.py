@@ -4,7 +4,6 @@ import warnings
 from math import ceil
 
 import numpy as np
-from sklearn.tree._classes import BestFirstTreeBuilder
 from sklearn.tree._classes import CRITERIA_REG
 from sklearn.tree._classes import DTYPE, DOUBLE
 from sklearn.tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
@@ -14,7 +13,7 @@ from sklearn.tree._criterion import Criterion
 from sklearn.tree._splitter import Splitter
 from sklearn.utils.validation import _check_sample_weight
 
-from .builder import DepthFirstCausalTreeBuilder
+from .builder import DepthFirstCausalTreeBuilder, BestFirstCausalTreeBuilder
 from .criterion import StandardMSE, CausalMSE
 
 CAUSAL_TREES_CRITERIA = {"causal_mse": CausalMSE, "standard_mse": StandardMSE}
@@ -224,7 +223,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 self.min_impurity_decrease,
             )
         else:
-            builder = BestFirstTreeBuilder(
+            builder = BestFirstCausalTreeBuilder(
                 splitter,
                 min_samples_split,
                 min_samples_leaf,
