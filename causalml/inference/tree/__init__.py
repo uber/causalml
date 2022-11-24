@@ -1,4 +1,5 @@
-from .causal.causaltree import CausalTreeRegressor, CausalRandomForestRegressor
+from .causal.causaltree import CausalTreeRegressor
+from .causal.causalforest import CausalRandomForestRegressor
 from .plot import uplift_tree_string, uplift_tree_plot, plot_dist_tree_leaves_values
 from .uplift import DecisionTree, UpliftTreeClassifier, UpliftRandomForestClassifier
 from .utils import (
