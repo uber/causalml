@@ -418,4 +418,3 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             leaves_groups_cnt[leaf_id][treatment[row_id]] += 1
 
         return leaves_groups_cnt
-

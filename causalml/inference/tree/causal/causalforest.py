@@ -9,23 +9,27 @@ from sklearn.ensemble._forest import compute_sample_weight, issparse
 from sklearn.utils.fixes import _joblib_parallel_args
 from sklearn.utils.validation import check_random_state, _check_sample_weight
 from sklearn.utils.multiclass import type_of_target
-from sklearn.ensemble._forest import ForestRegressor, RandomForestRegressor, ExtraTreesRegressor
+from sklearn.ensemble._forest import (
+    ForestRegressor,
+    RandomForestRegressor,
+    ExtraTreesRegressor,
+)
 from sklearn.ensemble._forest import _generate_sample_indices, _get_n_samples_bootstrap
 
 from .causaltree import CausalTreeRegressor
 
 
 def _parallel_build_trees(
-        tree,
-        forest,
-        X,
-        y,
-        sample_weight,
-        tree_idx,
-        n_trees,
-        verbose=0,
-        class_weight=None,
-        n_samples_bootstrap=None,
+    tree,
+    forest,
+    X,
+    y,
+    sample_weight,
+    tree_idx,
+    n_trees,
+    verbose=0,
+    class_weight=None,
+    n_samples_bootstrap=None,
 ):
     """
     Private function used to fit a single tree in parallel."""
@@ -56,27 +60,27 @@ def _parallel_build_trees(
 
 class CausalRandomForestRegressor(ForestRegressor):
     def __init__(
-            self,
-            n_estimators: int = 100,
-            *,
-            control_name: Union[int, str] = 0,
-            criterion: str = "causal_mse",
-            alpha: float = 0.05,
-            max_depth: int = None,
-            min_samples_split: int = 2,
-            min_samples_leaf: int = 100,
-            min_weight_fraction_leaf: float = 0.0,
-            max_features: Union[int, float, str] = 1.0,
-            max_leaf_nodes: int = None,
-            min_impurity_decrease: float = float("-inf"),
-            bootstrap: bool = True,
-            oob_score: bool = False,
-            n_jobs: int = None,
-            random_state: int = None,
-            verbose: int = 0,
-            warm_start: bool = False,
-            ccp_alpha: float = 0.0,
-            max_samples: int = None,
+        self,
+        n_estimators: int = 100,
+        *,
+        control_name: Union[int, str] = 0,
+        criterion: str = "causal_mse",
+        alpha: float = 0.05,
+        max_depth: int = None,
+        min_samples_split: int = 2,
+        min_samples_leaf: int = 100,
+        min_weight_fraction_leaf: float = 0.0,
+        max_features: Union[int, float, str] = 1.0,
+        max_leaf_nodes: int = None,
+        min_impurity_decrease: float = float("-inf"),
+        bootstrap: bool = True,
+        oob_score: bool = False,
+        n_jobs: int = None,
+        random_state: int = None,
+        verbose: int = 0,
+        warm_start: bool = False,
+        ccp_alpha: float = 0.0,
+        max_samples: int = None,
     ):
         """
         Initialize Random Forest of CausalTreeRegressors
@@ -368,13 +372,13 @@ class CausalRandomForestRegressor(ForestRegressor):
         return self._fit(X=X, y=y, sample_weight=w)
 
     def calculate_error(
-            self,
-            X_train: np.ndarray,
-            X_test: np.ndarray,
-            inbag: np.ndarray = None,
-            calibrate: bool = True,
-            memory_constrained: bool = False,
-            memory_limit: int = None,
+        self,
+        X_train: np.ndarray,
+        X_test: np.ndarray,
+        inbag: np.ndarray = None,
+        calibrate: bool = True,
+        memory_constrained: bool = False,
+        memory_limit: int = None,
     ) -> np.ndarray:
         """
         Calculate error bars from scikit-learn RandomForest estimators
