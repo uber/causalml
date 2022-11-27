@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Union, Literal
+from typing import Union
 
 import numpy as np
 import tqdm
@@ -42,7 +42,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         min_samples_leaf: int = 100,
         random_state: int = None,
         groups_cnt: bool = False,
-        groups_cnt_mode: Literal["nodes", "leaves"] = "nodes",
+        groups_cnt_mode: str = "nodes",
     ):
         """
         Initialize a Causal Tree
