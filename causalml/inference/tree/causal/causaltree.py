@@ -1,6 +1,6 @@
 import logging
 import sys
-from typing import Union
+from typing import Union, Literal
 
 import numpy as np
 import tqdm
@@ -32,15 +32,17 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         alpha: float = 0.05,
         control_name: Union[int, str] = 0,
         max_depth: int = None,
-        min_samples_split: Union[int, float] = 2,
+        min_samples_split: Union[int, float] = 60,
         min_weight_fraction_leaf: float = 0.0,
         max_features: Union[int, float, str] = None,
         max_leaf_nodes: int = None,
         min_impurity_decrease: float = float("-inf"),
         ccp_alpha: float = 0.0,
+        groups_penalty: float = 0.5,
         min_samples_leaf: int = 100,
         random_state: int = None,
-        leaves_groups_cnt: bool = False,
+        groups_cnt: bool = False,
+        groups_cnt_mode: Literal['nodes', 'leaves'] = 'nodes'
     ):
         """
         Initialize a Causal Tree
@@ -90,6 +92,9 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 subtree with the largest cost complexity that is smaller than
                 ``ccp_alpha`` will be chosen. By default, no pruning is performed. See
                 :ref:`minimal_cost_complexity_pruning` for details.
+            groups_penalty: (float, default=0.5)
+                This penalty coefficient manages the node impurity increase in case of the difference between
+                treatment and control samples sizes.
             min_samples_leaf: (int or float), default=100
                 The minimum number of samples required to be at a leaf node.
                 A split point at any depth will only be considered if it leaves at
@@ -104,7 +109,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             random_state: (int), RandomState instance or None, default=None
                 Used to pick randomly the `max_features` used at each split.
                 See :term:`Glossary <random_state>` for details.
-            leaves_groups_cnt: (bool), count treatment groups for each leaf
+            groups_cnt: (bool), count treatment and control groups for each node/leaf
+            groups_cnt_mode: (str, 'nodes', 'leaves'), mode for samples counting
         """
 
         self.criterion = criterion
@@ -118,13 +124,15 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
         self.ccp_alpha = ccp_alpha
+        self.groups_penalty = groups_penalty
         self.min_samples_leaf = min_samples_leaf
         self.random_state = random_state
 
         self.eps = 1e-5
         self._classes = {}
-        self.leaves_groups_cnt = leaves_groups_cnt
-        self._leaves_groups_cnt = {}
+        self.groups_cnt = groups_cnt
+        self.groups_cnt_mode = groups_cnt_mode
+        self._groups_cnt = {}
 
         super().__init__(
             criterion=criterion,
@@ -174,19 +182,12 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             X, y, w = X, y, sample_weight
         else:
             X, y, w = self._prepare_data(X=X, y=y, treatment=treatment)
-
-        self._treatment = w.copy()
+        self.treatment_groups = np.unique(w)
 
         super().fit(X=X, y=y, sample_weight=self.eps + w, check_input=check_input)
 
-        if self.leaves_groups_cnt:
-            if treatment is None:
-                raise ValueError(
-                    "`treatment` must be provided to get _leaves_groups_cnt attribute."
-                )
-            self._leaves_groups_cnt = self._count_groups_distribution(
-                X=X, treatment=treatment
-            )
+        if self.groups_cnt:
+            self._groups_cnt = self._count_groups_distribution(X=X, treatment=w)
         return self
 
     def fit_predict(
@@ -355,8 +356,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             )
         check_treatment_vector(treatment, self.control_name)
 
-        self.treatment_groups = np.unique(treatment)
-
         self.is_treatment = treatment != self.control_name
         w = self.is_treatment.astype(int)
 
@@ -367,54 +366,32 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
 
         return X, y, w
 
-    def _get_leaf_id(self, X: np.ndarray) -> int:
-        """
-        Find tree leaf id for a feature vector
-        Args:
-            X: (np.ndarray), feature vector
-        Returns: int, leaf id
-        """
-        check_is_fitted(self)
-        assert (
-            X.shape[0] == self.n_features
-        ), f"Trained model has different feature size. Got: {X.shape[0]}. Expected:{self.n_features}"
-
-        node_id = 0
-        while not self.is_leaves[node_id]:
-
-            left_node_id = self.tree_.children_left[node_id]
-            right_node_id = self.tree_.children_right[node_id]
-            feature_value = X[self.tree_.feature[node_id]]
-
-            if feature_value <= self.tree_.threshold[node_id]:
-                node_id = left_node_id
-            else:
-                node_id = right_node_id
-        return node_id
-
     def _count_groups_distribution(self, X: np.ndarray, treatment: np.ndarray) -> dict:
 
         """
-        Count treatment, control distribution for tree leaves based on train data
+        Count treatment, control distribution for tree nodes/leaves
         Args:
             X: (np.ndarray), feature matrix
             treatment: (np.ndarray), treatment vector
         Returns:
-            dict: treatment groups for each tree leaf
+            dict: treatment groups for each tree node/leaves
         """
         check_is_fitted(self)
 
         self.is_leaves = get_tree_leaves_mask(self)
-        nodes_ids = np.array(range(self.tree_.node_count))
-        leaves_ids = nodes_ids[self.is_leaves]
-
-        leaves_groups_cnt = {
-            leaf_id: {group: 0 for group in self.treatment_groups}
-            for leaf_id in leaves_ids
+        groups_cnt = {
+            idx: {group: 0 for group in self.treatment_groups}
+            for idx in np.array(range(self.tree_.node_count))
         }
+        node_indicators = self.tree_.decision_path(X.astype(np.float32))
 
-        for row_id in range(X.shape[0]):
-            leaf_id = self._get_leaf_id(X=X[row_id, :])
-            leaves_groups_cnt[leaf_id][treatment[row_id]] += 1
+        for sample_id in range(X.shape[0]):
+            nodes_path = \
+                node_indicators.indices[node_indicators.indptr[sample_id]:node_indicators.indptr[sample_id + 1]]
 
-        return leaves_groups_cnt
+            if self.groups_cnt_mode == "leaves":
+                groups_cnt[nodes_path[-1]][treatment[sample_id]] += 1
+            elif self.groups_cnt_mode == "nodes":
+                for node_id in nodes_path:
+                    groups_cnt[node_id][treatment[sample_id]] += 1
+        return groups_cnt

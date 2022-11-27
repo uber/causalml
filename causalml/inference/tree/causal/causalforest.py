@@ -67,7 +67,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         criterion: str = "causal_mse",
         alpha: float = 0.05,
         max_depth: int = None,
-        min_samples_split: int = 2,
+        min_samples_split: int = 60,
         min_samples_leaf: int = 100,
         min_weight_fraction_leaf: float = 0.0,
         max_features: Union[int, float, str] = 1.0,
@@ -80,7 +80,9 @@ class CausalRandomForestRegressor(ForestRegressor):
         verbose: int = 0,
         warm_start: bool = False,
         ccp_alpha: float = 0.0,
+        groups_penalty: float = 0.5,
         max_samples: int = None,
+        groups_cnt: bool = True
     ):
         """
         Initialize Random Forest of CausalTreeRegressors
@@ -129,13 +131,19 @@ class CausalRandomForestRegressor(ForestRegressor):
                     new forest.
             ccp_alpha : (non-negative float, default=0.0)
                     Complexity parameter used for Minimal Cost-Complexity Pruning.
+            groups_penalty: (float, default=0.5)
+                    This penalty coefficient manages the node impurity increase in case of the difference between
+                    treatment and control samples sizes.
             max_samples : (int or float, default=None)
                     If bootstrap is True, the number of samples to draw from X
                     to train each base estimator.
+            groups_cnt: (bool), count treatment and control groups for each node/leaf
         """
         super().__init__(
             base_estimator=CausalTreeRegressor(
-                control_name=control_name, criterion=criterion
+                control_name=control_name,
+                criterion=criterion,
+                groups_cnt=groups_cnt,
             ),
             n_estimators=n_estimators,
             estimator_params=(
@@ -148,6 +156,7 @@ class CausalRandomForestRegressor(ForestRegressor):
                 "max_leaf_nodes",
                 "min_impurity_decrease",
                 "ccp_alpha",
+                "groups_penalty",
                 "min_samples_leaf",
                 "random_state",
             ),
@@ -170,7 +179,9 @@ class CausalRandomForestRegressor(ForestRegressor):
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
         self.ccp_alpha = ccp_alpha
+        self.groups_penalty = groups_penalty
         self.alpha = alpha
+        self.groups_cnt = groups_cnt
 
     def _fit(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None):
         """
