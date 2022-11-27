@@ -195,7 +195,13 @@ class NearestNeighborMatch(object):
                     t_idx_matched.append(t_idx)
                     c_idx_matched.append(c_idx_min)
                     control.loc[c_idx_min, "unmatched"] = False
+        # Add the flags of the treatment and control groups to the matched dataframe
+        print(
+            "You can get matched dataframe where 't' represents the treatment group and 'c' represents the control group"
+        )
 
+        data.loc[np.array(t_idx_matched), "group"] = "t"
+        data.loc[np.array(c_idx_matched), "group"] = "c"
         return data.loc[
             np.concatenate([np.array(t_idx_matched), np.array(c_idx_matched)])
         ]
