@@ -28,15 +28,15 @@ with open("requirements-test.txt") as f:
 
 extensions = [
     Extension(
-        "causalml.inference.tree.causal.criterion",
-        ["causalml/inference/tree/causal/criterion.pyx"],
+        "causalml.inference.tree.causal._criterion",
+        ["causalml/inference/tree/causal/_criterion.pyx"],
         libraries=[],
         include_dirs=[np_get_include()],
         extra_compile_args=["-O3"],
     ),
     Extension(
-        "causalml.inference.tree.causal.builder",
-        ["causalml/inference/tree/causal/builder.pyx"],
+        "causalml.inference.tree.causal._builder",
+        ["causalml/inference/tree/causal/_builder.pyx"],
         libraries=[],
         include_dirs=[np_get_include()],
         extra_compile_args=["-O3"],

@@ -11,12 +11,6 @@ import numpy as np
 cimport numpy as np
 np.import_array()
 
-from sklearn.tree._tree cimport Node, Tree, TreeBuilder
-from sklearn.tree._tree cimport Splitter, SplitRecord
-from sklearn.tree._utils cimport StackRecord, Stack
-from sklearn.tree._utils cimport PriorityHeapRecord, PriorityHeap
-from sklearn.tree._tree cimport SIZE_t, DOUBLE_t
-
 
 cdef double INFINITY = np.inf
 cdef double EPSILON = np.finfo('double').eps
@@ -87,6 +81,8 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef SIZE_t parent
         cdef bint is_left
         cdef SIZE_t n_node_samples = splitter.n_samples
+        cdef long tr_count
+        cdef long ct_count
         cdef double weighted_n_samples = splitter.weighted_n_samples
         cdef double weighted_n_node_samples
         cdef SplitRecord split
@@ -124,9 +120,18 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
                 n_node_samples = end - start
                 splitter.node_reset(start, end, &weighted_n_node_samples)
 
+                with gil:
+                    # TODO: Get tr_count and ct_count without gil
+                    tr_count = <long> splitter.criterion.state["node"]["tr_count"]
+                    ct_count = <long> splitter.criterion.state["node"]["ct_count"]
+
                 is_leaf = (depth >= max_depth or
                            n_node_samples < min_samples_split or
                            n_node_samples < 2 * min_samples_leaf or
+                           tr_count < min_samples_split // 2 or
+                           ct_count < min_samples_split // 2 or
+                           tr_count < min_samples_leaf or
+                           ct_count < min_samples_leaf or
                            weighted_n_node_samples < 2 * min_weight_leaf)
 
                 if first:
@@ -174,22 +179,6 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
                 tree.max_depth = max_depth_seen
         if rc == -1:
             raise MemoryError()
-
-
-cdef struct FrontierRecord:
-    # Record of information of a Node, the frontier for a split. Those records are
-    # maintained in a heap to access the Node with the best improvement in impurity,
-    # allowing growing trees greedily on this improvement.
-    SIZE_t node_id
-    SIZE_t start
-    SIZE_t end
-    SIZE_t pos
-    SIZE_t depth
-    bint is_leaf
-    double impurity
-    double impurity_left
-    double impurity_right
-    double improvement
 
 
 cdef inline int _add_to_frontier(PriorityHeapRecord* rec,
@@ -344,6 +333,8 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         cdef SplitRecord split
         cdef SIZE_t node_id
         cdef SIZE_t n_node_samples
+        cdef long tr_count
+        cdef long ct_count
         cdef SIZE_t n_constant_features = 0
         cdef double weighted_n_samples = splitter.weighted_n_samples
         cdef double min_impurity_decrease = self.min_impurity_decrease
@@ -354,6 +345,11 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
 
         splitter.node_reset(start, end, &weighted_n_node_samples)
 
+        with gil:
+            # TODO: Get tr_count and ct_count without gil
+            tr_count = <long> splitter.criterion.state["node"]["tr_count"]
+            ct_count = <long> splitter.criterion.state["node"]["ct_count"]
+
         if is_first:
             impurity = splitter.node_impurity()
 
@@ -361,6 +357,10 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         is_leaf = (depth >= self.max_depth or
                    n_node_samples < self.min_samples_split or
                    n_node_samples < 2 * self.min_samples_leaf or
+                   tr_count < self.min_samples_split // 2 or
+                   ct_count < self.min_samples_split // 2 or
+                   tr_count < self.min_samples_leaf or
+                   ct_count < self.min_samples_leaf or
                    weighted_n_node_samples < 2 * self.min_weight_leaf
                    )
 
