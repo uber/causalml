@@ -50,16 +50,16 @@ def uplift_tree_string(decisionTree, x_names):
             if szCol in dcHeadings:
                 szCol = dcHeadings[szCol]
             if isinstance(decisionTree.value, int) or isinstance(
-                    decisionTree.value, float
+                decisionTree.value, float
             ):
                 decision = "%s >= %s?" % (szCol, decisionTree.value)
             else:
                 decision = "%s == %s?" % (szCol, decisionTree.value)
             trueBranch = (
-                    indent + "yes -> " + toString(decisionTree.trueBranch, indent + "\t\t")
+                indent + "yes -> " + toString(decisionTree.trueBranch, indent + "\t\t")
             )
             falseBranch = (
-                    indent + "no  -> " + toString(decisionTree.falseBranch, indent + "\t\t")
+                indent + "no  -> " + toString(decisionTree.falseBranch, indent + "\t\t")
             )
             return decision + "\n" + trueBranch + "\n" + falseBranch
 
@@ -94,13 +94,13 @@ def uplift_tree_plot(decisionTree, x_names):
     """Plots the obtained decision tree. """
 
     def toString(
-            iSplit,
-            decisionTree,
-            bBranch,
-            szParent="null",
-            indent="",
-            indexParent=0,
-            upliftScores=list(),
+        iSplit,
+        decisionTree,
+        bBranch,
+        szParent="null",
+        indent="",
+        indexParent=0,
+        upliftScores=list(),
     ):
         if decisionTree.results is not None:  # leaf node
             lsY = []
@@ -128,7 +128,7 @@ def uplift_tree_plot(decisionTree, x_names):
             if szCol in dcHeadings:
                 szCol = dcHeadings[szCol]
             if isinstance(decisionTree.value, int) or isinstance(
-                    decisionTree.value, float
+                decisionTree.value, float
             ):
                 decision = "%s >= %s" % (szCol, decisionTree.value)
             else:
@@ -183,7 +183,7 @@ def uplift_tree_plot(decisionTree, x_names):
         ]  # min max scaler
         baseUplift = float(decisionTree.summary.get("matchScore"))
         baseUpliftLevel = (baseUplift - minUplift) / (
-                maxUplift - minUplift
+            maxUplift - minUplift
         )  # min max scaler normalization
         white = np.array([255.0, 255.0, 255.0])
         blue = np.array([31.0, 119.0, 180.0])
@@ -292,10 +292,10 @@ def uplift_tree_plot(decisionTree, x_names):
 
 
 def plot_dist_tree_leaves_values(
-        tree: CausalTreeRegressor,
-        title: str = "Leaves values distribution",
-        figsize: tuple = (5, 5),
-        fontsize: int = 12
+    tree: CausalTreeRegressor,
+    title: str = "Leaves values distribution",
+    figsize: tuple = (5, 5),
+    fontsize: int = 12,
 ) -> None:
     """
     Create distplot for tree leaves values
@@ -313,28 +313,31 @@ def plot_dist_tree_leaves_values(
         -1,
     )[tree_leaves_mask]
     fig, ax = plt.subplots(figsize=figsize)
-    sns.distplot(leaves_values, ax=ax, )
+    sns.distplot(
+        leaves_values,
+        ax=ax,
+    )
     plt.title(title, fontsize=fontsize)
     plt.show()
 
 
 class _MPLCTreeExporter(_MPLTreeExporter):
     def __init__(
-            self,
-            causal_tree: CausalTreeRegressor,
-            max_depth: int,
-            feature_names: list,
-            class_names: list,
-            label: str,
-            filled: bool,
-            impurity: bool,
-            groups_count: bool,
-            treatment_groups: tuple,
-            node_ids: bool,
-            proportion: bool,
-            rounded: bool,
-            precision: int,
-            fontsize: int,
+        self,
+        causal_tree: CausalTreeRegressor,
+        max_depth: int,
+        feature_names: list,
+        class_names: list,
+        label: str,
+        filled: bool,
+        impurity: bool,
+        groups_count: bool,
+        treatment_groups: tuple,
+        node_ids: bool,
+        proportion: bool,
+        rounded: bool,
+        precision: int,
+        fontsize: int,
     ):
         """
         Causal Tree exporter for matplotlib
@@ -394,7 +397,9 @@ class _MPLCTreeExporter(_MPLTreeExporter):
         self.groups_count = groups_count
         self.treatment_groups = treatment_groups
 
-    def node_to_str(self, tree: _tree.Tree, node_id: int, criterion: str or object) -> str:
+    def node_to_str(
+        self, tree: _tree.Tree, node_id: int, criterion: str or object
+    ) -> str:
         """
         Generate the node content string
         Args:
@@ -445,7 +450,7 @@ class _MPLCTreeExporter(_MPLTreeExporter):
             if labels:
                 node_string += "%s = " % criterion
             node_string += (
-                    str(round(tree.impurity[node_id], self.precision)) + characters[4]
+                str(round(tree.impurity[node_id], self.precision)) + characters[4]
             )
 
         # Write node sample count
@@ -453,7 +458,7 @@ class _MPLCTreeExporter(_MPLTreeExporter):
             node_string += "samples = "
         if self.proportion:
             percent = (
-                    100.0 * tree.n_node_samples[node_id] / float(tree.n_node_samples[0])
+                100.0 * tree.n_node_samples[node_id] / float(tree.n_node_samples[0])
             )
             node_string += str(round(percent, 1)) + "%" + characters[4]
         else:
@@ -495,9 +500,9 @@ class _MPLCTreeExporter(_MPLTreeExporter):
 
         # Write node majority class
         if (
-                self.class_names is not None
-                and tree.n_classes[0] != 1
-                and tree.n_outputs == 1
+            self.class_names is not None
+            and tree.n_classes[0] != 1
+            and tree.n_outputs == 1
         ):
             # Only done for single-output classification trees
             if labels:
@@ -528,7 +533,7 @@ class _MPLCTreeExporter(_MPLTreeExporter):
         # Regression tree or multi-output
         color = list(self.colors["rgb"][0])
         alpha = float(value - self.colors["bounds"][0]) / (
-                self.colors["bounds"][1] - self.colors["bounds"][0]
+            self.colors["bounds"][1] - self.colors["bounds"][0]
         )
         alpha = 0 if np.isnan(alpha) else alpha
         # Compute the color as alpha against white
@@ -548,7 +553,10 @@ class _MPLCTreeExporter(_MPLTreeExporter):
             self.colors["rgb"] = _color_brew(tree.n_classes[0])
             if tree.n_outputs != 1:
                 # Find max and min impurities for multi-output
-                self.colors["bounds"] = (np.nanmin(-tree.impurity), np.nanmax(-tree.impurity))
+                self.colors["bounds"] = (
+                    np.nanmin(-tree.impurity),
+                    np.nanmax(-tree.impurity),
+                )
             elif tree.n_classes[0] == 1 and len(np.unique(tree.value)) != 1:
                 # Find max and min values in leaf nodes for regression
                 self.colors["bounds"] = (np.nanmin(tree.value), np.nanmax(tree.value))
@@ -564,22 +572,22 @@ class _MPLCTreeExporter(_MPLTreeExporter):
 
 
 def plot_causal_tree(
-        causal_tree: CausalTreeRegressor,
-        *,
-        max_depth: int = None,
-        feature_names: list = None,
-        class_names: list = None,
-        label: str = "all",
-        filled: bool = False,
-        impurity: bool = True,
-        groups_count: bool = True,
-        treatment_groups: tuple = (0, 1),
-        node_ids: bool = False,
-        proportion: bool = False,
-        rounded: bool = False,
-        precision: int = 3,
-        ax: plt.Axes = None,
-        fontsize: int = None,
+    causal_tree: CausalTreeRegressor,
+    *,
+    max_depth: int = None,
+    feature_names: list = None,
+    class_names: list = None,
+    label: str = "all",
+    filled: bool = False,
+    impurity: bool = True,
+    groups_count: bool = True,
+    treatment_groups: tuple = (0, 1),
+    node_ids: bool = False,
+    proportion: bool = False,
+    rounded: bool = False,
+    precision: int = 3,
+    ax: plt.Axes = None,
+    fontsize: int = None,
 ):
     """
     Plot a Causal Tree.

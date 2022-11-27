@@ -42,7 +42,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         min_samples_leaf: int = 100,
         random_state: int = None,
         groups_cnt: bool = False,
-        groups_cnt_mode: Literal['nodes', 'leaves'] = 'nodes'
+        groups_cnt_mode: Literal["nodes", "leaves"] = "nodes",
     ):
         """
         Initialize a Causal Tree
@@ -386,8 +386,11 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         node_indicators = self.tree_.decision_path(X.astype(np.float32))
 
         for sample_id in range(X.shape[0]):
-            nodes_path = \
-                node_indicators.indices[node_indicators.indptr[sample_id]:node_indicators.indptr[sample_id + 1]]
+            nodes_path = node_indicators.indices[
+                node_indicators.indptr[sample_id] : node_indicators.indptr[
+                    sample_id + 1
+                ]
+            ]
 
             if self.groups_cnt_mode == "leaves":
                 groups_cnt[nodes_path[-1]][treatment[sample_id]] += 1

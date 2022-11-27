@@ -82,7 +82,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         ccp_alpha: float = 0.0,
         groups_penalty: float = 0.5,
         max_samples: int = None,
-        groups_cnt: bool = True
+        groups_cnt: bool = True,
     ):
         """
         Initialize Random Forest of CausalTreeRegressors
