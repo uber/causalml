@@ -4,35 +4,18 @@
 # cython: language_level=3
 # cython: linetrace=True
 
-from sklearn.tree._criterion cimport RegressionCriterion
-from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
+from libc.math cimport fabs
 from libc.string cimport memset
 from libc.string cimport memcpy
-
-
-cdef struct NodeInfo:
-    double count        # the number of obs
-    double tr_count     # the number of treatment obs
-    double ct_count     # the number of control obs
-    double tr_y_sum     # the sum of outcomes among treatment obs
-    double ct_y_sum     # the sum of outcomes among control obs
-    double y_sq_sum     # the squared sum of outcomes
-    double tr_y_sq_sum  # the squared sum of outcomes among treatment obs
-    double ct_y_sq_sum  # the squared sum of outcomes among control obs
-
-
-cdef struct SplitState:
-    NodeInfo node   # current node state
-    NodeInfo right  # right split state
-    NodeInfo left   # left split state
 
 
 cdef class CausalRegressionCriterion(RegressionCriterion):
     """
     Base class for causal tree criterion
     """
-    cdef SplitState state
-    cdef double eps
+    cdef public SplitState state
+    cdef public double groups_penalty
+    cdef public double eps
 
     cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
                     double weighted_n_samples, SIZE_t* samples, SIZE_t start,
@@ -227,6 +210,9 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         dest[0] = self.state.node.tr_y_sum / self.state.node.tr_count - \
                   self.state.node.ct_y_sum / self.state.node.ct_count
 
+    cdef double get_groups_penalty(self, double tr_count, double ct_count) nogil:
+        """Compute penalty for the sample size difference between groups"""
+        return self.groups_penalty * fabs(tr_count- ct_count)
 
 cdef class StandardMSE(CausalRegressionCriterion):
     """
@@ -243,9 +229,12 @@ cdef class StandardMSE(CausalRegressionCriterion):
         cdef double impurity
         cdef SIZE_t k
 
+
         impurity = self.sq_sum_total / self.n_node_samples
         for k in range(self.n_outputs):
             impurity -= (self.sum_total[k] / self.n_node_samples) ** 2.0
+
+        impurity += self.get_groups_penalty(self.state.node.tr_count, self.state.node.ct_count)
 
         return impurity / self.n_outputs
 
@@ -266,10 +255,14 @@ cdef class StandardMSE(CausalRegressionCriterion):
         cdef SIZE_t k
         cdef double proxy_impurity_left = 0.0
         cdef double proxy_impurity_right = 0.0
+        cdef double penalty_left, penalty_right
+
+        penalty_left = self.get_groups_penalty(self.state.left.tr_count, self.state.left.ct_count)
+        penalty_right = self.get_groups_penalty(self.state.right.tr_count, self.state.right.ct_count)
 
         for k in range(self.n_outputs):
-            proxy_impurity_left += self.sum_left[k] * self.sum_left[k]
-            proxy_impurity_right += self.sum_right[k] * self.sum_right[k]
+            proxy_impurity_left += self.sum_left[k] * self.sum_left[k] - penalty_left
+            proxy_impurity_right += self.sum_right[k] * self.sum_right[k] - penalty_right
 
         return (proxy_impurity_left / self.weighted_n_left +
                 proxy_impurity_right / self.weighted_n_right)
@@ -295,6 +288,8 @@ cdef class StandardMSE(CausalRegressionCriterion):
         cdef SIZE_t k
         cdef DOUBLE_t w = 1.0
 
+        cdef double penalty_left, penalty_right
+
         for p in range(start, pos):
             i = samples[p]
 
@@ -311,8 +306,12 @@ cdef class StandardMSE(CausalRegressionCriterion):
             impurity_left[0] -= (self.sum_left[k] / self.weighted_n_left) ** 2.0
             impurity_right[0] -= (self.sum_right[k] / self.weighted_n_right) ** 2.0
 
+        impurity_left[0] += self.get_groups_penalty(self.state.left.tr_count, self.state.left.ct_count)
+        impurity_right[0] += self.get_groups_penalty(self.state.right.tr_count, self.state.right.ct_count)
+
         impurity_left[0] /= self.n_outputs
         impurity_right[0] /= self.n_outputs
+
 
 cdef class CausalMSE(CausalRegressionCriterion):
     """
@@ -342,6 +341,7 @@ cdef class CausalMSE(CausalRegressionCriterion):
             self.state.node.ct_y_sq_sum,
             self.state.node.ct_count)
         impurity = (tr_var / self.state.node.tr_count + ct_var / self.state.node.ct_count) - node_tau * node_tau
+        impurity += self.get_groups_penalty(self.state.node.tr_count, self.state.node.ct_count)
 
         return impurity
 
@@ -379,3 +379,6 @@ cdef class CausalMSE(CausalRegressionCriterion):
                            left_tau * left_tau
         impurity_right[0] = (right_tr_var / self.state.right.tr_count + right_ct_var / self.state.right.ct_count) - \
                             right_tau * right_tau
+
+        impurity_left[0]  += self.get_groups_penalty(self.state.left.tr_count, self.state.left.ct_count)
+        impurity_right[0] += self.get_groups_penalty(self.state.right.tr_count, self.state.right.ct_count)
