@@ -13,8 +13,8 @@ from sklearn.tree._criterion import Criterion
 from sklearn.tree._splitter import Splitter
 from sklearn.utils.validation import _check_sample_weight
 
-from .builder import DepthFirstCausalTreeBuilder, BestFirstCausalTreeBuilder
-from .criterion import StandardMSE, CausalMSE
+from ._builder import DepthFirstCausalTreeBuilder, BestFirstCausalTreeBuilder
+from ._criterion import StandardMSE, CausalMSE
 
 CAUSAL_TREES_CRITERIA = {"causal_mse": CausalMSE, "standard_mse": StandardMSE}
 CRITERIA_REG.update(CAUSAL_TREES_CRITERIA)
@@ -190,6 +190,8 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         criterion = self.criterion
         if not isinstance(criterion, Criterion):
             criterion = CRITERIA_REG[self.criterion](self.n_outputs_, n_samples)
+            criterion.eps = self.eps
+            criterion.groups_penalty = self.groups_penalty
         else:
             # Make a deepcopy in case the criterion has mutable attributes that
             # might be shared and modified concurrently during parallel fitting
