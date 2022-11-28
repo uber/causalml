@@ -73,7 +73,7 @@ setup(
         "setuptools>=18.0",
         "cython",
         "numpy",
-        "scikit-learn>=0.22.0",
+        "scikit-learn<=1.0.2",
     ],
     install_requires=requirements,
     tests_require=requirements_test,
