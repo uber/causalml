@@ -2,13 +2,11 @@ import logging
 import sys
 from typing import Union
 
-import forestci as fci
 import numpy as np
 import tqdm
 from pathos.pools import ProcessPool as PPool
 from scipy.stats import norm
 from sklearn.base import RegressorMixin
-from sklearn.ensemble._forest import ForestRegressor
 from sklearn.tree._tree import DTYPE
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
@@ -34,15 +32,17 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         alpha: float = 0.05,
         control_name: Union[int, str] = 0,
         max_depth: int = None,
-        min_samples_split: Union[int, float] = 2,
+        min_samples_split: Union[int, float] = 60,
         min_weight_fraction_leaf: float = 0.0,
         max_features: Union[int, float, str] = None,
         max_leaf_nodes: int = None,
         min_impurity_decrease: float = float("-inf"),
         ccp_alpha: float = 0.0,
+        groups_penalty: float = 0.5,
         min_samples_leaf: int = 100,
         random_state: int = None,
-        leaves_groups_cnt: bool = False,
+        groups_cnt: bool = False,
+        groups_cnt_mode: str = "nodes",
     ):
         """
         Initialize a Causal Tree
@@ -92,6 +92,9 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 subtree with the largest cost complexity that is smaller than
                 ``ccp_alpha`` will be chosen. By default, no pruning is performed. See
                 :ref:`minimal_cost_complexity_pruning` for details.
+            groups_penalty: (float, default=0.5)
+                This penalty coefficient manages the node impurity increase in case of the difference between
+                treatment and control samples sizes.
             min_samples_leaf: (int or float), default=100
                 The minimum number of samples required to be at a leaf node.
                 A split point at any depth will only be considered if it leaves at
@@ -106,7 +109,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             random_state: (int), RandomState instance or None, default=None
                 Used to pick randomly the `max_features` used at each split.
                 See :term:`Glossary <random_state>` for details.
-            leaves_groups_cnt: (bool), count treatment groups for each leaf
+            groups_cnt: (bool), count treatment and control groups for each node/leaf
+            groups_cnt_mode: (str, 'nodes', 'leaves'), mode for samples counting
         """
 
         self.criterion = criterion
@@ -120,13 +124,15 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
         self.ccp_alpha = ccp_alpha
+        self.groups_penalty = groups_penalty
         self.min_samples_leaf = min_samples_leaf
         self.random_state = random_state
 
         self.eps = 1e-5
         self._classes = {}
-        self.leaves_groups_cnt = leaves_groups_cnt
-        self._leaves_groups_cnt = {}
+        self.groups_cnt = groups_cnt
+        self.groups_cnt_mode = groups_cnt_mode
+        self._groups_cnt = {}
 
         super().__init__(
             criterion=criterion,
@@ -176,17 +182,12 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             X, y, w = X, y, sample_weight
         else:
             X, y, w = self._prepare_data(X=X, y=y, treatment=treatment)
+        self.treatment_groups = np.unique(w)
 
         super().fit(X=X, y=y, sample_weight=self.eps + w, check_input=check_input)
 
-        if self.leaves_groups_cnt:
-            if treatment is None:
-                raise ValueError(
-                    "`treatment` must be provided to get _leaves_groups_cnt attribute."
-                )
-            self._leaves_groups_cnt = self._count_groups_distribution(
-                X=X, treatment=treatment
-            )
+        if self.groups_cnt:
+            self._groups_cnt = self._count_groups_distribution(X=X, treatment=w)
         return self
 
     def fit_predict(
@@ -355,8 +356,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             )
         check_treatment_vector(treatment, self.control_name)
 
-        self.treatment_groups = np.unique(treatment)
-
         self.is_treatment = treatment != self.control_name
         w = self.is_treatment.astype(int)
 
@@ -367,234 +366,35 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
 
         return X, y, w
 
-    def _get_leaf_id(self, X: np.ndarray) -> int:
-        """
-        Find tree leaf id for a feature vector
-        Args:
-            X: (np.ndarray), feature vector
-        Returns: int, leaf id
-        """
-        check_is_fitted(self)
-        assert (
-            X.shape[0] == self.n_features
-        ), f"Trained model has different feature size. Got: {X.shape[0]}. Expected:{self.n_features}"
-
-        node_id = 0
-        while not self.is_leaves[node_id]:
-
-            left_node_id = self.tree_.children_left[node_id]
-            right_node_id = self.tree_.children_right[node_id]
-            feature_value = X[self.tree_.feature[node_id]]
-
-            if feature_value <= self.tree_.threshold[node_id]:
-                node_id = left_node_id
-            else:
-                node_id = right_node_id
-        return node_id
-
     def _count_groups_distribution(self, X: np.ndarray, treatment: np.ndarray) -> dict:
 
         """
-        Count treatment, control distribution for tree leaves based on train data
+        Count treatment, control distribution for tree nodes/leaves
         Args:
             X: (np.ndarray), feature matrix
             treatment: (np.ndarray), treatment vector
         Returns:
-            dict: treatment groups for each tree leaf
+            dict: treatment groups for each tree node/leaves
         """
         check_is_fitted(self)
 
         self.is_leaves = get_tree_leaves_mask(self)
-        nodes_ids = np.array(range(self.tree_.node_count))
-        leaves_ids = nodes_ids[self.is_leaves]
-
-        leaves_groups_cnt = {
-            leaf_id: {group: 0 for group in self.treatment_groups}
-            for leaf_id in leaves_ids
+        groups_cnt = {
+            idx: {group: 0 for group in self.treatment_groups}
+            for idx in np.array(range(self.tree_.node_count))
         }
+        node_indicators = self.tree_.decision_path(X.astype(np.float32))
 
-        for row_id in range(X.shape[0]):
-            leaf_id = self._get_leaf_id(X=X[row_id, :])
-            leaves_groups_cnt[leaf_id][treatment[row_id]] += 1
+        for sample_id in range(X.shape[0]):
+            nodes_path = node_indicators.indices[
+                node_indicators.indptr[sample_id] : node_indicators.indptr[
+                    sample_id + 1
+                ]
+            ]
 
-        return leaves_groups_cnt
-
-
-class CausalRandomForestRegressor(ForestRegressor):
-    def __init__(
-        self,
-        n_estimators: int = 100,
-        *,
-        control_name: Union[int, str] = 0,
-        criterion: str = "causal_mse",
-        alpha: float = 0.05,
-        max_depth: int = None,
-        min_samples_split: int = 2,
-        min_samples_leaf: int = 100,
-        min_weight_fraction_leaf: float = 0.0,
-        max_features: Union[int, float, str] = 1.0,
-        max_leaf_nodes: int = None,
-        min_impurity_decrease: float = float("-inf"),
-        bootstrap: bool = True,
-        oob_score: bool = False,
-        n_jobs: int = None,
-        random_state: int = None,
-        verbose: int = 0,
-        warm_start: bool = False,
-        ccp_alpha: float = 0.0,
-        max_samples: int = None,
-    ):
-        """
-        Initialize Random Forest of CausalTreeRegressors
-
-        Args:
-            n_estimators: (int, default=100)
-                    Number of trees in the forest
-            control_name: (str or int)
-                    Name of control group
-            criterion: ({"causal_mse", "standard_mse"}, default="causal_mse"):
-                    Function to measure the quality of a split.
-            alpha: (float)
-                    The confidence level alpha of the ATE estimate and ITE bootstrap estimates
-            max_depth: (int, default=None)
-                    The maximum depth of the tree.
-            min_samples_split: (int or float, default=2)
-                The minimum number of samples required to split an internal node:
-            min_samples_leaf: (int or float), default=100
-                The minimum number of samples required to be at a leaf node.
-            min_weight_fraction_leaf: (float, default=0.0)
-                The minimum weighted fraction of the sum total of weights (of all
-                the input samples) required to be at a leaf node.
-            max_features: (int, float or {"auto", "sqrt", "log2"}, default=None)
-                The number of features to consider when looking for the best split
-            max_leaf_nodes: (int, default=None)
-                Grow a tree with ``max_leaf_nodes`` in best-first fashion.
-            min_impurity_decrease: (float, default=float("-inf")))
-                A node will be split if this split induces a decrease of the impurity
-                greater than or equal to this value.
-            bootstrap : (bool, default=True)
-                Whether bootstrap samples are used when building trees.
-            oob_score : bool, default=False
-                Whether to use out-of-bag samples to estimate the generalization score.
-            n_jobs : int, default=None
-                    The number of jobs to run in parallel.
-            random_state : (int, RandomState instance or None, default=None)
-                    Controls both the randomness of the bootstrapping of the samples used
-                    when building trees (if ``bootstrap=True``) and the sampling of the
-                    features to consider when looking for the best split at each node
-                    (if ``max_features < n_features``).
-            verbose : (int, default=0)
-                    Controls the verbosity when fitting and predicting.
-            warm_start : (bool, default=False)
-                    When set to ``True``, reuse the solution of the previous call to fit
-                    and add more estimators to the ensemble, otherwise, just fit a whole
-                    new forest.
-            ccp_alpha : (non-negative float, default=0.0)
-                    Complexity parameter used for Minimal Cost-Complexity Pruning.
-            max_samples : (int or float, default=None)
-                    If bootstrap is True, the number of samples to draw from X
-                    to train each base estimator.
-        """
-        super().__init__(
-            base_estimator=CausalTreeRegressor(
-                control_name=control_name, criterion=criterion
-            ),
-            n_estimators=n_estimators,
-            estimator_params=(
-                "criterion",
-                "control_name",
-                "max_depth",
-                "min_samples_split",
-                "min_weight_fraction_leaf",
-                "max_features",
-                "max_leaf_nodes",
-                "min_impurity_decrease",
-                "ccp_alpha",
-                "min_samples_leaf",
-                "random_state",
-            ),
-            bootstrap=bootstrap,
-            oob_score=oob_score,
-            n_jobs=n_jobs,
-            random_state=random_state,
-            verbose=verbose,
-            warm_start=warm_start,
-            max_samples=max_samples,
-        )
-
-        self.criterion = criterion
-        self.control_name = control_name
-        self.max_depth = max_depth
-        self.min_samples_split = min_samples_split
-        self.min_samples_leaf = min_samples_leaf
-        self.min_weight_fraction_leaf = min_weight_fraction_leaf
-        self.max_features = max_features
-        self.max_leaf_nodes = max_leaf_nodes
-        self.min_impurity_decrease = min_impurity_decrease
-        self.ccp_alpha = ccp_alpha
-        self.alpha = alpha
-
-    def fit(self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray):
-        """
-        Fit Causal RandomForest
-        Args:
-            X: (np.ndarray), feature matrix
-            treatment: (np.ndarray), treatment vector
-            y: (np.ndarray), outcome vector
-        Returns:
-             self
-        """
-        X, y, w = self.base_estimator._prepare_data(X=X, y=y, treatment=treatment)
-        return super().fit(X=X, y=y, sample_weight=w)
-
-    def calculate_error(
-        self,
-        X_train: np.ndarray,
-        X_test: np.ndarray,
-        inbag: np.ndarray = None,
-        calibrate: bool = True,
-        memory_constrained: bool = False,
-        memory_limit: int = None,
-    ) -> np.ndarray:
-        """
-        Calculate error bars from scikit-learn RandomForest estimators
-        Source:
-        https://github.com/scikit-learn-contrib/forest-confidence-interval
-
-        Args:
-            X_train: (np.ndarray), training subsample of feature matrix, (n_train_sample, n_features)
-            X_test: (np.ndarray), test subsample of feature matrix, (n_train_sample, n_features)
-            inbag: (ndarray, optional),
-                    The inbag matrix that fit the data. If set to `None` (default) it
-                    will be inferred from the forest. However, this only works for trees
-                    for which bootstrapping was set to `True`. That is, if sampling was
-                    done with replacement. Otherwise, users need to provide their own
-                    inbag matrix.
-            calibrate: (boolean, optional)
-                    Whether to apply calibration to mitigate Monte Carlo noise.
-                    Some variance estimates may be negative due to Monte Carlo effects if
-                    the number of trees in the forest is too small. To use calibration,
-                    Default: True
-            memory_constrained: (boolean, optional)
-                    Whether or not there is a restriction on memory. If False, it is
-                    assumed that a ndarray of shape (n_train_sample,n_test_sample) fits
-                    in main memory. Setting to True can actually provide a speedup if
-                    memory_limit is tuned to the optimal range.
-            memory_limit: (int, optional)
-                    An upper bound for how much memory the intermediate matrices will take
-                    up in Megabytes. This must be provided if memory_constrained=True.
-
-        Returns:
-            (np.ndarray), An array with the unbiased sampling variance for a RandomForest object.
-        """
-
-        var = fci.random_forest_error(
-            self,
-            X_train,
-            X_test,
-            inbag=inbag,
-            calibrate=calibrate,
-            memory_constrained=memory_constrained,
-            memory_limit=memory_limit,
-        )
-        return var
+            if self.groups_cnt_mode == "leaves":
+                groups_cnt[nodes_path[-1]][treatment[sample_id]] += 1
+            elif self.groups_cnt_mode == "nodes":
+                for node_id in nodes_path:
+                    groups_cnt[node_id][treatment[sample_id]] += 1
+        return groups_cnt
