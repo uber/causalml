@@ -18,10 +18,10 @@ S-learner estimates the treatment effect using a single machine learning model a
 
 **Stage 1**
 
-Estimate the average outcomes :math:`\mu(x)` with covariates :math:`X` and an indicator variable for treatment effect :math:`W`:
+Estimate the average outcomes :math:`\mu(x)` with covariates :math:`X` and an indicator variable for treatment :math:`W`:
 
 .. math::
-  \mu(x) = E[Y \mid X=x, W=w]
+  \mu(x,w) = E[Y \mid X=x, W=w]
 
 using a machine learning model.
 

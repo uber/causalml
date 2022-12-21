@@ -28,15 +28,15 @@ with open("requirements-test.txt") as f:
 
 extensions = [
     Extension(
-        "causalml.inference.tree.causal.criterion",
-        ["causalml/inference/tree/causal/criterion.pyx"],
+        "causalml.inference.tree.causal._criterion",
+        ["causalml/inference/tree/causal/_criterion.pyx"],
         libraries=[],
         include_dirs=[np_get_include()],
         extra_compile_args=["-O3"],
     ),
     Extension(
-        "causalml.inference.tree.causal.builder",
-        ["causalml/inference/tree/causal/builder.pyx"],
+        "causalml.inference.tree.causal._builder",
+        ["causalml/inference/tree/causal/_builder.pyx"],
         libraries=[],
         include_dirs=[np_get_include()],
         extra_compile_args=["-O3"],
@@ -73,7 +73,7 @@ setup(
         "setuptools>=18.0",
         "cython",
         "numpy",
-        "scikit-learn>=0.22.0",
+        "scikit-learn<=1.0.2",
     ],
     install_requires=requirements,
     tests_require=requirements_test,
