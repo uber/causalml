@@ -333,10 +333,10 @@ class FilterSelect:
             pk (float): Probability of class 1 in treatment group
             qk (float): Probability of class 1 in control group
         """
-        if qk < 0.1**6:
-            qk = 0.1**6
-        elif qk > 1 - 0.1**6:
-            qk = 1 - 0.1**6
+        if qk < 0.1 ** 6:
+            qk = 0.1 ** 6
+        elif qk > 1 - 0.1 ** 6:
+            qk = 1 - 0.1 ** 6
         S = pk * np.log(pk / qk) + (1 - pk) * np.log((1 - pk) / (1 - qk))
         return S
 
@@ -398,8 +398,8 @@ class FilterSelect:
         for treatment_group in nodeSummary:
             if treatment_group != control_group:
                 d_res += (nodeSummary[treatment_group][0] - pc) ** 2 / max(
-                    0.1**6, pc
-                ) + (nodeSummary[treatment_group][0] - pc) ** 2 / max(0.1**6, 1 - pc)
+                    0.1 ** 6, pc
+                ) + (nodeSummary[treatment_group][0] - pc) ** 2 / max(0.1 ** 6, 1 - pc)
         return d_res
 
     def _filter_D_one_feature(

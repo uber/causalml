@@ -221,7 +221,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ("index", "causalml.tex", "causalml Documentation", "Someone at Uber", "manual"),
+    ("index", "causalml.tex", "causalml Documentation", "Someone at Uber", "manual")
 ]
 
 # The name of an image file (relative to this directory) to place at
@@ -269,7 +269,7 @@ texinfo_documents = [
         "causalml",
         "One line description of project.",
         "Miscellaneous",
-    ),
+    )
 ]
 
 # Documents to append as an appendix to all manuals.

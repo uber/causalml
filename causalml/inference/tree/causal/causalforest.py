@@ -141,9 +141,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         """
         super().__init__(
             base_estimator=CausalTreeRegressor(
-                control_name=control_name,
-                criterion=criterion,
-                groups_cnt=groups_cnt,
+                control_name=control_name, criterion=criterion, groups_cnt=groups_cnt
             ),
             n_estimators=n_estimators,
             estimator_params=(

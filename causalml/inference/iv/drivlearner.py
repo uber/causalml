@@ -194,8 +194,9 @@ class BaseDRIVLearner(object):
                     mask = (treatment_treat == group) | (
                         treatment_treat == self.control_name
                     )
-                    mask_1, mask_0 = mask & (assignment_treat == 1), mask & (
-                        assignment_treat == 0
+                    mask_1, mask_0 = (
+                        mask & (assignment_treat == 1),
+                        mask & (assignment_treat == 0),
                     )
                     cur_p_1[group], _ = compute_propensity_score(
                         X=X_treat[mask_1],
@@ -232,8 +233,9 @@ class BaseDRIVLearner(object):
             logger.info("Generate outcome regressions")
             for group in self.t_groups:
                 mask = (treatment_out == group) | (treatment_out == self.control_name)
-                mask_1, mask_0 = mask & (assignment_out == 1), mask & (
-                    assignment_out == 0
+                mask_1, mask_0 = (
+                    mask & (assignment_out == 1),
+                    mask & (assignment_out == 0),
                 )
                 self.models_mu_c[group][ifold].fit(X_out[mask_0], y_out[mask_0])
                 self.models_mu_t[group][ifold].fit(X_out[mask_1], y_out[mask_1])
@@ -265,7 +267,7 @@ class BaseDRIVLearner(object):
                     - p_0_filt
                 )
                 dr /= weight
-                self.models_tau[group][ifold].fit(X_filt, dr, sample_weight=weight**2)
+                self.models_tau[group][ifold].fit(X_filt, dr, sample_weight=weight ** 2)
 
     def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
@@ -524,14 +526,14 @@ class BaseDRIVLearner(object):
 
             part_1 = (
                 (y_filt_1 - yhat_1).var()
-                + _ate**2 * (treatment_filt_1 - prob_treatment_1).var()
+                + _ate ** 2 * (treatment_filt_1 - prob_treatment_1).var()
                 - 2
                 * _ate
                 * (y_filt_1 * treatment_filt_1 - yhat_1 * prob_treatment_1).mean()
             )
             part_0 = (
                 (y_filt_0 - yhat_0).var()
-                + _ate**2 * (treatment_filt_0 - prob_treatment_0).var()
+                + _ate ** 2 * (treatment_filt_0 - prob_treatment_0).var()
                 - 2
                 * _ate
                 * (y_filt_0 * treatment_filt_0 - yhat_0 * prob_treatment_0).mean()
