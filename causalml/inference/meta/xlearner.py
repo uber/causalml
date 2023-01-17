@@ -331,6 +331,9 @@ class BaseXLearner(BaseLearner):
                 )
             else:
                 p = self._format_p(p, self.t_groups)
+                te, dhat_cs, dhat_ts = self.predict(
+                    X, treatment, y, p=p, return_components=True
+                )
         else:
             te, dhat_cs, dhat_ts = self.fit_predict(
                 X, treatment, y, p, return_components=True
