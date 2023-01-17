@@ -321,13 +321,19 @@ class BaseXLearner(BaseLearner):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        if pretrain and p is None:
-            # when p is null, use pretrain propensity score
-            if not self.propensity:
-                raise ValueError("no propensity score, please call fit() first")
-            te, dhat_cs, dhat_ts = self.predict(
-                X, treatment, y, p=self.propensity, return_components=True
-            )
+        if pretrain:
+            if p is None:
+                # when p is null, use pretrain propensity score
+                if not self.propensity:
+                    raise ValueError("no propensity score, please call fit() first")
+                te, dhat_cs, dhat_ts = self.predict(
+                    X, treatment, y, p=self.propensity, return_components=True
+                )
+            else:
+                p = self._format_p(p, self.t_groups)
+                te, dhat_cs, dhat_ts = self.predict(
+                    X, treatment, y, p=p, return_components=True
+                )
         else:
             te, dhat_cs, dhat_ts = self.fit_predict(
                 X, treatment, y, p, return_components=True
