@@ -61,18 +61,15 @@ def get_pns_bounds(data_exp, data_obs, T, Y, type="PNS"):
     Y0doT0 = 1 - Y1doT0
 
     if type == "PNS":
-
         lb_args = [0, Y1doT1 - Y1doT0, Y1 - Y1doT0, Y1doT1 - Y1]
 
         ub_args = [Y1doT1, Y0doT0, T1Y1 + T0Y0, Y1doT1 - Y1doT0 + T1Y0 + T0Y1]
 
     if type == "PN":
-
         lb_args = [0, (Y1 - Y1doT0) / T1Y1]
         ub_args = [1, (Y0doT0 - T0Y0) / T1Y1]
 
     if type == "PS":
-
         lb_args = [0, (Y1doT1 - Y1) / T0Y0]
         ub_args = [1, (Y1doT1 - T1Y1) / T0Y0]
 

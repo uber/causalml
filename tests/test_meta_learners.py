@@ -671,7 +671,6 @@ def test_TMLELearner(generate_regression_data):
 
 
 def test_BaseSClassifier(generate_classification_data):
-
     np.random.seed(RANDOM_SEED)
 
     df, x_names = generate_classification_data()
@@ -716,7 +715,6 @@ def test_BaseSClassifier(generate_classification_data):
 
 
 def test_BaseTClassifier(generate_classification_data):
-
     np.random.seed(RANDOM_SEED)
 
     df, x_names = generate_classification_data()
@@ -761,7 +759,6 @@ def test_BaseTClassifier(generate_classification_data):
 
 
 def test_BaseXClassifier(generate_classification_data):
-
     np.random.seed(RANDOM_SEED)
 
     df, x_names = generate_classification_data()
@@ -832,7 +829,6 @@ def test_BaseXClassifier(generate_classification_data):
 
 
 def test_BaseRClassifier(generate_classification_data):
-
     np.random.seed(RANDOM_SEED)
 
     df, x_names = generate_classification_data()
@@ -882,7 +878,6 @@ def test_BaseRClassifier(generate_classification_data):
 
 
 def test_BaseRClassifier_with_sample_weights(generate_classification_data):
-
     np.random.seed(RANDOM_SEED)
 
     df, x_names = generate_classification_data()
