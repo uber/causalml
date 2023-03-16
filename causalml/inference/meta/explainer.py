@@ -215,17 +215,22 @@ class Explainer(object):
                 title = "{} - {}".format(title_prefix, title)
             plt.title(title)
 
-    def plot_shap_values(self, shap_dict=None):
+    def plot_shap_values(self, shap_dict=None, **kwargs):
         """
         Calculates and plots the distribution of shapley values of each feature, for each treatment group.
         Skips the calculation part if shap_dict is given.
+
+        Args:
+            shap_dict (optional, dict): a dict of shapley value matrics. If None, shap_dict will be computed.
         """
         if shap_dict is None:
             shap_dict = self.get_shap_values()
 
         for group, values in shap_dict.items():
             plt.title(group)
-            shap.summary_plot(values, features=self.X, feature_names=self.features)
+            shap.summary_plot(
+                values, features=self.X, feature_names=self.features, **kwargs
+            )
 
     def plot_shap_dependence(
         self,
@@ -246,9 +251,9 @@ class Explainer(object):
 
         Args:
              treatment_group (str or int): name of treatment group to create dependency plot on
-             feature_idx (str or int): feature index / name to create dependency plot on
+             feature_idx (str or int): feature index/name to create dependency plot on
              shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
-             interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
+             interaction_idx (optional, str or int): feature index/name used in coloring scheme as interaction feature.
                  If "auto" then shap.common.approximate_interactions is used to pick what seems to be the
                  strongest interaction (note that to find to true strongest interaction you need to compute
                  the SHAP interaction values).
