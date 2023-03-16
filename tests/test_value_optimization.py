@@ -15,7 +15,6 @@ from tests.const import RANDOM_SEED
 
 
 def test_counterfactual_value_optimization():
-
     df, X_names = make_uplift_classification(
         n_samples=2000, treatment_name=["control", "treatment1", "treatment2"]
     )

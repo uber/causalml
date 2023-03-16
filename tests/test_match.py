@@ -9,7 +9,6 @@ from .const import RANDOM_SEED, TREATMENT_COL, SCORE_COL, GROUP_COL
 
 @pytest.fixture
 def generate_unmatched_data(generate_regression_data):
-
     generated = False
 
     def _generate_data():

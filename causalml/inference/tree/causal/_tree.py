@@ -32,7 +32,6 @@ class BaseCausalDecisionTree(BaseDecisionTree):
     def fit(
         self, X, y, sample_weight=None, check_input=True, X_idx_sorted="deprecated"
     ):
-
         random_state = check_random_state(self.random_state)
 
         if self.ccp_alpha < 0.0:

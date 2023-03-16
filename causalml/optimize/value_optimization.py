@@ -57,7 +57,6 @@ class CounterfactualValueEstimator:
         *args,
         **kwargs
     ):
-
         self.treatment = treatment
         self.control_name = control_name
         self.treatment_names = treatment_names

@@ -278,7 +278,6 @@ def get_tree_leaves_mask(tree) -> np.ndarray:
     is_leaves = np.zeros(shape=n_nodes, dtype=bool)
     stack = [(0, 0)]
     while len(stack) > 0:
-
         node_id, depth = stack.pop()
         node_depth[node_id] = depth
 

@@ -62,7 +62,6 @@ class CounterfactualUnitSelector:
         defier_payoff,
         organic_conversion=None,
     ):
-
         self.learner = learner
         self.nevertaker_payoff = nevertaker_payoff
         self.alwaystaker_payoff = alwaystaker_payoff
@@ -76,11 +75,9 @@ class CounterfactualUnitSelector:
         """
 
         if self._gain_equality_check():
-
             self._fit_segment_model(data, treatment, outcome)
 
         else:
-
             self._fit_segment_model(data, treatment, outcome)
             self._fit_condprob_models(data, treatment, outcome)
 
@@ -91,11 +88,9 @@ class CounterfactualUnitSelector:
         """
 
         if self._gain_equality_check():
-
             est_payoff = self._get_exact_benefit(data, treatment, outcome)
 
         else:
-
             est_payoff = self._obj_func_midp(data, treatment, outcome)
 
         return est_payoff
@@ -246,11 +241,9 @@ class CounterfactualUnitSelector:
         pr_y0w1_x = segment_prob[:, segment_name == "ND"]
 
         if self.organic_conversion is not None:
-
             pr_y_x = self.organic_conversion
 
         else:
-
             pr_y_x = pr_y1_w0
             warnings.warn(
                 "Probability of organic conversion estimated from control observations."

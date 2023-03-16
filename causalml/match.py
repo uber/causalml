@@ -424,7 +424,6 @@ class MatchOptimizer(object):
 
 
 if __name__ == "__main__":
-
     from .features import TREATMENT_COL, SCORE_COL, GROUPBY_COL, PROPENSITY_FEATURES
     from .features import PROPENSITY_FEATURE_TRANSFORMATIONS, MATCHING_COVARIATES
     from .features import load_data

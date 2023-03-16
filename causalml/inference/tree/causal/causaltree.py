@@ -367,7 +367,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         return X, y, w
 
     def _count_groups_distribution(self, X: np.ndarray, treatment: np.ndarray) -> dict:
-
         """
         Count treatment, control distribution for tree nodes/leaves
         Args:
