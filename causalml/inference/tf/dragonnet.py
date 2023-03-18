@@ -42,9 +42,13 @@ class DragonNet:
         ratio=1.0,
         val_split=0.2,
         batch_size=64,
-        epochs=30,
-        learning_rate=1e-3,
+        epochs=100,
+        learning_rate=1e-5,
+        momentum=0.9,
         reg_l2=0.01,
+        use_adam=True,
+        adam_epochs=30,
+        adam_learning_rate=1e-3,
         loss_func=dragonnet_loss_binarycross,
         verbose=True,
     ):
@@ -58,8 +62,12 @@ class DragonNet:
         self.batch_size = batch_size
         self.epochs = epochs
         self.learning_rate = learning_rate
-        self.loss_func = loss_func
+        self.momentum = momentum
+        self.use_adam = use_adam
+        self.adam_learning_rate = adam_learning_rate
+        self.adam_epochs = adam_epochs
         self.reg_l2 = reg_l2
+        self.loss_func = loss_func
         self.verbose = verbose
 
     def make_dragonnet(self, input_dim):
@@ -166,34 +174,35 @@ class DragonNet:
         else:
             loss = self.loss_func
 
-        self.dragonnet.compile(
-            optimizer=Adam(lr=self.learning_rate), loss=loss, metrics=metrics
-        )
+        if self.use_adam:
+            self.dragonnet.compile(
+                optimizer=Adam(lr=self.adam_learning_rate), loss=loss, metrics=metrics
+            )
 
-        adam_callbacks = [
-            TerminateOnNaN(),
-            EarlyStopping(monitor="val_loss", patience=2, min_delta=0.0),
-            ReduceLROnPlateau(
-                monitor="loss",
-                factor=0.5,
-                patience=5,
+            adam_callbacks = [
+                TerminateOnNaN(),
+                EarlyStopping(monitor="val_loss", patience=2, min_delta=0.0),
+                ReduceLROnPlateau(
+                    monitor="loss",
+                    factor=0.5,
+                    patience=5,
+                    verbose=self.verbose,
+                    mode="auto",
+                    min_delta=1e-8,
+                    cooldown=0,
+                    min_lr=0,
+                ),
+            ]
+
+            self.dragonnet.fit(
+                X,
+                y,
+                callbacks=adam_callbacks,
+                validation_split=self.val_split,
+                epochs=self.adam_epochs,
+                batch_size=self.batch_size,
                 verbose=self.verbose,
-                mode="auto",
-                min_delta=1e-8,
-                cooldown=0,
-                min_lr=0,
-            ),
-        ]
-
-        self.dragonnet.fit(
-            X,
-            y,
-            callbacks=adam_callbacks,
-            validation_split=self.val_split,
-            epochs=self.epochs,
-            batch_size=self.batch_size,
-            verbose=self.verbose,
-        )
+            )
 
         sgd_callbacks = [
             TerminateOnNaN(),
@@ -210,10 +219,8 @@ class DragonNet:
             ),
         ]
 
-        sgd_lr = 1e-5
-        momentum = 0.9
         self.dragonnet.compile(
-            optimizer=SGD(lr=sgd_lr, momentum=momentum, nesterov=True),
+            optimizer=SGD(lr=self.learning_rate, momentum=self.momentum, nesterov=True),
             loss=loss,
             metrics=metrics,
         )
@@ -222,7 +229,7 @@ class DragonNet:
             y,
             callbacks=sgd_callbacks,
             validation_split=self.val_split,
-            epochs=300,
+            epochs=self.epochs,
             batch_size=self.batch_size,
             verbose=self.verbose,
         )
