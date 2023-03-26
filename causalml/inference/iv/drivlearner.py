@@ -548,7 +548,7 @@ class BaseDRIVLearner(object):
             # SE formula is based on the lower bound formula (9) from Frölich, Markus. 2006.
             # "Nonparametric IV estimation of local average treatment effects wth covariates."
             # Journal of Econometrics.
-            se = np.sqrt((part_1 / w + part_2 / (1 - w)) + part_2) / Gamma
+            se = np.sqrt((part_1 / w + part_0 / (1 - w)) + part_2) / Gamma
 
             _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
             _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
