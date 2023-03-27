@@ -17,18 +17,20 @@ The module structure is the following:
 # Authors: Zhenyu Zhao <zhenyuz@uber.com>
 #          Totte Harinen <totte@uber.com>
 
-from collections import defaultdict
-import cython
-from joblib import Parallel, delayed
 import multiprocessing as mp
-cimport numpy as np
+from collections import defaultdict
+
+import logging
+import cython
 import numpy as np
-from packaging import version
 import pandas as pd
 import scipy.stats as stats
 import sklearn
-from sklearn.utils import check_array, check_random_state, check_X_y
-from typing import List
+from joblib import Parallel, delayed
+from packaging import version
+from sklearn.model_selection import train_test_split
+from sklearn.utils import check_X_y, check_array, check_random_state
+
 if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
     from sklearn.utils._testing import ignore_warnings
 else:
@@ -37,6 +39,7 @@ else:
 
 MAX_INT = np.iinfo(np.int32).max
 
+logger = logging.getLogger("causalml")
 
 cdef extern from "math.h":
     double log(double x) nogil
@@ -244,7 +247,7 @@ class UpliftTreeClassifier:
         self.n_reg = n_reg
         self.max_features = max_features
 
-        assert evaluationFunction is not None and evaluationFunction in ['KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', 'IDDP'], \
+        assert evaluationFunction in ['KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', 'IDDP'], \
             f"evaluationFunction should be either 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', or 'IDDP' but {evaluationFunction} is passed"
 
         if evaluationFunction == 'KL':
@@ -314,28 +317,19 @@ class UpliftTreeClassifier:
 
         self.feature_imp_dict = defaultdict(float)
 
-        if self.n_class > 2 and (self.evaluationFunction == self.evaluate_DDP or self.evaluationFunction == self.evaluate_IDDP or
-                                 self.evaluationFunction == self.evaluate_IT or self.evaluationFunction == self.evaluate_CIT):
+        if (self.n_class > 2) and (self.evaluationFunction in [self.evaluate_DDP, self.evaluate_IDDP, self.evaluate_IT, self.evaluate_CIT]):
             raise ValueError("The DDP, IDDP, IT, and CIT approach can only cope with two class problems, that is two different treatment "
                              "options (e.g., control vs treatment). Please select another approach or only use a "
                              "dataset which employs two treatment options.")
 
         if self.honesty:
             try:
-                X, X_est, treatment_idx, treatment_idx_est, y, y_est = sklearn.model_selection.train_test_split(X,
-                                                                                                                treatment_idx,
-                                                                                                                y,
-                                                                                                                stratify=[treatment_idx, y],
-                                                                                                                test_size=self.estimation_sample_size,
-                                                                                                                shuffle=True,
-                                                                                                                random_state=self.random_state)
+                X, X_est, treatment_idx, treatment_idx_est, y, y_est = train_test_split(X, treatment_idx, y, stratify=[treatment_idx, y], test_size=self.estimation_sample_size,
+                                                                                        shuffle=True, random_state=self.random_state)
             except ValueError:
-                X, X_est, treatment_idx, treatment_idx_est, y, y_est = sklearn.model_selection.train_test_split(X,
-                                                                                                                treatment_idx,
-                                                                                                                y,
-                                                                                                                test_size=self.estimation_sample_size,
-                                                                                                                shuffle=True,
-                                                                                                                random_state=self.random_state)
+                logger.warning(f"Stratified sampling failed. Falling back to random sampling.")
+                X, X_est, treatment_idx, treatment_idx_est, y, y_est = train_test_split(X, treatment_idx, y, test_size=self.estimation_sample_size, shuffle=True,
+                                                                                        random_state=self.random_state)
 
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
             X, treatment_idx, y,
@@ -347,11 +341,10 @@ class UpliftTreeClassifier:
         if self.honesty:
             self.honestApproach(X_est, treatment_idx_est, y_est)
 
-        with np.errstate(divide='ignore',invalid='ignore'):
-            self.feature_importances_ = np.zeros(X.shape[1])
-            for col, imp in self.feature_imp_dict.items():
-                self.feature_importances_[col] = imp
-            self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
+        self.feature_importances_ = np.zeros(X.shape[1])
+        for col, imp in self.feature_imp_dict.items():
+            self.feature_importances_[col] = imp
+        self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
     # Prune Trees
     def prune(self, X, treatment, y, minGain=0.0001, rule='maxAbsDiff'):
