@@ -79,8 +79,8 @@ class BaseTLearner(BaseLearner):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
-        check_treatment_vector(treatment, self.control_name)
+        # X, treatment, y = convert_pd_to_np(X, treatment, y)
+        # check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
@@ -111,7 +111,7 @@ class BaseTLearner(BaseLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        # X, treatment, y = convert_pd_to_np(X, treatment, y)
         yhat_cs = {}
         yhat_ts = {}
 
@@ -171,7 +171,7 @@ class BaseTLearner(BaseLearner):
                 If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
                 UB [n_samples, n_treatment]
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        # X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.fit(X, treatment, y)
         te = self.predict(X, treatment, y, return_components=return_components)
 
