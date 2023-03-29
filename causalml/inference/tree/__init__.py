@@ -2,6 +2,7 @@ from .causal.causaltree import CausalTreeRegressor
 from .causal.causalforest import CausalRandomForestRegressor
 from .plot import uplift_tree_string, uplift_tree_plot, plot_dist_tree_leaves_values
 from .uplift import DecisionTree, UpliftTreeClassifier, UpliftRandomForestClassifier
+from .bart import BART
 from .utils import (
     cat_group,
     cat_transform,
