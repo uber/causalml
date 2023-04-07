@@ -229,12 +229,13 @@ class UpliftTreeClassifier:
 
     """
     def __init__(self, control_name, max_features=None, max_depth=3, min_samples_leaf=100,
-                 min_samples_treatment=10, n_reg=100, evaluationFunction='KL',
+                 min_samples_treatment=10, n_reg=100, eval_diff=0.01, evaluationFunction='KL',
                  normalization=True, random_state=None):
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
+        self.eval_diff = eval_diff
         self.max_features = max_features
         if evaluationFunction == 'KL':
             self.evaluationFunction = self.evaluate_KL
@@ -257,7 +258,7 @@ class UpliftTreeClassifier:
         self.normalization = normalization
         self.random_state = random_state
 
-    def fit(self, X, treatment, y):
+    def fit(self, X, treatment, y, X_val, treatment_val, y_val):
         """ Fit the uplift model.
 
         Args
@@ -281,14 +282,20 @@ class UpliftTreeClassifier:
         X, y = check_X_y(X, y)
         treatment = np.asarray(treatment)
         assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
-
+        
+        X_val, y_val = check_X_y(X_val, y_val)
+        treatment_val = np.asarray(treatment_val)
+        assert len(y_val) == len(treatment_val), 'Data length must be equal for X, treatment, and y.'
+        
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
         self.classes_ = [self.control_name]
         treatment_idx = np.zeros_like(treatment, dtype=int)
+        treatment_val_idx = np.zeros_like(treatment_val, dtype=int)
         for i, tr in enumerate(treatment_groups, 1):
             self.classes_.append(tr)
             treatment_idx[treatment == tr] = i
+            treatment_val_idx[treatment_val == tr] = i
         self.n_class = len(self.classes_)
 
         self.feature_imp_dict = defaultdict(float)
@@ -299,7 +306,7 @@ class UpliftTreeClassifier:
                              "dataset which employs two treatment options.")
 
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
-            X, treatment_idx, y,
+            X, treatment_idx, y, X_val, treatment_val_idx, y_val,
             max_depth=self.max_depth, min_samples_leaf=self.min_samples_leaf,
             depth=1, min_samples_treatment=self.min_samples_treatment,
             n_reg=self.n_reg, parentNodeSummary=None
@@ -888,7 +895,7 @@ class UpliftTreeClassifier:
             res.append(p)
         return res
 
-    def growDecisionTreeFrom(self, X, treatment_idx, y, max_depth=10,
+    def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val, eval_diff=0.01, max_depth=10,
                              min_samples_leaf=100, depth=1,
                              min_samples_treatment=10, n_reg=100,
                              parentNodeSummary=None):
@@ -989,6 +996,7 @@ class UpliftTreeClassifier:
 
             for value in lsUnique:
                 X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, col, value)
+                X_val_l, X_val_r, w_val_l, w_val_r, y_val_l, y_val_r = self.divideSet(X_val, treatment_val_idx, y_val, col, value)
                 # check the split validity on min_samples_leaf  372
                 if (len(X_l) < min_samples_leaf or len(X_r) < min_samples_leaf):
                     continue
@@ -999,15 +1007,26 @@ class UpliftTreeClassifier:
                                                          min_samples_treatment=min_samples_treatment,
                                                          n_reg=n_reg,
                                                          parentNodeSummary=currentNodeSummary)
-
                 rightNodeSummary = self.tree_node_summary(w_r, y_r,
-                                                          min_samples_treatment=min_samples_treatment,
+                                                         min_samples_treatment=min_samples_treatment,
                                                           n_reg=n_reg,
                                                           parentNodeSummary=currentNodeSummary)
-
-                # check the split validity on min_samples_treatment
                 assert len(leftNodeSummary) == len(rightNodeSummary)
 
+                if len(X_val) != 0:
+                    leftNodeSummary_val = self.tree_node_summary(w_val_l, y_val_l,
+                                                             parentNodeSummary=currentNodeSummary)
+                    rightNodeSummary_val = self.tree_node_summary(w_val_r, y_val_r,
+                                                              parentNodeSummary=currentNodeSummary)
+                    early_stopping_flag = False
+                    for k in range(len(leftNodeSummary_val)):
+                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > eval_diff or abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > eval_diff):
+                            early_stopping_flag = True
+                            break
+                    if early_stopping_flag:
+                        continue
+
+                # check the split validity on min_samples_treatment
                 node_mst = min([stat[1] for stat in leftNodeSummary + rightNodeSummary])
                 if node_mst < min_samples_treatment:
                     continue
@@ -1042,8 +1061,8 @@ class UpliftTreeClassifier:
                     bestGain = gain
                     bestGainImp = gain_for_imp
                     bestAttribute = (col, value)
-                    best_set_left = [X_l, w_l, y_l]
-                    best_set_right = [X_r, w_r, y_r]
+                    best_set_left = [X_l, w_l, y_l, X_val_l, w_val_l, y_val_l]
+                    best_set_right = [X_r, w_r, y_r, X_val_r, w_val_r, y_val_r]
 
         dcY = {'impurity': '%.3f' % currentScore, 'samples': '%d' % len(X)}
         # Add treatment size
@@ -1056,12 +1075,12 @@ class UpliftTreeClassifier:
         if bestGain > 0 and depth < max_depth:
             self.feature_imp_dict[bestAttribute[0]] += bestGainImp
             trueBranch = self.growDecisionTreeFrom(
-                *best_set_left, max_depth, min_samples_leaf,
+                *best_set_left, self.eval_diff, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
                 n_reg=n_reg, parentNodeSummary=currentNodeSummary
             )
             falseBranch = self.growDecisionTreeFrom(
-                *best_set_right, max_depth, min_samples_leaf,
+                *best_set_right, self.eval_diff, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
                 n_reg=n_reg, parentNodeSummary=currentNodeSummary
             )
@@ -1258,6 +1277,7 @@ class UpliftRandomForestClassifier:
                  min_samples_leaf=100,
                  min_samples_treatment=10,
                  n_reg=10,
+                 eval_diff = 0.1,
                  evaluationFunction='KL',
                  normalization=True,
                  n_jobs=-1,
@@ -1273,6 +1293,7 @@ class UpliftRandomForestClassifier:
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
+        self.eval_diff = eval_diff
         self.evaluationFunction = evaluationFunction
         self.control_name = control_name
         self.normalization = normalization
@@ -1288,7 +1309,7 @@ class UpliftRandomForestClassifier:
         if self.n_jobs == -1:
             self.n_jobs = mp.cpu_count()
 
-    def fit(self, X, treatment, y):
+    def fit(self, X, treatment, y, X_val=None, treatment_val=None, y_val=None):
         """
         Fit the UpliftRandomForestClassifier.
 
@@ -1312,6 +1333,7 @@ class UpliftRandomForestClassifier:
                 min_samples_leaf=self.min_samples_leaf,
                 min_samples_treatment=self.min_samples_treatment,
                 n_reg=self.n_reg,
+                eval_diff=self.eval_diff,
                 evaluationFunction=self.evaluationFunction,
                 control_name=self.control_name,
                 normalization=self.normalization,
@@ -1328,7 +1350,7 @@ class UpliftRandomForestClassifier:
 
         self.uplift_forest = (
             Parallel(n_jobs=self.n_jobs, prefer=self.joblib_prefer)
-            (delayed(self.bootstrap)(X, treatment, y, tree) for tree in self.uplift_forest)
+            (delayed(self.bootstrap)(X, treatment, y, X_val, treatment_val, y_val, tree) for tree in self.uplift_forest)
         )
 
         all_importances = [tree.feature_importances_ for tree in self.uplift_forest]
@@ -1336,13 +1358,22 @@ class UpliftRandomForestClassifier:
         self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
     @staticmethod
-    def bootstrap(X, treatment, y, tree):
+    def bootstrap(X, treatment, y, X_val, treatment_val, y_val, tree):
         random_state = check_random_state(tree.random_state)
         bt_index = random_state.choice(len(X), len(X))
         x_train_bt = X[bt_index]
         y_train_bt = y[bt_index]
         treatment_train_bt = treatment[bt_index]
-        tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
+
+        if len(X_val) == 0:
+            tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
+            return tree
+        bt_val_index = random_state.choice(len(X_val), len(X_val))
+        x_val_bt = X_val[bt_val_index]
+        y_val_bt = y_val[bt_val_index]
+        treatment_val_bt = treatment_val[bt_val_index]
+        
+        tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt, X_val=x_val_bt, treatment_val=treatment_val_bt, y_val=y_val_bt)
         return tree
 
     @ignore_warnings(category=FutureWarning)
