@@ -28,7 +28,7 @@ Propensity Score Matching
                                random_state=42)
     matched = psm.match_by_group(data=df,
                                  treatment_col=treatment_col,
-                                 score_col=score_col,
+                                 score_cols=score_cols,
                                  groupby_col=groupby_col)
 
     create_table_one(data=matched,

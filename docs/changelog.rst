@@ -3,6 +3,64 @@
 Changelog
 =========
 
+0.13.0 (Sep 2022)
+-----------------
+- CausalML surpassed `1MM downloads <https://pepy.tech/project/causalml>`_ on PyPI and `3,200 stars <https://github.com/uber/causalml/stargazers>`_ on GitHub. Thanks for choosing CausalML and supporting us on GitHub.
+- We have 7 new contributors @saiwing-yeung, @lixuan12315, @aldenrogers, @vincewu51, @AlkanSte, @enzoliao, and @alexander-pv. Thanks for your contributions!
+- @alexander-pv revamped `CausalTreeRegressor` and added `CausalRandomForestRegressor` with more seamless integration with `scikit-learn`'s Cython tree module. He also added integration with `shap` for causal tree/ random forest interpretation. Please check out the `example notebook <https://github.com/uber/causalml/blob/master/examples/causal_trees_interpretation.ipynb>`_.
+- We dropped the support for Python 3.6 and removed its test workflow.
+
+Updates
+~~~~~~~~~~~~~
+- Fix typo `(% -> $)` by @saiwing-yeung in https://github.com/uber/causalml/pull/488
+- Add function for calculating PNS bounds by @t-tte in https://github.com/uber/causalml/pull/482
+- Fix hard coding bug by @t-tte in https://github.com/uber/causalml/pull/492
+- Update README of `conda` install and instruction of maintain in conda-forge by @ppstacy in https://github.com/uber/causalml/pull/485
+- Update `examples.rst` by @lixuan12315 in https://github.com/uber/causalml/pull/496
+- Fix incorrect `effect_learner_objective` in `XGBRRegressor` by @jeongyoonlee in https://github.com/uber/causalml/pull/504
+- Fix Filter F doesn't work with latest `statsmodels`' F test f-value format by @paullo0106 in https://github.com/uber/causalml/pull/505
+- Exclude tests in `setup.py` by @aldenrogers in https://github.com/uber/causalml/pull/508
+- Enabling higher orders feature importance for F filter and LR filter by @zhenyuz0500 in https://github.com/uber/causalml/pull/509
+- Ate pretrain 0506 by @vincewu51 in https://github.com/uber/causalml/pull/511
+- Update `methodology.rst` by @AlkanSte in https://github.com/uber/causalml/pull/518
+- Fix the bug of incorrect result in qini for multiple models by @enzoliao in https://github.com/uber/causalml/pull/520
+- Test `get_qini()` by @enzoliao in https://github.com/uber/causalml/pull/523
+- Fixed typo in `uplift_trees_with_synthetic_data.ipynb` by @jroessler in https://github.com/uber/causalml/pull/531
+- Remove Python 3.6 test from workflows by @jeongyoonlee in https://github.com/uber/causalml/pull/535
+- Causal trees update by @alexander-pv in https://github.com/uber/causalml/pull/522
+- Causal trees interpretation example by @alexander-pv in https://github.com/uber/causalml/pull/536
+
+
+0.12.3 (Feb 2022)
+-----------------
+This patch is to release a version without the constraint for Shap to be abled to use for Conda.
+
+Updates
+~~~~~~~~~~~~~
+- `#483 <https://github.com/uber/causalml/pull/483>`_ by @ppstacy: Modify the requirement version of Shap
+
+
+0.12.2 (Feb 2022)
+-----------------
+This patch includes three updates by @tonkolviktor and @heiderich as follows. We also start using `black <https://black.readthedocs.io/en/stable/integrations/index.html>`_, a Python formatter. Please check out the updated `contribution guideline <https://github.com/uber/causalml/blob/master/CONTRIBUTING.md>`_ to learn how to use it.
+
+Updates
+~~~~~~~~~~~~~
+- `#473 <https://github.com/uber/causalml/pull/477>`_ by @tonkolviktor: Open up the scipy dependency version
+- `#476 <https://github.com/uber/causalml/pull/476>`_ by @heiderich: Use preferred backend for joblib instead of hard-coding it
+- `#477 <https://github.com/uber/causalml/pull/477>`_ by @heiderich: Allow parallel prediction for UpliftRandomForestClassifier and make the joblib's preferred backend configurable
+
+
+0.12.1 (Feb 2022)
+-----------------
+This patch includes two bug fixes for UpliftRandomForestClassifier as follows:
+
+Updates
+~~~~~~~~~~~~~
+- `#462 <https://github.com/uber/causalml/pull/462>`_ by @paullo0106: Use the correct treatment_idx for fillTree() when applying validation data set
+- `#468 <https://github.com/uber/causalml/pull/468>`_ by @jeongyoonlee: Switch the joblib backend for UpliftRandomForestClassifier to threading to avoid memory copy across trees
+
+
 0.12.0 (Jan 2022)
 -----------------
 - CausalML surpassed `637K downloads <https://pepy.tech/project/causalml>`_ on PyPI and `2,500 stars <https://github.com/uber/causalml/stargazers>`_ on Github!

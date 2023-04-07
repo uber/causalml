@@ -51,7 +51,14 @@ The package currently supports the following methods
 Installation with `conda` is recommended. `conda` environment files for Python 3.6, 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
 
 ## Install using `conda`:
+### Install from `conda-forge`
+Directly install from the conda-forge channel using conda.
 
+```sh
+$ conda install -c conda-forge causalml
+```
+
+### Install with the `conda` virtual environment
 This will create a new `conda` virtual environment named `causalml-[tf-]py3x`, where `x` is in `[6, 7, 8, 9]`. e.g. `causalml-py37` or `causalml-tf-py38`. If you want to change the name of the environment, update the relevant YAML file in `envs/`
 
 ```

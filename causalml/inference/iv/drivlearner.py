@@ -14,6 +14,7 @@ from causalml.propensity import compute_propensity_score
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold
 from tqdm import tqdm
+from xgboost import XGBRegressor
 
 logger = logging.getLogger("causalml")
 
@@ -264,7 +265,7 @@ class BaseDRIVLearner(object):
                     - p_0_filt
                 )
                 dr /= weight
-                self.models_tau[group][ifold].fit(X_filt, dr, sample_weight=weight ** 2)
+                self.models_tau[group][ifold].fit(X_filt, dr, sample_weight=weight**2)
 
     def predict(self, X, treatment=None, y=None, return_components=False, verbose=True):
         """Predict treatment effects.
@@ -432,7 +433,7 @@ class BaseDRIVLearner(object):
         treatment,
         y,
         p=None,
-        pz=None,
+        pZ=None,
         bootstrap_ci=False,
         n_bootstraps=1000,
         bootstrap_size=10000,
@@ -523,14 +524,14 @@ class BaseDRIVLearner(object):
 
             part_1 = (
                 (y_filt_1 - yhat_1).var()
-                + _ate ** 2 * (treatment_filt_1 - prob_treatment_1).var()
+                + _ate**2 * (treatment_filt_1 - prob_treatment_1).var()
                 - 2
                 * _ate
                 * (y_filt_1 * treatment_filt_1 - yhat_1 * prob_treatment_1).mean()
             )
             part_0 = (
                 (y_filt_0 - yhat_0).var()
-                + _ate ** 2 * (treatment_filt_0 - prob_treatment_0).var()
+                + _ate**2 * (treatment_filt_0 - prob_treatment_0).var()
                 - 2
                 * _ate
                 * (y_filt_0 * treatment_filt_0 - yhat_0 * prob_treatment_0).mean()
@@ -547,7 +548,7 @@ class BaseDRIVLearner(object):
             # SE formula is based on the lower bound formula (9) from Frölich, Markus. 2006.
             # "Nonparametric IV estimation of local average treatment effects wth covariates."
             # Journal of Econometrics.
-            se = np.sqrt((part_1 / w + part_2 / (1 - w)) + part_2) / Gamma
+            se = np.sqrt((part_1 / w + part_0 / (1 - w)) + part_2) / Gamma
 
             _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
             _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)

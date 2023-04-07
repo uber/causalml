@@ -7,27 +7,27 @@ from statsmodels.sandbox.regression.gmm import IV2SLS
 
 
 class IVRegressor(object):
-    ''' A wrapper class that uses IV2SLS from statsmodel
+    """A wrapper class that uses IV2SLS from statsmodel
 
     A linear 2SLS model that estimates the average treatment effect with endogenous treatment variable.
-    '''
+    """
 
     def __init__(self):
-        '''
+        """
         Initializes the class.
-        '''
+        """
 
-        self.method = '2SLS'
+        self.method = "2SLS"
 
     def fit(self, X, treatment, y, w):
-        ''' Fits the 2SLS model.
+        """Fits the 2SLS model.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
             w (np.array or pd.Series): an instrument vector
-        '''
+        """
 
         X, treatment, y, w = convert_pd_to_np(X, treatment, y, w)
 
@@ -39,11 +39,11 @@ class IVRegressor(object):
         self.iv_fit = self.iv_model.fit()
 
     def predict(self):
-        '''Returns the average treatment effect and its estimated standard error
+        """Returns the average treatment effect and its estimated standard error
 
         Returns:
             (float): average treatment effect
             (float): standard error of the estimation
-        '''
+        """
 
         return self.iv_fit.params[-1], self.iv_fit.bse[-1]
