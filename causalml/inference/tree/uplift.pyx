@@ -996,7 +996,7 @@ class UpliftTreeClassifier:
 
             for value in lsUnique:
                 X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, col, value)
-                X_val_l, X_val_r, w_val_l, w_val_r, y_val_l, y_val_r = self.divideSet(X_val, treatment_val_idx, y_val, col, value)
+    
                 # check the split validity on min_samples_leaf  372
                 if (len(X_l) < min_samples_leaf or len(X_r) < min_samples_leaf):
                     continue
@@ -1014,6 +1014,7 @@ class UpliftTreeClassifier:
                 assert len(leftNodeSummary) == len(rightNodeSummary)
 
                 if len(X_val) != 0:
+                    X_val_l, X_val_r, w_val_l, w_val_r, y_val_l, y_val_r = self.divideSet(X_val, treatment_val_idx, y_val, col, value)
                     leftNodeSummary_val = self.tree_node_summary(w_val_l, y_val_l,
                                                              parentNodeSummary=currentNodeSummary)
                     rightNodeSummary_val = self.tree_node_summary(w_val_r, y_val_r,
