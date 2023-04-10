@@ -1368,7 +1368,6 @@ class UpliftRandomForestClassifier:
 
         if X_val is None:
             tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
-            return tree
         else:
             bt_val_index = random_state.choice(len(X_val), len(X_val))
             x_val_bt = X_val[bt_val_index]
