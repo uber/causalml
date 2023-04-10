@@ -229,13 +229,13 @@ class UpliftTreeClassifier:
 
     """
     def __init__(self, control_name, max_features=None, max_depth=3, min_samples_leaf=100,
-                 min_samples_treatment=10, n_reg=100, eval_diff=0.01, evaluationFunction='KL',
+                 min_samples_treatment=10, n_reg=100, early_stopping_eval_diff=0.01, evaluationFunction='KL',
                  normalization=True, random_state=None):
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
-        self.eval_diff = eval_diff
+        self.early_stopping_eval_diff = early_stopping_eval_diff
         self.max_features = max_features
         if evaluationFunction == 'KL':
             self.evaluationFunction = self.evaluate_KL
@@ -258,7 +258,7 @@ class UpliftTreeClassifier:
         self.normalization = normalization
         self.random_state = random_state
 
-    def fit(self, X, treatment, y, X_val, treatment_val, y_val):
+    def fit(self, X, treatment, y, X_val=None, treatment_val=None, y_val=None):
         """ Fit the uplift model.
 
         Args
@@ -282,10 +282,10 @@ class UpliftTreeClassifier:
         X, y = check_X_y(X, y)
         treatment = np.asarray(treatment)
         assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
-        
-        X_val, y_val = check_X_y(X_val, y_val)
-        treatment_val = np.asarray(treatment_val)
-        assert len(y_val) == len(treatment_val), 'Data length must be equal for X, treatment, and y.'
+        if X_val is not None:
+            X_val, y_val = check_X_y(X_val, y_val)
+            treatment_val = np.asarray(treatment_val)
+            assert len(y_val) == len(treatment_val), 'Data length must be equal for X_val, treatment_val, and y_val.'
         
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
@@ -895,7 +895,7 @@ class UpliftTreeClassifier:
             res.append(p)
         return res
 
-    def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val, eval_diff=0.01, max_depth=10,
+    def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val, early_stopping_eval_diff=0.01, max_depth=10,
                              min_samples_leaf=100, depth=1,
                              min_samples_treatment=10, n_reg=100,
                              parentNodeSummary=None):
@@ -1013,7 +1013,7 @@ class UpliftTreeClassifier:
                                                           parentNodeSummary=currentNodeSummary)
                 assert len(leftNodeSummary) == len(rightNodeSummary)
 
-                if len(X_val) != 0:
+                if X_val is not None:
                     X_val_l, X_val_r, w_val_l, w_val_r, y_val_l, y_val_r = self.divideSet(X_val, treatment_val_idx, y_val, col, value)
                     leftNodeSummary_val = self.tree_node_summary(w_val_l, y_val_l,
                                                              parentNodeSummary=currentNodeSummary)
@@ -1021,7 +1021,7 @@ class UpliftTreeClassifier:
                                                               parentNodeSummary=currentNodeSummary)
                     early_stopping_flag = False
                     for k in range(len(leftNodeSummary_val)):
-                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > eval_diff or abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > eval_diff):
+                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > early_stopping_eval_diff or abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > early_stopping_eval_diff):
                             early_stopping_flag = True
                             break
                     if early_stopping_flag:
@@ -1076,12 +1076,12 @@ class UpliftTreeClassifier:
         if bestGain > 0 and depth < max_depth:
             self.feature_imp_dict[bestAttribute[0]] += bestGainImp
             trueBranch = self.growDecisionTreeFrom(
-                *best_set_left, self.eval_diff, max_depth, min_samples_leaf,
+                *best_set_left, self.early_stopping_eval_diff, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
                 n_reg=n_reg, parentNodeSummary=currentNodeSummary
             )
             falseBranch = self.growDecisionTreeFrom(
-                *best_set_right, self.eval_diff, max_depth, min_samples_leaf,
+                *best_set_right, self.early_stopping_eval_diff, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
                 n_reg=n_reg, parentNodeSummary=currentNodeSummary
             )
@@ -1278,7 +1278,7 @@ class UpliftRandomForestClassifier:
                  min_samples_leaf=100,
                  min_samples_treatment=10,
                  n_reg=10,
-                 eval_diff = 0.1,
+                 early_stopping_eval_diff=0.01,
                  evaluationFunction='KL',
                  normalization=True,
                  n_jobs=-1,
@@ -1294,7 +1294,7 @@ class UpliftRandomForestClassifier:
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
-        self.eval_diff = eval_diff
+        self.early_stopping_eval_diff = early_stopping_eval_diff
         self.evaluationFunction = evaluationFunction
         self.control_name = control_name
         self.normalization = normalization
@@ -1334,7 +1334,7 @@ class UpliftRandomForestClassifier:
                 min_samples_leaf=self.min_samples_leaf,
                 min_samples_treatment=self.min_samples_treatment,
                 n_reg=self.n_reg,
-                eval_diff=self.eval_diff,
+                early_stopping_eval_diff=self.early_stopping_eval_diff,
                 evaluationFunction=self.evaluationFunction,
                 control_name=self.control_name,
                 normalization=self.normalization,
@@ -1366,15 +1366,16 @@ class UpliftRandomForestClassifier:
         y_train_bt = y[bt_index]
         treatment_train_bt = treatment[bt_index]
 
-        if len(X_val) == 0:
+        if X_val is None:
             tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
             return tree
-        bt_val_index = random_state.choice(len(X_val), len(X_val))
-        x_val_bt = X_val[bt_val_index]
-        y_val_bt = y_val[bt_val_index]
-        treatment_val_bt = treatment_val[bt_val_index]
-        
-        tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt, X_val=x_val_bt, treatment_val=treatment_val_bt, y_val=y_val_bt)
+        else:
+            bt_val_index = random_state.choice(len(X_val), len(X_val))
+            x_val_bt = X_val[bt_val_index]
+            y_val_bt = y_val[bt_val_index]
+            treatment_val_bt = treatment_val[bt_val_index]
+            
+            tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt, X_val=x_val_bt, treatment_val=treatment_val_bt, y_val=y_val_bt)
         return tree
 
     @ignore_warnings(category=FutureWarning)
