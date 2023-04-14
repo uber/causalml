@@ -1373,7 +1373,7 @@ class UpliftRandomForestClassifier:
             x_val_bt = X_val[bt_val_index]
             y_val_bt = y_val[bt_val_index]
             treatment_val_bt = treatment_val[bt_val_index]
-            
+    
             tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt, X_val=x_val_bt, treatment_val=treatment_val_bt, y_val=y_val_bt)
         return tree
 
