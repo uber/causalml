@@ -176,7 +176,7 @@ class DragonNet:
 
         if self.use_adam:
             self.dragonnet.compile(
-                optimizer=Adam(lr=self.adam_learning_rate), loss=loss, metrics=metrics
+                optimizer=Adam(learning_rate=self.adam_learning_rate), loss=loss, metrics=metrics
             )
 
             adam_callbacks = [
@@ -220,7 +220,7 @@ class DragonNet:
         ]
 
         self.dragonnet.compile(
-            optimizer=SGD(lr=self.learning_rate, momentum=self.momentum, nesterov=True),
+            optimizer=SGD(learning_rate=self.learning_rate, momentum=self.momentum, nesterov=True),
             loss=loss,
             metrics=metrics,
         )
