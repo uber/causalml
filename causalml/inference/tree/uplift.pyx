@@ -910,6 +910,12 @@ class UpliftTreeClassifier:
             An array containing the treatment group idx for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
+        X_val : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to valid the uplift model.
+        treatment_val_idx : array-like, shape = [num_samples]
+            An array containing the validation treatment group idx for each unit.
+        y_val : array-like, shape = [num_samples]
+            An array containing the validation outcome of interest for each unit.
         max_depth: int, optional (default=10)
             The maximum depth of the tree.
         min_samples_leaf: int, optional (default=100)
@@ -1324,6 +1330,15 @@ class UpliftRandomForestClassifier:
 
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
+
+        X_val : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to valid the uplift model.
+
+        treatment_val : array-like, shape = [num_samples]
+            An array containing the validation treatment group for each unit.
+
+        y_val : array-like, shape = [num_samples]
+            An array containing the validation outcome of interest for each unit.
         """
         random_state = check_random_state(self.random_state)
 
