@@ -191,7 +191,9 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             self._groups_cnt = self._count_groups_distribution(X=X, treatment=w)
         return self
 
-    def predict(self, X: np.ndarray, with_outcomes: bool = False, check_input=True) -> np.ndarray:
+    def predict(
+        self, X: np.ndarray, with_outcomes: bool = False, check_input=True
+    ) -> np.ndarray:
         """
         Args:
             X (np.matrix): a feature matrix
@@ -205,7 +207,9 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         y_outcomes = super().predict(X)
         y_pred = y_outcomes[:, 1] - y_outcomes[:, 0]
         need_outcomes = with_outcomes or self._with_outcomes
-        return np.hstack([y_outcomes, y_pred.reshape(-1, 1)]) if need_outcomes else y_pred
+        return (
+            np.hstack([y_outcomes, y_pred.reshape(-1, 1)]) if need_outcomes else y_pred
+        )
 
     def fit_predict(
         self,
