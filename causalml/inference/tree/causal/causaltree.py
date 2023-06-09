@@ -132,6 +132,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         self._classes = {}
         self.groups_cnt = groups_cnt
         self.groups_cnt_mode = groups_cnt_mode
+        self._with_outcomes = False
         self._groups_cnt = {}
 
         super().__init__(
@@ -189,6 +190,22 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         if self.groups_cnt:
             self._groups_cnt = self._count_groups_distribution(X=X, treatment=w)
         return self
+
+    def predict(self, X: np.ndarray, with_outcomes: bool = False, check_input=True) -> np.ndarray:
+        """
+        Args:
+            X (np.matrix): a feature matrix
+            with_outcomes (bool), return outcomes for treatment and control along with treatment effect estimation
+            check_input (bool), default=True. Allow to bypass several input checking.
+        Returns:
+           (np.matrix): ITE or ITE with outcomes [y0, y1, ITE]
+        """
+        if check_input:
+            X = self._validate_X_predict(X, check_input)
+        y_outcomes = super().predict(X)
+        y_pred = y_outcomes[:, 1] - y_outcomes[:, 0]
+        need_outcomes = with_outcomes or self._with_outcomes
+        return np.hstack([y_outcomes, y_pred.reshape(-1, 1)]) if need_outcomes else y_pred
 
     def fit_predict(
         self,
@@ -295,8 +312,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             )
 
         pool = PPool(nodes=n_jobs)
-        if "pytest" in sys.modules:
-            pool.restart(force=True)
+        pool.restart(force=True)
 
         bootstrap_estimates = np.array(
             list(

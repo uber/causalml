@@ -205,10 +205,9 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         return 0
 
     cdef void node_value(self, double * dest) nogil:
-        """Compute the node value of samples[start:end] into dest."""
-        # Save the average of treatment effects within a node as a value for the node
-        dest[0] = self.state.node.tr_y_sum / self.state.node.tr_count - \
-                  self.state.node.ct_y_sum / self.state.node.ct_count
+        """Compute the node values of samples[start:end] into dest."""
+        dest[0] = self.state.node.ct_y_sum / self.state.node.ct_count
+        dest[1] = self.state.node.tr_y_sum / self.state.node.tr_count
 
     cdef double get_groups_penalty(self, double tr_count, double ct_count) nogil:
         """Compute penalty for the sample size difference between groups"""
