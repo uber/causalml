@@ -383,12 +383,15 @@ class CausalRandomForestRegressor(ForestRegressor):
         return self._fit(X=X, y=y, sample_weight=w)
 
     def predict(self, X: np.ndarray, with_outcomes: bool = False) -> np.ndarray:
-        """
+        """Predict individual treatment effects
+
         Args:
             X (np.matrix): a feature matrix
-            with_outcomes (bool), return outcomes for treatment and control along with treatment effect estimation
+            with_outcomes (bool), default=False,
+                                  include outcomes Y_hat(X|T=0), Y_hat(X|T=1) along with individual treatment effect
         Returns:
-           (np.matrix): ITE or ITE with outcomes [y0, y1, ITE]
+           (np.matrix): individual treatment effect (ITE), dim=nx1
+                        or ITE with outcomes [Y_hat(X|T=0), Y_hat(X|T=1), ITE], dim=nx3
         """
         if with_outcomes:
             self.n_outputs_ = self.max_outputs_
