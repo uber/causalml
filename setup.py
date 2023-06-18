@@ -68,13 +68,6 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
-    setup_requires=[
-        # Setuptools 18.0 properly handles Cython extensions.
-        "setuptools>=18.0",
-        "cython",
-        "numpy",
-        "scikit-learn<=1.0.2",
-    ],
     install_requires=requirements,
     tests_require=requirements_test,
     ext_modules=cythonize(extensions, annotate=True),
