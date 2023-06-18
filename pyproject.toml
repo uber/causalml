@@ -3,6 +3,6 @@ requires = [
 	"setuptools>=18.0",
 	"wheel",
 	"cython",
-	"numpy",
+	"oldest-supported-numpy",
 	"scikit-learn<=1.0.2",
 ]
