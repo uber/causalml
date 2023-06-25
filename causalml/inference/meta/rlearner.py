@@ -14,8 +14,7 @@ from causalml.inference.meta.utils import (
     convert_pd_to_np,
     get_weighted_variance,
 )
-from causalml.inference.meta.explainer import Explainer
-from causalml.propensity import compute_propensity_score, ElasticNetPropensityModel
+from causalml.propensity import ElasticNetPropensityModel
 
 
 logger = logging.getLogger("causalml")

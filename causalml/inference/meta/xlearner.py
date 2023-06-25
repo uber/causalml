@@ -8,12 +8,9 @@ from scipy.stats import norm
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
     check_treatment_vector,
-    check_p_conditions,
     convert_pd_to_np,
 )
-from causalml.inference.meta.explainer import Explainer
 from causalml.metrics import regression_metrics, classification_metrics
-from causalml.propensity import compute_propensity_score
 
 logger = logging.getLogger("causalml")
 
@@ -199,7 +196,7 @@ class BaseXLearner(BaseLearner):
             )
             te[:, i] = np.ravel(_te)
 
-            if (y is not None) and (treatment is not None) and verbose:
+            if (y is not None) and (treatment is not None):
                 mask = (treatment == group) | (treatment == self.control_name)
                 treatment_filt = treatment[mask]
                 X_filt = X[mask]

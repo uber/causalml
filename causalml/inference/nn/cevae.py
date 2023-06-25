@@ -78,7 +78,7 @@ class CEVAE:
         self.num_samples = num_samples
         self.weight_decay = weight_decay
 
-    def fit(self, X, treatment, y, p=None):
+    def fit(self, X, treatment, y):
         """
         Fits CEVAE.
 
@@ -127,7 +127,7 @@ class CEVAE:
             .numpy()
         )
 
-    def fit_predict(self, X, treatment, y, p=None):
+    def fit_predict(self, X, treatment, y):
         """
         Fits the CEVAE model and then predicts.
 

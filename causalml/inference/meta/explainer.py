@@ -114,7 +114,7 @@ class Explainer(object):
         """
         Builds tau models (using X to predict estimated/actual tau) for each treatment group.
         """
-        if self.method in ("permutation"):
+        if self.method in "permutation":
             self.X_train, self.X_test, self.tau_train, self.tau_test = train_test_split(
                 self.X,
                 self.tau,
