@@ -48,7 +48,7 @@ The package currently supports the following methods
 
 # Installation
 
-Installation with `conda` is recommended. `conda` environment files for Python 3.6, 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
+Installation with `conda` is recommended. `conda` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
 
 ## Install using `conda`:
 ### Install from `conda-forge`
@@ -61,7 +61,7 @@ $ conda install -c conda-forge causalml
 ### Install with the `conda` virtual environment
 This will create a new `conda` virtual environment named `causalml-[tf-]py3x`, where `x` is in `[6, 7, 8, 9]`. e.g. `causalml-py37` or `causalml-tf-py38`. If you want to change the name of the environment, update the relevant YAML file in `envs/`
 
-```
+```bash
 $ git clone https://github.com/uber/causalml.git
 $ cd causalml/envs/
 $ conda env create -f environment-py38.yml	# for the virtual environment with Python 3.8 and CausalML
@@ -70,7 +70,7 @@ $ conda activate causalml-py38
 ```
 
 ### Install `causalml` with `tensorflow`
-```
+```bash
 $ git clone https://github.com/uber/causalml.git
 $ cd causalml/envs/
 $ conda env create -f environment-tf-py38.yml	# for the virtual environment with Python 3.8 and CausalML
@@ -78,32 +78,28 @@ $ conda activate causalml-tf-py38
 (causalml-tf-py38) pip install -U numpy			# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
 ```
 
-## Install using `pip`:
+## Install from `PyPI`:
 
-```
-$ git clone https://github.com/uber/causalml.git
-$ cd causalml
-$ pip install -r requirements.txt
+```bash
 $ pip install causalml
 ```
 
 ### Install `causalml` with `tensorflow`
-```
-$ git clone https://github.com/uber/causalml.git
-$ cd causalml
-$ pip install -r requirements-tf.txt
+```bash
 $ pip install causalml[tf]
 $ pip install -U numpy							# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
 ```
 
 ## Install from source:
 
-```
+```bash
 $ git clone https://github.com/uber/causalml.git
 $ cd causalml
-$ pip install -r requirements.txt
-$ python setup.py build_ext --inplace
-$ python setup.py install
+$ pip install .
+```
+with `tensorflow`:
+```bash
+pip install .[tf]
 ```
 
 
