@@ -25,6 +25,7 @@ jobs:
         run: |
             pip install -U pip
             pip install -U setuptools
-            python -m pip install .
+            python -m pip install .[test]
+            python setup.py build_ext --inplace
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/

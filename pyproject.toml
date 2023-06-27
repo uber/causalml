@@ -26,6 +26,7 @@ dependencies = [
     "forestci==0.6",
     "pathos==0.2.9",
     "pip>=10.0",
+    "numpy<1.24",
     "scipy>=1.4.1",
     "matplotlib",
     "pandas>=0.24.1,<1.4.0",
@@ -47,21 +48,22 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+test = [
+    "pytest>=4.6",
+    "pytest-cov>=4.0"
+]
 tf = [
     "tensorflow>=2.4.0"
 ]
+
 
 [build-system]
 requires = [
     "setuptools>=18.0",
     "wheel",
     "Cython>=0.28.0",
-    "oldest-supported-numpy",
+    "numpy<1.24",
     "scikit-learn<=1.0.2",
-]
-tests_require = [
-    "pytest>=4.6",
-    "pytest-cov"
 ]
 
 [project.urls]
