@@ -462,7 +462,9 @@ class SensitivitySelectionBias(Sensitivity):
 
             sens.append([a, rsqs, ate, ate_lb, ate_ub])
 
-        sens_df = pd.DataFrame(sens, columns=['alpha', 'rsqs', 'New ATE', 'New ATE LB', 'New ATE UB'])
+        sens_df = pd.DataFrame(
+            sens, columns=["alpha", "rsqs", "New ATE", "New ATE LB", "New ATE UB"]
+        )
 
         rss = np.sum(np.square(y - preds))
         partial_rsqs = []
