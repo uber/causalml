@@ -240,13 +240,13 @@ def load_data(data, features, transformations={}):
     df = data[features].copy()
 
     bool_cols = [col for col in df.columns if df[col].dtype == bool]
-    df.loc[:, bool_cols] = df[bool_cols].astype(np.int8)
+    df.loc[:, bool_cols] = df[bool_cols].astype(int)
 
     for col, transformation in transformations.items():
         logger.info("Applying {} to {}".format(transformation.__name__, col))
         df[col] = df[col].apply(transformation)
 
-    cat_cols = [col for col in features if df[col].dtype == np.object]
+    cat_cols = [col for col in features if df[col].dtype == object]
     num_cols = [col for col in features if col not in cat_cols]
 
     logger.info("Applying one-hot-encoding to {}".format(cat_cols))
