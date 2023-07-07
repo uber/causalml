@@ -60,13 +60,13 @@ def test_counterfactual_unit_selection():
     )
 
     cus.fit(
-        data=df_train.drop("treatment_group_key", 1),
+        data=df_train.drop("treatment_group_key", axis=1),
         treatment="treatment_numeric",
         outcome="conversion",
     )
 
     cus_pred = cus.predict(
-        data=df_test.drop("treatment_group_key", 1),
+        data=df_test.drop("treatment_group_key", axis=1),
         treatment="treatment_numeric",
         outcome="conversion",
     )
