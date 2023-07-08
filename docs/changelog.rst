@@ -3,6 +3,43 @@
 Changelog
 =========
 
+0.14.0 (July 2023)
+-----------------
+- CausalML surpassed `2MM downloads <https://pepy.tech/project/causalml>`_ on PyPI and `4,100 stars <https://github.com/uber/causalml/stargazers>`_ on GitHub. Thanks for choosing CausalML and supporting us on GitHub.
+- We have 7 new contributors: @darthtrevino, @ras44, @AbhishekVermaDH, @joel-mcmurry, @AlxClt, @kklein, and @volico. Thanks for your contributions!
+
+Updates
+~~~~~~~~~~~~~
+- Fix the readthedocs build failure by @jeongyoonlee in https://github.com/uber/causalml/pull/545
+- Add pyproject.toml with basic build dependencies for PEP518 compliance by @darthtrevino in https://github.com/uber/causalml/pull/553
+- bump numpy from 1.20.3 to 1.23.2 in environment-py38.yml #338 by @ras44 in https://github.com/uber/causalml/pull/550
+- CausalTree split criterions fix and fit optimization by @alexander-pv in https://github.com/uber/causalml/pull/557
+- fixing math notations for proper rendering by @AbhishekVermaDH in https://github.com/uber/causalml/pull/558
+- Update methodology.rst by @joel-mcmurry in https://github.com/uber/causalml/pull/568
+- Causal trees bootstrapping and `max_leaf_nodes` fixes with minor update by @alexander-pv in https://github.com/uber/causalml/pull/583
+- Fix #596 by @AlxClt in https://github.com/uber/causalml/pull/597
+- Add **kwargs to Explainer.plot_shap_values() by @jeongyoonlee in https://github.com/uber/causalml/pull/603
+- Make the Adam optimization optional and learning rate/epochs configurable in DragonNet by @jeongyoonlee in https://github.com/uber/causalml/pull/604
+- Fix bug in variance calculation in drivlearner. by @huigangchen in https://github.com/uber/causalml/pull/606
+- Bug Fix in Dragonnet: Adam parameter name lr depreciation by @huigangchen in https://github.com/uber/causalml/pull/617
+- Fix AttributeError in builds with numpy>=1.24 and pandas>=2.0 by @jeongyoonlee in https://github.com/uber/causalml/pull/631
+- Pass on **kwargs in `plot_shap_values` of base meta leaner by @kklein in https://github.com/uber/causalml/pull/627
+- Bump scipy from 1.4.1 to 1.10.0 by @dependabot in https://github.com/uber/causalml/pull/629
+- Feature/ttest criterion by @volico in https://github.com/uber/causalml/pull/570
+- Added Interaction Tree (IT), Causal Inference Tree (CIT), and Invariant DDP (IDDP) by @jroessler in https://github.com/uber/causalml/pull/562
+- Causal trees option to return counterfactual outcomes by @alexander-pv in https://github.com/uber/causalml/pull/623
+
+New contributors
+~~~~~~~~~~~~~~~~
+- @darthtrevino made their first contribution in https://github.com/uber/causalml/pull/553
+- @ras44 made their first contribution in https://github.com/uber/causalml/pull/550
+- @AbhishekVermaDH made their first contribution in https://github.com/uber/causalml/pull/558
+- @joel-mcmurry made their first contribution in https://github.com/uber/causalml/pull/568
+- @AlxClt made their first contribution in https://github.com/uber/causalml/pull/597
+- @kklein made their first contribution in https://github.com/uber/causalml/pull/627
+- @volico made their first contribution in https://github.com/uber/causalml/pull/570
+
+
 0.13.0 (Sep 2022)
 -----------------
 - CausalML surpassed `1MM downloads <https://pepy.tech/project/causalml>`_ on PyPI and `3,200 stars <https://github.com/uber/causalml/stargazers>`_ on GitHub. Thanks for choosing CausalML and supporting us on GitHub.
