@@ -6,7 +6,7 @@ Changelog
 0.14.0 (July 2023)
 -----------------
 - CausalML surpassed `2MM downloads <https://pepy.tech/project/causalml>`_ on PyPI and `4,100 stars <https://github.com/uber/causalml/stargazers>`_ on GitHub. Thanks for choosing CausalML and supporting us on GitHub.
-- We have 7 new contributors: @darthtrevino, @ras44, @AbhishekVermaDH, @@joel-mcmurry, @AlxClt, @kklein, and @volico. Thanks for your contributions!
+- We have 7 new contributors: @darthtrevino, @ras44, @AbhishekVermaDH, @joel-mcmurry, @AlxClt, @kklein, and @volico. Thanks for your contributions!
 
 Updates
 ~~~~~~~~~~~~~
