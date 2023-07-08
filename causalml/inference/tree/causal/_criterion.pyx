@@ -44,9 +44,9 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         memset(&self.sum_total[0], 0, self.n_outputs * sizeof(double))
         self.sq_sum_total = 0.
         self.eps = 1e-5
-        self.state.node = [0., 0., 0., 0., 0., 0., 0., 0.]
-        self.state.left = [0., 0., 0., 0., 0., 0., 0., 0.]
-        self.state.right = [0., 0., 0., 0., 0., 0., 0., 0.]
+        self.state.node = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
+        self.state.left = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
+        self.state.right = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
 
         for p in range(start, end):
             i = samples[p]
@@ -382,3 +382,111 @@ cdef class CausalMSE(CausalRegressionCriterion):
 
         impurity_left[0]  += self.get_groups_penalty(self.state.left.tr_count, self.state.left.ct_count)
         impurity_right[0] += self.get_groups_penalty(self.state.right.tr_count, self.state.right.ct_count)
+
+
+cdef class TTest(CausalRegressionCriterion):
+    """
+    TTest impurity criterion for Causal Tree based on "Su, Xiaogang, et al. (2009). Subgroup analysis via recursive partitioning."
+    """
+    cdef double node_impurity(self) nogil:
+        cdef double impurity
+        cdef double node_tau
+        cdef double tr_var
+        cdef double ct_var
+
+        node_tau = self.get_tau(self.state.node)
+        tr_var = self.get_variance(
+            self.state.node.tr_y_sum,
+            self.state.node.tr_y_sq_sum,
+            self.state.node.tr_count
+        )
+        ct_var = self.get_variance(
+            self.state.node.ct_y_sum,
+            self.state.node.ct_y_sq_sum,
+            self.state.node.ct_count)
+        # T statistic of difference between treatment and control means
+        impurity = node_tau / (((tr_var / self.state.node.tr_count) + (ct_var / self.state.node.ct_count)) ** 0.5)
+
+        return impurity
+
+    cdef double get_tau(self, NodeInfo info) nogil:
+        return info.tr_y_sum / info.tr_count - info.ct_y_sum / info.ct_count
+
+    cdef double get_variance(self, double y_sum, double y_sq_sum, double count) nogil:
+        return y_sq_sum / count - (y_sum * y_sum) / (count * count)
+
+    cdef void children_impurity(self, double * impurity_left, double * impurity_right) nogil:
+        """
+        Evaluate the impurity in children nodes, i.e. the impurity of the
+           left child (samples[start:pos]) and the impurity the right child
+           (samples[pos:end]).
+        """
+        cdef double right_tr_var
+        cdef double right_ct_var
+        cdef double left_tr_var
+        cdef double left_ct_var
+        cdef double right_tau
+        cdef double left_tau
+        cdef double right_t_stat
+        cdef double left_t_stat
+        cdef double t_stat
+
+        right_tau = self.get_tau(self.state.right)
+        right_tr_var = self.get_variance(
+            self.state.right.tr_y_sum,
+            self.state.right.tr_y_sq_sum,
+            self.state.right.tr_count)
+        right_ct_var = self.get_variance(
+            self.state.right.ct_y_sum,
+            self.state.right.ct_y_sq_sum,
+            self.state.right.ct_count)
+
+        left_tau = self.get_tau(self.state.left)
+        left_tr_var = self.get_variance(
+            self.state.left.tr_y_sum,
+            self.state.left.tr_y_sq_sum,
+            self.state.left.tr_count)
+        left_ct_var = self.get_variance(
+            self.state.left.ct_y_sum,
+            self.state.left.ct_y_sq_sum,
+            self.state.left.ct_count)
+        pooled_var = ((self.state.right.tr_count - 1) / (
+                    self.state.node.tr_count + self.state.node.ct_count - 4)) * right_tr_var + \
+                     (self.state.right.ct_count - 1) / (
+                                 self.state.node.tr_count + self.state.node.ct_count - 4) * right_ct_var + \
+                     (self.state.left.tr_count - 1) / (
+                                 self.state.node.tr_count + self.state.node.ct_count - 4) * left_tr_var + \
+                     (self.state.left.ct_count - 1) / (
+                                 self.state.node.tr_count + self.state.node.ct_count - 4) * left_ct_var
+
+        # T statistic of difference between treatment and control means in left and right nodes
+        left_t_stat = left_tau / (
+                    ((left_ct_var / self.state.left.ct_count) + (left_tr_var / self.state.left.tr_count)) ** 0.5)
+        right_t_stat = right_tau / (
+                    ((right_ct_var / self.state.right.ct_count) + (right_tr_var / self.state.right.tr_count)) ** 0.5)
+
+        # Squared T statistic of difference between tau from left and right nodes.
+        t_stat = ((left_tau - right_tau) / ((pooled_var ** 0.5) * (
+                    (1 / self.state.right.tr_count) + (1 / self.state.right.ct_count) + (
+                        1 / self.state.left.tr_count) + (1 / self.state.left.ct_count)) ** 0.5)) ** 2
+
+        self.state.left.split_metric = t_stat+self.get_groups_penalty(self.state.node.tr_count,
+                                                                      self.state.node.ct_count)
+
+        impurity_left[0] = left_t_stat
+        impurity_right[0] = right_t_stat
+
+    cdef double impurity_improvement(self, double impurity_parent,
+                                     double impurity_left,
+                                     double impurity_right) nogil:
+        return self.state.left.split_metric
+
+    cdef double proxy_impurity_improvement(self) nogil:
+        """Compute a proxy of the impurity reduction. In case of t statistic - proxy_impurity_improvement 
+        is the same as impurity_improvement.
+        """
+        cdef double impurity_left
+        cdef double impurity_right
+        self.children_impurity(&impurity_left, &impurity_right)
+
+        return self.state.left.split_metric

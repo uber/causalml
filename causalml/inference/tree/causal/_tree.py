@@ -14,9 +14,13 @@ from sklearn.tree._splitter import Splitter
 from sklearn.utils.validation import _check_sample_weight
 
 from ._builder import DepthFirstCausalTreeBuilder, BestFirstCausalTreeBuilder
-from ._criterion import StandardMSE, CausalMSE
+from ._criterion import StandardMSE, CausalMSE, TTest
 
-CAUSAL_TREES_CRITERIA = {"causal_mse": CausalMSE, "standard_mse": StandardMSE}
+CAUSAL_TREES_CRITERIA = {
+    "causal_mse": CausalMSE,
+    "standard_mse": StandardMSE,
+    "t_test": TTest,
+}
 CRITERIA_REG.update(CAUSAL_TREES_CRITERIA)
 
 

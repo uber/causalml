@@ -43,9 +43,7 @@ class CausalTreeBase:
 class TestCausalTreeRegressor(CausalTreeBase):
     def prepare_causal_tree(self) -> CausalTreeRegressor:
         ctree = CausalTreeRegressor(
-            control_name=self.control_name,
-            groups_cnt=True,
-            random_state=RANDOM_SEED,
+            control_name=self.control_name, groups_cnt=True, random_state=RANDOM_SEED
         )
         return ctree
 
