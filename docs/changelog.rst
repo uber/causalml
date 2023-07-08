@@ -12,7 +12,7 @@ Updates
 ~~~~~~~~~~~~~
 - Fix the readthedocs build failure by @jeongyoonlee in https://github.com/uber/causalml/pull/545
 - Add pyproject.toml with basic build dependencies for PEP518 compliance by @darthtrevino in https://github.com/uber/causalml/pull/553
-- bump numpy==1.23.2 in environment-py38.yml #338 by @ras44 in https://github.com/uber/causalml/pull/550
+- bump numpy from 1.20.3 to 1.23.2 in environment-py38.yml #338 by @ras44 in https://github.com/uber/causalml/pull/550
 - CausalTree split criterions fix and fit optimization by @alexander-pv in https://github.com/uber/causalml/pull/557
 - fixing math notations for proper rendering by @AbhishekVermaDH in https://github.com/uber/causalml/pull/558
 - Update methodology.rst by @joel-mcmurry in https://github.com/uber/causalml/pull/568
