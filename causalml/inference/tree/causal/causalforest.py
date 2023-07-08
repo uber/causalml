@@ -249,8 +249,8 @@ class CausalRandomForestRegressor(ForestRegressor):
                     "is necessary for Poisson regression."
                 )
 
-        self.n_outputs_ = y.shape[1]
-
+        self.n_outputs_ = np.unique(sample_weight).astype(int).size + 1
+        self.max_outputs_ = self.n_outputs_
         y, expanded_class_weight = self._validate_y_class_weight(y)
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
@@ -379,6 +379,26 @@ class CausalRandomForestRegressor(ForestRegressor):
         """
         X, y, w = self.base_estimator._prepare_data(X=X, y=y, treatment=treatment)
         return self._fit(X=X, y=y, sample_weight=w)
+
+    def predict(self, X: np.ndarray, with_outcomes: bool = False) -> np.ndarray:
+        """Predict individual treatment effects
+
+        Args:
+            X (np.matrix): a feature matrix
+            with_outcomes (bool), default=False,
+                                  include outcomes Y_hat(X|T=0), Y_hat(X|T=1) along with individual treatment effect
+        Returns:
+           (np.matrix): individual treatment effect (ITE), dim=nx1
+                        or ITE with outcomes [Y_hat(X|T=0), Y_hat(X|T=1), ITE], dim=nx3
+        """
+        if with_outcomes:
+            self.n_outputs_ = self.max_outputs_
+            for estimator in self.estimators_:
+                estimator._with_outcomes = True
+        else:
+            self.n_outputs_ = 1
+        y_pred = super().predict(X)
+        return y_pred
 
     def calculate_error(
         self,

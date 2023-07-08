@@ -1,6 +1,7 @@
 # cython: cdivision=True
 # cython: boundscheck=False
 # cython: wraparound=False
+# cython: language_level=3
 """
 Forest of trees-based ensemble methods for Uplift modeling on Classification
 Problem. Those methods include random forests and extremely randomized trees.

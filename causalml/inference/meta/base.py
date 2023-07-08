@@ -249,7 +249,7 @@ class BaseLearner(metaclass=ABCMeta):
         model_tau_feature=None,
         features=None,
         shap_dict=None,
-        **kwargs
+        **kwargs,
     ):
         """
         Plots distribution of shapley values.
@@ -288,7 +288,7 @@ class BaseLearner(metaclass=ABCMeta):
         features=None,
         shap_dict=None,
         interaction_idx="auto",
-        **kwargs
+        **kwargs,
     ):
         """
         Plots dependency of shapley values for a specified feature, colored by an interaction feature.
@@ -331,5 +331,5 @@ class BaseLearner(metaclass=ABCMeta):
             feature_idx=feature_idx,
             shap_dict=shap_dict,
             interaction_idx=interaction_idx,
-            **kwargs
+            **kwargs,
         )
