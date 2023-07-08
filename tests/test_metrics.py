@@ -5,10 +5,7 @@ from causalml.metrics.visualize import qini_score
 
 def test_qini_score():
     test_df = pd.DataFrame(
-        {
-            "y": [0, 0, 0, 0, 1, 0, 0, 1, 1, 1],
-            "w": [0] * 5 + [1] * 5,
-        }
+        {"y": [0, 0, 0, 0, 1, 0, 0, 1, 1, 1], "w": [0] * 5 + [1] * 5}
     )
 
     good_uplift = [_ / 10 for _ in range(0, 5)]

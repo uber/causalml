@@ -169,7 +169,7 @@ class GradientBoostedPropensityModel(PropensityModel):
                 self.model.predict_proba(X, ntree_limit=self.model.best_ntree_limit)[
                     :, 1
                 ],
-                *self.clip_bounds
+                *self.clip_bounds,
             )
         else:
             return super(GradientBoostedPropensityModel, self).predict(X)

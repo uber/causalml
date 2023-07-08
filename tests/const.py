@@ -11,3 +11,7 @@ OUTCOME_COL = "outcome"
 CONTROL_NAME = "control"
 TREATMENT_NAMES = [CONTROL_NAME, "treatment1", "treatment2", "treatment3"]
 CONVERSION = "conversion"
+DELTA_UPLIFT_INCREASE_DICT = {
+    "treatment1": 0.1,
+}
+N_UPLIFT_INCREASE_DICT = {"treatment1": 5}

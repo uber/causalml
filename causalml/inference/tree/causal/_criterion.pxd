@@ -18,7 +18,7 @@ cdef struct NodeInfo:
     double y_sq_sum     # the squared sum of outcomes
     double tr_y_sq_sum  # the squared sum of outcomes among treatment obs
     double ct_y_sq_sum  # the squared sum of outcomes among control obs
-
+    double split_metric # Additional split metric for t-test criterion
 
 cdef struct SplitState:
     NodeInfo node   # current node state

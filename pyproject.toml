@@ -1,8 +1,70 @@
+[project]
+name = "causalml"
+version = "0.13.0"
+description = "Python Package for Uplift Modeling and Causal Inference with Machine Learning Algorithms"
+readme = { file = "README.md", content-type = "text/markdown" }
+
+authors = [
+    { "name" = "Huigang Chen" },
+    { "name" = "Totte Harinen" },
+    { "name" = "Jeong-Yoon Lee" },
+    { "name" = "Jing Pan" },
+    { "name" = "Mike Yung" },
+    { "name" = "Zhenyu Zhao" }
+]
+maintainers = [
+    { name = "Jeong-Yoon Lee" }
+]
+classifiers = [
+    "Programming Language :: Python",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+requires-python = ">=3.7"
+dependencies = [
+    "forestci==0.6",
+    "pathos==0.2.9",
+    "pip>=10.0",
+    "numpy<1.24",
+    "scipy>=1.4.1",
+    "matplotlib",
+    "pandas>=0.24.1,<1.4.0",
+    "scikit-learn<=1.0.2",
+    "statsmodels>=0.9.0",
+    "Cython>=0.28.0",
+    "seaborn",
+    "xgboost",
+    "pydotplus",
+    "tqdm",
+    "shap",
+    "dill",
+    "lightgbm",
+    "pygam",
+    "packaging",
+    "torch",
+    "pyro-ppl",
+    "graphviz",
+]
+
+[project.optional-dependencies]
+test = [
+    "pytest>=4.6",
+    "pytest-cov>=4.0"
+]
+tf = [
+    "tensorflow>=2.4.0"
+]
+
+
 [build-system]
 requires = [
-	"setuptools>=18.0",
-	"wheel",
-	"cython",
-	"numpy",
-	"scikit-learn<=1.0.2",
+    "setuptools>=18.0",
+    "wheel",
+    "Cython>=0.28.0",
+    "numpy<1.24",
+    "scikit-learn<=1.0.2",
 ]
+
+[project.urls]
+homepage = "https://github.com/uber/causalml"

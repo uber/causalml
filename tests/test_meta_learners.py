@@ -936,13 +936,7 @@ def test_XGBRegressor_with_sample_weights(generate_regression_data):
     # Check if XGBRRegressor successfully produces treatment effect estimation
     # when sample_weight is passed
     uplift_model = XGBRRegressor()
-    uplift_model.fit(
-        X=X,
-        p=e,
-        treatment=treatment,
-        y=y,
-        sample_weight=weights,
-    )
+    uplift_model.fit(X=X, p=e, treatment=treatment, y=y, sample_weight=weights)
     tau_pred = uplift_model.predict(X=X)
     assert len(tau_pred) == len(weights)
 
