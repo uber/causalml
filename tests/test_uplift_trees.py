@@ -92,14 +92,34 @@ def test_UpliftRandomForestClassifier(
         assert cumgain["uplift_tree"].sum() > cumgain["Random"].sum()
 
 
-def test_UpliftTreeClassifier(generate_classification_data):
+@pytest.mark.parametrize("evaluation_function", ["DDP", "IT", "CIT", "IDDP"])
+def test_UpliftTreeClassifierTwoTreatments(
+    generate_classification_data_two_treatments, evaluation_function
+):
+    df, x_names = generate_classification_data_two_treatments()
+    UpliftTreeClassifierTesting(df, x_names, evaluation_function)
+
+
+@pytest.mark.parametrize("evaluation_function", ["KL", "Chi", "ED", "CTS"])
+def test_UpliftTreeClassifierMultipleTreatments(
+    generate_classification_data, evaluation_function
+):
     df, x_names = generate_classification_data()
+    UpliftTreeClassifierTesting(df, x_names, evaluation_function)
+
+
+def UpliftTreeClassifierTesting(df, x_names, evaluation_function):
     df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
 
     # Train the UpLift Random Forest classifier
     uplift_model = UpliftTreeClassifier(
-        control_name=TREATMENT_NAMES[0], random_state=RANDOM_SEED
+        control_name=TREATMENT_NAMES[0],
+        random_state=RANDOM_SEED,
+        evaluationFunction=evaluation_function,
     )
+
+    if evaluation_function == "IDDP":
+        assert uplift_model.honesty is True
 
     pr = cProfile.Profile(subcalls=True, builtins=True, timeunit=0.001)
     pr.enable()
@@ -143,7 +163,7 @@ def test_UpliftTreeClassifier(generate_classification_data):
     )
 
     # Check if the cumulative gain of UpLift Random Forest is higher than
-    # random
+    # random (sometimes IT and IDDP are not better than random)
     assert cumgain["uplift_tree"].sum() > cumgain["Random"].sum()
 
     # Check if the total count is split correctly, at least for control group in the first level

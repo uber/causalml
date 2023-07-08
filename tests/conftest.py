@@ -4,7 +4,14 @@ import pytest
 from causalml.dataset import synthetic_data
 from causalml.dataset import make_uplift_classification
 
-from .const import RANDOM_SEED, N_SAMPLE, TREATMENT_NAMES, CONVERSION
+from .const import (
+    RANDOM_SEED,
+    N_SAMPLE,
+    TREATMENT_NAMES,
+    CONVERSION,
+    DELTA_UPLIFT_INCREASE_DICT,
+    N_UPLIFT_INCREASE_DICT,
+)
 
 
 @pytest.fixture(scope="module")
@@ -52,6 +59,8 @@ def generate_classification_data_two_treatments():
                 treatment_name=TREATMENT_NAMES[0:2],
                 y_name=CONVERSION,
                 random_seed=RANDOM_SEED,
+                delta_uplift_increase_dict=DELTA_UPLIFT_INCREASE_DICT,
+                n_uplift_increase_dict=N_UPLIFT_INCREASE_DICT,
             )
 
         return data

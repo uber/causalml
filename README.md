@@ -30,20 +30,24 @@ The package currently supports the following methods
 * **Tree-based algorithms**
     * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square [[2]](#Literature)
     * Uplift tree/random forests on Contextual Treatment Selection [[3]](#Literature)
-    * Causal Tree [[4]](#Literature) - Work-in-progress
+    * Uplift tree/random forests on DDP [[4]](#Literature)
+    * Uplift tree/random forests on IDDP [[5]](#Literature)
+    * Interaction Tree [[6]](#Literature)
+    * Conditional Interaction Tree [[7]](#Literature)
+    * Causal Tree [[8]](#Literature) - Work-in-progress
 * **Meta-learner algorithms**
-    * S-learner [[5]](#Literature)
-    * T-learner [[5]](#Literature)
-    * X-learner [[5]](#Literature)
-    * R-learner [[6]](#Literature)
-    * Doubly Robust (DR) learner [[7]](#Literature)
-    * TMLE learner [[8]](#Literature)
+    * S-learner [[9]](#Literature)
+    * T-learner [[9]](#Literature)
+    * X-learner [[9]](#Literature)
+    * R-learner [[10]](#Literature)
+    * Doubly Robust (DR) learner [[11]](#Literature)
+    * TMLE learner [[12]](#Literature)
 * **Instrumental variables algorithms**
     * 2-Stage Least Squares (2SLS)
-    * Doubly Robust (DR) IV [[9]](#Literature)
+    * Doubly Robust (DR) IV [[13]](#Literature)
 * **Neural-network-based algorithms**
-    * CEVAE [[10]](#Literature)
-    * DragonNet [[11]](#Literature) - with `causalml[tf]` installation (see [Installation](#installation))
+    * CEVAE [[14]](#Literature)
+    * DragonNet [[15]](#Literature) - with `causalml[tf]` installation (see [Installation](#installation))
 
 
 # Installation
@@ -272,16 +276,20 @@ Bibtex:
 1. Chen, Huigang, Totte Harinen, Jeong-Yoon Lee, Mike Yung, and Zhenyu Zhao. "Causalml: Python package for causal machine learning." arXiv preprint arXiv:2002.11631 (2020).
 2. Radcliffe, Nicholas J., and Patrick D. Surry. "Real-world uplift modelling with significance-based uplift trees." White Paper TR-2011-1, Stochastic Solutions (2011): 1-33.
 3. Zhao, Yan, Xiao Fang, and David Simchi-Levi. "Uplift modeling with multiple treatments and general response types." Proceedings of the 2017 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics, 2017.
-4. Athey, Susan, and Guido Imbens. "Recursive partitioning for heterogeneous causal effects." Proceedings of the National Academy of Sciences 113.27 (2016): 7353-7360.
-5. Künzel, Sören R., et al. "Metalearners for estimating heterogeneous treatment effects using machine learning." Proceedings of the national academy of sciences 116.10 (2019): 4156-4165.
-6. Nie, Xinkun, and Stefan Wager. "Quasi-oracle estimation of heterogeneous treatment effects." arXiv preprint arXiv:1712.04912 (2017).
-7. Bang, Heejung, and James M. Robins. "Doubly robust estimation in missing data and causal inference models." Biometrics 61.4 (2005): 962-973.
-8. Van Der Laan, Mark J., and Daniel Rubin. "Targeted maximum likelihood learning." The international journal of biostatistics 2.1 (2006).
-9. Kennedy, Edward H. "Optimal doubly robust estimation of heterogeneous causal effects." arXiv preprint arXiv:2004.14497 (2020).
-10. Louizos, Christos, et al. "Causal effect inference with deep latent-variable models." arXiv preprint arXiv:1705.08821 (2017).
-11. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
-12. Zhao, Zhenyu, Yumin Zhang, Totte Harinen, and Mike Yung. "Feature Selection Methods for Uplift Modeling." arXiv preprint arXiv:2005.03447 (2020).
-13. Zhao, Zhenyu, and Totte Harinen. "Uplift modeling for multiple treatments with cost optimization." In 2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA), pp. 422-431. IEEE, 2019.
+4. Hansotia, Behram, and Brad Rukstales. "Incremental value modeling." Journal of Interactive Marketing 16.3 (2002): 35-46.
+5. Jannik Rößler, Richard Guse, and Detlef Schoder. "The Best of Two Worlds: Using Recent Advances from Uplift Modeling and Heterogeneous Treatment Effects to Optimize Targeting Policies". International Conference on Information Systems (2022)
+6. Su, Xiaogang, et al. "Subgroup analysis via recursive partitioning." Journal of Machine Learning Research 10.2 (2009).
+7. Su, Xiaogang, et al. "Facilitating score and causal inference trees for large observational studies." Journal of Machine Learning Research 13 (2012): 2955.
+8. Athey, Susan, and Guido Imbens. "Recursive partitioning for heterogeneous causal effects." Proceedings of the National Academy of Sciences 113.27 (2016): 7353-7360.
+9. Künzel, Sören R., et al. "Metalearners for estimating heterogeneous treatment effects using machine learning." Proceedings of the national academy of sciences 116.10 (2019): 4156-4165.
+10. Nie, Xinkun, and Stefan Wager. "Quasi-oracle estimation of heterogeneous treatment effects." arXiv preprint arXiv:1712.04912 (2017).
+11. Bang, Heejung, and James M. Robins. "Doubly robust estimation in missing data and causal inference models." Biometrics 61.4 (2005): 962-973.
+12. Van Der Laan, Mark J., and Daniel Rubin. "Targeted maximum likelihood learning." The international journal of biostatistics 2.1 (2006).
+13. Kennedy, Edward H. "Optimal doubly robust estimation of heterogeneous causal effects." arXiv preprint arXiv:2004.14497 (2020).
+14. Louizos, Christos, et al. "Causal effect inference with deep latent-variable models." arXiv preprint arXiv:1705.08821 (2017).
+15. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
+16. Zhao, Zhenyu, Yumin Zhang, Totte Harinen, and Mike Yung. "Feature Selection Methods for Uplift Modeling." arXiv preprint arXiv:2005.03447 (2020).
+17. Zhao, Zhenyu, and Totte Harinen. "Uplift modeling for multiple treatments with cost optimization." In 2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA), pp. 422-431. IEEE, 2019.
  
 
 ## Related projects
