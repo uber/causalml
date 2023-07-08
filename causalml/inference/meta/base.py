@@ -276,7 +276,7 @@ class BaseLearner(metaclass=ABCMeta):
             override_checks=override_checks,
             classes=self._classes,
         )
-        explainer.plot_shap_values(shap_dict=shap_dict)
+        explainer.plot_shap_values(shap_dict=shap_dict, **kwargs)
 
     def plot_shap_dependence(
         self,
