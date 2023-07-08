@@ -194,8 +194,9 @@ class BaseDRIVLearner(object):
                     mask = (treatment_treat == group) | (
                         treatment_treat == self.control_name
                     )
-                    mask_1, mask_0 = mask & (assignment_treat == 1), mask & (
-                        assignment_treat == 0
+                    mask_1, mask_0 = (
+                        mask & (assignment_treat == 1),
+                        mask & (assignment_treat == 0),
                     )
                     cur_p_1[group], _ = compute_propensity_score(
                         X=X_treat[mask_1],
@@ -232,8 +233,9 @@ class BaseDRIVLearner(object):
             logger.info("Generate outcome regressions")
             for group in self.t_groups:
                 mask = (treatment_out == group) | (treatment_out == self.control_name)
-                mask_1, mask_0 = mask & (assignment_out == 1), mask & (
-                    assignment_out == 0
+                mask_1, mask_0 = (
+                    mask & (assignment_out == 1),
+                    mask & (assignment_out == 0),
                 )
                 self.models_mu_c[group][ifold].fit(X_out[mask_0], y_out[mask_0])
                 self.models_mu_t[group][ifold].fit(X_out[mask_1], y_out[mask_1])

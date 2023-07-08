@@ -103,10 +103,7 @@ def get_xgboost_objective_metric(objective):
         return {clean_xgboost_objective(k): v for (k, v) in orig.items()}
 
     metric_mapping = clean_dict_keys(
-        {
-            "rank:pairwise": "auc",
-            "reg:squarederror": "rmse",
-        }
+        {"rank:pairwise": "auc", "reg:squarederror": "rmse"}
     )
 
     objective = clean_xgboost_objective(objective)
