@@ -70,7 +70,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "causalml"
-copyright = "2019 Uber Technologies, Inc."
+copyright = "2023 Uber Technologies, Inc."
 author = "CausalML"
 
 # The version info for the project you're documenting, acts as replacement
@@ -78,7 +78,9 @@ author = "CausalML"
 # the built documents.
 #
 # The short X.Y version.
-version = causalml.__version__
+import importlib.metadata
+
+version = importlib.metadata.version("causalml")
 # The full version, including alpha/beta/rc tags.
 # release = causalml.__version__
 
@@ -221,7 +223,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ("index", "causalml.tex", "causalml Documentation", "Someone at Uber", "manual"),
+    ("index", "causalml.tex", "causalml Documentation", "Someone at Uber", "manual")
 ]
 
 # The name of an image file (relative to this directory) to place at
@@ -269,7 +271,7 @@ texinfo_documents = [
         "causalml",
         "One line description of project.",
         "Miscellaneous",
-    ),
+    )
 ]
 
 # Documents to append as an appendix to all manuals.

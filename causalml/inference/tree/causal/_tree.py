@@ -14,9 +14,13 @@ from sklearn.tree._splitter import Splitter
 from sklearn.utils.validation import _check_sample_weight
 
 from ._builder import DepthFirstCausalTreeBuilder, BestFirstCausalTreeBuilder
-from ._criterion import StandardMSE, CausalMSE
+from ._criterion import StandardMSE, CausalMSE, TTest
 
-CAUSAL_TREES_CRITERIA = {"causal_mse": CausalMSE, "standard_mse": StandardMSE}
+CAUSAL_TREES_CRITERIA = {
+    "causal_mse": CausalMSE,
+    "standard_mse": StandardMSE,
+    "t_test": TTest,
+}
 CRITERIA_REG.update(CAUSAL_TREES_CRITERIA)
 
 
@@ -70,7 +74,8 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             # [:, np.newaxis] that does not.
             y = np.reshape(y, (-1, 1))
 
-        self.n_outputs_ = y.shape[1]
+        # For memory allocation to store control, treatment outcomes
+        self.n_outputs_ = np.unique(sample_weight).astype(int).size
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)

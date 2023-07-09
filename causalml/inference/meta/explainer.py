@@ -238,7 +238,7 @@ class Explainer(object):
         feature_idx,
         shap_dict=None,
         interaction_idx="auto",
-        **kwargs
+        **kwargs,
     ):
         """
          Plots dependency of shapley values for a specified feature, colored by an interaction feature.
@@ -269,5 +269,5 @@ class Explainer(object):
             self.X,
             interaction_index=interaction_idx,
             feature_names=self.features,
-            **kwargs
+            **kwargs,
         )
