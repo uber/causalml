@@ -316,11 +316,14 @@ class UpliftTreeClassifier:
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
         self.classes_ = [self.control_name]
         treatment_idx = np.zeros_like(treatment, dtype=int)
-        treatment_val_idx = np.zeros_like(treatment_val, dtype=int)
+        treatment_val_idx = None
+        if treatment_val is not None:
+            treatment_val_idx = np.zeros_like(treatment_val, dtype=int)
         for i, tr in enumerate(treatment_groups, 1):
             self.classes_.append(tr)
             treatment_idx[treatment == tr] = i
-            treatment_val_idx[treatment_val == tr] = i
+            if treatment_val_idx is not None:
+                treatment_val_idx[treatment_val == tr] = i
         self.n_class = len(self.classes_)
 
         self.feature_imp_dict = defaultdict(float)
