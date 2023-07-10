@@ -1327,8 +1327,11 @@ class UpliftTreeClassifier:
                     bestGain = gain
                     bestGainImp = gain_for_imp
                     bestAttribute = (col, value)
-                    best_set_left = [X_l, w_l, y_l, X_val_l, w_val_l, y_val_l]
-                    best_set_right = [X_r, w_r, y_r, X_val_r, w_val_r, y_val_r]
+                    best_set_left = [X_l, w_l, y_l]
+                    best_set_right = [X_r, w_r, y_r]
+                    if X_val is not None:
+                        best_set_left = [X_l, w_l, y_l, X_val_l, w_val_l, y_val_l]
+                        best_set_right = [X_r, w_r, y_r, X_val_r, w_val_r, y_val_r]
 
         dcY = {'impurity': '%.3f' % currentScore, 'samples': '%d' % len(X)}
         # Add treatment size
