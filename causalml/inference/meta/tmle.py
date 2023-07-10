@@ -126,7 +126,7 @@ class TMLELearner(object):
             self.__class__.__name__, self.model_tau.__repr__(), self.cv
         )
 
-    def estimate_ate(self, X, treatment, y, p, segment=None):
+    def estimate_ate(self, X, treatment, y, p, segment=None, return_ci=False):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
@@ -137,6 +137,7 @@ class TMLELearner(object):
                 case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             segment (np.array, optional): An optional segment vector of int. If given, the ATE and its CI will be
                                           estimated for each segment.
+            return_ci (bool, optional): Whether to return confidence intervals                                          
 
         Returns:
             (tuple): The ATE and its confidence interval (LB, UB) for each treatment, t and segment, s
