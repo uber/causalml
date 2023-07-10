@@ -25,7 +25,7 @@ def test_UpliftRandomForestClassifier(
 ):
     df, x_names = generate_classification_data()
     df_train, df_test, df_val = None, None, None
-    
+
     if early_stopping == "true":
         df_train, df_test_val = train_test_split(
             df, test_size=0.2, random_state=RANDOM_SEED
@@ -34,7 +34,9 @@ def test_UpliftRandomForestClassifier(
             df_test_val, test_size=0.5, random_state=RANDOM_SEED
         )
     else:
-        df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
+        df_train, df_test = train_test_split(
+            df, test_size=0.2, random_state=RANDOM_SEED
+        )
 
     with parallel_backend(backend):
         # Train the UpLift Random Forest classifier
@@ -56,9 +58,9 @@ def test_UpliftRandomForestClassifier(
             )
         else:
             uplift_model.fit(
-            df_train[x_names].values,
-            treatment=df_train["treatment_group_key"].values,
-            y=df_train[CONVERSION].values,
+                df_train[x_names].values,
+                treatment=df_train["treatment_group_key"].values,
+                y=df_train[CONVERSION].values,
             )
         predictions = {}
         predictions["single"] = uplift_model.predict(df_test[x_names].values)
