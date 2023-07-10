@@ -1128,7 +1128,7 @@ class UpliftTreeClassifier:
             res.append(p)
         return res
 
-    def growDecisionTreeFrom(self, X, treatment_idx, y, X_val=None, treatment_val_idx=None, y_val=None,
+    def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val,
                              early_stopping_eval_diff=0.01, max_depth=10,
                              min_samples_leaf=100, depth=1,
                              min_samples_treatment=10, n_reg=100,
@@ -1328,8 +1328,8 @@ class UpliftTreeClassifier:
                     bestGain = gain
                     bestGainImp = gain_for_imp
                     bestAttribute = (col, value)
-                    best_set_left = [X_l, w_l, y_l]
-                    best_set_right = [X_r, w_r, y_r]
+                    best_set_left = [X_l, w_l, y_l, None, None, None]
+                    best_set_right = [X_r, w_r, y_r, None, None, None]
                     if X_val_l is not None:
                         best_set_left = [X_l, w_l, y_l, X_val_l, w_val_l, y_val_l]
                         best_set_right = [X_r, w_r, y_r, X_val_r, w_val_r, y_val_r]
