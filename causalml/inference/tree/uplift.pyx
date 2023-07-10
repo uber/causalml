@@ -1128,7 +1128,8 @@ class UpliftTreeClassifier:
             res.append(p)
         return res
 
-    def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val, early_stopping_eval_diff=0.01, max_depth=10,
+    def growDecisionTreeFrom(self, X, treatment_idx, y, X_val=None, treatment_val_idx=None, y_val=None,
+                             early_stopping_eval_diff=0.01, max_depth=10,
                              min_samples_leaf=100, depth=1,
                              min_samples_treatment=10, n_reg=100,
                              parentNodeSummary=None):
@@ -1322,7 +1323,7 @@ class UpliftTreeClassifier:
                         norm_factor = self.normI(n_c, n_c_left, n_t, n_t_left, alpha=0.9)
                     else:
                         norm_factor = 1
-                    gain = gain / norm_factor
+                    gain = gain / norm_factor 
                 if (gain > bestGain and len(X_l) > min_samples_leaf and len(X_r) > min_samples_leaf):
                     bestGain = gain
                     bestGainImp = gain_for_imp
