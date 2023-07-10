@@ -137,7 +137,7 @@ class TMLELearner(object):
                 case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1)
             segment (np.array, optional): An optional segment vector of int. If given, the ATE and its CI will be
                                           estimated for each segment.
-            return_ci (bool, optional): Whether to return confidence intervals                                          
+            return_ci (bool, optional): Whether to return confidence intervals
 
         Returns:
             (tuple): The ATE and its confidence interval (LB, UB) for each treatment, t and segment, s
