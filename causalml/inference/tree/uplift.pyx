@@ -1329,7 +1329,7 @@ class UpliftTreeClassifier:
                     bestAttribute = (col, value)
                     best_set_left = [X_l, w_l, y_l]
                     best_set_right = [X_r, w_r, y_r]
-                    if X_val is not None:
+                    if X_val_l is not None:
                         best_set_left = [X_l, w_l, y_l, X_val_l, w_val_l, y_val_l]
                         best_set_right = [X_r, w_r, y_r, X_val_r, w_val_r, y_val_r]
 
