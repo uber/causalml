@@ -1,4 +1,4 @@
-name: Test conda-forge install
+name: Test conda-venv install
 
 on: [push]
 
@@ -29,5 +29,5 @@ jobs:
       - name: Install using venv
         run: |
             cd envs
-            conda env create -f environemtn-py38.yml
+            conda env create -f environment-py38.yml
             conda activate causalml-py38
