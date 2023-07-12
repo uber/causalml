@@ -1,6 +1,10 @@
 name: Test conda-forge install
 
 on: [push]
+  push:
+    paths:
+      - 'envs/*.yml'
+      - '.github/workflows/test-conda-forge-install.yaml'
 
 jobs:
   build:
@@ -20,11 +24,8 @@ jobs:
         run: python -c "import sys; print(sys.version)"
       - name: Install conda
         run: |
-            pwd
             wget https://repo.anaconda.com/miniconda/Miniconda3-py38_23.5.0-3-Linux-x86_64.sh
             bash Miniconda3-py38_23.5.0-3-Linux-x86_64.sh -b
-            ls -la
-            pwd
             source /home/runner/miniconda3/bin/activate
             conda init
             source ~/.bashrc
