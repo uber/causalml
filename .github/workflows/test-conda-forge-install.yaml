@@ -29,8 +29,6 @@ jobs:
             conda init
             source ~/.bashrc
             conda env list
-            conda create -n py38 python=3.8
-      - name: Install dependencies
+      - name: Install from conda-forge 
         run: |
-            conda activate py38
             conda install -c conda-forge causalml
