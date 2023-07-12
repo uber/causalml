@@ -1,0 +1,31 @@
+name: Test conda-forge install
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: [3.8]
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      # You can test your matrix by printing the current Python version
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+      - name: Install conda
+        run: |
+            wget https://repo.anaconda.com/miniconda/Miniconda3-py38_23.5.0-3-Linux-x86_64.sh
+            bash Miniconda3-py38_23.5.0-3-Linux-x86_64.sh -b
+            source miniconda3/bin/activate
+            conda init
+            source ~/.bashrc
+            conda env list
+            conda create -n py38 python=3.8
+      - name: Install dependencies
+        run: |
+            conda activate py38
+            conda install -c conda-forge causalml
