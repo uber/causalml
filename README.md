@@ -63,7 +63,7 @@ For example, on ubuntu this can be done with:
 
 ```
 sudo apt-get install -y gcc g++
-``
+```
 
 ## Install using `conda`:
 
