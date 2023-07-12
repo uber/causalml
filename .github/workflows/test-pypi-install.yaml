@@ -1,4 +1,4 @@
-name: Test conda-forge install
+name: Test PyPI install
 
 on: [push]
 
