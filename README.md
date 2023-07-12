@@ -52,7 +52,18 @@ The package currently supports the following methods
 
 # Installation
 
-Installation with `conda` is recommended. `conda` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
+Installation with `conda` is recommended.  Install `conda` with:
+
+```
+wget https://repo.anaconda.com/miniconda/Miniconda3-py38_23.5.0-3-Linux-x86_64.sh
+bash Miniconda3-py38_23.5.0-3-Linux-x86_64.sh -b
+source miniconda3/bin/activate 
+conda init
+source ~/.bashrc 
+conda env list
+```
+
+`conda` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
 
 ## Install using `conda`:
 ### Install from `conda-forge`
