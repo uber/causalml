@@ -1,6 +1,6 @@
 name: Test conda-venv install
 
-on: [push]
+on:
   push:
     paths:
       - 'envs/*.yml'
