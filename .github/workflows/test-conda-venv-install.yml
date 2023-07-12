@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: [38]
+        python-version: [37, 38, 39]
 
     steps:
       - name: checkout repository
