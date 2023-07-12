@@ -1,33 +1,40 @@
 name: Test conda-venv install
 
 on: [push]
+  push:
+    paths:
+      - 'envs/*.yml'
+      - '.github/workflows/test-conda-venv-install.yaml'
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
     strategy:
       matrix:
-        python-version: [3.8]
+        os: [ubuntu-latest]
+        python-version: [38]
 
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
-      # You can test your matrix by printing the current Python version
+      - name: checkout repository
+        uses: actions/checkout@v2
+
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
-      - name: Install conda
+
+      - name: create environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          channels: defaults
+          auto-activate-base: false
+          activate-environment: causalml-py${{ python-version }}
+          environment-file: envs/environment-py{{ python-version }}
+
+      - name: check env
         run: |
-            wget https://repo.anaconda.com/miniconda/Miniconda3-py38_23.5.0-3-Linux-x86_64.sh
-            bash Miniconda3-py38_23.5.0-3-Linux-x86_64.sh -b
-            source /home/runner/miniconda3/bin/activate
-            conda init
-            source ~/.bashrc
-            conda env list
-      - name: Install using venv
-        run: |
-            cd envs
-            conda env create -f environment-py38.yml
-            conda activate causalml-py38
+            conda env export
