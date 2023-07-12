@@ -33,7 +33,7 @@ jobs:
           channels: defaults
           auto-activate-base: false
           activate-environment: causalml-py${{ matrix.python-version }}
-          environment-file: envs/environment-py{{ matrix.python-version }}
+          environment-file: envs/environment-py${{ matrix.python-version }}
 
       - name: check env
         run: |
