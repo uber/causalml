@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.os }}-py${{ matrix.python-version }}
+    name: ${{ matrix.os }}${{ matrix.tf-label }}-py${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
 
     defaults:
@@ -19,6 +19,9 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: [37, 38, 39]
+        include:
+          - tf-label: ''
+          - tf-label: '-tf'
 
     steps:
       - name: checkout repository
@@ -32,8 +35,8 @@ jobs:
         with:
           channels: defaults
           auto-activate-base: false
-          activate-environment: causalml-py${{ matrix.python-version }}
-          environment-file: envs/environment-py${{ matrix.python-version }}.yml
+          activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version }}
+          environment-file: envs/environment${{ matrix.tf-label }}-py${{ matrix.python-version }}.yml
 
       - name: check env
         run: |
