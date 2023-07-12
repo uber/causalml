@@ -4,7 +4,7 @@ on: [push]
   push:
     paths:
       - 'envs/*.yml'
-      - '.github/workflows/test-conda-forge-install.yaml'
+      - '.github/workflows/test-conda-forge-install.yml'
 
 jobs:
   build:
