@@ -56,6 +56,15 @@ Installation with `conda` is recommended.
 
 `conda` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
 
+## gcc, g++
+`gcc` and `g++` must be installed on the system to compile C/C++ libraries.
+
+For example, on ubuntu this can be done with:
+
+```
+sudo apt-get install -y gcc g++
+``
+
 ## Install using `conda`:
 
 Install `conda` with:
