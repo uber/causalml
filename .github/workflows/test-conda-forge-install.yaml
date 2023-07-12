@@ -25,7 +25,7 @@ jobs:
             bash Miniconda3-py38_23.5.0-3-Linux-x86_64.sh -b
             ls -la
             pwd
-            source miniconda3/bin/activate
+            source /home/runner/miniconda3/bin/activate
             conda init
             source ~/.bashrc
             conda env list
