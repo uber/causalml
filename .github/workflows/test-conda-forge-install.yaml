@@ -1,8 +1,6 @@
 name: Test conda-forge install
 
-on:
-  release:
-    types: [published]
+on: [push]
 
 jobs:
   build:
