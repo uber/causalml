@@ -18,7 +18,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: [37, 38, 39]
+        python-version: [39]
         tf-label: ['', '-tf']
 
     steps:
