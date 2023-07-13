@@ -19,7 +19,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: [39]
+        python-version: [37, 38, 39]
         tf-label: ['', '-tf']
 
     steps:
