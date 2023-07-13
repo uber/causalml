@@ -16,6 +16,7 @@ jobs:
         shell: bash -l {0}
 
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         python-version: [39]
