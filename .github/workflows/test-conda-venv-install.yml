@@ -42,6 +42,8 @@ jobs:
             conda env export
       - name: Build
         run: |
+            pip install -U pip
+            pip install -U setuptools
             python -m pip install .[test]
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/
