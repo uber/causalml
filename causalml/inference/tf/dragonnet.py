@@ -310,7 +310,7 @@ class DragonNet:
             ratio (float): weight assigned to the targeted regularization loss component
             dragonnet_loss (function): a loss function
         """
-        self.dragonnet.load_model(h5_filepath,
+        self.dragonnet = load_model(h5_filepath,
                                   custom_objects={
                                       'EpsilonLayer': EpsilonLayer,
                                       'dragonnet_loss_binarycross': dragonnet_loss_binarycross,
