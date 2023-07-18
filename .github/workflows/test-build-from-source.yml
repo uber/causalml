@@ -1,0 +1,42 @@
+name: Test conda-venv install
+
+on:
+  push:
+    paths:
+      - 'envs/*.yml'
+      - '.github/workflows/test-conda-venv-install.yml'
+
+jobs:
+  build:
+    name: ${{ matrix.os }}${{ matrix.tf-label }}-py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: [37, 38, 39]
+        tf-label: ['', '-tf']
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+
+      - name: create environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          channels: defaults
+          auto-activate-base: false
+          activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version }}
+          environment-file: envs/environment${{ matrix.tf-label }}-py${{ matrix.python-version }}.yml
+
+      - name: check env
+        run: |
+            conda env export
