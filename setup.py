@@ -4,7 +4,7 @@ from setuptools.extension import Extension
 try:
     from Cython.Build import cythonize
 except ImportError:
-    dist.Distribution().fetch_build_eggs(["cython>=0.28.0"])
+    dist.Distribution().fetch_build_eggs(["cython<=0.29.34"])
     from Cython.Build import cythonize
 import Cython.Compiler.Options
 
