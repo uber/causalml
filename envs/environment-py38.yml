@@ -23,6 +23,7 @@ dependencies:
     - decorator==5.0.7
     - defusedxml==0.7.1
     - dill==0.3.3
+    - duecredit==0.9.2
     - entrypoints==0.3
     - future==0.18.2
     - gast==0.3.3
