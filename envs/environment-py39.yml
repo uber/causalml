@@ -2,7 +2,7 @@ name: causalml-py39
 channels:
   - defaults
 dependencies:
-  - pip=21.0.1
+  - pip
   - python=3.9
   - setuptools=52.0.0
   - pip:
