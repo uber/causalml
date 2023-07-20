@@ -160,7 +160,7 @@ class TMLELearner(object):
         ate_lb = []
         ate_ub = []
 
-        for i, group in enumerate(self.t_groups):
+        for _, group in enumerate(self.t_groups):
             logger.info("Estimating ATE for group {}.".format(group))
             w_group = (treatment == group).astype(int)
             p_group = p[group]

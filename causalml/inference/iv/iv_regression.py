@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 
 from causalml.inference.meta.utils import convert_pd_to_np
 import statsmodels.api as sm
