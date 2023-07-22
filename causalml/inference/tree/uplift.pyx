@@ -1269,7 +1269,8 @@ class UpliftTreeClassifier:
                                                               parentNodeSummary=currentNodeSummary)
                     early_stopping_flag = False
                     for k in range(len(leftNodeSummary_val)):
-                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > min(leftNodeSummary_val[k][0],leftNodeSummary[k][0])/early_stopping_eval_diff_scale or abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > min(rightNodeSummary_val[k][0],rightNodeSummary[k][0])/early_stopping_eval_diff_scale):
+                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > min(leftNodeSummary_val[k][0],leftNodeSummary[k][0])/early_stopping_eval_diff_scale or
+                         abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > min(rightNodeSummary_val[k][0],rightNodeSummary[k][0])/early_stopping_eval_diff_scale):
                             early_stopping_flag = True
                             break
                     if early_stopping_flag:
