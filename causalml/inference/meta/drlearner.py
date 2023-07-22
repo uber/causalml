@@ -8,7 +8,6 @@ from tqdm import tqdm
 from xgboost import XGBRegressor
 
 from causalml.inference.meta.base import BaseLearner
-from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import (
     check_treatment_vector,
     check_p_conditions,

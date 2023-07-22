@@ -265,7 +265,7 @@ class BaseLearner(metaclass=ABCMeta):
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
             shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
         """
-        override_checks = False if shap_dict is None else True
+        override_checks = shap_dict is not None
         explainer = Explainer(
             method="shapley",
             control_name=self.control_name,
