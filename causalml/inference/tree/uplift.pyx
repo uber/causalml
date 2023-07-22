@@ -220,6 +220,10 @@ class UpliftTreeClassifier:
     n_reg: int, optional (default=100)
         The regularization parameter defined in Rzepakowski et al. 2012, the weight (in terms of sample size) of the
         parent node influence on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
+    
+    early_stopping_eval_diff_scale: float, optional (default=1)
+        If train and valid uplift score diff bigger than 
+        min(train_uplift_score,valid_uplift_score)/early_stopping_eval_diff_scale, stop.
 
     control_name: string
         The name of the control group (other experiment groups will be regarded as treatment groups).
@@ -240,13 +244,13 @@ class UpliftTreeClassifier:
 
     """
     def __init__(self, control_name, max_features=None, max_depth=3, min_samples_leaf=100,
-                 min_samples_treatment=10, n_reg=100, early_stopping_eval_diff=0.01, evaluationFunction='KL',
+                 min_samples_treatment=10, n_reg=100, early_stopping_eval_diff_scale=1, evaluationFunction='KL',
                  normalization=True, honesty=False, estimation_sample_size=0.5, random_state=None):
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
-        self.early_stopping_eval_diff = early_stopping_eval_diff
+        self.early_stopping_eval_diff_scale = early_stopping_eval_diff_scale
         self.max_features = max_features
 
         assert evaluationFunction in ['KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', 'IDDP'], \
@@ -344,7 +348,8 @@ class UpliftTreeClassifier:
 
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
             X, treatment_idx, y, X_val, treatment_val_idx, y_val,
-            max_depth=self.max_depth, min_samples_leaf=self.min_samples_leaf,
+            max_depth=self.max_depth, early_stopping_eval_diff_scale=self.early_stopping_eval_diff_scale,
+            min_samples_leaf=self.min_samples_leaf,
             depth=1, min_samples_treatment=self.min_samples_treatment,
             n_reg=self.n_reg, parentNodeSummary=None
         )
@@ -1129,7 +1134,7 @@ class UpliftTreeClassifier:
         return res
 
     def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val,
-                             early_stopping_eval_diff=0.01, max_depth=10,
+                             early_stopping_eval_diff_scale=1, max_depth=10,
                              min_samples_leaf=100, depth=1,
                              min_samples_treatment=10, n_reg=100,
                              parentNodeSummary=None):
@@ -1211,7 +1216,6 @@ class UpliftTreeClassifier:
         else:
             p_t = currentNodeSummary[suboptTreatment][0]
             n_t = currentNodeSummary[suboptTreatment][1]
-
         p_value = (1. - stats.norm.cdf(abs(p_c - p_t) / np.sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
         upliftScore = [maxDiff, p_value]
 
@@ -1265,7 +1269,7 @@ class UpliftTreeClassifier:
                                                               parentNodeSummary=currentNodeSummary)
                     early_stopping_flag = False
                     for k in range(len(leftNodeSummary_val)):
-                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > early_stopping_eval_diff or abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > early_stopping_eval_diff):
+                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > min(leftNodeSummary_val[k][0],leftNodeSummary[k][0])/early_stopping_eval_diff_scale or abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > min(rightNodeSummary_val[k][0],rightNodeSummary[k][0])/early_stopping_eval_diff_scale):
                             early_stopping_flag = True
                             break
                     if early_stopping_flag:
@@ -1345,12 +1349,12 @@ class UpliftTreeClassifier:
         if bestGain > 0 and depth < max_depth:
             self.feature_imp_dict[bestAttribute[0]] += bestGainImp
             trueBranch = self.growDecisionTreeFrom(
-                *best_set_left, self.early_stopping_eval_diff, max_depth, min_samples_leaf,
+                *best_set_left, self.early_stopping_eval_diff_scale, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
                 n_reg=n_reg, parentNodeSummary=currentNodeSummary
             )
             falseBranch = self.growDecisionTreeFrom(
-                *best_set_right, self.early_stopping_eval_diff, max_depth, min_samples_leaf,
+                *best_set_right, self.early_stopping_eval_diff_scale, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
                 n_reg=n_reg, parentNodeSummary=currentNodeSummary
             )
@@ -1517,6 +1521,10 @@ class UpliftRandomForestClassifier:
         weight (in terms of sample size) of the parent node influence on the
         child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
+    early_stopping_eval_diff_scale: float, optional (default=1)
+        If train and valid uplift score diff bigger than 
+        min(train_uplift_score,valid_uplift_score)/early_stopping_eval_diff_scale, stop.
+
     control_name: string
         The name of the control group (other experiment groups will be regarded as treatment groups)
 
@@ -1554,7 +1562,7 @@ class UpliftRandomForestClassifier:
                  min_samples_leaf=100,
                  min_samples_treatment=10,
                  n_reg=10,
-                 early_stopping_eval_diff=0.01,
+                 early_stopping_eval_diff_scale=1,
                  evaluationFunction='KL',
                  normalization=True,
                  honesty=False,
@@ -1572,7 +1580,7 @@ class UpliftRandomForestClassifier:
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
-        self.early_stopping_eval_diff = early_stopping_eval_diff
+        self.early_stopping_eval_diff_scale = early_stopping_eval_diff_scale
         self.evaluationFunction = evaluationFunction
         self.control_name = control_name
         self.normalization = normalization
@@ -1622,7 +1630,7 @@ class UpliftRandomForestClassifier:
                 min_samples_leaf=self.min_samples_leaf,
                 min_samples_treatment=self.min_samples_treatment,
                 n_reg=self.n_reg,
-                early_stopping_eval_diff=self.early_stopping_eval_diff,
+                early_stopping_eval_diff_scale=self.early_stopping_eval_diff_scale,
                 evaluationFunction=self.evaluationFunction,
                 control_name=self.control_name,
                 normalization=self.normalization,

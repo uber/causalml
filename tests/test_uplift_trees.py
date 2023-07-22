@@ -45,7 +45,7 @@ def test_UpliftRandomForestClassifier(
             control_name=TREATMENT_NAMES[0],
             random_state=RANDOM_SEED,
             joblib_prefer=joblib_prefer,
-            early_stopping_eval_diff=0.01,
+            early_stopping_eval_diff_scale=1,
         )
         if early_stopping == "true":
             uplift_model.fit(
