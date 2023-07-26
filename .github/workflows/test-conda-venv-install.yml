@@ -44,11 +44,7 @@ jobs:
           conda config --show-sources
           conda config --show  
 
-      - name: echo conda env
-        run: |
-          conda env export
-
-      - name: Build
+     - name: Build
         run: |
             pip install -U pip
             pip install -U setuptools
@@ -57,3 +53,7 @@ jobs:
 
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/
+
+      - name: echo conda env
+        run: |
+          conda env export

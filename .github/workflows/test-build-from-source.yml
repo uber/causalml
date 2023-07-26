@@ -57,10 +57,6 @@ jobs:
           conda config --show-sources
           conda config --show  
 
-      - name: echo conda env
-        run: |
-          conda env export
-
       - name: Build
         run: |
             pip install -U pip
@@ -68,5 +64,12 @@ jobs:
             python -m pip install .${{ matrix.tf-label-pip}}
             python -m pip install .[test]
             python setup.py build_ext --inplace
+
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/
+
+      - name: echo conda env
+        run: |
+          conda env export
+
+
