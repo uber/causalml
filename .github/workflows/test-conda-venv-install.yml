@@ -37,13 +37,22 @@ jobs:
           activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version }}
           environment-file: envs/environment${{ matrix.tf-label }}-py${{ matrix.python-version }}.yml
 
-      - name: echo env
+      - name: echo conda config
         run: |
-            conda env export
+          conda info
+          conda list
+          conda config --show-sources
+          conda config --show  
+
+      - name: echo conda env
+          conda env export
+
       - name: Build
         run: |
             pip install -U pip
             pip install -U setuptools
             python -m pip install .[test]
+            python setup.py build_ext --inplace
+
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/
