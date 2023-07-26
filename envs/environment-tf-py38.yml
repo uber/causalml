@@ -25,12 +25,12 @@ dependencies:
     - dill==0.3.3
     - entrypoints==0.3
     - future==0.18.2
-    - gast>=0.4.0
+    - gast==0.3.3
     - google-auth==1.29.0
     - google-auth-oauthlib==0.4.4
     - google-pasta==0.2.0
-    - grpcio>=1.34.0
-    - h5py>=3.1.0
+    - grpcio==1.37.0
+    - h5py==2.10.0
     - idna==2.10
     - iniconfig==1.1.1
     - ipykernel==5.5.3
@@ -68,7 +68,7 @@ dependencies:
     - nest-asyncio==1.5.1
     - notebook==6.3.0
     - numba==0.53.1
-    - numpy>=1.18.5
+    - numpy==1.18.5
     - oauthlib==3.1.0
     - opt-einsum==3.3.0
     - packaging==20.9
