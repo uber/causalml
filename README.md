@@ -56,15 +56,6 @@ Installation with `conda` is recommended.
 
 `conda` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
 
-## gcc, g++
-`gcc` and `g++` must be installed on the system to compile C/C++ libraries.
-
-For example, on ubuntu this can be done with:
-
-```
-sudo apt-get install -y gcc g++
-```
-
 ## Install using `conda`:
 
 Install `conda` with:
@@ -118,12 +109,25 @@ pip install -U numpy							# this step is necessary to fix [#338](https://github
 
 ## Install from source:
 
+### gcc, g++
+`gcc` and `g++` must be installed on the system to compile C/C++ libraries.
+
+For example, on ubuntu this can be done with:
+
+```
+sudo apt-get install -y gcc g++
+```
+
+Then:
+
 ```bash
 git clone https://github.com/uber/causalml.git
 cd causalml
 pip install .
 ```
+
 with `tensorflow`:
+
 ```bash
 pip install .[tf]
 ```
