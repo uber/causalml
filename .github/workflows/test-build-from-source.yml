@@ -43,6 +43,23 @@ jobs:
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
 
+      - name: create environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: foo
+          python-version: ${{ matrix.python-version }}
+          channels: defaults
+
+      - name: echo conda config
+        run: |
+          conda info
+          conda list
+          conda config --show-sources
+          conda config --show  
+
+      - name: echo conda env
+          conda env export
+
       - name: Build
         run: |
             pip install -U pip
