@@ -45,6 +45,7 @@ jobs:
           conda config --show  
 
       - name: echo conda env
+        run: |
           conda env export
 
       - name: Build
