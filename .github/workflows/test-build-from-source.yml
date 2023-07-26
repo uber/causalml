@@ -52,6 +52,10 @@ jobs:
 
       - name: echo conda config
         run: |
+          conda install -c conda-forge cxx-compiler
+
+      - name: echo conda config
+        run: |
           conda info
           conda list
           conda config --show-sources
