@@ -4,7 +4,7 @@ on:
   push:
     paths:
       - 'envs/*.yml'
-      - '.github/workflows/test-conda-venv-install.yml'
+      - '.github/workflows/test-build-from-source.yml'
 
 jobs:
   build:
