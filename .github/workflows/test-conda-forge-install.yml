@@ -8,10 +8,20 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.os }}-py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python-version: [3.8]
+        os: [ubuntu-latest]
+        python-version: [3.7, 3.8, 3.9]
+        include:
+          - python-version: 3.7
+            python-version-nd: 37
+          - python-version: 3.8
+            python-version-nd: 38
+          - python-version: 3.9
+            python-version-nd: 39
 
     steps:
       - uses: actions/checkout@v2
@@ -19,17 +29,17 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      # You can test your matrix by printing the current Python version
+
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
-      - name: Install conda
-        run: |
-            wget https://repo.anaconda.com/miniconda/Miniconda3-py38_23.5.0-3-Linux-x86_64.sh
-            bash Miniconda3-py38_23.5.0-3-Linux-x86_64.sh -b
-            source /home/runner/miniconda3/bin/activate
-            conda init
-            source ~/.bashrc
-            conda env list
+
+      - name: create environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: causalml-py${{ matrix.python-version-nd }} 
+          python-version: ${{ matrix.python-version }}
+          channels: defaults
+
       - name: Install from conda-forge 
         run: |
             conda install -c conda-forge causalml
