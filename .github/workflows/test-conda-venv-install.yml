@@ -8,7 +8,7 @@ on:
 
 jobs:
   build:
-    name: ${{ matrix.os }}${{ matrix.tf-label }}-py${{ matrix.python-version }}
+    name: ${{ matrix.os }}${{ matrix.tf-label }}-py${{ matrix.python-version-nd }}
     runs-on: ${{ matrix.os }}
 
     defaults:
@@ -19,8 +19,17 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: [37, 38, 39]
+        python-version: [3.7, 3.8, 3.9]
         tf-label: ['', '-tf']
+        include:
+          - python-version: 3.7
+            python-version-nd: 37
+          - python-version: 3.8
+            python-version-nd: 38
+          - python-version: 3.9
+            python-version-nd: 39
+          - tf-label: '-tf'
+            tf-label-pip: '[tf]'
 
     steps:
       - name: checkout repository
@@ -34,8 +43,8 @@ jobs:
         with:
           channels: defaults
           auto-activate-base: false
-          activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version }}
-          environment-file: envs/environment${{ matrix.tf-label }}-py${{ matrix.python-version }}.yml
+          activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version-nd }}
+          environment-file: envs/environment${{ matrix.tf-label }}-py${{ matrix.python-version-nd }}.yml
 
       - name: echo conda config
         run: |
