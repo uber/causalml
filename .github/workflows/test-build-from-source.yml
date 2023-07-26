@@ -19,24 +19,35 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: [37, 38, 39]
+        python-version: [3.7, 3.8, 3.9]
         tf-label: ['', '-tf']
+        include:
+          - python-version: 3.7
+            python-version-no-dot: 37
+          - python-version: 3.8
+            python-version-no-dot: 38
+          - python-version: 3.9
+            python-version-no-dot: 39
+          - tf-label: '-tf'
+            tf-label-pip: '[tf]'
 
     steps:
       - name: checkout repository
         uses: actions/checkout@v2
 
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Display Python version
         run: python -c "import sys; print(sys.version)"
 
-      - name: create environment
-        uses: conda-incubator/setup-miniconda@v2
-        with:
-          channels: defaults
-          auto-activate-base: false
-          activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version }}
-          environment-file: envs/environment${{ matrix.tf-label }}-py${{ matrix.python-version }}.yml
-
-      - name: check env
+      - name: Build
         run: |
-            conda env export
+            pip install -U pip
+            pip install -U setuptools
+            python -m pip install .${{ matrix.tf-label-pip}}
+            python -m pip install .[test]
+      - name: Test with pytest
+        run: pytest -vs tests/ --cov causalml/
