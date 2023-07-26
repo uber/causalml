@@ -50,7 +50,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           channels: defaults
 
-      - name: echo conda config
+      - name: install cxx-compiler 
         run: |
           conda install -c conda-forge cxx-compiler
 
