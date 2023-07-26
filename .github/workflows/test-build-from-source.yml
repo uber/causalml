@@ -23,11 +23,11 @@ jobs:
         tf-label: ['', '-tf']
         include:
           - python-version: 3.7
-            python-version-no-dot: 37
+            python-version-nd: 37
           - python-version: 3.8
-            python-version-no-dot: 38
+            python-version-nd: 38
           - python-version: 3.9
-            python-version-no-dot: 39
+            python-version-nd: 39
           - tf-label: '-tf'
             tf-label-pip: '[tf]'
 
@@ -46,7 +46,7 @@ jobs:
       - name: create environment
         uses: conda-incubator/setup-miniconda@v2
         with:
-          activate-environment: foo
+          activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version-nd }} 
           python-version: ${{ matrix.python-version }}
           channels: defaults
 
