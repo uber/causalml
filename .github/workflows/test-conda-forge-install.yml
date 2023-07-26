@@ -38,7 +38,6 @@ jobs:
         with:
           activate-environment: causalml-py${{ matrix.python-version-nd }} 
           python-version: ${{ matrix.python-version }}
-          channels: defaults
 
       - name: Install from conda-forge 
         run: |
