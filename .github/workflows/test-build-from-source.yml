@@ -49,5 +49,6 @@ jobs:
             pip install -U setuptools
             python -m pip install .${{ matrix.tf-label-pip}}
             python -m pip install .[test]
+            python setup.py build_ext --inplace
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/
