@@ -1,4 +1,4 @@
-name: Test conda-venv install
+name: Test build from source install
 
 on:
   push:
