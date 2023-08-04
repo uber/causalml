@@ -19,11 +19,24 @@ def test_make_uplift_classification(generate_classification_data):
 
 @pytest.mark.parametrize("backend", ["loky", "threading", "multiprocessing"])
 @pytest.mark.parametrize("joblib_prefer", ["threads", "processes"])
+@pytest.mark.parametrize("early_stopping", ["true", "false"])
 def test_UpliftRandomForestClassifier(
-    generate_classification_data, backend, joblib_prefer
+    generate_classification_data, backend, joblib_prefer, early_stopping
 ):
     df, x_names = generate_classification_data()
-    df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
+    df_train, df_test, df_val = None, None, None
+
+    if early_stopping == "true":
+        df_train, df_test_val = train_test_split(
+            df, test_size=0.2, random_state=RANDOM_SEED
+        )
+        df_test, df_val = train_test_split(
+            df_test_val, test_size=0.5, random_state=RANDOM_SEED
+        )
+    else:
+        df_train, df_test = train_test_split(
+            df, test_size=0.2, random_state=RANDOM_SEED
+        )
 
     with parallel_backend(backend):
         # Train the UpLift Random Forest classifier
@@ -32,14 +45,23 @@ def test_UpliftRandomForestClassifier(
             control_name=TREATMENT_NAMES[0],
             random_state=RANDOM_SEED,
             joblib_prefer=joblib_prefer,
+            early_stopping_eval_diff_scale=1,
         )
-
-        uplift_model.fit(
-            df_train[x_names].values,
-            treatment=df_train["treatment_group_key"].values,
-            y=df_train[CONVERSION].values,
-        )
-
+        if early_stopping == "true":
+            uplift_model.fit(
+                df_train[x_names].values,
+                treatment=df_train["treatment_group_key"].values,
+                y=df_train[CONVERSION].values,
+                X_val=df_val[x_names].values,
+                treatment_val=df_val["treatment_group_key"].values,
+                y_val=df_val[CONVERSION].values,
+            )
+        else:
+            uplift_model.fit(
+                df_train[x_names].values,
+                treatment=df_train["treatment_group_key"].values,
+                y=df_train[CONVERSION].values,
+            )
         predictions = {}
         predictions["single"] = uplift_model.predict(df_test[x_names].values)
         with parallel_backend("loky", n_jobs=2):
