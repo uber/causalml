@@ -53,7 +53,7 @@ jobs:
           conda config --show-sources
           conda config --show  
 
-     - name: Build
+      - name: Build
         run: |
             pip install -U pip
             pip install -U setuptools
