@@ -200,16 +200,20 @@ class Explainer(object):
 
         return shap_dict
 
-    def plot_importance(self, importance_dict=None, title_prefix=""):
+    def plot_importance(self, importance_dict=None, title_prefix="", figsize=(12, 8)):
         """
         Calculates and plots feature importances for each treatment group, based on specified method in __init__.
         Skips the calculation part if importance_dict is given.
+        Args:
+            importance_dict (optional, dict): a dict of feature importance matrics. If None, importance_dict will be computed.
+            title_prefix (optional, str): a prefix to the title of the plot.
+            figsize (optional, tuple): the size of the figure.
         """
         if importance_dict is None:
             importance_dict = self.get_importance()
         for group, series in importance_dict.items():
             plt.figure()
-            series.sort_values().plot(kind="barh", figsize=(12, 8))
+            series.sort_values().plot(kind="barh", figsize=figsize)
             title = group
             if title_prefix != "":
                 title = "{} - {}".format(title_prefix, title)
