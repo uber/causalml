@@ -53,6 +53,8 @@ jobs:
       - name: install cxx-compiler 
         run: |
           conda install -c conda-forge cxx-compiler
+          conda install python-graphviz
+          conda install -c conda-forge xorg-libxrender
 
       - name: echo conda config
         run: |
