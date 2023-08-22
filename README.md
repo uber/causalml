@@ -109,13 +109,14 @@ pip install -U numpy							# this step is necessary to fix [#338](https://github
 
 ## Install from source:
 
-### gcc, g++
-`gcc` and `g++` must be installed on the system to compile C/C++ libraries.
-
-For example, on ubuntu this can be done with:
+### Create a clean conda environment
 
 ```
-sudo apt-get install -y gcc g++
+conda create -n causalml-py38 python=3.8
+conda activate causalml-py38
+conda install -c conda-forge cxx-compiler
+conda install python-graphviz
+conda install -c conda-forge xorg-libxrender
 ```
 
 Then:
@@ -124,6 +125,7 @@ Then:
 git clone https://github.com/uber/causalml.git
 cd causalml
 pip install .
+python setup.py build_ext --inplace
 ```
 
 with `tensorflow`:
