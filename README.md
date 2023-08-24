@@ -7,7 +7,7 @@
 [![PyPI Version](https://badge.fury.io/py/causalml.svg)](https://pypi.org/project/causalml/)
 [![Build Status](https://github.com/uber/causalml/actions/workflows/python-test.yaml/badge.svg)](https://github.com/uber/causalml/actions/workflows/python-test.yaml)
 [![Documentation Status](https://readthedocs.org/projects/causalml/badge/?version=latest)](http://causalml.readthedocs.io/en/latest/?badge=latest)
-[![Downloads](https://pepy.tech/badge/causalml)](https://pepy.tech/project/causalml)
+[![Downloads](https://static.pepy.tech/badge/causalml)](https://pepy.tech/project/causalml)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3015/badge)](https://bestpractices.coreinfrastructure.org/projects/3015)
 
 
