@@ -23,6 +23,7 @@ jobs:
         run: python -c "import sys; print(sys.version)"
       - name: Install dependencies
         run: |
+            sudo apt install graphviz
             pip install -U pip
             pip install -U setuptools
             python -m pip install .[test]
