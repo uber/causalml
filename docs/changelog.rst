@@ -3,6 +3,37 @@
 Changelog
 =========
 
+0.14.1 (Aug 2023)
+-----------------
+* This release mainly addressed installation issues and updated documentation accordingly.
+* We have 4 new contributors. @bsaunders27, @xhulianoThe1, @zpppy, and @bsaunders23. Thanks for your contributions!
+
+Updates
+~~~~~~~
+* Update the python-publish workflow file to fix the package publish Gi… by @jeongyoonlee in https://github.com/uber/causalml/pull/633
+* Update Cython dependency by @alexander-pv in https://github.com/uber/causalml/pull/640
+* Fix for builds on Mac M1 infrastructure by @bsaunders27 in https://github.com/uber/causalml/pull/641
+* code cleanups by @xhulianoThe1 in https://github.com/uber/causalml/pull/634
+* support valid error early stopping by @zpppy in https://github.com/uber/causalml/pull/614
+* fix: update to ``envs/`` conda build for precompiled M1 installs by @bsaunders27 in https://github.com/uber/causalml/pull/646
+* Installation updates to README and .github/workflows by @ras44 in https://github.com/uber/causalml/pull/637
+* fix: simulate_randomized_trial by @bsaunders23 in https://github.com/uber/causalml/pull/656
+* issue 252 by @vincewu51 in https://github.com/uber/causalml/pull/660
+* ras44/651 graph viz, resolves #651 by @ras44 in https://github.com/uber/causalml/pull/661
+* linted with black by @ras44 in https://github.com/uber/causalml/pull/663
+* Fix issue 650 by @vincewu51 in https://github.com/uber/causalml/pull/659
+* Install graphviz in the workflow builds by @jeongyoonlee in https://github.com/uber/causalml/pull/668
+* Update docs/installation.rst by @jeongyoonlee in https://github.com/uber/causalml/pull/667
+* Schedule monthly PyPI install tests by @jeongyoonlee in https://github.com/uber/causalml/pull/670
+
+New contributors
+~~~~~~~~~~~~~~~~
+* @bsaunders27 made their first contribution in https://github.com/uber/causalml/pull/641
+* @xhulianoThe1 made their first contribution in https://github.com/uber/causalml/pull/634
+* @zpppy made their first contribution in https://github.com/uber/causalml/pull/614
+* @bsaunders23 made their first contribution in https://github.com/uber/causalml/pull/656
+
+
 0.14.0 (July 2023)
 ------------------
 - CausalML surpassed `2MM downloads <https://pepy.tech/project/causalml>`_ on PyPI and `4,100 stars <https://github.com/uber/causalml/stargazers>`_ on GitHub. Thanks for choosing CausalML and supporting us on GitHub.
