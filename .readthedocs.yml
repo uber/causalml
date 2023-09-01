@@ -1,6 +1,12 @@
 # Required
 version: 2
 
+# Set the OS, Python version and other tools you might need
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "miniconda3-4.7"
+
 conda:
   environment: docs/environment-py38-rtd.yml
 
