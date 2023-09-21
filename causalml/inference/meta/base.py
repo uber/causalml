@@ -249,7 +249,7 @@ class BaseLearner(metaclass=ABCMeta):
         model_tau_feature=None,
         features=None,
         shap_dict=None,
-        **kwargs
+        **kwargs,
     ):
         """
         Plots distribution of shapley values.
@@ -265,7 +265,7 @@ class BaseLearner(metaclass=ABCMeta):
             features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
             shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
         """
-        override_checks = False if shap_dict is None else True
+        override_checks = shap_dict is not None
         explainer = Explainer(
             method="shapley",
             control_name=self.control_name,
@@ -276,7 +276,7 @@ class BaseLearner(metaclass=ABCMeta):
             override_checks=override_checks,
             classes=self._classes,
         )
-        explainer.plot_shap_values(shap_dict=shap_dict)
+        explainer.plot_shap_values(shap_dict=shap_dict, **kwargs)
 
     def plot_shap_dependence(
         self,
@@ -288,7 +288,7 @@ class BaseLearner(metaclass=ABCMeta):
         features=None,
         shap_dict=None,
         interaction_idx="auto",
-        **kwargs
+        **kwargs,
     ):
         """
         Plots dependency of shapley values for a specified feature, colored by an interaction feature.
@@ -331,5 +331,5 @@ class BaseLearner(metaclass=ABCMeta):
             feature_idx=feature_idx,
             shap_dict=shap_dict,
             interaction_idx=interaction_idx,
-            **kwargs
+            **kwargs,
         )

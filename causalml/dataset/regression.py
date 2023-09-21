@@ -102,7 +102,7 @@ def simulate_randomized_trial(n=1000, p=5, sigma=1.0, adj=0.0):
     """
 
     X = np.random.normal(size=n * p).reshape((n, -1))
-    b = np.maximum(np.repeat(0.0, n), X[:, 0] + X[:, 1], X[:, 2]) + np.maximum(
+    b = np.maximum.reduce([np.repeat(0.0, n), X[:, 0] + X[:, 1], X[:, 2]]) + np.maximum(
         np.repeat(0.0, n), X[:, 3] + X[:, 4]
     )
     e = np.repeat(0.5, n)

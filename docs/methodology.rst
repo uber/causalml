@@ -205,7 +205,70 @@ Another Uplift Tree algorithm that is implemented is the delta-delta-p (:math:`\
 
 where :math:`a_0` and :math:`a_1` are the outcomes of a Split A, :math:`y` is the selected class, and :math:`P^T` and :math:`P^C` are the response rates of treatment and control group, respectively. In other words, we first calculate the difference in the response rate in each branch (:math:`\Delta P_{left}` and :math:`\Delta P_{right}`), and subsequently, calculate their differences (:math:`\Delta\Delta P = |\Delta P_{left} - \Delta P_{right}|`).
 
+IDDP
+~~~~
 
+Build upon the :math:`\Delta\Delta P` approach, the IDDP approach by :cite:`rossler2022the` is implemented, where the sample splitting
+criterion is defined as follows:
+
+.. math::
+    IDDP = \frac{\Delta\Delta P^*}{I(\phi, \phi_l, \phi_r)}
+
+where :math:`\Delta\Delta P^*` is defined as :math:`\Delta\Delta P - |E[Y(1) - Y(0)]| X \epsilon \phi|` and
+:math:`I(\phi, \phi_l, \phi_r)` is defined as:
+
+.. math::
+    I(\phi, \phi_l, \phi_r) = H(\frac{n_t(\phi)} {n(\phi)}, \frac{n_c(\phi)}{n(\phi)}) * 2 \frac{1+\Delta\Delta P^*}{3} + \frac{n_t(\phi)}{n(\phi)} H(\frac{n_t(\phi_l)}{n(\phi)}, \frac{n_t(\phi_r)}{n(\phi)}) \\
+    + \frac{n_c(\phi)}{n(\phi)} * H(\frac{n_c(\phi_l)}{n(\phi)}, \frac{n_c(\phi_r)}{n(\phi)}) + \frac{1}{2}
+
+where the entropy H is defined as :math:`H(p,q)=(-p*log_2(p)) + (-q*log_2(q))` and where :math:`\phi` is a subset of the feature space
+associated with the current decision node, and :math:`\phi_l` and :math:`\phi_r` are the left and right child nodes, respectively.
+:math:`n_t(\phi)` is the number of treatment samples, :math:`n_c(\phi)` the number of control samples, and :math:`n(\phi)` the number
+of all samples in the current (parent) node.
+
+IT
+~~
+
+Further, the package implements the Interaction Tree (IT) proposed by :cite:`su2009subgroup`, where the sample splitting criterion
+maximizes the G statistic among all permissible splits:
+
+.. math::
+    G(s^*) = max G(s)
+
+where :math:`G(s)=t^2(s)` and :math:`t(s)` is defined as:
+
+.. math::
+    t(s) = \frac{(y^L_1 - y^L_0) - (y^R_1 - y^R_0)}{\sigma * (1/n_1 + 1/n_2 + 1/n_3 + 1/n_4)}
+
+where :math:`\sigma=\sum_{i=4}^4w_is_i^2` is a pooled estimator of the constant variance, and :math:`w_i=(n_i-1)/\sum_{j=1}^4(n_j-1)`.
+Further, :math:`y^L_1`, :math:`s^2_1`, and :math:`n_1` are the the sample mean, the sample variance, and the sample size
+for the treatment group in the left child node ,respectively. Similar notation applies to the other quantities.
+
+Note that this implementation deviates from the original implementation in that (1) the pruning techniques and (2) the validation method
+for determining the best tree size are different.
+
+CIT
+~~~
+
+Also, the package implements the Causal Inference Tree (CIT) by :cite:`su2012facilitating`, where the sample splitting
+criterion calculates the likelihood ratio test statistic:
+
+.. math::
+    LRT(s) = -n_{\tau L}/2 * ln(n_{\tau L} SSE_{\tau L}) -n_{\tau R}/2 * ln(n_{\tau R} SSE_{\tau R}) + \\
+    n_{\tau L1} ln n_{\tau L1} + n_{\tau L0} ln n_{\tau L0} + n_{\tau R1} ln n_{\tau R1} + n_{\tau R0} ln n_{\tau R0}
+
+where :math:`n_{\tau}`, :math:`n_{\tau 0}`, and :math:`n_{\tau 1}` are the total number of observations in node :math:`\tau`,
+the number of observations in node :math:`\tau` that are assigned to the control group, and the number of observations in node :math:`\tau`
+that are assigned to the treatment group, respectively. :math:`SSE_{\tau}` is defined as:
+
+.. math::
+    SSE_{\tau} = \sum_{i \epsilon \tau: t_i=1}(y_i - \hat{y_{t1}})^2 + \sum_{i \epsilon \tau: t_i=0}(y_i - \hat{y_{t0}})^2
+
+and :math:`\hat{y_{t0}}` and :math:`\hat{y_{t1}}` are the sample average responses of the control and treatment groups in node
+:math:`\tau`, respectively.
+
+Note that this implementation deviates from the original implementation in that (1) the pruning techniques and (2) the validation method
+for determining the best tree size are different.
 
 CTS
 ~~~
@@ -216,6 +279,7 @@ The final Uplift Tree algorithm that is implemented is the Contextual Treatment 
    \hat{\Delta}_{\mu}(s) = \hat{p}(\phi_l \mid \phi) \times \max_{t=0, ..., K}\hat{y}_t(\phi_l) + \hat{p}(\phi_r \mid \phi) \times \max_{t=0, ..., K}\hat{y}_t(\phi_r) -  \max_{t=0, ..., K}\hat{y}_t(\phi)
 
 where :math:`\phi_l` and :math:`\phi_r` refer to the feature subspaces in the left leaf and the right leaves respectively, :math:`\hat{p}(\phi_j \mid \phi)` denotes the estimated conditional probability of a subject's being in :math:`\phi_j` given :math:`\phi`, and :math:`\hat{y}_t(\phi_j)` is the conditional expected response under treatment :math:`t`.
+
 
 Value optimization methods
 --------------------------

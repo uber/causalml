@@ -55,7 +55,7 @@ class CounterfactualValueEstimator:
         conversion_cost,
         impression_cost,
         *args,
-        **kwargs
+        **kwargs,
     ):
         self.treatment = treatment
         self.control_name = control_name

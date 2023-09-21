@@ -12,9 +12,9 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys
-import os
 import matplotlib
+import sphinx_rtd_theme
+import importlib.metadata
 
 matplotlib.use("agg")
 
@@ -32,9 +32,6 @@ matplotlib.use("agg")
 # This lets us ensure that the source package is imported, and that its
 # version is used.
 # sys.path.insert(0, project_root)
-
-import causalml
-import sphinx_rtd_theme
 
 # -- General configuration ---------------------------------------------
 
@@ -70,7 +67,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "causalml"
-copyright = "2019 Uber Technologies, Inc."
+copyright = "2023 Uber Technologies, Inc."
 author = "CausalML"
 
 # The version info for the project you're documenting, acts as replacement
@@ -78,7 +75,8 @@ author = "CausalML"
 # the built documents.
 #
 # The short X.Y version.
-version = causalml.__version__
+
+version = importlib.metadata.version("causalml")
 # The full version, including alpha/beta/rc tags.
 # release = causalml.__version__
 
@@ -210,18 +208,18 @@ htmlhelp_basename = "causalml_doc"
 
 latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
-    #'papersize': 'letterpaper',
+    # 'papersize': 'letterpaper',
     # The font size ('10pt', '11pt' or '12pt').
-    #'pointsize': '10pt',
+    # 'pointsize': '10pt',
     # Additional stuff for the LaTeX preamble.
-    #'preamble': '',
+    # 'preamble': '',
 }
 
 # Grouping the document tree into LaTeX files. List of tuples
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ("index", "causalml.tex", "causalml Documentation", "Someone at Uber", "manual"),
+    ("index", "causalml.tex", "causalml Documentation", "Someone at Uber", "manual")
 ]
 
 # The name of an image file (relative to this directory) to place at
@@ -269,7 +267,7 @@ texinfo_documents = [
         "causalml",
         "One line description of project.",
         "Miscellaneous",
-    ),
+    )
 ]
 
 # Documents to append as an appendix to all manuals.

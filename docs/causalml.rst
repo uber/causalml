@@ -23,7 +23,7 @@ causalml.inference.meta module
     :show-inheritance:
 
 causalml.inference.iv module
-------------------------------
+----------------------------
 
 .. automodule:: causalml.inference.iv
     :members:
@@ -32,7 +32,7 @@ causalml.inference.iv module
     :show-inheritance:
 
 causalml.inference.nn module
-------------------------------
+----------------------------
 
 .. automodule:: causalml.inference.nn
     :members:
@@ -41,7 +41,7 @@ causalml.inference.nn module
     :show-inheritance:
 
 causalml.inference.tf module
-------------------------------
+----------------------------
 
 .. automodule:: causalml.inference.tf
     :members:
@@ -93,7 +93,7 @@ causalml.metrics module
     :show-inheritance:
 
 causalml.feature_selection module
------------------------
+---------------------------------
 
 .. automodule:: causalml.feature_selection
     :members:
@@ -102,7 +102,7 @@ causalml.feature_selection module
     :show-inheritance:
 
 causalml.features module
---------------------------
+------------------------
 
 .. automodule:: causalml.features
     :members:

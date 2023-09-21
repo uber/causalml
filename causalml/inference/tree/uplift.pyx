@@ -1,6 +1,7 @@
 # cython: cdivision=True
 # cython: boundscheck=False
 # cython: wraparound=False
+# cython: language_level=3
 """
 Forest of trees-based ensemble methods for Uplift modeling on Classification
 Problem. Those methods include random forests and extremely randomized trees.
@@ -17,18 +18,20 @@ The module structure is the following:
 # Authors: Zhenyu Zhao <zhenyuz@uber.com>
 #          Totte Harinen <totte@uber.com>
 
-from collections import defaultdict
-import cython
-from joblib import Parallel, delayed
 import multiprocessing as mp
-cimport numpy as np
+from collections import defaultdict
+
+import logging
+import cython
 import numpy as np
-from packaging import version
 import pandas as pd
 import scipy.stats as stats
 import sklearn
-from sklearn.utils import check_array, check_random_state, check_X_y
-from typing import List
+from joblib import Parallel, delayed
+from packaging import version
+from sklearn.model_selection import train_test_split
+from sklearn.utils import check_X_y, check_array, check_random_state
+
 if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
     from sklearn.utils._testing import ignore_warnings
 else:
@@ -37,6 +40,7 @@ else:
 
 MAX_INT = np.iinfo(np.int32).max
 
+logger = logging.getLogger("causalml")
 
 cdef extern from "math.h":
     double log(double x) nogil
@@ -199,7 +203,7 @@ class UpliftTreeClassifier:
     ----------
 
     evaluationFunction : string
-        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP'.
+        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', 'IDDP'.
 
     max_features: int, optional (default=None)
         The number of features to consider when looking for the best split.
@@ -216,6 +220,10 @@ class UpliftTreeClassifier:
     n_reg: int, optional (default=100)
         The regularization parameter defined in Rzepakowski et al. 2012, the weight (in terms of sample size) of the
         parent node influence on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
+    
+    early_stopping_eval_diff_scale: float, optional (default=1)
+        If train and valid uplift score diff bigger than 
+        min(train_uplift_score,valid_uplift_score)/early_stopping_eval_diff_scale, stop.
 
     control_name: string
         The name of the control group (other experiment groups will be regarded as treatment groups).
@@ -224,18 +232,30 @@ class UpliftTreeClassifier:
         The normalization factor defined in Rzepakowski et al. 2012, correcting for tests with large number of splits
         and imbalanced treatment and control splits.
 
+    honesty: bool (default=False)
+         True if the honest approach based on "Athey, S., & Imbens, G. (2016). Recursive partitioning for heterogeneous causal effects."
+         shall be used. If 'IDDP' is used as evaluation function, this parameter is automatically set to true.
+
+    estimation_sample_size: float (default=0.5)
+         Sample size for estimating the CATE score in the leaves if honesty == True.
+
     random_state: int, RandomState instance or None (default=None)
         A random seed or `np.random.RandomState` to control randomness in building a tree.
 
     """
     def __init__(self, control_name, max_features=None, max_depth=3, min_samples_leaf=100,
-                 min_samples_treatment=10, n_reg=100, evaluationFunction='KL',
-                 normalization=True, random_state=None):
+                 min_samples_treatment=10, n_reg=100, early_stopping_eval_diff_scale=1, evaluationFunction='KL',
+                 normalization=True, honesty=False, estimation_sample_size=0.5, random_state=None):
         self.max_depth = max_depth
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
+        self.early_stopping_eval_diff_scale = early_stopping_eval_diff_scale
         self.max_features = max_features
+
+        assert evaluationFunction in ['KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', 'IDDP'], \
+            f"evaluationFunction should be either 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', or 'IDDP' but {evaluationFunction} is passed"
+
         if evaluationFunction == 'KL':
             self.evaluationFunction = self.evaluate_KL
         elif evaluationFunction == 'ED':
@@ -244,7 +264,13 @@ class UpliftTreeClassifier:
             self.evaluationFunction = self.evaluate_Chi
         elif evaluationFunction == 'DDP':
             self.evaluationFunction = self.evaluate_DDP
-        else:
+        elif evaluationFunction == 'IT':
+            self.evaluationFunction = self.evaluate_IT
+        elif evaluationFunction == 'CIT':
+            self.evaluationFunction = self.evaluate_CIT
+        elif evaluationFunction == 'IDDP':
+            self.evaluationFunction = self.evaluate_IDDP
+        elif evaluationFunction == 'CTS':
             self.evaluationFunction = self.evaluate_CTS
         self.fitted_uplift_tree = None
 
@@ -253,11 +279,15 @@ class UpliftTreeClassifier:
         self.control_name = control_name
         self.classes_ = [self.control_name]
         self.n_class = 1
-
         self.normalization = normalization
+        self.honesty = honesty
+        self.estimation_sample_size = estimation_sample_size
         self.random_state = random_state
+        if evaluationFunction == 'IDDP' and self.honesty is False:
+            self.honesty = True
 
-    def fit(self, X, treatment, y):
+
+    def fit(self, X, treatment, y, X_val=None, treatment_val=None, y_val=None):
         """ Fit the uplift model.
 
         Args
@@ -281,29 +311,51 @@ class UpliftTreeClassifier:
         X, y = check_X_y(X, y)
         treatment = np.asarray(treatment)
         assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
-
+        if X_val is not None:
+            X_val, y_val = check_X_y(X_val, y_val)
+            treatment_val = np.asarray(treatment_val)
+            assert len(y_val) == len(treatment_val), 'Data length must be equal for X_val, treatment_val, and y_val.'
+        
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
         self.classes_ = [self.control_name]
         treatment_idx = np.zeros_like(treatment, dtype=int)
+        treatment_val_idx = None
+        if treatment_val is not None:
+            treatment_val_idx = np.zeros_like(treatment_val, dtype=int)
         for i, tr in enumerate(treatment_groups, 1):
             self.classes_.append(tr)
             treatment_idx[treatment == tr] = i
+            if treatment_val_idx is not None:
+                treatment_val_idx[treatment_val == tr] = i
         self.n_class = len(self.classes_)
 
         self.feature_imp_dict = defaultdict(float)
 
-        if self.evaluationFunction == self.evaluate_DDP and self.n_class > 2:
-            raise ValueError("The DDP approach can only cope with two class problems, that is two different treatment "
+        if (self.n_class > 2) and (self.evaluationFunction in [self.evaluate_DDP, self.evaluate_IDDP, self.evaluate_IT, self.evaluate_CIT]):
+            raise ValueError("The DDP, IDDP, IT, and CIT approach can only cope with two class problems, that is two different treatment "
                              "options (e.g., control vs treatment). Please select another approach or only use a "
                              "dataset which employs two treatment options.")
 
+        if self.honesty:
+            try:
+                X, X_est, treatment_idx, treatment_idx_est, y, y_est = train_test_split(X, treatment_idx, y, stratify=[treatment_idx, y], test_size=self.estimation_sample_size,
+                                                                                        shuffle=True, random_state=self.random_state)
+            except ValueError:
+                logger.warning(f"Stratified sampling failed. Falling back to random sampling.")
+                X, X_est, treatment_idx, treatment_idx_est, y, y_est = train_test_split(X, treatment_idx, y, test_size=self.estimation_sample_size, shuffle=True,
+                                                                                        random_state=self.random_state)
+
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
-            X, treatment_idx, y,
-            max_depth=self.max_depth, min_samples_leaf=self.min_samples_leaf,
+            X, treatment_idx, y, X_val, treatment_val_idx, y_val,
+            max_depth=self.max_depth, early_stopping_eval_diff_scale=self.early_stopping_eval_diff_scale,
+            min_samples_leaf=self.min_samples_leaf,
             depth=1, min_samples_treatment=self.min_samples_treatment,
             n_reg=self.n_reg, parentNodeSummary=None
         )
+
+        if self.honesty:
+            self.honestApproach(X_est, treatment_idx_est, y_est)
 
         self.feature_importances_ = np.zeros(X.shape[1])
         for col, imp in self.feature_imp_dict.items():
@@ -350,6 +402,49 @@ class UpliftTreeClassifier:
                        n_reg=self.n_reg,
                        parentNodeSummary=None)
         return self
+
+    def honestApproach(self, X_est, T_est, Y_est):
+        """ Apply the honest approach based on "Athey, S., & Imbens, G. (2016). Recursive partitioning for heterogeneous causal effects."
+        Args
+        ----
+        X_est : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to calculate the unbiased estimates in the leafs of the decision tree.
+        T_est : array-like, shape = [num_samples]
+            An array containing the treatment group for each unit.
+        Y_est : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
+        """
+
+        self.modifyEstimation(X_est, T_est, Y_est, self.fitted_uplift_tree)
+
+    def modifyEstimation(self, X_est, t_est, y_est, tree):
+        """ Modifies the leafs of the current decision tree to only contain unbiased estimates.
+        Applies the honest approach based on "Athey, S., & Imbens, G. (2016). Recursive partitioning for heterogeneous causal effects."
+        Args
+        ----
+        X_est : ndarray, shape = [num_samples, num_features]
+           An ndarray of the covariates used to calculate the unbiased estimates in the leafs of the decision tree.
+        T_est : array-like, shape = [num_samples]
+           An array containing the treatment group for each unit.
+        Y_est : array-like, shape = [num_samples]
+           An array containing the outcome of interest for each unit.
+        tree : object
+            object of DecisionTree class - the current decision tree that shall be modified
+        """
+
+        # Divide sets for child nodes
+        if tree.trueBranch or tree.falseBranch:
+            X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X_est, t_est, y_est, tree.col, tree.value)
+
+            # recursive call for each branch
+            if tree.trueBranch is not None:
+                self.modifyEstimation(X_l, w_l, y_l, tree.trueBranch)
+            if tree.falseBranch is not None:
+                self.modifyEstimation(X_r, w_r, y_r, tree.falseBranch)
+
+        # classProb
+        if tree.results is not None:
+            tree.results = self.uplift_classification_results(t_est, y_est)
 
     def pruneTree(self, X, treatment_idx, y, tree, rule='maxAbsDiff', minGain=0.,
                   n_reg=0,
@@ -752,6 +847,157 @@ class UpliftTreeClassifier:
         return d_res
 
     @staticmethod
+    def evaluate_IT(leftNodeSummary, rightNodeSummary, w_l, w_r):
+        '''
+        Calculate Squared T-Statistic as split evaluation criterion for a given node
+
+        Args
+        ----
+        leftNodeSummary : list of list
+            The left node summary statistics.
+        rightNodeSummary : list of list
+            The right node summary statistics.
+        w_l: array-like, shape = [num_samples]
+            An array containing the treatment for each unit in the left node
+        w_r: array-like, shape = [num_samples]
+            An array containing the treatment for each unit in the right node
+
+        Returns
+        -------
+        g_s : Squared T-Statistic
+        '''
+        g_s = 0
+
+        ## Control Group
+        # Sample mean in left & right child node
+        y_l_0 = leftNodeSummary[0][0]
+        y_r_0 = rightNodeSummary[0][0]
+        # Sample size left & right child node
+        n_3 = leftNodeSummary[0][1]
+        n_4 = rightNodeSummary[0][1]
+        # Sample variance in left & right child node (p*(p-1) for bernoulli)
+        s_3 = y_l_0*(1-y_l_0)
+        s_4 = y_r_0*(1-y_r_0)
+
+        for treatment_left, treatment_right in zip(leftNodeSummary[1:], rightNodeSummary[1:]):
+            ## Treatment Group
+            # Sample mean in left & right child node
+            y_l_1 = treatment_left[0]
+            y_r_1 = treatment_right[0]
+            # Sample size left & right child node
+            n_1 = treatment_left[1]
+            n_2 = treatment_right[1]
+            # Sample variance in left & right child node
+            s_1 = y_l_1*(1-y_l_1)
+            s_2 = y_r_1*(1-y_r_1)
+
+            sum_n = np.sum([n_1 - 1, n_2 - 1, n_3 - 1, n_4 - 1])
+            w_1 = (n_1 - 1) / sum_n
+            w_2 = (n_2 - 1) / sum_n
+            w_3 = (n_3 - 1) / sum_n
+            w_4 = (n_4 - 1) / sum_n
+
+            # Pooled estimator of the constant variance
+            sigma = np.sqrt(np.sum([w_1 * s_1, w_2 * s_2, w_3 * s_3, w_4 * s_4]))
+
+            # Squared t-statistic
+            g_s = np.power(((y_l_1 - y_l_0) - (y_r_1 - y_r_0)) / (sigma * np.sqrt(np.sum([1 / n_1, 1 / n_2, 1 / n_3, 1 / n_4]))), 2)
+
+        return g_s
+
+    @staticmethod
+    def evaluate_CIT(currentNodeSummary, leftNodeSummary, rightNodeSummary, y_l, y_r, w_l, w_r, y, w):
+        '''
+        Calculate likelihood ratio test statistic as split evaluation criterion for a given node
+        Args
+        ----
+        currentNodeSummary: list of lists
+            The parent node summary statistics
+        leftNodeSummary : list of lists
+            The left node summary statistics.
+        rightNodeSummary : list of lists
+            The right node summary statistics.
+        y_l: array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit in the left node
+        y_r: array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit in the right node
+        w_l: array-like, shape = [num_samples]
+            An array containing the treatment for each unit in the left node
+        w_r: array-like, shape = [num_samples]
+            An array containing the treatment for each unit in the right node
+        y: array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit
+        w: array-like, shape = [num_samples]
+            An array containing the treatment for each unit
+        Returns
+        -------
+        lrt : Likelihood ratio test statistic
+        '''
+        lrt = 0
+
+        # Control sample size left & right child node
+        n_l_t_0 = leftNodeSummary[0][1]
+        n_r_t_0 = rightNodeSummary[0][1]
+
+        for treatment_left, treatment_right in zip(leftNodeSummary[1:], rightNodeSummary[1:]):
+            # Treatment sample size left & right child node
+            n_l_t_1 = treatment_left[1]
+            n_r_t_1 = treatment_right[1]
+
+            # Total size of left & right node
+            n_l_t = n_l_t_1 + n_l_t_0
+            n_r_t = n_r_t_1 + n_r_t_0
+
+            # Total size of parent node
+            n_t = n_l_t + n_r_t
+
+            # Total treatment & control size in parent node
+            n_t_1 = n_l_t_1 + n_r_t_1
+            n_t_0 = n_l_t_0 + n_r_t_0
+
+            # Standard squared error of left child node
+            sse_tau_l = np.sum(np.power(y_l[w_l == 1] - treatment_left[0], 2)) + np.sum(
+                np.power(y_l[w_l == 0] - treatment_left[0], 2))
+
+            # Standard squared error of right child node
+            sse_tau_r = np.sum(np.power(y_r[w_r == 1] - treatment_right[0], 2)) + np.sum(
+                np.power(y_r[w_r == 0] - treatment_right[0], 2))
+
+            # Standard squared error of parent child node
+            sse_tau = np.sum(np.power(y[w == 1] - currentNodeSummary[1][0], 2)) + np.sum(
+                np.power(y[w == 0] - currentNodeSummary[0][0], 2))
+
+            # Maximized log-likelihood function
+            i_tau_l = - (n_l_t / 2) * np.log(n_l_t * sse_tau_l) + n_l_t_1 * np.log(n_l_t_1) + n_l_t_0 * np.log(n_l_t_0)
+            i_tau_r = - (n_r_t / 2) * np.log(n_r_t * sse_tau_r) + n_r_t_1 * np.log(n_r_t_1) + n_r_t_0 * np.log(n_r_t_0)
+            i_tau = - (n_t / 2) * np.log(n_t * sse_tau) + n_t_1 * np.log(n_t_1) + n_t_0 * np.log(n_t_0)
+
+            # Likelihood ration test statistic
+            lrt = 2 * (i_tau_l + i_tau_r - i_tau)
+
+        return lrt
+
+    @staticmethod
+    def evaluate_IDDP(nodeSummary):
+        '''
+        Calculate Delta P as split evaluation criterion for a given node.
+        Args
+        ----
+        nodeSummary : dictionary
+            The tree node summary statistics, produced by tree_node_summary() method.
+        control_name : string
+            The control group name.
+        Returns
+        -------
+        d_res : Delta P
+        '''
+        pc = nodeSummary[0][0]
+        d_res = 0
+        for treatment_group in nodeSummary[1:]:
+            d_res += treatment_group[0] - pc
+        return d_res
+
+    @staticmethod
     def evaluate_CTS(nodeSummary):
         '''
         Calculate CTS (conditional treatment selection) as split evaluation criterion for a given node.
@@ -767,8 +1013,7 @@ class UpliftTreeClassifier:
         '''
         return -max([stat[0] for stat in nodeSummary])
 
-    def normI(self, n_c: cython.int, n_c_left: cython.int, n_t: list, n_t_left: list,
-              alpha: cython.float=0.9) -> cython.float:
+    def normI(self, n_c: cython.int, n_c_left: cython.int, n_t: list, n_t_left: list, alpha: cython.float = 0.9, currentDivergence: cython.float = 0.0) -> cython.float:
         '''
         Normalization factor.
 
@@ -796,21 +1041,21 @@ class UpliftTreeClassifier:
         pt_a = 1. * np.sum(n_t_left) / (np.sum(n_t) + 0.1)
         pc_a = 1. * n_c_left / (n_c + 0.1)
 
-        # Normalization Part 1
-        norm_res += (
-            alpha * entropyH(1. * np.sum(n_t) / (np.sum(n_t) + n_c), 1. * n_c / (np.sum(n_t) + n_c))
-            * kl_divergence(pt_a, pc_a)
-        )
-        # Normalization Part 2 & 3
-        for i in range(len(n_t)):
-            pt_a_i = 1. * n_t_left[i] / (n_t[i] + 0.1)
-            norm_res += (
-                (1 - alpha) * entropyH(1. * n_t[i] / (n_t[i] + n_c), 1. * n_c / (n_t[i] + n_c))
-                * kl_divergence(1. * pt_a_i, pc_a)
-            )
-            norm_res += (1. * n_t[i] / (np.sum(n_t) + n_c) * entropyH(pt_a_i))
+        if self.evaluationFunction == self.evaluate_IDDP:
+            # Normalization Part 1
+            norm_res += (entropyH(1. * np.sum(n_t) / (np.sum(n_t) + n_c), 1. * n_c / (np.sum(n_t) + n_c)) * currentDivergence)
+            norm_res += (1. * np.sum(n_t) / (np.sum(n_t) + n_c) * entropyH(pt_a))
+
+        else:
+            # Normalization Part 1
+            norm_res += (alpha * entropyH(1. * np.sum(n_t) / (np.sum(n_t) + n_c), 1. * n_c / (np.sum(n_t) + n_c)) * kl_divergence(pt_a, pc_a))
+            # Normalization Part 2 & 3
+            for i in range(len(n_t)):
+                pt_a_i = 1. * n_t_left[i] / (n_t[i] + 0.1)
+                norm_res += ((1 - alpha) * entropyH(1. * n_t[i] / (n_t[i] + n_c), 1. * n_c / (n_t[i] + n_c)) * kl_divergence(1. * pt_a_i, pc_a))
+                norm_res += (1. * n_t[i] / (np.sum(n_t) + n_c) * entropyH(pt_a_i))
         # Normalization Part 4
-        norm_res += 1. * n_c/(np.sum(n_t) + n_c) * entropyH(pc_a)
+        norm_res += 1. * n_c / (np.sum(n_t) + n_c) * entropyH(pc_a)
 
         # Normalization Part 5
         norm_res += 0.5
@@ -888,7 +1133,8 @@ class UpliftTreeClassifier:
             res.append(p)
         return res
 
-    def growDecisionTreeFrom(self, X, treatment_idx, y, max_depth=10,
+    def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val,
+                             early_stopping_eval_diff_scale=1, max_depth=10,
                              min_samples_leaf=100, depth=1,
                              min_samples_treatment=10, n_reg=100,
                              parentNodeSummary=None):
@@ -903,6 +1149,12 @@ class UpliftTreeClassifier:
             An array containing the treatment group idx for each unit.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
+        X_val : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to valid the uplift model.
+        treatment_val_idx : array-like, shape = [num_samples]
+            An array containing the validation treatment group idx for each unit.
+        y_val : array-like, shape = [num_samples]
+            An array containing the validation outcome of interest for each unit.
         max_depth: int, optional (default=10)
             The maximum depth of the tree.
         min_samples_leaf: int, optional (default=100)
@@ -931,7 +1183,11 @@ class UpliftTreeClassifier:
                                                     min_samples_treatment=min_samples_treatment,
                                                     n_reg=n_reg,
                                                     parentNodeSummary=parentNodeSummary)
-        currentScore = self.evaluationFunction(currentNodeSummary)
+
+        if self.evaluationFunction == self.evaluate_IT or self.evaluationFunction == self.evaluate_CIT:
+            currentScore = 0
+        else:
+            currentScore = self.evaluationFunction(currentNodeSummary)
 
         # Prune Stats
         maxAbsDiff = 0
@@ -960,7 +1216,6 @@ class UpliftTreeClassifier:
         else:
             p_t = currentNodeSummary[suboptTreatment][0]
             n_t = currentNodeSummary[suboptTreatment][1]
-
         p_value = (1. - stats.norm.cdf(abs(p_c - p_t) / np.sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
         upliftScore = [maxDiff, p_value]
 
@@ -989,6 +1244,7 @@ class UpliftTreeClassifier:
 
             for value in lsUnique:
                 X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, col, value)
+    
                 # check the split validity on min_samples_leaf  372
                 if (len(X_l) < min_samples_leaf or len(X_r) < min_samples_leaf):
                     continue
@@ -999,15 +1255,28 @@ class UpliftTreeClassifier:
                                                          min_samples_treatment=min_samples_treatment,
                                                          n_reg=n_reg,
                                                          parentNodeSummary=currentNodeSummary)
-
                 rightNodeSummary = self.tree_node_summary(w_r, y_r,
-                                                          min_samples_treatment=min_samples_treatment,
+                                                         min_samples_treatment=min_samples_treatment,
                                                           n_reg=n_reg,
                                                           parentNodeSummary=currentNodeSummary)
-
-                # check the split validity on min_samples_treatment
                 assert len(leftNodeSummary) == len(rightNodeSummary)
 
+                if X_val is not None:
+                    X_val_l, X_val_r, w_val_l, w_val_r, y_val_l, y_val_r = self.divideSet(X_val, treatment_val_idx, y_val, col, value)
+                    leftNodeSummary_val = self.tree_node_summary(w_val_l, y_val_l,
+                                                             parentNodeSummary=currentNodeSummary)
+                    rightNodeSummary_val = self.tree_node_summary(w_val_r, y_val_r,
+                                                              parentNodeSummary=currentNodeSummary)
+                    early_stopping_flag = False
+                    for k in range(len(leftNodeSummary_val)):
+                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > min(leftNodeSummary_val[k][0],leftNodeSummary[k][0])/early_stopping_eval_diff_scale or
+                         abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > min(rightNodeSummary_val[k][0],rightNodeSummary[k][0])/early_stopping_eval_diff_scale):
+                            early_stopping_flag = True
+                            break
+                    if early_stopping_flag:
+                        continue
+
+                # check the split validity on min_samples_treatment
                 node_mst = min([stat[1] for stat in leftNodeSummary + rightNodeSummary])
                 if node_mst < min_samples_treatment:
                     continue
@@ -1023,6 +1292,28 @@ class UpliftTreeClassifier:
                     rightScore2 = self.evaluationFunction(rightNodeSummary)
                     gain = np.abs(leftScore1 - rightScore2)
                     gain_for_imp = np.abs(len(X_l) * leftScore1 - len(X_r) * rightScore2)
+                elif self.evaluationFunction == self.evaluate_IT:
+                    gain = self.evaluationFunction(leftNodeSummary, rightNodeSummary, w_l, w_r)
+                    gain_for_imp = gain * len(X)
+                elif self.evaluationFunction == self.evaluate_CIT:
+                    gain = self.evaluationFunction(currentNodeSummary, leftNodeSummary, rightNodeSummary, y_l, y_r, w_l, w_r, y, treatment_idx)
+                    gain_for_imp = gain * len(X)
+                elif self.evaluationFunction == self.evaluate_IDDP:
+                    leftScore1 = self.evaluationFunction(leftNodeSummary)
+                    rightScore2 = self.evaluationFunction(rightNodeSummary)
+                    gain = np.abs(leftScore1 - rightScore2) - np.abs(currentScore)
+                    gain_for_imp = (len(X_l) * leftScore1 + len(X_r) * rightScore2 - len(X) * np.abs(currentScore))
+                    if self.normalization:
+                        # Normalize used divergence
+                        currentDivergence = 2 * (gain + 1) / 3
+                        n_c = currentNodeSummary[0][1]
+                        n_c_left = leftNodeSummary[0][1]
+                        n_t = [tr[1] for tr in currentNodeSummary[1:]]
+                        n_t_left = [tr[1] for tr in leftNodeSummary[1:]]
+                        norm_factor = self.normI(n_c, n_c_left, n_t, n_t_left, alpha=0.9, currentDivergence=currentDivergence)
+                    else:
+                        norm_factor = 1
+                    gain = gain / norm_factor
                 else:
                     leftScore1 = self.evaluationFunction(leftNodeSummary)
                     rightScore2 = self.evaluationFunction(rightNodeSummary)
@@ -1037,13 +1328,16 @@ class UpliftTreeClassifier:
                         norm_factor = self.normI(n_c, n_c_left, n_t, n_t_left, alpha=0.9)
                     else:
                         norm_factor = 1
-                    gain = gain / norm_factor
+                    gain = gain / norm_factor 
                 if (gain > bestGain and len(X_l) > min_samples_leaf and len(X_r) > min_samples_leaf):
                     bestGain = gain
                     bestGainImp = gain_for_imp
                     bestAttribute = (col, value)
-                    best_set_left = [X_l, w_l, y_l]
-                    best_set_right = [X_r, w_r, y_r]
+                    best_set_left = [X_l, w_l, y_l, None, None, None]
+                    best_set_right = [X_r, w_r, y_r, None, None, None]
+                    if X_val is not None:
+                        best_set_left = [X_l, w_l, y_l, X_val_l, w_val_l, y_val_l]
+                        best_set_right = [X_r, w_r, y_r, X_val_r, w_val_r, y_val_r]
 
         dcY = {'impurity': '%.3f' % currentScore, 'samples': '%d' % len(X)}
         # Add treatment size
@@ -1056,12 +1350,12 @@ class UpliftTreeClassifier:
         if bestGain > 0 and depth < max_depth:
             self.feature_imp_dict[bestAttribute[0]] += bestGainImp
             trueBranch = self.growDecisionTreeFrom(
-                *best_set_left, max_depth, min_samples_leaf,
+                *best_set_left, self.early_stopping_eval_diff_scale, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
                 n_reg=n_reg, parentNodeSummary=currentNodeSummary
             )
             falseBranch = self.growDecisionTreeFrom(
-                *best_set_right, max_depth, min_samples_leaf,
+                *best_set_right, self.early_stopping_eval_diff_scale, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
                 n_reg=n_reg, parentNodeSummary=currentNodeSummary
             )
@@ -1206,7 +1500,7 @@ class UpliftRandomForestClassifier:
         The number of trees in the uplift random forest.
 
     evaluationFunction : string
-        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP'.
+        Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', 'IDDP'.
 
     max_features: int, optional (default=10)
         The number of features to consider when looking for the best split.
@@ -1228,6 +1522,10 @@ class UpliftRandomForestClassifier:
         weight (in terms of sample size) of the parent node influence on the
         child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
+    early_stopping_eval_diff_scale: float, optional (default=1)
+        If train and valid uplift score diff bigger than 
+        min(train_uplift_score,valid_uplift_score)/early_stopping_eval_diff_scale, stop.
+
     control_name: string
         The name of the control group (other experiment groups will be regarded as treatment groups)
 
@@ -1235,6 +1533,13 @@ class UpliftRandomForestClassifier:
         The normalization factor defined in Rzepakowski et al. 2012,
         correcting for tests with large number of splits and imbalanced
         treatment and control splits
+
+    honesty: bool (default=False)
+     True if the honest approach based on "Athey, S., & Imbens, G. (2016). Recursive partitioning for
+     heterogeneous causal effects." shall be used.
+
+    estimation_sample_size: float (default=0.5)
+         Sample size for estimating the CATE score in the leaves if honesty == True.
 
     n_jobs: int, optional (default=-1)
         The parallelization parameter to define how many parallel jobs need to be created.
@@ -1258,8 +1563,11 @@ class UpliftRandomForestClassifier:
                  min_samples_leaf=100,
                  min_samples_treatment=10,
                  n_reg=10,
+                 early_stopping_eval_diff_scale=1,
                  evaluationFunction='KL',
                  normalization=True,
+                 honesty=False,
+                 estimation_sample_size=0.5,
                  n_jobs=-1,
                  joblib_prefer: str = "threads"):
 
@@ -1273,9 +1581,11 @@ class UpliftRandomForestClassifier:
         self.min_samples_leaf = min_samples_leaf
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
+        self.early_stopping_eval_diff_scale = early_stopping_eval_diff_scale
         self.evaluationFunction = evaluationFunction
         self.control_name = control_name
         self.normalization = normalization
+        self.honesty = honesty
         self.n_jobs = n_jobs
         self.joblib_prefer = joblib_prefer
 
@@ -1288,7 +1598,7 @@ class UpliftRandomForestClassifier:
         if self.n_jobs == -1:
             self.n_jobs = mp.cpu_count()
 
-    def fit(self, X, treatment, y):
+    def fit(self, X, treatment, y, X_val=None, treatment_val=None, y_val=None):
         """
         Fit the UpliftRandomForestClassifier.
 
@@ -1302,6 +1612,15 @@ class UpliftRandomForestClassifier:
 
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
+
+        X_val : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to valid the uplift model.
+
+        treatment_val : array-like, shape = [num_samples]
+            An array containing the validation treatment group for each unit.
+
+        y_val : array-like, shape = [num_samples]
+            An array containing the validation outcome of interest for each unit.
         """
         random_state = check_random_state(self.random_state)
 
@@ -1312,9 +1631,11 @@ class UpliftRandomForestClassifier:
                 min_samples_leaf=self.min_samples_leaf,
                 min_samples_treatment=self.min_samples_treatment,
                 n_reg=self.n_reg,
+                early_stopping_eval_diff_scale=self.early_stopping_eval_diff_scale,
                 evaluationFunction=self.evaluationFunction,
                 control_name=self.control_name,
                 normalization=self.normalization,
+                honesty=self.honesty,
                 random_state=random_state.randint(MAX_INT))
             for _ in range(self.n_estimators)
         ]
@@ -1328,7 +1649,7 @@ class UpliftRandomForestClassifier:
 
         self.uplift_forest = (
             Parallel(n_jobs=self.n_jobs, prefer=self.joblib_prefer)
-            (delayed(self.bootstrap)(X, treatment, y, tree) for tree in self.uplift_forest)
+            (delayed(self.bootstrap)(X, treatment, y, X_val, treatment_val, y_val, tree) for tree in self.uplift_forest)
         )
 
         all_importances = [tree.feature_importances_ for tree in self.uplift_forest]
@@ -1336,13 +1657,22 @@ class UpliftRandomForestClassifier:
         self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
 
     @staticmethod
-    def bootstrap(X, treatment, y, tree):
+    def bootstrap(X, treatment, y, X_val, treatment_val, y_val, tree):
         random_state = check_random_state(tree.random_state)
         bt_index = random_state.choice(len(X), len(X))
         x_train_bt = X[bt_index]
         y_train_bt = y[bt_index]
         treatment_train_bt = treatment[bt_index]
-        tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
+
+        if X_val is None:
+            tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt)
+        else:
+            bt_val_index = random_state.choice(len(X_val), len(X_val))
+            x_val_bt = X_val[bt_val_index]
+            y_val_bt = y_val[bt_val_index]
+            treatment_val_bt = treatment_val[bt_val_index]
+    
+            tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt, X_val=x_val_bt, treatment_val=treatment_val_bt, y_val=y_val_bt)
         return tree
 
     @ignore_warnings(category=FutureWarning)

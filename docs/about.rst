@@ -15,7 +15,10 @@ The package currently supports the following methods:
 - Tree-based algorithms
     - :ref:`Uplift Random Forests <Uplift Tree>` on KL divergence, Euclidean Distance, and Chi-Square
     - :ref:`Uplift Random Forests <Uplift Tree>` on Contextual Treatment Selection
-    - :ref:`Uplift Random Forests <Uplift Tree>` on delta-delta-p (:math:`\Delta\Delta P`) criterion (only for binary trees and two-class problems)
+    - :ref:`Uplift Random Forests <DDP>` on delta-delta-p (:math:`\Delta\Delta P`) criterion (only for binary trees and two-class problems)
+    - :ref:`Uplift Random Forests <IDDP>` on IDDP (only for binary trees and two-class problems)
+    - :ref:`Interaction Tree <IT>` (only for binary trees and two-class problems)
+    - :ref:`Causal Inference Tree <CIT>` (only for binary trees and two-class problems)
 - Meta-learner algorithms
     - :ref:`S-learner`
     - :ref:`T-learner`

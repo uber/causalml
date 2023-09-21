@@ -7,6 +7,8 @@ from importlib import import_module
 
 logger = logging.getLogger("sensitivity")
 
+SUMMARY_COLS = ["Method", "ATE", "New ATE", "New ATE LB", "New ATE UB"]
+
 
 def one_sided(alpha, p, treatment):
     """One sided confounding function.
@@ -217,9 +219,7 @@ class Sensitivity(object):
 
         alpha_range.sort()
 
-        summary_df = pd.DataFrame(
-            columns=["Method", "ATE", "New ATE", "New ATE LB", "New ATE UB"]
-        )
+        summary = []
         for method in methods:
             sens = self.get_class_object(method)
             sens = sens(
@@ -238,7 +238,9 @@ class Sensitivity(object):
                 method = method + "(sample size @{})".format(sample_size)
 
             sens_df = sens.summary(method=method)
-            summary_df = summary_df.append(sens_df)
+            summary.append(sens_df.values.tolist()[0])
+
+        summary_df = pd.DataFrame(summary, columns=SUMMARY_COLS)
 
         return summary_df
 
@@ -264,13 +266,7 @@ class Sensitivity(object):
         sensitivity_summary = pd.DataFrame(
             [method_name, ate, ate_new, ate_new_lower, ate_new_upper]
         ).T
-        sensitivity_summary.columns = [
-            "Method",
-            "ATE",
-            "New ATE",
-            "New ATE LB",
-            "New ATE UB",
-        ]
+        sensitivity_summary.columns = SUMMARY_COLS
         return sensitivity_summary
 
     def sensitivity_estimate(self):
@@ -453,20 +449,22 @@ class SensitivitySelectionBias(Sensitivity):
         preds = self.get_prediction(X, p, treatment, y)
 
         sens_df = pd.DataFrame()
+
+        sens = []
         for a in alpha_range:
-            sens = defaultdict(list)
-            sens["alpha"] = a
             adj = confound(a, p, treatment)
             preds_adj = y - adj
             s_preds = self.get_prediction(X, p, treatment, preds_adj)
             ate, ate_lb, ate_ub = self.get_ate_ci(X, p, treatment, preds_adj)
 
             s_preds_residul = preds_adj - s_preds
-            sens["rsqs"] = a**2 * np.var(treatment) / np.var(s_preds_residul)
-            sens["New ATE"] = ate
-            sens["New ATE LB"] = ate_lb
-            sens["New ATE UB"] = ate_ub
-            sens_df = sens_df.append(pd.DataFrame(sens, index=[0]))
+            rsqs = a**2 * np.var(treatment) / np.var(s_preds_residul)
+
+            sens.append([a, rsqs, ate, ate_lb, ate_ub])
+
+        sens_df = pd.DataFrame(
+            sens, columns=["alpha", "rsqs", "New ATE", "New ATE LB", "New ATE UB"]
+        )
 
         rss = np.sum(np.square(y - preds))
         partial_rsqs = []
@@ -502,9 +500,7 @@ class SensitivitySelectionBias(Sensitivity):
         sensitivity_summary["ATE"] = sensitivity_summary[
             sensitivity_summary.alpha == 0
         ]["New ATE"]
-        return sensitivity_summary[
-            ["Method", "ATE", "New ATE", "New ATE LB", "New ATE UB"]
-        ]
+        return sensitivity_summary[SUMMARY_COLS]
 
     @staticmethod
     def plot(sens_df, partial_rsqs_df=None, type="raw", ci=False, partial_rsqs=False):

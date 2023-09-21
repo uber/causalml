@@ -86,7 +86,7 @@ Please see below for how to read the plot, and `uplift_tree_visualization.ipynb 
 - validation uplift score:  all the information above is static once the tree is trained (based on the trained trees), while the validation uplift score represents the treatment effect of the testing data when the method fill() is used. This score can be used as a comparison to the training uplift score, to evaluate if the tree has an overfitting issue.
 
 Uplift Tree Feature Importances
--------------------------
+-------------------------------
 
 .. code-block:: python
 
