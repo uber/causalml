@@ -59,20 +59,20 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
 
     @abstractmethod
     def __init__(
-            self,
-            *,
-            criterion,
-            splitter,
-            max_depth,
-            min_samples_split,
-            min_samples_leaf,
-            min_weight_fraction_leaf,
-            max_features,
-            max_leaf_nodes,
-            random_state,
-            min_impurity_decrease,
-            class_weight=None,
-            ccp_alpha=0.0,
+        self,
+        *,
+        criterion,
+        splitter,
+        max_depth,
+        min_samples_split,
+        min_samples_leaf,
+        min_weight_fraction_leaf,
+        max_features,
+        max_leaf_nodes,
+        random_state,
+        min_impurity_decrease,
+        class_weight=None,
+        ccp_alpha=0.0,
     ):
         self.criterion = criterion
         self.splitter = splitter
@@ -88,7 +88,9 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         self.ccp_alpha = ccp_alpha
 
     @abstractmethod
-    def fit(self, X, y, sample_weight=None, check_input=True, X_idx_sorted="deprecated"):
+    def fit(
+        self, X, y, sample_weight=None, check_input=True, X_idx_sorted="deprecated"
+    ):
         pass
 
     def get_depth(self):
@@ -121,7 +123,7 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         if check_input:
             X = self._validate_data(X, dtype=DTYPE, accept_sparse="csr", reset=False)
             if issparse(X) and (
-                    X.indices.dtype != np.intc or X.indptr.dtype != np.intc
+                X.indices.dtype != np.intc or X.indptr.dtype != np.intc
             ):
                 raise ValueError("No support for np.int64 index based sparse matrices")
         else:
