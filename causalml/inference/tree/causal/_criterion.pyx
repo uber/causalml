@@ -213,6 +213,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         """Compute penalty for the sample size difference between groups"""
         return self.groups_penalty * fabs(tr_count- ct_count)
 
+
 cdef class StandardMSE(CausalRegressionCriterion):
     """
     Standard MSE with treatment effect estimates

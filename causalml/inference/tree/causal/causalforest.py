@@ -277,22 +277,6 @@ class CausalRandomForestRegressor(ForestRegressor):
 
         # Check parameters
         self._validate_estimator()
-        # TODO: Remove in v1.2
-        if isinstance(self, (RandomForestRegressor, ExtraTreesRegressor)):
-            if self.criterion == "mse":
-                warn(
-                    "Criterion 'mse' was deprecated in v1.0 and will be "
-                    "removed in version 1.2. Use `criterion='squared_error'` "
-                    "which is equivalent.",
-                    FutureWarning,
-                )
-            elif self.criterion == "mae":
-                warn(
-                    "Criterion 'mae' was deprecated in v1.0 and will be "
-                    "removed in version 1.2. Use `criterion='absolute_error'` "
-                    "which is equivalent.",
-                    FutureWarning,
-                )
 
         if not self.bootstrap and self.oob_score:
             raise ValueError("Out of bag estimation only available if bootstrap=True")

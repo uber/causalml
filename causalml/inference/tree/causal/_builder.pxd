@@ -4,11 +4,11 @@
 # cython: language_level=3
 # cython: linetrace=True
 
-from sklearn.tree._tree cimport Node, Tree, TreeBuilder
-from sklearn.tree._tree cimport Splitter, SplitRecord
-from sklearn.tree._utils cimport StackRecord, Stack
-from sklearn.tree._utils cimport PriorityHeapRecord, PriorityHeap
-from sklearn.tree._tree cimport SIZE_t, DOUBLE_t
+from .._tree._tree cimport Node, Tree, TreeBuilder
+from .._tree._splitter cimport Splitter, SplitRecord
+from .._tree._utils cimport StackRecord, Stack
+from .._tree._utils cimport PriorityHeapRecord, PriorityHeap
+from .._tree._tree cimport SIZE_t, DOUBLE_t
 
 
 cdef struct FrontierRecord:
