@@ -4,14 +4,15 @@ import warnings
 from math import ceil
 
 import numpy as np
-from sklearn.tree._classes import CRITERIA_REG
-from sklearn.tree._classes import DTYPE, DOUBLE
-from sklearn.tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
-from sklearn.tree._classes import Tree, BaseDecisionTree
-from sklearn.tree._classes import issparse, check_random_state
-from sklearn.tree._criterion import Criterion
-from sklearn.tree._splitter import Splitter
+from scipy.sparse import issparse
+from sklearn.utils import check_random_state
 from sklearn.utils.validation import _check_sample_weight
+
+from .._tree._classes import DTYPE, DOUBLE
+from .._tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
+from .._tree._classes import Tree, BaseDecisionTree
+from .._tree._criterion import Criterion
+from .._tree._splitter import Splitter
 
 from ._builder import DepthFirstCausalTreeBuilder, BestFirstCausalTreeBuilder
 from ._criterion import StandardMSE, CausalMSE, TTest
@@ -21,7 +22,6 @@ CAUSAL_TREES_CRITERIA = {
     "standard_mse": StandardMSE,
     "t_test": TTest,
 }
-CRITERIA_REG.update(CAUSAL_TREES_CRITERIA)
 
 
 class BaseCausalDecisionTree(BaseDecisionTree):
@@ -193,7 +193,9 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         # Build tree
         criterion = self.criterion
         if not isinstance(criterion, Criterion):
-            criterion = CRITERIA_REG[self.criterion](self.n_outputs_, n_samples)
+            criterion = CAUSAL_TREES_CRITERIA[self.criterion](
+                self.n_outputs_, n_samples
+            )
             criterion.eps = self.eps
             criterion.groups_penalty = self.groups_penalty
         else:
