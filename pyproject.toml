@@ -62,8 +62,8 @@ requires = [
     "setuptools>=18.0",
     "wheel",
     "Cython<=0.29.34",
-    "numpy",
-    "scikit-learn<=1.0.2",
+    "numpy>=1.18.5",
+    "scikit-learn>=0.22.0",
 ]
 
 [project.urls]
