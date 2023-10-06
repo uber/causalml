@@ -16,30 +16,39 @@ This project may include the following roles. Additional roles may be adopted an
 
 **2.2. Appeal Process**. Decisions may be appealed by opening an issue and that appeal will be considered by the Maintainers in good faith, who will respond in writing within a reasonable time. If the Maintainers deny the appeal, the appeal may be brought before the Organization Steering Committee, who will also respond in writing in a reasonable time.
 
-## 3. How We Work.
 
-**3.1. Openness**. Participation is open to anyone who is directly and materially affected by the activity in question. There shall be no undue financial barriers to participation.
+## 3. Termination of Membership
 
-**3.2. Balance**. The development process should balance the interests of Contributors and other stakeholders. Contributors from diverse interest categories shall be sought with the objective of achieving balance.
+The membership of a Maintainer will terminate if any of the following occur:
 
-**3.3. Coordination and Harmonization**. Good faith efforts shall be made to resolve potential conflicts or incompatibility between releases in this Project.
+**3.1 Resignation**. Written notice of resignation to the Maintainers.
 
-**3.4. Consideration of Views and Objections**. Prompt consideration shall be given to the written views and objections of all Contributors.
+**3.2 Unreachable Member**. If a member is unresponsive at its listed handle for more than three months the Maintainers may vote to remove the member.
 
-**3.5. Written procedures**. This governance document and other materials documenting this project's development process shall be available to any interested person.
+## 4. How We Work.
 
-## 4. No Confidentiality.
+**4.1. Openness**. Participation is open to anyone who is directly and materially affected by the activity in question. There shall be no undue financial barriers to participation.
+
+**4.2. Balance**. The development process should balance the interests of Contributors and other stakeholders. Contributors from diverse interest categories shall be sought with the objective of achieving balance.
+
+**4.3. Coordination and Harmonization**. Good faith efforts shall be made to resolve potential conflicts or incompatibility between releases in this Project.
+
+**4.4. Consideration of Views and Objections**. Prompt consideration shall be given to the written views and objections of all Contributors.
+
+**4.5. Written procedures**. This governance document and other materials documenting this project's development process shall be available to any interested person.
+
+## 5. No Confidentiality.
 
 Information disclosed in connection with any Project activity, including but not limited to meetings, contributions, and submissions, is not confidential, regardless of any markings or statements to the contrary.
 
-## 5. Trademarks.
+## 6. Trademarks.
 
 Any names, trademarks, logos, or goodwill developed by and associated with the Project (the "Marks") are controlled by the Organization. Maintainers may only use these Marks in accordance with the Organization's trademark policy. If a Maintainer resigns or is removed, any rights the Maintainer may have in the Marks revert to the Organization.
 
-## 6. Amendments.
+## 7. Amendments.
 
 Amendments to this governance policy may be made by affirmative vote of 2/3 of all Maintainers, with approval by the Organization's Steering Committee.
 
 ---
-Part of MVG-0.1-beta.
+Adapted from [MVG-0.1-beta](https://github.com/github/MVG/tree/v0.1-beta).
 Made with love by GitHub. Licensed under the [CC-BY 4.0 License](https://creativecommons.org/licenses/by-sa/4.0/).
