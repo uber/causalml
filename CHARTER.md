@@ -1,6 +1,6 @@
 # Charter for the CausalML Organization
 
-This is the organizational charter for the CausalML Organization (the "Organization"). By adding their name to the [Steering Committee.md file](./STEERING-COMMITTEE.md), Steering Committee members agree as follows.
+This is the organizational charter for the CausalML Organization (the "Organization"). By adding their name to the [Steering Committee.md file](./STEERING_COMMITTEE.md), Steering Committee members agree as follows.
 
 ## 1. Mission
 
@@ -42,7 +42,7 @@ Information disclosed in connection with any of the Organization's activities, i
 
 ## 8. Amendments
 
-Amendments to this charter, the [antitrust policy](./ANTITRUST.md), the [trademark policy](./TRADEMARKS.md), or the [code of conduct](./CODE-OF-CONDUCT.md) may only be made with at least a 3/4 affirmative vote of the Steering Committee.
+Amendments to this charter, the [antitrust policy](./ANTITRUST.md), the [trademark policy](./TRADEMARKS.md), or the [code of conduct](./CODE_OF_CONDUCT.md) may only be made with at least a 3/4 affirmative vote of the Steering Committee.
 
 ---
 Adapted from [MVG-0.1-beta](https://github.com/github/MVG/tree/v0.1-beta).
