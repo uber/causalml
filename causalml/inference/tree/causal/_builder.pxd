@@ -6,11 +6,10 @@
 
 from sklearn.tree._tree cimport Node, Tree, TreeBuilder
 from sklearn.tree._tree cimport Splitter, SplitRecord
-from sklearn.tree._utils cimport StackRecord, Stack
-from sklearn.tree._utils cimport PriorityHeapRecord, PriorityHeap
 from sklearn.tree._tree cimport SIZE_t, DOUBLE_t
 
 
+# A record on the heap for best-first builder
 cdef struct FrontierRecord:
     # Record of information of a Node, the frontier for a split. Those records are
     # maintained in a heap to access the Node with the best improvement in impurity,
@@ -25,3 +24,14 @@ cdef struct FrontierRecord:
     double impurity_left
     double impurity_right
     double improvement
+
+
+# A record on the stack for depth-first builder
+cdef struct StackRecord:
+    SIZE_t start
+    SIZE_t end
+    SIZE_t depth
+    SIZE_t parent
+    bint is_left
+    double impurity
+    SIZE_t n_constant_features
