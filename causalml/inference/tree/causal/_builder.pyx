@@ -14,7 +14,7 @@ from libcpp.algorithm cimport pop_heap
 from libcpp.algorithm cimport push_heap
 
 import numpy as np
-cimport numpy as np
+cimport numpy as cnp
 np.import_array()
 
 
@@ -25,6 +25,7 @@ cdef int IS_FIRST = 1
 cdef int IS_NOT_FIRST = 0
 cdef int IS_LEFT = 1
 cdef int IS_NOT_LEFT = 0
+
 
 TREE_LEAF = -1
 TREE_UNDEFINED = -2
@@ -48,16 +49,17 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         self.max_depth = max_depth
         self.min_impurity_decrease = min_impurity_decrease
 
-    cpdef build(self, Tree tree, object X, np.ndarray y,
-                np.ndarray sample_weight=None):
+    cpdef build(self, Tree tree, object X, cnp.ndarray y,
+                cnp.ndarray sample_weight=None):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
         X, y, sample_weight = self._check_input(X, y, sample_weight)
 
-        cdef DOUBLE_t* sample_weight_ptr = NULL
-        if sample_weight is not None:
-            sample_weight_ptr = <DOUBLE_t*> sample_weight.data
+        IF not SKLEARN_NEWER_12:
+            cdef DOUBLE_t* sample_weight_ptr = NULL
+            if sample_weight is not None:
+                sample_weight_ptr = <DOUBLE_t*> sample_weight.data
 
         # Initial capacity
         cdef int init_capacity
@@ -78,7 +80,10 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef double min_impurity_decrease = self.min_impurity_decrease
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, sample_weight_ptr)
+        IF not SKLEARN_NEWER_12:
+            splitter.init(X, y, sample_weight_ptr)
+        ELSE:
+            splitter.init(X, y, sample_weight)
 
         cdef SIZE_t start
         cdef SIZE_t end
@@ -237,16 +242,18 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
 
-    cpdef build(self, Tree tree, object X, np.ndarray y,
-                np.ndarray sample_weight=None):
+    cpdef build(self, Tree tree, object X, cnp.ndarray y,
+                cnp.ndarray sample_weight=None):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
         X, y, sample_weight = self._check_input(X, y, sample_weight)
 
-        cdef DOUBLE_t* sample_weight_ptr = NULL
-        if sample_weight is not None:
-            sample_weight_ptr = <DOUBLE_t*> sample_weight.data
+
+        IF not SKLEARN_NEWER_12:
+            cdef DOUBLE_t* sample_weight_ptr = NULL
+            if sample_weight is not None:
+                sample_weight_ptr = <DOUBLE_t*> sample_weight.data
 
         # Parameters
         cdef Splitter splitter = self.splitter
@@ -256,7 +263,10 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         cdef SIZE_t min_samples_split = self.min_samples_split
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, sample_weight_ptr)
+        IF not SKLEARN_NEWER_12:
+            splitter.init(X, y, sample_weight_ptr)
+        ELSE:
+            splitter.init(X, y, sample_weight)
 
         cdef vector[FrontierRecord] frontier
         cdef FrontierRecord record

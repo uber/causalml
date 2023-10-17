@@ -17,9 +17,14 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
     cdef public double groups_penalty
     cdef public double eps
 
-    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
-                    double weighted_n_samples, SIZE_t* samples, SIZE_t start,
-                    SIZE_t end) nogil except -1:
+    cdef int init(self,
+        const DOUBLE_t[:, ::1] y,
+        DOUBLE_ARRAY_t sample_weight,
+        double weighted_n_samples,
+        SIZE_t* samples,
+        SIZE_t start,
+        SIZE_t end
+    ) nogil except -1:
         """Initialize the criterion.
         This initializes the criterion at node samples[start:end] and children
         samples[start:start] and samples[start:end].
@@ -67,6 +72,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         # Reset to pos=start
         self.reset()
         return 0
+
 
     cdef int reset(self) nogil except -1:
         """Reset the criterion at pos=start."""
@@ -138,7 +144,10 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
     cdef int update(self, SIZE_t new_pos) nogil except -1:
         """Updated statistics by moving samples[pos:new_pos] to the left."""
-        cdef double * sample_weight = self.sample_weight
+        IF not SKLEARN_NEWER_12:
+            cdef DOUBLE_t * sample_weight = self.sample_weight
+        ELSE:
+            cdef const DOUBLE_t[:] sample_weight = self.sample_weight
         cdef SIZE_t * samples = self.samples
 
         cdef SIZE_t pos = self.pos
@@ -156,6 +165,8 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         we are going to update sum_left from the direction that require the least amount of computations,
         i.e. from pos to new_pos or from end to new_pos
         """
+        cdef DOUBLE_t is_treated
+
         if (new_pos - pos) <= (end - new_pos):
             for p in range(pos, new_pos):
                 i = samples[p]
@@ -272,7 +283,11 @@ cdef class StandardMSE(CausalRegressionCriterion):
         i.e. the impurity of the left child (samples[start:pos]) and the
         impurity the right child (samples[pos:end]).
         """
-        cdef DOUBLE_t * sample_weight = self.sample_weight
+        IF not SKLEARN_NEWER_12:
+            cdef DOUBLE_t * sample_weight = self.sample_weight
+        ELSE:
+            cdef const DOUBLE_t[:] sample_weight = self.sample_weight
+
         cdef SIZE_t * samples = self.samples
         cdef SIZE_t pos = self.pos
         cdef SIZE_t start = self.start
@@ -481,7 +496,7 @@ cdef class TTest(CausalRegressionCriterion):
         return self.state.left.split_metric
 
     cdef double proxy_impurity_improvement(self) nogil:
-        """Compute a proxy of the impurity reduction. In case of t statistic - proxy_impurity_improvement 
+        """Compute a proxy of the impurity reduction. In case of t statistic - proxy_impurity_improvement
         is the same as impurity_improvement.
         """
         cdef double impurity_left

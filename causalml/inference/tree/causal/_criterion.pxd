@@ -8,6 +8,13 @@
 from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 
+IF not SKLEARN_NEWER_12:
+    # If SKLearn < 1.2, use DOUBLE_t* as DOUBLE_ARRAY_t
+    ctypedef DOUBLE_t* DOUBLE_ARRAY_t
+ELSE:
+    # If SKLearn >= 1.2, use const DOUBLE_t[:] as DOUBLE_ARRAY_t
+    ctypedef const DOUBLE_t[:] DOUBLE_ARRAY_t
+
 
 cdef struct NodeInfo:
     double count        # the number of obs

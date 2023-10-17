@@ -20,7 +20,7 @@ dependencies:
     - chardet==4.0.0
     - coverage==5.5
     - cycler==0.10.0
-    - Cython==0.29.34
+    - Cython==0.29.36
     - decorator==5.0.7
     - defusedxml==0.7.1
     - dill==0.3.5.1
