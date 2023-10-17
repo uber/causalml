@@ -9,6 +9,15 @@ from sklearn.tree._tree cimport Splitter, SplitRecord
 from sklearn.tree._tree cimport SIZE_t, DOUBLE_t
 
 
+IF SKLEARN_VERSION < 13:
+    cimport numpy as cnp
+    ctypedef cnp.ndarray BUILD_Y_t
+    ctypedef cnp.ndarray BUILD_SAMPLE_WEIGTH_t
+ELSE:
+    ctypedef const DOUBLE_t[:, ::1] BUILD_Y_t
+    ctypedef const DOUBLE_t[:] BUILD_SAMPLE_WEIGTH_t
+
+
 # A record on the heap for best-first builder
 cdef struct FrontierRecord:
     # Record of information of a Node, the frontier for a split. Those records are

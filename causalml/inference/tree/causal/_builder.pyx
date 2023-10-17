@@ -49,9 +49,38 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         self.max_depth = max_depth
         self.min_impurity_decrease = min_impurity_decrease
 
-    cpdef build(self, Tree tree, object X, cnp.ndarray y,
-                cnp.ndarray sample_weight=None):
-        """Build a decision tree from the training set (X, y)."""
+
+    IF SKLEARN_VERSION < 13:
+        cpdef build(
+            self,
+            Tree tree,
+            object X,
+            BUILD_Y_t y,
+            BUILD_SAMPLE_WEIGTH_t sample_weight=None
+        ):
+            """Build a decision tree from the training set (X, y)."""
+            self._build(tree, X, y, sample_weight, None)
+    ELSE:
+        cpdef build(
+            self,
+            Tree tree,
+            object X,
+            BUILD_Y_t y,
+            BUILD_SAMPLE_WEIGTH_t sample_weight=None,
+            const unsigned char[::1] missing_values_in_feature_mask=None,
+        ):
+            """Build a decision tree from the training set (X, y)."""
+            self._build(tree, X, y, sample_weight, missing_values_in_feature_mask)
+
+    cdef inline _build(
+        self,
+        Tree tree,
+        object X,
+        BUILD_Y_t y,
+        BUILD_SAMPLE_WEIGTH_t sample_weight=None,
+        const unsigned char[::1] missing_values_in_feature_mask=None,
+    ):
+        """Inline build a decision tree from the training set (X, y)."""
 
         # check input
         X, y, sample_weight = self._check_input(X, y, sample_weight)
@@ -82,8 +111,10 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         # Recursive partition (without actual recursion)
         IF SKLEARN_VERSION < 12:
             splitter.init(X, y, sample_weight_ptr)
-        ELSE:
+        ELIF SKLEARN_VERSION < 13:
             splitter.init(X, y, sample_weight)
+        ELSE:
+            splitter.init(X, y, sample_weight, missing_values_in_feature_mask)
 
         cdef SIZE_t start
         cdef SIZE_t end
@@ -242,9 +273,38 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
 
-    cpdef build(self, Tree tree, object X, cnp.ndarray y,
-                cnp.ndarray sample_weight=None):
-        """Build a decision tree from the training set (X, y)."""
+
+    IF SKLEARN_VERSION < 13:
+        cpdef build(
+            self,
+            Tree tree,
+            object X,
+            BUILD_Y_t y,
+            BUILD_SAMPLE_WEIGTH_t sample_weight=None
+        ):
+            """Build a decision tree from the training set (X, y)."""
+            self._build(tree, X, y, sample_weight, None)
+    ELSE:
+        cpdef build(
+            self,
+            Tree tree,
+            object X,
+            BUILD_Y_t y,
+            BUILD_SAMPLE_WEIGTH_t sample_weight=None,
+            const unsigned char[::1] missing_values_in_feature_mask=None,
+        ):
+            """Build a decision tree from the training set (X, y)."""
+            self._build(tree, X, y, sample_weight, missing_values_in_feature_mask)
+
+
+    cdef inline _build(self,
+        Tree tree,
+        object X,
+        BUILD_Y_t y,
+        BUILD_SAMPLE_WEIGTH_t sample_weight=None,
+        const unsigned char[::1] missing_values_in_feature_mask=None
+    ):
+        """Inline build a decision tree from the training set (X, y)."""
 
         # check input
         X, y, sample_weight = self._check_input(X, y, sample_weight)
@@ -265,8 +325,10 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         # Recursive partition (without actual recursion)
         IF SKLEARN_VERSION < 12:
             splitter.init(X, y, sample_weight_ptr)
-        ELSE:
+        ELIF SKLEARN_VERSION < 13:
             splitter.init(X, y, sample_weight)
+        ELSE:
+            splitter.init(X, y, sample_weight, missing_values_in_feature_mask)
 
         cdef vector[FrontierRecord] frontier
         cdef FrontierRecord record
