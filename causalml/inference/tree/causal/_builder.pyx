@@ -56,7 +56,7 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         # check input
         X, y, sample_weight = self._check_input(X, y, sample_weight)
 
-        IF not SKLEARN_NEWER_12:
+        IF SKLEARN_VERSION < 12:
             cdef DOUBLE_t* sample_weight_ptr = NULL
             if sample_weight is not None:
                 sample_weight_ptr = <DOUBLE_t*> sample_weight.data
@@ -80,7 +80,7 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef double min_impurity_decrease = self.min_impurity_decrease
 
         # Recursive partition (without actual recursion)
-        IF not SKLEARN_NEWER_12:
+        IF SKLEARN_VERSION < 12:
             splitter.init(X, y, sample_weight_ptr)
         ELSE:
             splitter.init(X, y, sample_weight)
@@ -250,7 +250,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         X, y, sample_weight = self._check_input(X, y, sample_weight)
 
 
-        IF not SKLEARN_NEWER_12:
+        IF SKLEARN_VERSION < 12:
             cdef DOUBLE_t* sample_weight_ptr = NULL
             if sample_weight is not None:
                 sample_weight_ptr = <DOUBLE_t*> sample_weight.data
@@ -263,7 +263,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         cdef SIZE_t min_samples_split = self.min_samples_split
 
         # Recursive partition (without actual recursion)
-        IF not SKLEARN_NEWER_12:
+        IF SKLEARN_VERSION < 12:
             splitter.init(X, y, sample_weight_ptr)
         ELSE:
             splitter.init(X, y, sample_weight)

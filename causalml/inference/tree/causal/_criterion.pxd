@@ -8,12 +8,19 @@
 from sklearn.tree._criterion cimport RegressionCriterion
 from sklearn.tree._criterion cimport SIZE_t, DOUBLE_t
 
-IF not SKLEARN_NEWER_12:
+IF SKLEARN_VERSION < 12:
     # If SKLearn < 1.2, use DOUBLE_t* as DOUBLE_ARRAY_t
     ctypedef DOUBLE_t* DOUBLE_ARRAY_t
 ELSE:
     # If SKLearn >= 1.2, use const DOUBLE_t[:] as DOUBLE_ARRAY_t
     ctypedef const DOUBLE_t[:] DOUBLE_ARRAY_t
+
+IF SKLEARN_VERSION < 13:
+    # If SKLearn < 1.3, use DOUBLE_t* as DOUBLE_ARRAY_t
+    ctypedef SIZE_t* SIZE_ARRAY_t
+ELSE:
+    # Else use const SIZE_t[:] memory view
+    ctypedef const SIZE_t[:] SIZE_ARRAY_t
 
 
 cdef struct NodeInfo:

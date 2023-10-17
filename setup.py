@@ -12,11 +12,13 @@ import Cython.Compiler.Options
 
 
 compile_time_env = {}
-if version.parse(sklearn.__version__) >= version.parse("1.2"):
-    SKLEARN_NEWER_12 = True
-    compile_time_env["SKLEARN_NEWER_12"] = True
+sklearn_version = version.parse(sklearn.__version__)
+if  sklearn_version>= version.parse("1.3"):
+    compile_time_env["SKLEARN_VERSION"] = 13
+elif sklearn_version >= version.parse("1.2"):
+    compile_time_env["SKLEARN_VERSION"] = 12
 else:
-    compile_time_env["SKLEARN_NEWER_12"] = False
+    compile_time_env["SKLEARN_VERSION"] = 11
 
 
 Cython.Compiler.Options.annotate = True

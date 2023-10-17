@@ -21,18 +21,23 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         const DOUBLE_t[:, ::1] y,
         DOUBLE_ARRAY_t sample_weight,
         double weighted_n_samples,
-        SIZE_t* samples,
+        SIZE_ARRAY_t sample_indices,
         SIZE_t start,
         SIZE_t end
     ) nogil except -1:
         """Initialize the criterion.
-        This initializes the criterion at node samples[start:end] and children
-        samples[start:start] and samples[start:end].
+        This initializes the criterion at node sample_indices[start:end] and children
+        sample_indices[start:start] and sample_indices[start:end].
         """
         # Initialize fields
         self.y = y
         self.sample_weight = sample_weight
-        self.samples = samples
+        # self.samples = sample_indices
+        IF SKLEARN_VERSION < 13:
+            self.samples = sample_indices
+        ELSE:
+            self.sample_indices = sample_indices
+
         self.start = start
         self.end = end
         self.n_node_samples = end - start
@@ -54,7 +59,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         self.state.right = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
 
         for p in range(start, end):
-            i = samples[p]
+            i = sample_indices[p]
             is_treated = sample_weight[i] - self.eps
 
             self.sum_total[k] += self.y[i, k]
@@ -144,11 +149,12 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
     cdef int update(self, SIZE_t new_pos) nogil except -1:
         """Updated statistics by moving samples[pos:new_pos] to the left."""
-        IF not SKLEARN_NEWER_12:
-            cdef DOUBLE_t * sample_weight = self.sample_weight
+        cdef DOUBLE_ARRAY_t sample_weight = self.sample_weight
+
+        IF SKLEARN_VERSION < 13:
+            cdef SIZE_ARRAY_t sample_indices = self.samples
         ELSE:
-            cdef const DOUBLE_t[:] sample_weight = self.sample_weight
-        cdef SIZE_t * samples = self.samples
+            cdef SIZE_ARRAY_t sample_indices = self.sample_indices
 
         cdef SIZE_t pos = self.pos
         cdef SIZE_t end = self.end
@@ -169,7 +175,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
         if (new_pos - pos) <= (end - new_pos):
             for p in range(pos, new_pos):
-                i = samples[p]
+                i = sample_indices[p]
                 is_treated = sample_weight[i] - self.eps
 
                 self.sum_left[k] += self.y[i, k]
@@ -185,7 +191,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
             self.reverse_reset()
 
             for p in range(end - 1, new_pos - 1, -1):
-                i = samples[p]
+                i = sample_indices[p]
                 is_treated = sample_weight[i] - self.eps
 
                 self.sum_left[k] -= self.y[i, k]
@@ -216,7 +222,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         return 0
 
     cdef void node_value(self, double * dest) nogil:
-        """Compute the node values of samples[start:end] into dest."""
+        """Compute the node values of sample_indices[start:end] into dest."""
         dest[0] = self.state.node.ct_y_sum / self.state.node.ct_count
         dest[1] = self.state.node.tr_y_sum / self.state.node.tr_count
 
@@ -233,7 +239,7 @@ cdef class StandardMSE(CausalRegressionCriterion):
     cdef double node_impurity(self) nogil:
         """Evaluate the impurity of the current node.
         Evaluate the MSE criterion as impurity of the current node,
-        i.e. the impurity of samples[start:end]. The smaller the impurity the
+        i.e. the impurity of sample_indices[start:end]. The smaller the impurity the
         better.
         """
         cdef double impurity
@@ -283,12 +289,12 @@ cdef class StandardMSE(CausalRegressionCriterion):
         i.e. the impurity of the left child (samples[start:pos]) and the
         impurity the right child (samples[pos:end]).
         """
-        IF not SKLEARN_NEWER_12:
-            cdef DOUBLE_t * sample_weight = self.sample_weight
-        ELSE:
-            cdef const DOUBLE_t[:] sample_weight = self.sample_weight
+        cdef DOUBLE_ARRAY_t sample_weight = self.sample_weight
 
-        cdef SIZE_t * samples = self.samples
+        IF SKLEARN_VERSION < 13:
+            cdef SIZE_ARRAY_t sample_indices = self.samples
+        ELSE:
+            cdef SIZE_ARRAY_t sample_indices = self.sample_indices
         cdef SIZE_t pos = self.pos
         cdef SIZE_t start = self.start
 
@@ -305,7 +311,7 @@ cdef class StandardMSE(CausalRegressionCriterion):
         cdef double penalty_left, penalty_right
 
         for p in range(start, pos):
-            i = samples[p]
+            i = sample_indices[p]
 
             for k in range(self.n_outputs):
                 y_ik = self.y[i, k]
