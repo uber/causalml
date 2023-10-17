@@ -190,9 +190,15 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
                     is_leaf = (is_leaf or split.pos >= end or
                                (split.improvement + EPSILON < min_impurity_decrease))
 
-                node_id = tree._add_node(parent, is_left, is_leaf, split.feature,
+                IF SKLEARN_VERSION < 13:
+                    node_id = tree._add_node(parent, is_left, is_leaf, split.feature,
                                          split.threshold, impurity, n_node_samples,
                                          weighted_n_node_samples)
+                ELSE:
+                    node_id = tree._add_node(parent, is_left, is_leaf, split.feature,
+                                         split.threshold, impurity, n_node_samples,
+                                         weighted_n_node_samples,
+                                         split.missing_go_to_left)
 
                 if node_id == SIZE_MAX:
                     rc = -1
@@ -459,12 +465,22 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
             is_leaf = (is_leaf or split.pos >= end or
                        split.improvement + EPSILON < min_impurity_decrease)
 
-        node_id = tree._add_node(parent - tree.nodes
+        IF SKLEARN_VERSION < 13:
+            node_id = tree._add_node(parent - tree.nodes
                                  if parent != NULL
                                  else _TREE_UNDEFINED,
                                  is_left, is_leaf,
                                  split.feature, split.threshold, impurity, n_node_samples,
                                  weighted_n_node_samples)
+        ELSE:
+            node_id = tree._add_node(parent - tree.nodes
+                                 if parent != NULL
+                                 else _TREE_UNDEFINED,
+                                 is_left, is_leaf,
+                                 split.feature, split.threshold, impurity, n_node_samples,
+                                 weighted_n_node_samples,
+                                 split.missing_go_to_left)
+
         if node_id == SIZE_MAX:
             return -1
 

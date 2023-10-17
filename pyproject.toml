@@ -30,7 +30,7 @@ dependencies = [
     "scipy>=1.4.1",
     "matplotlib",
     "pandas>=0.24.1",
-    "scikit-learn>=1.0.0",
+    "scikit-learn>=1.0.0,<1.4",
     "statsmodels>=0.9.0",
     "seaborn",
     "xgboost",
@@ -62,7 +62,7 @@ requires = [
     "wheel",
     "Cython<=0.29.36",
     "numpy",
-    "scikit-learn<=1.3.1",
+    "scikit-learn<1.4",
 ]
 
 [project.urls]
