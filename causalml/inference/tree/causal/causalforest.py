@@ -1,13 +1,11 @@
 from typing import Union
-import importlib
+
 import numpy as np
 import forestci as fci
 from joblib import Parallel, delayed
-from packaging import version
 from warnings import catch_warnings, simplefilter, warn
 
 from sklearn.exceptions import DataConversionWarning
-
 from sklearn.utils.validation import check_random_state, _check_sample_weight
 from sklearn.utils.multiclass import type_of_target
 
@@ -16,16 +14,37 @@ from sklearn.ensemble._forest import ForestRegressor
 from sklearn.ensemble._forest import compute_sample_weight, issparse
 from sklearn.ensemble._forest import _generate_sample_indices, _get_n_samples_bootstrap
 
-
-if version.parse(importlib.metadata.version("scikit-learn")) >= version.parse("1.1.0"):
-    _joblib_parallel_args = dict(prefer="threads")
-else:
-    from sklearn.utils.fixes import _joblib_parallel_args
-
-    _joblib_parallel_args = _joblib_parallel_args(prefer="threads")
-
-
 from .causaltree import CausalTreeRegressor
+
+
+def _parse_joblib_parallel_args() -> dict:
+    """
+    Workaround to support old python versions.
+    Returns:
+    -------
+     (dict) Additional arguments for joblib Parallel
+    """
+    try:
+        from packaging.version import parse as version
+    except ModuleNotFoundError:
+        from distutils.version import LooseVersion as version
+
+    try:
+        import importlib.metadata
+
+        sklearn_version = importlib.metadata.version("scikit-learn")
+    except ModuleNotFoundError:
+        from pkg_resources import get_distribution
+
+        sklearn_version = get_distribution("scikit-learn").version
+
+    if version(sklearn_version) >= version("1.1.0"):
+        _joblib_parallel_args = dict(prefer="threads")
+    else:
+        from sklearn.utils.fixes import _joblib_parallel_args
+
+        _joblib_parallel_args = _joblib_parallel_args(prefer="threads")
+    return _joblib_parallel_args
 
 
 def _parallel_build_trees(
@@ -323,7 +342,7 @@ class CausalRandomForestRegressor(ForestRegressor):
             trees = Parallel(
                 n_jobs=self.n_jobs,
                 verbose=self.verbose,
-                **_joblib_parallel_args,
+                **_parse_joblib_parallel_args(),
             )(
                 delayed(_parallel_build_trees)(
                     t,
