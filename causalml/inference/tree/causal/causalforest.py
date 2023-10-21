@@ -1,20 +1,29 @@
 from typing import Union
+import importlib.metadata
 import numpy as np
 import forestci as fci
 from joblib import Parallel, delayed
+from packaging import version
 from warnings import catch_warnings, simplefilter, warn
-from sklearn.ensemble._forest import DOUBLE, DTYPE, MAX_INT
+
 from sklearn.exceptions import DataConversionWarning
-from sklearn.ensemble._forest import compute_sample_weight, issparse
-from sklearn.utils.fixes import _joblib_parallel_args
+
 from sklearn.utils.validation import check_random_state, _check_sample_weight
 from sklearn.utils.multiclass import type_of_target
-from sklearn.ensemble._forest import (
-    ForestRegressor,
-    RandomForestRegressor,
-    ExtraTreesRegressor,
-)
+
+from sklearn.ensemble._forest import DOUBLE, DTYPE, MAX_INT
+from sklearn.ensemble._forest import ForestRegressor
+from sklearn.ensemble._forest import compute_sample_weight, issparse
 from sklearn.ensemble._forest import _generate_sample_indices, _get_n_samples_bootstrap
+
+
+if version.parse(importlib.metadata.version("scikit-learn")) >= version.parse("1.1.0"):
+    _joblib_parallel_args = dict(prefer="threads")
+else:
+    from sklearn.utils.fixes import _joblib_parallel_args
+
+    _joblib_parallel_args = _joblib_parallel_args(prefer="threads")
+
 
 from .causaltree import CausalTreeRegressor
 
@@ -311,11 +320,10 @@ class CausalRandomForestRegressor(ForestRegressor):
                 self._make_estimator(append=False, random_state=random_state)
                 for i in range(n_more_estimators)
             ]
-
             trees = Parallel(
                 n_jobs=self.n_jobs,
                 verbose=self.verbose,
-                **_joblib_parallel_args(prefer="threads"),
+                **_joblib_parallel_args,
             )(
                 delayed(_parallel_build_trees)(
                     t,
