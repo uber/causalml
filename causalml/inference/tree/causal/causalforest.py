@@ -1,5 +1,5 @@
 from typing import Union
-import importlib.metadata
+import importlib
 import numpy as np
 import forestci as fci
 from joblib import Parallel, delayed
