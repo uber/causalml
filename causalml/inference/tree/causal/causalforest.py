@@ -8,7 +8,7 @@ from warnings import catch_warnings, simplefilter, warn
 from sklearn.exceptions import DataConversionWarning
 from sklearn.utils.validation import check_random_state, _check_sample_weight
 from sklearn.utils.multiclass import type_of_target
-
+from sklearn import __version__ as sklearn_version
 from sklearn.ensemble._forest import DOUBLE, DTYPE, MAX_INT
 from sklearn.ensemble._forest import ForestRegressor
 from sklearn.ensemble._forest import compute_sample_weight, issparse
@@ -16,35 +16,17 @@ from sklearn.ensemble._forest import _generate_sample_indices, _get_n_samples_bo
 
 from .causaltree import CausalTreeRegressor
 
+try:
+    from packaging.version import parse as Version
+except ModuleNotFoundError:
+    from distutils.version import LooseVersion as Version
 
-def _parse_joblib_parallel_args() -> dict:
-    """
-    Workaround to support old python versions.
-    Returns:
-    -------
-     (dict) Additional arguments for joblib Parallel
-    """
-    try:
-        from packaging.version import parse as version
-    except ModuleNotFoundError:
-        from distutils.version import LooseVersion as version
+if Version(sklearn_version) >= Version("1.1.0"):
+    _joblib_parallel_args = dict(prefer="threads")
+else:
+    from sklearn.utils.fixes import _joblib_parallel_args
 
-    try:
-        import importlib.metadata
-
-        sklearn_version = importlib.metadata.version("scikit-learn")
-    except ModuleNotFoundError:
-        from pkg_resources import get_distribution
-
-        sklearn_version = get_distribution("scikit-learn").version
-
-    if version(sklearn_version) >= version("1.1.0"):
-        _joblib_parallel_args = dict(prefer="threads")
-    else:
-        from sklearn.utils.fixes import _joblib_parallel_args
-
-        _joblib_parallel_args = _joblib_parallel_args(prefer="threads")
-    return _joblib_parallel_args
+    _joblib_parallel_args = _joblib_parallel_args(prefer="threads")
 
 
 def _parallel_build_trees(
@@ -167,12 +149,18 @@ class CausalRandomForestRegressor(ForestRegressor):
                     to train each base estimator.
             groups_cnt: (bool), count treatment and control groups for each node/leaf
         """
-        super().__init__(
-            base_estimator=CausalTreeRegressor(
-                control_name=control_name, criterion=criterion, groups_cnt=groups_cnt
-            ),
-            n_estimators=n_estimators,
-            estimator_params=(
+        self._estimator = CausalTreeRegressor(
+            control_name=control_name, criterion=criterion, groups_cnt=groups_cnt
+        )
+        _estimator_key = (
+            "estimator"
+            if Version(sklearn_version) >= Version("1.2.0")
+            else "base_estimator"
+        )
+        _parent_args = {
+            _estimator_key: self._estimator,
+            "n_estimators": n_estimators,
+            "estimator_params": (
                 "criterion",
                 "control_name",
                 "max_depth",
@@ -186,14 +174,16 @@ class CausalRandomForestRegressor(ForestRegressor):
                 "min_samples_leaf",
                 "random_state",
             ),
-            bootstrap=bootstrap,
-            oob_score=oob_score,
-            n_jobs=n_jobs,
-            random_state=random_state,
-            verbose=verbose,
-            warm_start=warm_start,
-            max_samples=max_samples,
-        )
+            "bootstrap": bootstrap,
+            "oob_score": oob_score,
+            "n_jobs": n_jobs,
+            "random_state": random_state,
+            "verbose": verbose,
+            "warm_start": warm_start,
+            "max_samples": max_samples,
+        }
+
+        super().__init__(**_parent_args)
 
         self.criterion = criterion
         self.control_name = control_name
@@ -342,7 +332,7 @@ class CausalRandomForestRegressor(ForestRegressor):
             trees = Parallel(
                 n_jobs=self.n_jobs,
                 verbose=self.verbose,
-                **_parse_joblib_parallel_args(),
+                **_joblib_parallel_args,
             )(
                 delayed(_parallel_build_trees)(
                     t,
@@ -388,7 +378,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         Returns:
              self
         """
-        X, y, w = self.base_estimator._prepare_data(X=X, y=y, treatment=treatment)
+        X, y, w = self._estimator._prepare_data(X=X, y=y, treatment=treatment)
         return self._fit(X=X, y=y, sample_weight=w)
 
     def predict(self, X: np.ndarray, with_outcomes: bool = False) -> np.ndarray:
