@@ -9,6 +9,7 @@ This document lists the Maintainers of the Project. Maintainers may be added onc
 | Jeong-Yoon Lee | @jeongyoonlee |
 | Paul Lo | @paullo0106 |
 | Jing Pan | @ppstacy |
+| Alexander Popkov | @@alexander-pv |
 | Roland Stevenson | @ras44 |
 | Yifeng Wu | @vincewu51 |
 | Zhenyu Zhao | @zhenyuz0500 |
