@@ -66,8 +66,9 @@ If you added a new inference method, add test code to the `tests/` folder.
 
 **CausalML** uses `pytest` for tests. Install `pytest` and `pytest-cov`, and the package dependencies:
 ```bash
-$ pip install pytest pytest-cov -r requirements.txt
+$ pip install .[test]
 ```
+See details for test dependencies in `pyproject.toml`
 
 ### Building Cython
 
@@ -75,6 +76,7 @@ In order to run tests, you need to build the Cython modules
 ```bash
 $ python setup.py build_ext --inplace
 ```
+This is important because during testing causalml modules are imported from the source code.
 
 ### Testing
 
