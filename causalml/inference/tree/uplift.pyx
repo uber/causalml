@@ -19,68 +19,6 @@ The module structure is the following:
 # Authors: Zhenyu Zhao <zhenyuz@uber.com>
 #          Totte Harinen <totte@uber.com>
 
-# Modified to speed up UpliftTreeClassifier.growDecisionTreeFrom and
-# consequently can also speed up UpliftTreeClassifier.fit, and
-# UpliftRandomForestClassifier.
-
-# Modification version 1, on 2023-10-04 by Peter Lo <peterloleungyau@gmail.com>
-# 
-# - created divideSet_len from divideSet, which does not split the whole
-#   X into X_l and X_r, but returns len(X_l) and len(X_r) instead,
-#   because in finding the best split, the whole X_l and X_r are not
-#   used. This saves some allocations.
-# 
-# - in finding the best split, we use mostly scalar values
-#   (e.g. best_col and best_value in favor of one single tuple
-#   bestAttribute) to keep the current best, and further avoids
-#   allocating many objects. After finding the best split, we use the
-#   original divideSet to get the X_l and X_r and subsequently
-#   best_set_left and best_set_right which are used in subsequent
-#   construction of subtrees of the left and right branches; and
-#   calculate bestAttribute as a tuple.
-# 
-# - also, from the annotation of Cython, it seems some constant values
-#   such as the list of percentile values to test for threshold will be
-#   constructed in each iteration of the loop, because the Cython
-#   compiler cannot be sure that the list will not be modified by
-#   np.percentile, but since we can be sure, we create the list once
-#   outside the loop.
-# 
-# Modification verison 2, on 2023-10-05 by Peter Lo <peterloleungyau@gmail.com>
-# 
-# - modified group_uniqueCounts to group_uniqueCounts_to_arr, to use
-#   pre-allocated flat numpy array to fill in the counts, instead of
-#   using list of list.
-# 
-# - modified tree_node_summary to tree_node_summary_to_arr to use
-#   pre-allocated flat numpy arrays, and to fill in the node summary in
-#   new format, which consist of two parallel arrays: out_summary_p for
-#   [P(Y=1|T=i)...] and out_summary_n for [N(T=i)...], instead of the
-#   previous list of list.
-# 
-# - for all the evaluation functions, created the arr_evaluate_*
-#   versions that uses the new node summary format. Also created
-#   arr_normI as the counter-part of normI using the new node summary
-#   format.
-# 
-# - added some cdef to give type declarations to help speed up some
-#   calculations.
-# 
-# Modifcation version 3, on 2023-10-06 by Peter Lo <peterloleungyau@gmail.com>
-# 
-# - combine divideSet_len and group_uniqueCounts_to_arr to be
-#   group_counts_by_divide, so as to reduce creating intermediate
-#   objects. This calculates the group counts for the left branch.
-# 
-# - created tree_node_summary_from_counts from tree_node_summary_to_arr,
-#   to use pre-calculated group counts (e.g. by group_counts_by_divide).
-# 
-# - for right branch, calculate the group counts by subtracting the
-#   group counts of left branch from the total count (pre-calculated
-#   outside the looping of choosing split points), which should be more
-#   efficient than looping through the data again.
-
-
 import multiprocessing as mp
 from collections import defaultdict
 
