@@ -13,6 +13,7 @@ The module structure is the following:
 - The ``UpliftTreeClassifier`` base class implements the uplift trees (without
   Bootstrapping for random forest), this class is called within
   ``UpliftRandomForestClassifier`` for constructing random forest.
+
 """
 
 # Authors: Zhenyu Zhao <zhenyuz@uber.com>
@@ -24,6 +25,7 @@ from collections import defaultdict
 import logging
 import cython
 import numpy as np
+cimport numpy as np
 import pandas as pd
 import scipy.stats as stats
 import sklearn
@@ -37,6 +39,15 @@ if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
 else:
     from sklearn.utils.testing import ignore_warnings
 
+N_TYPE = np.int32
+TR_TYPE = np.int8
+Y_TYPE = np.int8
+P_TYPE = np.float64
+
+ctypedef np.int32_t N_TYPE_t
+ctypedef np.int8_t TR_TYPE_t
+ctypedef np.int8_t Y_TYPE_t
+ctypedef np.float64_t P_TYPE_t
 
 MAX_INT = np.iinfo(np.int32).max
 
@@ -44,7 +55,8 @@ logger = logging.getLogger("causalml")
 
 cdef extern from "math.h":
     double log(double x) nogil
-
+    double fabs(double x) nogil
+    double sqrt(double x) nogil
 
 @cython.cfunc
 def kl_divergence(pk: cython.float, qk: cython.float) -> cython.float:
@@ -190,6 +202,133 @@ class DecisionTree:
         self.matchScore = matchScore
 
 
+def group_uniqueCounts_to_arr(np.ndarray[TR_TYPE_t, ndim=1] treatment_idx,
+                              np.ndarray[Y_TYPE_t, ndim=1] y,
+                              np.ndarray[N_TYPE_t, ndim=1] out_arr):
+    '''
+        Count sample size by experiment group.
+
+        Args
+        ----
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
+            Should be of type numpy.int8
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
+            Should be of type numpy.int8
+        out_arr : array-like, shape = [2 * n_class]
+            An array to store the output counts, should have type numpy.int32
+
+    Returns
+    -------
+
+    No return value, but modified the out_arr to hold the negative and positive
+    outcome sample sizes for each of the control and treatment groups.
+        out_arr[2*i] is N(Y = 0, T = i) for i = 0, ..., n_class
+        out_arr[2*i+1] is N(Y = 1, T = i) for i = 0, ..., n_class
+    '''
+    cdef int out_arr_len = out_arr.shape[0]
+    cdef int n_class = out_arr_len / 2
+    cdef int num_samples = treatment_idx.shape[0]
+    cdef int yv = 0
+    cdef int tv = 0
+    cdef int i = 0
+    # first clear the output
+    for i in range(out_arr_len):
+        out_arr[i] = 0
+    # then loop through treatment_idx and y, sum the counts
+    # first sum as N(T = i) and N(Y = 1, T = i) at index (2*i, 2*i+1), and later adjust
+    for i in range(num_samples):
+        tv = treatment_idx[i]
+        # assume treatment index is in range
+        out_arr[2*tv] += 1
+        # assume y should be either 0 or 1, so this is summing 
+        out_arr[2*tv + 1] += y[i]
+    # adjust the entry at index 2*i to be N(Y = 0, T = i) = N(T = i) - N(Y = 1, T = i)
+    for i in range(n_class):
+        out_arr[2*i] -= out_arr[2*i + 1]
+    # done, modified out_arr, so no need to return it
+
+def group_counts_by_divide(
+        col_vals, threshold_val, is_split_by_gt,
+        np.ndarray[TR_TYPE_t, ndim=1] treatment_idx,
+        np.ndarray[Y_TYPE_t, ndim=1] y,
+        np.ndarray[N_TYPE_t, ndim=1] out_arr):
+    '''
+    Count sample size by experiment group for the left branch,
+    after splitting col_vals by threshold_val.
+    If is_split_by_gt, the left branch is (col_vals >= threshold_val),
+    otherwise the left branch is (col_vals == threshold_val).
+
+    This aims to combine the previous divideSet_len and
+    group_uniqueCounts_to_arr into one function, so as to reduce the
+    number of intermediate objects.
+
+    Args
+    ----
+    col_vals : array-like, shape = [num_samples]
+        An array containing one column of x values.
+    threshold_val : compatible value with col_vals
+        A value for splitting col_vals.
+        If is_split_by_gt, the left branch is (col_vals >= threshold_val),
+        otherwise the left branch is (col_vals == threshold_val).
+    is_split_by_gt : bool
+        Whether to split by (col_vals >= threshold_val).
+        If False, will split by (col_vals == threshold_val).
+    treatment_idx : array-like, shape = [num_samples]
+        An array containing the treatment group index for each unit.
+        Should be of type numpy.int8
+    y : array-like, shape = [num_samples]
+        An array containing the outcome of interest for each unit.
+        Should be of type numpy.int8
+    out_arr : array-like, shape = [2 * n_class]
+        An array to store the output counts, should have type numpy.int32
+
+    Returns
+    -------
+    len_X_l: the number of samples in the left branch.
+    Also modify the out_arr to hold the negative and positive
+    outcome sample sizes for each of the control and treatment groups.
+        out_arr[2*i] is N(Y = 0, T = i) for i = 0, ..., n_class
+        out_arr[2*i+1] is N(Y = 1, T = i) for i = 0, ..., n_class
+    '''
+    cdef int out_arr_len = out_arr.shape[0]
+    cdef int n_class = out_arr_len / 2
+    cdef int num_samples = treatment_idx.shape[0]
+    cdef int yv = 0
+    cdef int tv = 0
+    cdef int i = 0
+    cdef N_TYPE_t len_X_l = 0
+    cdef np.ndarray[np.uint8_t, ndim=1, cast=True] filt
+    # first clear the output
+    for i in range(out_arr_len):
+        out_arr[i] = 0
+
+    # split
+    if is_split_by_gt:
+        filt = col_vals >= threshold_val
+    else:
+        filt = col_vals == threshold_val
+
+    # then loop through treatment_idx and y, sum the counts where filt
+    # is True, and it is the count for the left branch.
+    # Also count len_X_l in the process.
+
+    # first sum as N(T = i) and N(Y = 1, T = i) at index (2*i, 2*i+1), and later adjust
+    for i in range(num_samples):
+        if filt[i]> 0:
+            len_X_l += 1
+            tv = treatment_idx[i]
+            # assume treatment index is in range
+            out_arr[2*tv] += 1
+            # assume y should be either 0 or 1, so this is summing 
+            out_arr[2*tv + 1] += y[i]
+    # adjust the entry at index 2*i to be N(Y = 0, T = i) = N(T = i) - N(Y = 1, T = i)
+    for i in range(n_class):
+        out_arr[2*i] -= out_arr[2*i + 1]
+    # done, modified out_arr
+    return len_X_l
+
 # Uplift Tree Classifier
 class UpliftTreeClassifier:
     """ Uplift Tree Classifier for Classification Task.
@@ -258,20 +397,28 @@ class UpliftTreeClassifier:
 
         if evaluationFunction == 'KL':
             self.evaluationFunction = self.evaluate_KL
+            self.arr_eval_func = self.arr_evaluate_KL
         elif evaluationFunction == 'ED':
             self.evaluationFunction = self.evaluate_ED
+            self.arr_eval_func = self.arr_evaluate_ED
         elif evaluationFunction == 'Chi':
             self.evaluationFunction = self.evaluate_Chi
+            self.arr_eval_func = self.arr_evaluate_Chi     
         elif evaluationFunction == 'DDP':
             self.evaluationFunction = self.evaluate_DDP
+            self.arr_eval_func = self.arr_evaluate_DDP
         elif evaluationFunction == 'IT':
             self.evaluationFunction = self.evaluate_IT
+            self.arr_eval_func = self.arr_evaluate_IT
         elif evaluationFunction == 'CIT':
             self.evaluationFunction = self.evaluate_CIT
+            self.arr_eval_func = self.arr_evaluate_CIT
         elif evaluationFunction == 'IDDP':
             self.evaluationFunction = self.evaluate_IDDP
+            self.arr_eval_func = self.arr_evaluate_IDDP
         elif evaluationFunction == 'CTS':
             self.evaluationFunction = self.evaluate_CTS
+            self.arr_eval_func = self.arr_evaluate_CTS
         self.fitted_uplift_tree = None
 
         assert control_name is not None and isinstance(control_name, str), \
@@ -309,20 +456,22 @@ class UpliftTreeClassifier:
         self.random_state_ = check_random_state(self.random_state)
 
         X, y = check_X_y(X, y)
+        y = (y > 0).astype(Y_TYPE) # make sure it is 0 or 1, and is int8
         treatment = np.asarray(treatment)
         assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
         if X_val is not None:
             X_val, y_val = check_X_y(X_val, y_val)
+            y_val = (y_val > 0).astype(Y_TYPE) # make sure it is 0 or 1, and is int8
             treatment_val = np.asarray(treatment_val)
             assert len(y_val) == len(treatment_val), 'Data length must be equal for X_val, treatment_val, and y_val.'
         
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
         self.classes_ = [self.control_name]
-        treatment_idx = np.zeros_like(treatment, dtype=int)
+        treatment_idx = np.zeros_like(treatment, dtype=TR_TYPE)
         treatment_val_idx = None
         if treatment_val is not None:
-            treatment_val_idx = np.zeros_like(treatment_val, dtype=int)
+            treatment_val_idx = np.zeros_like(treatment_val, dtype=TR_TYPE)
         for i, tr in enumerate(treatment_groups, 1):
             self.classes_.append(tr)
             treatment_idx[treatment == tr] = i
@@ -351,7 +500,7 @@ class UpliftTreeClassifier:
             max_depth=self.max_depth, early_stopping_eval_diff_scale=self.early_stopping_eval_diff_scale,
             min_samples_leaf=self.min_samples_leaf,
             depth=1, min_samples_treatment=self.min_samples_treatment,
-            n_reg=self.n_reg, parentNodeSummary=None
+            n_reg=self.n_reg, parentNodeSummary_p=None
         )
 
         if self.honesty:
@@ -737,6 +886,43 @@ class UpliftTreeClassifier:
 
         return X[filt], X[~filt], treatment_idx[filt], treatment_idx[~filt], y[filt], y[~filt]
 
+    @staticmethod
+    def divideSet_len(X, treatment_idx, y, column, value):
+        '''Tree node split.
+
+        Modified from dividedSet(), but return the len(X_l) and
+        len(X_r) instead of the split X_l and X_r, to avoid some
+        overhead, intended to be used for finding the split. After
+        finding the best splits, can split to find the X_l and X_r.
+
+        Args
+        ----
+        X : ndarray, shape = [num_samples, num_features]
+            An ndarray of the covariates used to train the uplift model.
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
+        column : int
+                The column used to split the data.
+        value : float or int
+                The value in the column for splitting the data.
+
+        Returns
+        -------
+        (len_X_l, len_X_r, treatment_l, treatment_r, y_l, y_r) : list of ndarray
+                The covariates nrows, treatments and outcomes of left node and the right node.
+
+        '''
+        # for int and float values
+        if np.issubdtype(value.dtype, np.number):
+            filt = X[:, column] >= value
+        else:  # for strings
+            filt = X[:, column] == value
+
+        len_X_l = np.sum(filt)
+        return len_X_l, len(X) - len_X_l, treatment_idx[filt], treatment_idx[~filt], y[filt], y[~filt]
+
     def group_uniqueCounts(self, treatment_idx, y):
         '''
         Count sample size by experiment group.
@@ -785,6 +971,36 @@ class UpliftTreeClassifier:
         return d_res
 
     @staticmethod
+    def arr_evaluate_KL(np.ndarray[P_TYPE_t, ndim=1] node_summary_p,
+                        np.ndarray[N_TYPE_t, ndim=1] node_summary_n):
+        '''
+        Calculate KL Divergence as split evaluation criterion for a given node.
+        Modified to accept new node summary format.
+
+        Args
+        ----
+        node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the current node, i.e. [P(Y=1|T=i)...]
+        node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the current node, i.e. [N(T=i)...]
+
+        Returns
+        -------
+        d_res : KL Divergence
+        '''
+        cdef int n_class = node_summary_p.shape[0]
+        cdef P_TYPE_t p_c = node_summary_p[0]
+        cdef P_TYPE_t d_res = 0.0
+        cdef int i = 0
+        for i in range(1, n_class):
+            d_res += kl_divergence(node_summary_p[i], p_c)
+        return d_res
+
+    @staticmethod
     def evaluate_ED(nodeSummary):
         '''
         Calculate Euclidean Distance as split evaluation criterion for a given node.
@@ -803,6 +1019,35 @@ class UpliftTreeClassifier:
         d_res = 0
         for treatment_group in nodeSummary[1:]:
             d_res += 2*(treatment_group[0] - pc)**2
+        return d_res
+
+    @staticmethod
+    def arr_evaluate_ED(np.ndarray[P_TYPE_t, ndim=1] node_summary_p,
+                        np.ndarray[N_TYPE_t, ndim=1] node_summary_n):
+        '''
+        Calculate Euclidean Distance as split evaluation criterion for a given node.
+
+        Args
+        ----
+        node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the current node, i.e. [P(Y=1|T=i)...]
+        node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the current node, i.e. [N(T=i)...]
+
+        Returns
+        -------
+        d_res : Euclidean Distance
+        '''
+        cdef int n_class = node_summary_p.shape[0]
+        cdef P_TYPE_t p_c = node_summary_p[0]
+        cdef P_TYPE_t d_res = 0.0
+        cdef int i = 0
+        for i in range(1, n_class):
+            d_res += 2*(node_summary_p[i] - p_c)*(node_summary_p[i] - p_c)
         return d_res
 
     @staticmethod
@@ -827,6 +1072,39 @@ class UpliftTreeClassifier:
         return d_res
 
     @staticmethod
+    def arr_evaluate_Chi(np.ndarray[P_TYPE_t, ndim=1] node_summary_p,
+                         np.ndarray[N_TYPE_t, ndim=1] node_summary_n):
+        '''
+        Calculate Chi-Square statistic as split evaluation criterion for a given node.
+
+        Args
+        ----
+        node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the current node, i.e. [P(Y=1|T=i)...]
+        node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the current node, i.e. [N(T=i)...]
+
+        Returns
+        -------
+        d_res : Chi-Square
+        '''
+        cdef int n_class = node_summary_p.shape[0]
+        cdef P_TYPE_t p_c = node_summary_p[0]
+        cdef P_TYPE_t d_res = 0.0
+        cdef int i = 0
+        cdef P_TYPE_t max_eps_pc = max(0.1 ** 6, p_c)
+        cdef P_TYPE_t max_eps_1_pc = max(0.1 ** 6, 1 - p_c)
+        cdef P_TYPE_t diff_sq = 0.0
+        for i in range(1, n_class):
+            diff_sq = (node_summary_p[i] - p_c) * (node_summary_p[i] - p_c)
+            d_res += (diff_sq / max_eps_pc + diff_sq / max_eps_1_pc)
+        return d_res
+
+    @staticmethod
     def evaluate_DDP(nodeSummary):
         '''
         Calculate Delta P as split evaluation criterion for a given node.
@@ -844,6 +1122,35 @@ class UpliftTreeClassifier:
         d_res = 0
         for treatment_group in nodeSummary[1:]:
             d_res += treatment_group[0] - pc
+        return d_res
+
+    @staticmethod
+    def arr_evaluate_DDP(np.ndarray[P_TYPE_t, ndim=1] node_summary_p,
+                         np.ndarray[N_TYPE_t, ndim=1] node_summary_n):
+        '''
+        Calculate Delta P as split evaluation criterion for a given node.
+
+        Args
+        ----
+        node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the current node, i.e. [P(Y=1|T=i)...]
+        node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the current node, i.e. [N(T=i)...]
+
+        Returns
+        -------
+        d_res : Delta P
+        '''
+        cdef int n_class = node_summary_p.shape[0]
+        cdef P_TYPE_t p_c = node_summary_p[0]
+        cdef P_TYPE_t d_res = 0.0
+        cdef int i = 0
+        for i in range(1, n_class):
+            d_res += node_summary_p[i] - p_c
         return d_res
 
     @staticmethod
@@ -902,6 +1209,77 @@ class UpliftTreeClassifier:
 
             # Squared t-statistic
             g_s = np.power(((y_l_1 - y_l_0) - (y_r_1 - y_r_0)) / (sigma * np.sqrt(np.sum([1 / n_1, 1 / n_2, 1 / n_3, 1 / n_4]))), 2)
+
+        return g_s
+
+    @staticmethod
+    def arr_evaluate_IT(np.ndarray[P_TYPE_t, ndim=1] left_node_summary_p,
+                        np.ndarray[N_TYPE_t, ndim=1] left_node_summary_n,
+                        np.ndarray[P_TYPE_t, ndim=1] right_node_summary_p,
+                        np.ndarray[N_TYPE_t, ndim=1] right_node_summary_n):
+        '''
+        Calculate Squared T-Statistic as split evaluation criterion for a given node
+
+        NOTE: n_class should be 2.
+
+        Args
+        ----
+        left_node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the left node, i.e. [P(Y=1|T=i)...]
+        left_node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the left node, i.e. [N(T=i)...]
+        right_node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the right node, i.e. [P(Y=1|T=i)...]
+        right_node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the right node, i.e. [N(T=i)...]
+
+        Returns
+        -------
+        g_s : Squared T-Statistic
+        '''
+        ## Control Group
+        # Sample mean in left & right child node
+        cdef P_TYPE_t y_l_0 = left_node_summary_p[0]
+        cdef P_TYPE_t y_r_0 = right_node_summary_p[0]
+        # Sample size left & right child node
+        cdef N_TYPE_t n_3 = left_node_summary_n[0]
+        cdef N_TYPE_t n_4 = right_node_summary_n[0]
+        # Sample variance in left & right child node (p*(p-1) for bernoulli)
+        cdef P_TYPE_t s_3 = y_l_0*(1-y_l_0)
+        cdef P_TYPE_t s_4 = y_r_0*(1-y_r_0)
+
+        # only one treatment, contrast with control, so no need to loop
+        ## Treatment Group
+        # Sample mean in left & right child node
+        cdef P_TYPE_t y_l_1 = left_node_summary_p[1]
+        cdef P_TYPE_t y_r_1 = right_node_summary_p[1]
+        # Sample size left & right child node
+        cdef N_TYPE_t n_1 = left_node_summary_n[1]
+        cdef N_TYPE_t n_2 = right_node_summary_n[1]
+        # Sample variance in left & right child node
+        cdef P_TYPE_t s_1 = y_l_1*(1-y_l_1)
+        cdef P_TYPE_t s_2 = y_r_1*(1-y_r_1)
+
+        cdef P_TYPE_t sum_n = (n_1 - 1) + (n_2 - 1) + (n_3 - 1) + (n_4 - 1)
+        cdef P_TYPE_t w_1 = (n_1 - 1) / sum_n
+        cdef P_TYPE_t w_2 = (n_2 - 1) / sum_n
+        cdef P_TYPE_t w_3 = (n_3 - 1) / sum_n
+        cdef P_TYPE_t w_4 = (n_4 - 1) / sum_n
+
+        # Pooled estimator of the constant variance
+        cdef P_TYPE_t sigma = sqrt(w_1 * s_1 + w_2 * s_2 + w_3 * s_3 + w_4 * s_4)
+
+        # Squared t-statistic
+        cdef P_TYPE_t g_s = ((y_l_1 - y_l_0) - (y_r_1 - y_r_0)) / (sigma * sqrt(1.0 / n_1 + 1.0 / n_2 + 1.0 / n_3 + 1.0 / n_4))
+        g_s = g_s * g_s
 
         return g_s
 
@@ -978,9 +1356,101 @@ class UpliftTreeClassifier:
         return lrt
 
     @staticmethod
+    def arr_evaluate_CIT(np.ndarray[P_TYPE_t, ndim=1] cur_node_summary_p,
+                         np.ndarray[N_TYPE_t, ndim=1] cur_node_summary_n,
+                         np.ndarray[P_TYPE_t, ndim=1] left_node_summary_p,
+                         np.ndarray[N_TYPE_t, ndim=1] left_node_summary_n,
+                         np.ndarray[P_TYPE_t, ndim=1] right_node_summary_p,
+                         np.ndarray[N_TYPE_t, ndim=1] right_node_summary_n):
+        '''
+        Calculate likelihood ratio test statistic as split evaluation criterion for a given node
+        
+        NOTE: n_class should be 2.
+
+        Args
+        ----
+        cur_node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the current node, i.e. [P(Y=1|T=i)...]
+        cur_node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the current node, i.e. [N(T=i)...]
+        left_node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the left node, i.e. [P(Y=1|T=i)...]
+        left_node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the left node, i.e. [N(T=i)...]
+        right_node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the right node, i.e. [P(Y=1|T=i)...]
+        right_node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the right node, i.e. [N(T=i)...]
+                
+        Returns
+        -------
+        lrt : Likelihood ratio test statistic
+        '''
+        cdef P_TYPE_t lrt = 0.0
+
+        # since will take log of these N, so use a double type
+
+        # Control sample size left & right child node
+        cdef P_TYPE_t n_l_t_0 = left_node_summary_n[0]
+        cdef P_TYPE_t n_r_t_0 = right_node_summary_n[0]
+
+        # Treatment sample size left & right child node
+        cdef P_TYPE_t n_l_t_1 = left_node_summary_n[1]
+        cdef P_TYPE_t n_r_t_1 = right_node_summary_n[1]
+
+        # Total size of left & right node
+        cdef P_TYPE_t n_l_t = n_l_t_1 + n_l_t_0
+        cdef P_TYPE_t n_r_t = n_r_t_1 + n_r_t_0
+
+        # Total size of parent node
+        cdef P_TYPE_t n_t = n_l_t + n_r_t
+
+        # Total treatment & control size in parent node
+        cdef P_TYPE_t n_t_1 = n_l_t_1 + n_r_t_1
+        cdef P_TYPE_t n_t_0 = n_l_t_0 + n_r_t_0
+
+        # NOTE: the original code for sse_tau_l and sse_tau_r does not seem to follow the paper.
+        # sse = \sum_{i for treatment} (y_i - p_treatment)^2 + \sum_{i for control} (y_i - p_control)^2
+
+        # NOTE: since for classification, the y is either 0 or 1, we can calculate sse more simply
+        # for y being 0 or 1, sse = n*p*(1-p), but here need to calculate separately for treatment and control groups.
+
+        # Standard squared error of left child node
+        cdef P_TYPE_t sse_tau_l = n_l_t_0 * left_node_summary_p[0] * (1.0 - left_node_summary_p[0]) + n_l_t_1 * left_node_summary_p[1] * (1.0 - left_node_summary_p[1])
+
+        # Standard squared error of right child node
+        cdef P_TYPE_t sse_tau_r = n_r_t_0 * right_node_summary_p[0] * (1.0 - right_node_summary_p[0]) + n_r_t_1 * right_node_summary_p[1] * (1.0 - right_node_summary_p[1])
+
+        # Standard squared error of parent child node
+        cdef P_TYPE_t sse_tau = n_t_0 * cur_node_summary_p[0] * (1.0 - cur_node_summary_p[0]) + n_t_1 * cur_node_summary_p[1] * (1.0 - cur_node_summary_p[1])
+
+        # Maximized log-likelihood function
+        cdef P_TYPE_t i_tau_l = - (n_l_t / 2.0) * log(n_l_t * sse_tau_l) + n_l_t_1 * log(n_l_t_1) + n_l_t_0 * log(n_l_t_0)
+        cdef P_TYPE_t i_tau_r = - (n_r_t / 2.0) * log(n_r_t * sse_tau_r) + n_r_t_1 * log(n_r_t_1) + n_r_t_0 * log(n_r_t_0)
+        cdef P_TYPE_t i_tau = - (n_t / 2.0) * log(n_t * sse_tau) + n_t_1 * log(n_t_1) + n_t_0 * log(n_t_0)
+
+        # Likelihood ration test statistic
+        lrt = 2 * (i_tau_l + i_tau_r - i_tau)
+
+        return lrt
+
+    @staticmethod
     def evaluate_IDDP(nodeSummary):
         '''
         Calculate Delta P as split evaluation criterion for a given node.
+        
         Args
         ----
         nodeSummary : dictionary
@@ -998,6 +1468,35 @@ class UpliftTreeClassifier:
         return d_res
 
     @staticmethod
+    def arr_evaluate_IDDP(np.ndarray[P_TYPE_t, ndim=1] node_summary_p,
+                          np.ndarray[N_TYPE_t, ndim=1] node_summary_n):
+        '''
+        Calculate Delta P as split evaluation criterion for a given node.
+        
+        Args
+        ----
+        node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the current node, i.e. [P(Y=1|T=i)...]
+        node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the current node, i.e. [N(T=i)...]
+
+        Returns
+        -------
+        d_res : Delta P
+        '''
+        cdef int n_class = node_summary_p.shape[0]
+        cdef P_TYPE_t p_c = node_summary_p[0]
+        cdef P_TYPE_t d_res = 0.0
+        cdef int i = 0
+        for i in range(1, n_class):
+            d_res += node_summary_p[i] - p_c
+        return d_res
+
+    @staticmethod
     def evaluate_CTS(nodeSummary):
         '''
         Calculate CTS (conditional treatment selection) as split evaluation criterion for a given node.
@@ -1009,9 +1508,40 @@ class UpliftTreeClassifier:
 
         Returns
         -------
-        d_res : Chi-Square
+        d_res : CTS score
         '''
         return -max([stat[0] for stat in nodeSummary])
+
+    @staticmethod
+    def arr_evaluate_CTS(np.ndarray[P_TYPE_t, ndim=1] node_summary_p,
+                         np.ndarray[N_TYPE_t, ndim=1] node_summary_n):
+        '''
+        Calculate CTS (conditional treatment selection) as split evaluation criterion for a given node.
+
+        Args
+        ----
+        node_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            The positive probabilities of each of the control
+            and treament groups of the current node, i.e. [P(Y=1|T=i)...]
+        node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the current node, i.e. [N(T=i)...]
+
+        Returns
+        -------
+        d_res : CTS score
+        '''
+        # not sure why use negative for CTS, but in calculating the
+        # gain, it is adjusted back so as to maximize the gain.
+        cdef int n_class = node_summary_p.shape[0]
+        cdef P_TYPE_t d_res = node_summary_p[0]
+        cdef int i = 0
+        for i in range(1, n_class):
+            if node_summary_p[i] > d_res:
+                d_res = node_summary_p[i]
+        return -d_res
 
     def normI(self, n_c: cython.int, n_c_left: cython.int, n_t: list, n_t_left: list, alpha: cython.float = 0.9, currentDivergence: cython.float = 0.0) -> cython.float:
         '''
@@ -1056,6 +1586,68 @@ class UpliftTreeClassifier:
                 norm_res += (1. * n_t[i] / (np.sum(n_t) + n_c) * entropyH(pt_a_i))
         # Normalization Part 4
         norm_res += 1. * n_c / (np.sum(n_t) + n_c) * entropyH(pc_a)
+
+        # Normalization Part 5
+        norm_res += 0.5
+        return norm_res
+
+    def arr_normI(self, cur_node_summary_n, left_node_summary_n,
+                  alpha: cython.float = 0.9, currentDivergence: cython.float = 0.0) -> cython.float:
+        '''
+        Normalization factor.
+
+        Args
+        ----
+        cur_node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the current node, i.e. [N(T=i)...]
+
+        left_node_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            The counts of each of the control
+            and treament groups of the left node, i.e. [N(T=i)...]
+
+        alpha : float
+            The weight used to balance different normalization parts.
+
+        Returns
+        -------
+        norm_res : float
+            Normalization factor.
+        '''
+        cdef N_TYPE_t[::1] cur_summary_n = cur_node_summary_n
+        cdef N_TYPE_t[::1] left_summary_n = left_node_summary_n        
+        cdef int n_class = cur_summary_n.shape[0]
+        cdef int i = 0
+
+        cdef P_TYPE_t norm_res = 0.0
+        cdef P_TYPE_t n_c = cur_summary_n[0]
+        cdef P_TYPE_t n_c_left = left_summary_n[0]
+        cdef P_TYPE_t pt_a = 0.0, pt_a_i = 0.0, pc_a = 0.0, sum_n_t_left = 0.0, sum_n_t = 0.0
+
+        for i in range(1, n_class):
+            sum_n_t_left += left_summary_n[i]
+            sum_n_t += cur_summary_n[i]
+
+        pt_a = 1. * sum_n_t_left / (sum_n_t + 0.1)
+        pc_a = 1. * n_c_left / (n_c + 0.1)
+
+        if self.evaluationFunction == self.evaluate_IDDP:
+            # Normalization Part 1
+            norm_res += (entropyH(1. * sum_n_t / (sum_n_t + n_c), 1. * n_c / (sum_n_t + n_c)) * currentDivergence)
+            norm_res += (1. * sum_n_t / (sum_n_t + n_c) * entropyH(pt_a))
+
+        else:
+            # Normalization Part 1
+            norm_res += (alpha * entropyH(1. * sum_n_t / (sum_n_t + n_c), 1. * n_c / (sum_n_t + n_c)) * kl_divergence(pt_a, pc_a))
+            # Normalization Part 2 & 3
+            for i in range(1, n_class):
+                pt_a_i = 1. * left_summary_n[i] / (cur_summary_n[i] + 0.1)
+                norm_res += ((1 - alpha) * entropyH(1. * cur_summary_n[i] / (cur_summary_n[i] + n_c), 1. * n_c / (cur_summary_n[i] + n_c)) * kl_divergence(1. * pt_a_i, pc_a))
+                norm_res += (1. * cur_summary_n[i] / (sum_n_t + n_c) * entropyH(pt_a_i))
+        # Normalization Part 4
+        norm_res += 1. * n_c / (sum_n_t + n_c) * entropyH(pc_a)
 
         # Normalization Part 5
         norm_res += 0.5
@@ -1107,6 +1699,167 @@ class UpliftTreeClassifier:
 
         return nodeSummary
 
+    @staticmethod
+    def tree_node_summary_to_arr(np.ndarray[TR_TYPE_t, ndim=1] treatment_idx,
+                                 np.ndarray[Y_TYPE_t, ndim=1] y,
+                                 np.ndarray[P_TYPE_t, ndim=1] out_summary_p,
+                                 np.ndarray[N_TYPE_t, ndim=1] out_summary_n,
+                                 np.ndarray[N_TYPE_t, ndim=1] buf_count_arr,
+                                 np.ndarray[P_TYPE_t, ndim=1] parentNodeSummary_p,
+                                 int has_parent_summary,
+                                 min_samples_treatment=10, n_reg=100
+                                 ):
+        '''
+        Tree node summary statistics.
+        Modified from tree_node_summary, to use different format for the summary.
+        Instead of [[P(Y=1|T=0), N(T=0)], [P(Y=1|T=1), N(T=1)], ...],
+        use two arrays [N(T=i)...] and [P(Y=1|T=i)...].
+
+        Args
+        ----
+        treatment_idx : array-like, shape = [num_samples]
+            An array containing the treatment group index for each unit.
+            Has type numpy.int8.
+        y : array-like, shape = [num_samples]
+            An array containing the outcome of interest for each unit.
+            Has type numpy.int8.
+        out_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            To be filled with the positive probabilities of each of the control
+            and treament groups of the current node.
+        out_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            To be filled with the counts of each of the control
+            and treament groups of the current node.
+        buf_count_arr : array of shape [2*n_class]
+            Has type numpy.int32.
+            To be use as temporary buffer for group_uniqueCounts_to_arr.
+        parentNodeSummary_p : array of shape [n_class]
+            The positive probabilities of each of the control and treatment groups
+            in the parent node.
+        has_parent_summary : bool as int
+            If True (non-zero), then parentNodeSummary_p is a valid parent node summary probabilities.
+            If False (0), assume no parent node summary and parentNodeSummary_p is not touched.
+        min_samples_treatment: int, optional (default=10)
+            The minimum number of samples required of the experiment group t be split at a leaf node.
+        n_reg :  int, optional (default=10)
+            The regularization parameter defined in Rzepakowski et al. 2012,
+            the weight (in terms of sample size) of the parent node influence
+            on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
+
+        Returns
+        -------
+        No return values, but will modify out_summary_p and out_summary_n.
+        '''
+        # buf_count_arr: [N(Y=0, T=0), N(Y=1, T=0), N(Y=0, T=1), N(Y=1, T=1), ...]
+        group_uniqueCounts_to_arr(treatment_idx, y, buf_count_arr)
+
+        cdef int i = 0
+        cdef int n_class = buf_count_arr.shape[0] / 2
+        cdef int n = 0
+        cdef int n_pos = 0
+        cdef P_TYPE_t p = 0.0
+        cdef int n_min_sams = min_samples_treatment
+        cdef P_TYPE_t n_reg_p = n_reg
+
+        # out_summary_p: [P(Y=1|T=i)...]
+        # out_summary_n: [N(T=i) ... ]
+        if has_parent_summary == 0:
+            for i in range(n_class):
+                n_pos = buf_count_arr[2*i + 1] # N(Y=1|T=i)
+                n = buf_count_arr[2*i] + n_pos # N(Y=0|T=i) + N(Y=1|T=i) == N(T=i)
+                p = (n_pos / <double> n) if n > 0 else 0.
+                out_summary_n[i] = n
+                out_summary_p[i] = p
+        else:
+            for i in range(n_class):
+                n_pos = buf_count_arr[2*i + 1]
+                n = buf_count_arr[2*i] + n_pos
+                if n > n_min_sams:
+                    p = (n_pos + parentNodeSummary_p[i] * n_reg_p) / (<double> n + n_reg_p)
+                else:
+                    p = parentNodeSummary_p[i]
+                out_summary_n[i] = n
+                out_summary_p[i] = p
+
+    @staticmethod
+    def tree_node_summary_from_counts(
+            np.ndarray[N_TYPE_t, ndim=1] group_count_arr,
+            np.ndarray[P_TYPE_t, ndim=1] out_summary_p,
+            np.ndarray[N_TYPE_t, ndim=1] out_summary_n,
+            np.ndarray[P_TYPE_t, ndim=1] parentNodeSummary_p,
+            int has_parent_summary,
+            min_samples_treatment=10, n_reg=100
+    ):
+        '''Tree node summary statistics.
+
+        Modified from tree_node_summary_to_arr, to use different
+        format for the summary and to calculate based on already
+        calculated group counts.  Instead of [[P(Y=1|T=0), N(T=0)],
+        [P(Y=1|T=1), N(T=1)], ...], use two arrays [N(T=i)...] and
+        [P(Y=1|T=i)...].
+
+        Args
+        ----
+        group_count_arr : array of shape [2*n_class]
+            Has type numpy.int32.
+            The grounp counts, where entry 2*i is N(Y=0, T=i),
+            and entry 2*i+1 is N(Y=1, T=i).
+        out_summary_p : array of shape [n_class]
+            Has type numpy.double.
+            To be filled with the positive probabilities of each of the control
+            and treament groups of the current node.
+        out_summary_n : array of shape [n_class]
+            Has type numpy.int32.
+            To be filled with the counts of each of the control
+            and treament groups of the current node.
+        parentNodeSummary_p : array of shape [n_class]
+            The positive probabilities of each of the control and treatment groups
+            in the parent node.
+        has_parent_summary : bool as int
+            If True (non-zero), then parentNodeSummary_p is a valid parent node summary probabilities.
+            If False (0), assume no parent node summary and parentNodeSummary_p is not touched.
+        min_samples_treatment: int, optional (default=10)
+            The minimum number of samples required of the experiment group t be split at a leaf node.
+        n_reg :  int, optional (default=10)
+            The regularization parameter defined in Rzepakowski et al. 2012,
+            the weight (in terms of sample size) of the parent node influence
+            on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
+
+        Returns
+        -------
+        No return values, but will modify out_summary_p and out_summary_n.
+
+        '''
+        # group_count_arr: [N(Y=0, T=0), N(Y=1, T=0), N(Y=0, T=1), N(Y=1, T=1), ...]
+        cdef int i = 0
+        cdef int n_class = group_count_arr.shape[0] / 2
+        cdef int n = 0
+        cdef int n_pos = 0
+        cdef P_TYPE_t p = 0.0
+        cdef int n_min_sams = min_samples_treatment
+        cdef P_TYPE_t n_reg_p = n_reg
+
+        # out_summary_p: [P(Y=1|T=i)...]
+        # out_summary_n: [N(T=i) ... ]
+        if has_parent_summary == 0:
+            for i in range(n_class):
+                n_pos = group_count_arr[2*i + 1] # N(Y=1|T=i)
+                n = group_count_arr[2*i] + n_pos # N(Y=0|T=i) + N(Y=1|T=i) == N(T=i)
+                p = (n_pos / <double> n) if n > 0 else 0.
+                out_summary_n[i] = n
+                out_summary_p[i] = p
+        else:
+            for i in range(n_class):
+                n_pos = group_count_arr[2*i + 1]
+                n = group_count_arr[2*i] + n_pos
+                if n > n_min_sams:
+                    p = (n_pos + parentNodeSummary_p[i] * n_reg_p) / (<double> n + n_reg_p)
+                else:
+                    p = parentNodeSummary_p[i]
+                out_summary_n[i] = n
+                out_summary_p[i] = p
+
     def uplift_classification_results(self, treatment_idx, y):
         '''
         Classification probability for each treatment in the tree node.
@@ -1137,7 +1890,7 @@ class UpliftTreeClassifier:
                              early_stopping_eval_diff_scale=1, max_depth=10,
                              min_samples_leaf=100, depth=1,
                              min_samples_treatment=10, n_reg=100,
-                             parentNodeSummary=None):
+                             parentNodeSummary_p=None):
         '''
         Train the uplift decision tree.
 
@@ -1147,6 +1900,7 @@ class UpliftTreeClassifier:
             An ndarray of the covariates used to train the uplift model.
         treatment_idx : array-like, shape = [num_samples]
             An array containing the treatment group idx for each unit.
+            The dtype should be numpy.int8.
         y : array-like, shape = [num_samples]
             An array containing the outcome of interest for each unit.
         X_val : ndarray, shape = [num_samples, num_features]
@@ -1167,8 +1921,8 @@ class UpliftTreeClassifier:
             The regularization parameter defined in Rzepakowski et al. 2012,
             the weight (in terms of sample size) of the parent node influence
             on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
-        parentNodeSummary : dictionary, optional (default = None)
-            Node summary statistics of the parent tree node.
+        parentNodeSummary_p : array-like, shape [n_class]
+            Node summary probability statistics of the parent tree node.
 
         Returns
         -------
@@ -1178,50 +1932,126 @@ class UpliftTreeClassifier:
         if len(X) == 0:
             return DecisionTree(classes_=self.classes_)
 
-        # Current node summary: [P(Y=1|T), N(T)]
-        currentNodeSummary = self.tree_node_summary(treatment_idx, y,
-                                                    min_samples_treatment=min_samples_treatment,
-                                                    n_reg=n_reg,
-                                                    parentNodeSummary=parentNodeSummary)
+        assert treatment_idx.dtype == TR_TYPE
+        assert y.dtype == Y_TYPE
+
+        # some temporary buffers for node summaries
+        cdef int n_class = self.n_class
+        # buffers for group counts, right can be derived from total and left
+        cdef np.ndarray[N_TYPE_t, ndim=1] left_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
+        cdef np.ndarray[N_TYPE_t, ndim=1] right_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
+        cdef np.ndarray[N_TYPE_t, ndim=1] total_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
+        # for X_val if any, allocate if needed below
+        cdef np.ndarray[N_TYPE_t, ndim=1] val_left_count_arr
+        cdef np.ndarray[N_TYPE_t, ndim=1] val_right_count_arr
+        cdef np.ndarray[N_TYPE_t, ndim=1] val_total_count_arr
+        # buffers for node summary
+        cdef np.ndarray[P_TYPE_t, ndim=1] cur_summary_p = np.zeros(self.n_class, dtype = P_TYPE)
+        cdef np.ndarray[N_TYPE_t, ndim=1] cur_summary_n = np.zeros(self.n_class, dtype = N_TYPE)
+        cdef np.ndarray[P_TYPE_t, ndim=1] left_summary_p = np.zeros(self.n_class, dtype = P_TYPE)
+        cdef np.ndarray[N_TYPE_t, ndim=1] left_summary_n = np.zeros(self.n_class, dtype = N_TYPE)
+        cdef np.ndarray[P_TYPE_t, ndim=1] right_summary_p = np.zeros(self.n_class, dtype = P_TYPE)
+        cdef np.ndarray[N_TYPE_t, ndim=1] right_summary_n = np.zeros(self.n_class, dtype = N_TYPE)
+        # for val left and right summary
+        cdef np.ndarray[P_TYPE_t, ndim=1] val_left_summary_p = np.zeros(self.n_class, dtype = P_TYPE)
+        cdef np.ndarray[N_TYPE_t, ndim=1] val_left_summary_n = np.zeros(self.n_class, dtype = N_TYPE)
+        cdef np.ndarray[P_TYPE_t, ndim=1] val_right_summary_p = np.zeros(self.n_class, dtype = P_TYPE)
+        cdef np.ndarray[N_TYPE_t, ndim=1] val_right_summary_n = np.zeros(self.n_class, dtype = N_TYPE)
+        
+        # dummy
+        cdef int has_parent_summary = 0
+        if parentNodeSummary_p is None:
+            parent_summary_p = np.zeros(self.n_class, dtype = P_TYPE) # dummy for calling tree_node_summary_to_arr
+            has_parent_summary = 0
+        else:
+            parent_summary_p = parentNodeSummary_p
+            has_parent_summary = 1
+
+        cdef int i = 0
+
+        # preparation: fill in the total count, then for each
+        # candidate split, we calculate the count for left branch, and
+        # can derive count for right branch using the total count.
+
+        # group_count_arr: [N(Y=0, T=0), N(Y=1, T=0), N(Y=0, T=1), N(Y=1, T=1), ...]
+        group_uniqueCounts_to_arr(treatment_idx, y, total_count_arr)
+        if X_val is not None:
+            val_left_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
+            val_right_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
+            val_total_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
+            group_uniqueCounts_to_arr(treatment_val_idx, y_val, val_total_count_arr)
+
+        # Current node summary: [P(Y=1|T=i)...] and [N(T=i)...]
+        self.tree_node_summary_from_counts(
+            total_count_arr,
+            cur_summary_p, cur_summary_n,
+            parent_summary_p,
+            has_parent_summary,
+            min_samples_treatment=min_samples_treatment,
+            n_reg=n_reg
+            )
+
+        # to reconstruct current node summary in list of list form, so
+        # that the constructed tree follows previous format.
+
+        # Current node summary: [[P(Y=1|T=i), N(T=i)]...]
+        currentNodeSummary = []
+        for i in range(n_class):
+            currentNodeSummary.append([cur_summary_p[i], cur_summary_n[i]])
+        #
 
         if self.evaluationFunction == self.evaluate_IT or self.evaluationFunction == self.evaluate_CIT:
             currentScore = 0
         else:
-            currentScore = self.evaluationFunction(currentNodeSummary)
+            currentScore = self.arr_eval_func(cur_summary_p, cur_summary_n)
 
-        # Prune Stats
-        maxAbsDiff = 0
-        maxDiff = -1.
-        bestTreatment = 0       # treatment index for the control group
-        suboptTreatment = 0     # treatment index for the control group
-        maxDiffTreatment = 0    # treatment index for the control group
-        maxDiffSign = 0
-        p_c, n_c = currentNodeSummary[0]
-        for i_tr in range(1, self.n_class):
-            p_t, _ = currentNodeSummary[i_tr]
-            # P(Y|T=t) - P(Y|T=0)
+        # Prune Stats:
+        cdef P_TYPE_t maxAbsDiff = 0.0
+        cdef P_TYPE_t maxDiff = -1.
+        cdef int bestTreatment = 0       # treatment index for the control group, also used in returning the tree for this node
+        cdef int suboptTreatment = 0     # treatment index for the control group
+        cdef int maxDiffTreatment = 0    # treatment index for the control group, also used in returning the tree for this node
+        maxDiffSign = 0 # also used in returning the tree for this node
+        # adapted to new current node summary format
+        cdef P_TYPE_t p_c = cur_summary_p[0]
+        cdef N_TYPE_t n_c = cur_summary_n[0]
+        cdef N_TYPE_t n_t = 0
+        cdef int i_tr = 0
+        cdef P_TYPE_t p_t = 0.0, diff = 0.0
+
+        for i_tr in range(1, n_class):
+            p_t = cur_summary_p[i_tr]
+            # P(Y=1|T=t) - P(Y=1|T=0)
             diff = p_t - p_c
-            if abs(diff) >= maxAbsDiff:
+            if fabs(diff) >= maxAbsDiff:
                 maxDiffTreatment = i_tr
                 maxDiffSign = np.sign(diff)
-                maxAbsDiff = abs(diff)
+                maxAbsDiff = fabs(diff)
             if diff >= maxDiff:
                 maxDiff = diff
                 suboptTreatment = i_tr
                 if diff > 0:
                     bestTreatment = i_tr
         if maxDiff > 0:
-            p_t = currentNodeSummary[bestTreatment][0]
-            n_t = currentNodeSummary[bestTreatment][1]
+            p_t = cur_summary_p[bestTreatment]
+            n_t = cur_summary_n[bestTreatment]
         else:
-            p_t = currentNodeSummary[suboptTreatment][0]
-            n_t = currentNodeSummary[suboptTreatment][1]
-        p_value = (1. - stats.norm.cdf(abs(p_c - p_t) / np.sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
+            p_t = cur_summary_p[suboptTreatment]
+            n_t = cur_summary_n[suboptTreatment]
+        p_value = (1. - stats.norm.cdf(fabs(p_c - p_t) / sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
         upliftScore = [maxDiff, p_value]
 
         bestGain = 0.0
         bestGainImp = 0.0
         bestAttribute = None
+        # keep mostly scalar when finding best split, then get the structural value after finding the best split
+        best_col = None
+        best_value = None
+        len_X = len(X)
+        len_X_val = len(X_val) if X_val is not None else 0
+
+        c_num_percentiles = [3, 5, 10, 20, 30, 50, 70, 80, 90, 95, 97]
+        c_cat_percentiles = [10, 50, 90]
 
         # last column is the result/target column, 2nd to the last is the treatment group
         columnCount = X.shape[1]
@@ -1236,108 +2066,147 @@ class UpliftTreeClassifier:
             lsUnique = np.unique(columnValues)
 
             if np.issubdtype(lsUnique.dtype, np.number):
+                is_split_by_gt = True
                 if len(lsUnique) > 10:
-                    lspercentile = np.percentile(columnValues, [3, 5, 10, 20, 30, 50, 70, 80, 90, 95, 97])
+                    lspercentile = np.percentile(columnValues, c_num_percentiles)
                 else:
-                    lspercentile = np.percentile(lsUnique, [10, 50, 90])
+                    lspercentile = np.percentile(lsUnique, c_cat_percentiles)
                 lsUnique = np.unique(lspercentile)
+            else:
+                # to split by equality check.
+                is_split_by_gt = False
 
             for value in lsUnique:
-                X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, col, value)
-    
+                len_X_l = group_counts_by_divide(columnValues, value, is_split_by_gt, treatment_idx, y, left_count_arr)
+                len_X_r = len_X - len_X_l
+
                 # check the split validity on min_samples_leaf  372
-                if (len(X_l) < min_samples_leaf or len(X_r) < min_samples_leaf):
+                if (len_X_l < min_samples_leaf or len_X_r < min_samples_leaf):
                     continue
                 # summarize notes
                 # Gain -- Entropy or Gini
-                p = float(len(X_l)) / len(X)
-                leftNodeSummary = self.tree_node_summary(w_l, y_l,
-                                                         min_samples_treatment=min_samples_treatment,
-                                                         n_reg=n_reg,
-                                                         parentNodeSummary=currentNodeSummary)
-                rightNodeSummary = self.tree_node_summary(w_r, y_r,
-                                                         min_samples_treatment=min_samples_treatment,
-                                                          n_reg=n_reg,
-                                                          parentNodeSummary=currentNodeSummary)
-                assert len(leftNodeSummary) == len(rightNodeSummary)
+                p = float(len_X_l) / len_X
+
+                # right branch group counts can be calculated from left branch counts and total counts
+                for i in range(2 * n_class):
+                    right_count_arr[i] = total_count_arr[i] - left_count_arr[i]
+
+                # left and right node summary, into the temporary buffers {left,right}_summary_{p,n}
+                self.tree_node_summary_from_counts(
+                    left_count_arr,
+                    left_summary_p, left_summary_n,
+                    cur_summary_p,
+                    1,
+                    min_samples_treatment,
+                    n_reg
+                    )
+
+                self.tree_node_summary_from_counts(
+                    right_count_arr,
+                    right_summary_p, right_summary_n,
+                    cur_summary_p,
+                    1,
+                    min_samples_treatment,
+                    n_reg
+                    )
 
                 if X_val is not None:
-                    X_val_l, X_val_r, w_val_l, w_val_r, y_val_l, y_val_r = self.divideSet(X_val, treatment_val_idx, y_val, col, value)
-                    leftNodeSummary_val = self.tree_node_summary(w_val_l, y_val_l,
-                                                             parentNodeSummary=currentNodeSummary)
-                    rightNodeSummary_val = self.tree_node_summary(w_val_r, y_val_r,
-                                                              parentNodeSummary=currentNodeSummary)
+                    len_X_val_l = group_counts_by_divide(X_val[:, col], value, is_split_by_gt, treatment_val_idx, y_val, val_left_count_arr)
+
+                    # right branch group counts can be calculated from left branch counts and total counts
+                    for i in range(2 * n_class):
+                        val_right_count_arr[i] = val_total_count_arr[i] - val_left_count_arr[i]
+
+                    self.tree_node_summary_from_counts(
+                        val_left_count_arr,
+                        val_left_summary_p, val_left_summary_n,
+                        cur_summary_p, # parentNodeSummary_p
+                        1 # has_parent_summary
+                    )
+
+                    self.tree_node_summary_from_counts(
+                        val_right_count_arr,
+                        val_right_summary_p, val_right_summary_n,
+                        cur_summary_p, # parentNodeSummary_p
+                        1 # has_parent_summary
+                    )
+
                     early_stopping_flag = False
-                    for k in range(len(leftNodeSummary_val)):
-                        if (abs(leftNodeSummary_val[k][0]-leftNodeSummary[k][0]) > min(leftNodeSummary_val[k][0],leftNodeSummary[k][0])/early_stopping_eval_diff_scale or
-                         abs(rightNodeSummary_val[k][0]-rightNodeSummary[k][0]) > min(rightNodeSummary_val[k][0],rightNodeSummary[k][0])/early_stopping_eval_diff_scale):
+                    for k in range(n_class):
+                        if (abs(val_left_summary_p[k] - left_summary_p[k]) >
+                                min(val_left_summary_p[k], left_summary_p[k])/early_stopping_eval_diff_scale or
+                            abs(val_right_summary_p[k] - right_summary_p[k]) > 
+                                min(val_right_summary_p[k], right_summary_p[k])/early_stopping_eval_diff_scale):
                             early_stopping_flag = True
                             break
+
                     if early_stopping_flag:
                         continue
 
                 # check the split validity on min_samples_treatment
-                node_mst = min([stat[1] for stat in leftNodeSummary + rightNodeSummary])
+                node_mst = min(np.min(left_summary_n), np.min(right_summary_n))
                 if node_mst < min_samples_treatment:
                     continue
 
                 # evaluate the split
-                if self.evaluationFunction == self.evaluate_CTS:
-                    leftScore1 = self.evaluationFunction(leftNodeSummary)
-                    rightScore2 = self.evaluationFunction(rightNodeSummary)
+                if self.arr_eval_func == self.arr_evaluate_CTS:
+                    leftScore1 = self.arr_eval_func(left_summary_p, left_summary_n)
+                    rightScore2 = self.arr_eval_func(right_summary_p, right_summary_n)
                     gain = (currentScore - p * leftScore1 - (1 - p) * rightScore2)
-                    gain_for_imp = (len(X) * currentScore - len(X_l) * leftScore1 - len(X_r) * rightScore2)
-                elif self.evaluationFunction == self.evaluate_DDP:
-                    leftScore1 = self.evaluationFunction(leftNodeSummary)
-                    rightScore2 = self.evaluationFunction(rightNodeSummary)
+                    gain_for_imp = (len_X * currentScore - len_X_l * leftScore1 - len_X_r * rightScore2)
+                elif self.arr_eval_func == self.arr_evaluate_DDP:
+                    leftScore1 = self.arr_eval_func(left_summary_p, left_summary_n)
+                    rightScore2 = self.arr_eval_func(right_summary_p, right_summary_n)
                     gain = np.abs(leftScore1 - rightScore2)
-                    gain_for_imp = np.abs(len(X_l) * leftScore1 - len(X_r) * rightScore2)
-                elif self.evaluationFunction == self.evaluate_IT:
-                    gain = self.evaluationFunction(leftNodeSummary, rightNodeSummary, w_l, w_r)
-                    gain_for_imp = gain * len(X)
-                elif self.evaluationFunction == self.evaluate_CIT:
-                    gain = self.evaluationFunction(currentNodeSummary, leftNodeSummary, rightNodeSummary, y_l, y_r, w_l, w_r, y, treatment_idx)
-                    gain_for_imp = gain * len(X)
-                elif self.evaluationFunction == self.evaluate_IDDP:
-                    leftScore1 = self.evaluationFunction(leftNodeSummary)
-                    rightScore2 = self.evaluationFunction(rightNodeSummary)
+                    gain_for_imp = np.abs(len_X_l * leftScore1 - len_X_r * rightScore2)
+                elif self.arr_eval_func == self.arr_evaluate_IT:
+                    gain = self.arr_eval_func(left_summary_p, left_summary_n, right_summary_p, right_summary_n)
+                    gain_for_imp = gain * len_X
+                elif self.arr_eval_func == self.arr_evaluate_CIT:
+                    gain = self.arr_eval_func(cur_summary_p, cur_summary_n,
+                                              left_summary_p, left_summary_n,
+                                              right_summary_p, right_summary_n)
+                    gain_for_imp = gain * len_X
+                elif self.arr_eval_func == self.arr_evaluate_IDDP:
+                    leftScore1 = self.arr_eval_func(left_summary_p, left_summary_n)
+                    rightScore2 = self.arr_eval_func(right_summary_p, right_summary_n)
                     gain = np.abs(leftScore1 - rightScore2) - np.abs(currentScore)
-                    gain_for_imp = (len(X_l) * leftScore1 + len(X_r) * rightScore2 - len(X) * np.abs(currentScore))
+                    gain_for_imp = (len_X_l * leftScore1 + len_X_r * rightScore2 - len_X * np.abs(currentScore))
                     if self.normalization:
                         # Normalize used divergence
                         currentDivergence = 2 * (gain + 1) / 3
-                        n_c = currentNodeSummary[0][1]
-                        n_c_left = leftNodeSummary[0][1]
-                        n_t = [tr[1] for tr in currentNodeSummary[1:]]
-                        n_t_left = [tr[1] for tr in leftNodeSummary[1:]]
-                        norm_factor = self.normI(n_c, n_c_left, n_t, n_t_left, alpha=0.9, currentDivergence=currentDivergence)
+                        norm_factor = self.arr_normI(cur_summary_n, left_summary_n, alpha=0.9, currentDivergence=currentDivergence)
                     else:
                         norm_factor = 1
                     gain = gain / norm_factor
                 else:
-                    leftScore1 = self.evaluationFunction(leftNodeSummary)
-                    rightScore2 = self.evaluationFunction(rightNodeSummary)
+                    leftScore1 = self.arr_eval_func(left_summary_p, left_summary_n)
+                    rightScore2 = self.arr_eval_func(right_summary_p, right_summary_n)
                     gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)
-                    gain_for_imp = (len(X_l) * leftScore1 + len(X_r) * rightScore2 - len(X) * currentScore)
+                    gain_for_imp = (len_X_l * leftScore1 + len_X_r * rightScore2 - len_X * currentScore)
                     if self.normalization:
-                        n_c = currentNodeSummary[0][1]
-                        n_c_left = leftNodeSummary[0][1]
-                        n_t = [tr[1] for tr in currentNodeSummary[1:]]
-                        n_t_left = [tr[1] for tr in leftNodeSummary[1:]]
-
-                        norm_factor = self.normI(n_c, n_c_left, n_t, n_t_left, alpha=0.9)
+                        norm_factor = self.arr_normI(cur_summary_n, left_summary_n, alpha=0.9)
                     else:
                         norm_factor = 1
                     gain = gain / norm_factor 
-                if (gain > bestGain and len(X_l) > min_samples_leaf and len(X_r) > min_samples_leaf):
+                if (gain > bestGain and len_X_l > min_samples_leaf and len_X_r > min_samples_leaf):
                     bestGain = gain
                     bestGainImp = gain_for_imp
-                    bestAttribute = (col, value)
-                    best_set_left = [X_l, w_l, y_l, None, None, None]
-                    best_set_right = [X_r, w_r, y_r, None, None, None]
-                    if X_val is not None:
-                        best_set_left = [X_l, w_l, y_l, X_val_l, w_val_l, y_val_l]
-                        best_set_right = [X_r, w_r, y_r, X_val_r, w_val_r, y_val_r]
+                    best_col = col
+                    best_value = value
+        
+        # after finding the best split col and value
+        if best_col is not None:
+            bestAttribute = (best_col, best_value)
+            # re-calculate the divideSet
+            X_l, X_r, w_l, w_r, y_l, y_r = self.divideSet(X, treatment_idx, y, best_col, best_value)
+            if X_val is not None:
+                X_val_l, X_val_r, w_val_l, w_val_r, y_val_l, y_val_r = self.divideSet(X_val, treatment_val_idx, y_val, best_col, best_value)
+                best_set_left = [X_l, w_l, y_l, X_val_l, w_val_l, y_val_l]
+                best_set_right = [X_r, w_r, y_r, X_val_r, w_val_r, y_val_r]
+            else:
+                best_set_left = [X_l, w_l, y_l, None, None, None]
+                best_set_right = [X_r, w_r, y_r, None, None, None]
 
         dcY = {'impurity': '%.3f' % currentScore, 'samples': '%d' % len(X)}
         # Add treatment size
@@ -1352,12 +2221,12 @@ class UpliftTreeClassifier:
             trueBranch = self.growDecisionTreeFrom(
                 *best_set_left, self.early_stopping_eval_diff_scale, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
-                n_reg=n_reg, parentNodeSummary=currentNodeSummary
+                n_reg=n_reg, parentNodeSummary_p=cur_summary_p
             )
             falseBranch = self.growDecisionTreeFrom(
                 *best_set_right, self.early_stopping_eval_diff_scale, max_depth, min_samples_leaf,
                 depth + 1, min_samples_treatment=min_samples_treatment,
-                n_reg=n_reg, parentNodeSummary=currentNodeSummary
+                n_reg=n_reg, parentNodeSummary_p=cur_summary_p
             )
 
             return DecisionTree(
