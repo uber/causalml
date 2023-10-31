@@ -173,7 +173,7 @@ te, lb, ub =  rl.estimate_ate(X=X, p=e, treatment=treatment, y=y)
 print('Average Treatment Effect (BaseRRegressor using XGBoost): {:.2f} ({:.2f}, {:.2f})'.format(te[0], lb[0], ub[0]))
 ```
 
-See the [Meta-learner example notebook](https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data.ipynb) for details.
+See the [Meta-learner example notebook](https://github.com/uber/causalml/blob/master/docs/examples/meta_learners_with_synthetic_data.ipynb) for details.
 
 
 ## Interpretable Causal ML
@@ -225,7 +225,7 @@ slearner.plot_shap_dependence(treatment_group='treatment_A',
   <img width="629px" height="618px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/shap_vis.png">
 </div>
 
-See the [feature interpretations example notebook](https://github.com/uber/causalml/blob/master/examples/feature_interpretations_example.ipynb) for details.
+See the [feature interpretations example notebook](https://github.com/uber/causalml/blob/master/docs/examples/feature_interpretations_example.ipynb) for details.
 
 ### Uplift Tree Visualization
 
@@ -248,7 +248,7 @@ Image(graph.create_png())
   <img width="800px" height="479px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/uplift_tree_vis.png">
 </div>
 
-See the [Uplift Tree visualization example notebook](https://github.com/uber/causalml/blob/master/examples/uplift_tree_visualization.ipynb) for details.
+See the [Uplift Tree visualization example notebook](https://github.com/uber/causalml/blob/master/docs/examples/uplift_tree_visualization.ipynb) for details.
 
 # Contributing
 

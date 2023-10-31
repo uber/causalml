@@ -48,6 +48,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.autosectionlabel",
     "sphinxcontrib.bibtex",
+    "nbsphinx",
 ]
 
 autodoc_mock_imports = ["_tkinter"]
