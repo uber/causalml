@@ -2,16 +2,18 @@ import logging
 import sys
 from typing import Union
 
-import numpy as np
 import tqdm
+import numpy as np
+from numpy import float32 as DTYPE
+
 from pathos.pools import ProcessPool as PPool
 from scipy.stats import norm
 from sklearn.base import RegressorMixin
-from sklearn.tree._tree import DTYPE
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 from causalml.inference.meta.utils import check_treatment_vector
+
 from ._tree import BaseCausalDecisionTree
 from ..utils import get_tree_leaves_mask, timeit
 
