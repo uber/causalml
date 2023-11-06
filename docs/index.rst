@@ -12,7 +12,6 @@ Contents:
     examples
     interpretation
     validation
-    visualization
     causalml
     references
     changelog

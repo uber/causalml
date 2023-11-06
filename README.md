@@ -1,12 +1,13 @@
 <div align="center">
-  <a href="https://github.com/uber/causalml"><img width="380px" height="140px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/causalml_logo.png"></a>
+  <a href="https://github.com/uber/causalml"><img width="380px" height="140px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/logo/causalml_logo.png"></a>
 </div>
 
 ------------------------------------------------------
 
 [![PyPI Version](https://badge.fury.io/py/causalml.svg)](https://pypi.org/project/causalml/)
-[![Build Status](https://travis-ci.com/uber/causalml.svg?token=t7jFKh1sKGtbqHWp2sGn&branch=master)](https://travis-ci.com/uber/causalml)
+[![Build Status](https://github.com/uber/causalml/actions/workflows/python-test.yaml/badge.svg)](https://github.com/uber/causalml/actions/workflows/python-test.yaml)
 [![Documentation Status](https://readthedocs.org/projects/causalml/badge/?version=latest)](http://causalml.readthedocs.io/en/latest/?badge=latest)
+[![Downloads](https://static.pepy.tech/badge/causalml)](https://pepy.tech/project/causalml)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3015/badge)](https://bestpractices.coreinfrastructure.org/projects/3015)
 
 
@@ -16,7 +17,7 @@ This project is stable and being incubated for long-term support. It may contain
 # Causal ML: A Python Package for Uplift Modeling and Causal Inference with ML
 
 **Causal ML** is a Python package that provides a suite of uplift modeling and causal inference methods using machine learning algorithms based on recent
-research. It provides a standard interface that allows user to estimate the Conditional Average Treatment Effect (CATE) or Individual Treatment
+research [[1]](#Literature). It provides a standard interface that allows user to estimate the Conditional Average Treatment Effect (CATE) or Individual Treatment
  Effect (ITE) from experimental or observational data. Essentially, it estimates the causal impact of intervention `T` on outcome `Y` for users
  with observed features `X`, without strong assumptions on the model form. Typical use cases include
 
@@ -27,37 +28,110 @@ research. It provides a standard interface that allows user to estimate the Cond
 The package currently supports the following methods
 
 * **Tree-based algorithms**
-    * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square
-    * Uplift tree/random forests on Contextual Treatment Selection
+    * Uplift tree/random forests on KL divergence, Euclidean Distance, and Chi-Square [[2]](#Literature)
+    * Uplift tree/random forests on Contextual Treatment Selection [[3]](#Literature)
+    * Uplift tree/random forests on DDP [[4]](#Literature)
+    * Uplift tree/random forests on IDDP [[5]](#Literature)
+    * Interaction Tree [[6]](#Literature)
+    * Conditional Interaction Tree [[7]](#Literature)
+    * Causal Tree [[8]](#Literature) - Work-in-progress
 * **Meta-learner algorithms**
-    * S-learner
-    * T-learner
-    * X-learner
-    * R-learner
+    * S-learner [[9]](#Literature)
+    * T-learner [[9]](#Literature)
+    * X-learner [[9]](#Literature)
+    * R-learner [[10]](#Literature)
+    * Doubly Robust (DR) learner [[11]](#Literature)
+    * TMLE learner [[12]](#Literature)
+* **Instrumental variables algorithms**
+    * 2-Stage Least Squares (2SLS)
+    * Doubly Robust (DR) IV [[13]](#Literature)
+* **Neural-network-based algorithms**
+    * CEVAE [[14]](#Literature)
+    * DragonNet [[15]](#Literature) - with `causalml[tf]` installation (see [Installation](#installation))
 
 
 # Installation
 
-## Prerequisites
+Installation with `conda` is recommended.
 
-Install dependencies:
-```
-$ pip install -r requirements.txt
-```
+`conda` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
 
-Install from pip:
+## Install using `conda`:
 
-```
-$ pip install causalml
-```
-
-Install from source:
+Install `conda` with:
 
 ```
-$ git clone https://github.com/uber/causalml.git
-$ cd causalml
-$ python setup.py build_ext --inplace
-$ python setup.py install
+wget https://repo.anaconda.com/miniconda/Miniconda3-py38_23.5.0-3-Linux-x86_64.sh
+bash Miniconda3-py38_23.5.0-3-Linux-x86_64.sh -b
+source miniconda3/bin/activate 
+conda init
+source ~/.bashrc 
+```
+
+### Install from `conda-forge`
+Directly install from the conda-forge channel using conda.
+
+```sh
+conda install -c conda-forge causalml
+```
+
+### Install with the `conda` virtual environment
+This will create a new `conda` virtual environment named `causalml-[tf-]py3x`, where `x` is in `[6, 7, 8, 9]`. e.g. `causalml-py37` or `causalml-tf-py38`. If you want to change the name of the environment, update the relevant YAML file in `envs/`
+
+```bash
+git clone https://github.com/uber/causalml.git
+cd causalml/envs/
+conda env create -f environment-py38.yml	# for the virtual environment with Python 3.8 and CausalML
+conda activate causalml-py38
+(causalml-py38)
+```
+
+### Install `causalml` with `tensorflow`
+```bash
+git clone https://github.com/uber/causalml.git
+cd causalml/envs/
+conda env create -f environment-tf-py38.yml	# for the virtual environment with Python 3.8 and CausalML
+conda activate causalml-tf-py38
+(causalml-tf-py38) pip install -U numpy			# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
+```
+
+## Install from `PyPI`:
+
+```bash
+pip install causalml
+```
+
+### Install `causalml` with `tensorflow`
+```bash
+pip install causalml[tf]
+pip install -U numpy							# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
+```
+
+## Install from source:
+
+### Create a clean conda environment
+
+```
+conda create -n causalml-py38 python=3.8
+conda activate causalml-py38
+conda install -c conda-forge cxx-compiler
+conda install python-graphviz
+conda install -c conda-forge xorg-libxrender
+```
+
+Then:
+
+```bash
+git clone https://github.com/uber/causalml.git
+cd causalml
+pip install .
+python setup.py build_ext --inplace
+```
+
+with `tensorflow`:
+
+```bash
+pip install .[tf]
 ```
 
 
@@ -91,7 +165,7 @@ te, lb, ub = nn.estimate_ate(X, treatment, y)
 print('Average Treatment Effect (Neural Network (MLP)): {:.2f} ({:.2f}, {:.2f})'.format(te[0], lb[0], ub[0]))
 
 xl = BaseXRegressor(learner=XGBRegressor(random_state=42))
-te, lb, ub = xl.estimate_ate(X, e, treatment, y)
+te, lb, ub = xl.estimate_ate(X, treatment, y, e)
 print('Average Treatment Effect (BaseXRegressor using XGBoost): {:.2f} ({:.2f}, {:.2f})'.format(te[0], lb[0], ub[0]))
 
 rl = BaseRRegressor(learner=XGBRegressor(random_state=42))
@@ -110,6 +184,11 @@ Causal ML provides methods to interpret the treatment effect models trained as f
 
 ```python
 from causalml.inference.meta import BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor
+from causalml.dataset.regression import synthetic_data
+
+# Load synthetic data
+y, X, treatment, tau, b, e = synthetic_data(mode=1, n=10000, p=25, sigma=0.5)
+w_multi = np.array(['treatment_A' if x==1 else 'control' for x in treatment]) # customize treatment/control names
 
 slearner = BaseSRegressor(LGBMRegressor(), control_name='control')
 slearner.estimate_ate(X, w_multi, y)
@@ -133,7 +212,7 @@ shap_slearner = slearner.get_shap_values(X=X, tau=slearner_tau)
 slearner.plot_shap_values(X=X, tau=slearner_tau)
 
 # Plot shap values WITH specifying shap_dict
-slearner.plot_shap_values(shap_dict=shap_slearner)
+slearner.plot_shap_values(X=X, shap_dict=shap_slearner)
 
 # interaction_idx set to 'auto' (searches for feature with greatest approximate interaction)
 slearner.plot_shap_dependence(treatment_group='treatment_A',
@@ -171,7 +250,6 @@ Image(graph.create_png())
 
 See the [Uplift Tree visualization example notebook](https://github.com/uber/causalml/blob/master/examples/uplift_tree_visualization.ipynb) for details.
 
-
 # Contributing
 
 We welcome community contributors to the project. Before you start, please read our [code of conduct](https://github.com/uber/causalml/blob/master/CODE_OF_CONDUCT.md) and check out [contributing guidelines](./CONTRIBUTING.md) first.
@@ -192,6 +270,14 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](https:
 ## Documentation
 * [Causal ML API documentation](https://causalml.readthedocs.io/en/latest/about.html)
 
+## Conference Talks and Publications by CausalML Team
+* (Talk) Introduction to CausalML at [Causal Data Science Meeting 2021](https://www.causalscience.org/meeting/program/day-2/)
+* (Talk) Introduction to CausalML at [2021 Conference on Digital Experimentation @ MIT (CODE@MIT)](https://ide.mit.edu/events/2021-conference-on-digital-experimentation-mit-codemit/)
+* (Talk) Causal Inference and Machine Learning in Practice with EconML and CausalML: Industrial Use Cases at Microsoft, TripAdvisor, Uber at [KDD 2021 Tutorials](https://kdd.org/kdd2021/tutorials) ([website and slide links](https://causal-machine-learning.github.io/kdd2021-tutorial/))
+* (Publication) CausalML White Paper [Causalml: Python package for causal machine learning](https://arxiv.org/abs/2002.11631)
+* (Publication) [Uplift Modeling for Multiple Treatments with Cost Optimization](https://ieeexplore.ieee.org/document/8964199) at [2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA)](http://203.170.84.89/~idawis33/dsaa2019/preliminary-program/)
+* (Publication) [Feature Selection Methods for Uplift Modeling](https://arxiv.org/abs/2005.03447)
+
 ## Citation
 To cite CausalML in publications, you can refer to the following sources:
 
@@ -209,14 +295,26 @@ Bibtex:
 >}
 
 
-## Papers
+## Literature
 
-* Nicholas J Radcliffe and Patrick D Surry. Real-world uplift modelling with significance based uplift trees. White Paper TR-2011-1, Stochastic Solutions, 2011.
-* Yan Zhao, Xiao Fang, and David Simchi-Levi. Uplift modeling with multiple treatments and general response types. Proceedings of the 2017
-SIAM International Conference on Data Mining, SIAM, 2017.
-* Sören R. Künzel, Jasjeet S. Sekhon, Peter J. Bickel, and Bin Yu. Metalearners for estimating heterogeneous treatment effects using machine learning.
-Proceedings of the National Academy of Sciences, 2019.
-* Xinkun Nie and Stefan Wager. Quasi-Oracle Estimation of Heterogeneous Treatment Effects. Atlantic Causal Inference Conference, 2018.
+1. Chen, Huigang, Totte Harinen, Jeong-Yoon Lee, Mike Yung, and Zhenyu Zhao. "Causalml: Python package for causal machine learning." arXiv preprint arXiv:2002.11631 (2020).
+2. Radcliffe, Nicholas J., and Patrick D. Surry. "Real-world uplift modelling with significance-based uplift trees." White Paper TR-2011-1, Stochastic Solutions (2011): 1-33.
+3. Zhao, Yan, Xiao Fang, and David Simchi-Levi. "Uplift modeling with multiple treatments and general response types." Proceedings of the 2017 SIAM International Conference on Data Mining. Society for Industrial and Applied Mathematics, 2017.
+4. Hansotia, Behram, and Brad Rukstales. "Incremental value modeling." Journal of Interactive Marketing 16.3 (2002): 35-46.
+5. Jannik Rößler, Richard Guse, and Detlef Schoder. "The Best of Two Worlds: Using Recent Advances from Uplift Modeling and Heterogeneous Treatment Effects to Optimize Targeting Policies". International Conference on Information Systems (2022)
+6. Su, Xiaogang, et al. "Subgroup analysis via recursive partitioning." Journal of Machine Learning Research 10.2 (2009).
+7. Su, Xiaogang, et al. "Facilitating score and causal inference trees for large observational studies." Journal of Machine Learning Research 13 (2012): 2955.
+8. Athey, Susan, and Guido Imbens. "Recursive partitioning for heterogeneous causal effects." Proceedings of the National Academy of Sciences 113.27 (2016): 7353-7360.
+9. Künzel, Sören R., et al. "Metalearners for estimating heterogeneous treatment effects using machine learning." Proceedings of the national academy of sciences 116.10 (2019): 4156-4165.
+10. Nie, Xinkun, and Stefan Wager. "Quasi-oracle estimation of heterogeneous treatment effects." arXiv preprint arXiv:1712.04912 (2017).
+11. Bang, Heejung, and James M. Robins. "Doubly robust estimation in missing data and causal inference models." Biometrics 61.4 (2005): 962-973.
+12. Van Der Laan, Mark J., and Daniel Rubin. "Targeted maximum likelihood learning." The international journal of biostatistics 2.1 (2006).
+13. Kennedy, Edward H. "Optimal doubly robust estimation of heterogeneous causal effects." arXiv preprint arXiv:2004.14497 (2020).
+14. Louizos, Christos, et al. "Causal effect inference with deep latent-variable models." arXiv preprint arXiv:1705.08821 (2017).
+15. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
+16. Zhao, Zhenyu, Yumin Zhang, Totte Harinen, and Mike Yung. "Feature Selection Methods for Uplift Modeling." arXiv preprint arXiv:2005.03447 (2020).
+17. Zhao, Zhenyu, and Totte Harinen. "Uplift modeling for multiple treatments with cost optimization." In 2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA), pp. 422-431. IEEE, 2019.
+ 
 
 ## Related projects
 

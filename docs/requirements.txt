@@ -1,6 +1,7 @@
 Cython>=0.28.0
 numpy>=0.16.0
+scikit-learn
 matplotlib
 sphinx
 sphinx_rtd_theme
-sphinxcontrib-bibtex
+sphinxcontrib-bibtex<2.0.0

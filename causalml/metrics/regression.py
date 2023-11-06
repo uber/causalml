@@ -1,13 +1,13 @@
 import logging
 import numpy as np
 from sklearn.metrics import mean_squared_error as mse
-from sklearn.metrics import mean_absolute_error as mae # noqa
-from sklearn.metrics import r2_score    # noqa
+from sklearn.metrics import mean_absolute_error as mae  # noqa
+from sklearn.metrics import r2_score  # noqa
 
 from .const import EPS
 
 
-logger = logging.getLogger('causalml')
+logger = logging.getLogger("causalml")
 
 
 def ape(y, p):
@@ -47,7 +47,7 @@ def smape(y, p):
     Returns:
         e (numpy.float64): sMAPE
     """
-    return 2. * np.mean(np.abs(y - p) / (np.abs(y) + np.abs(p)))
+    return 2.0 * np.mean(np.abs(y - p) / (np.abs(y) + np.abs(p)))
 
 
 def rmse(y, p):
@@ -91,7 +91,7 @@ def gini(y, p):
     # get Lorenz curves
     l_true = np.cumsum(true_order) / np.sum(true_order)
     l_pred = np.cumsum(pred_order) / np.sum(pred_order)
-    l_ones = np.linspace(1/n_samples, 1, n_samples)
+    l_ones = np.linspace(1 / n_samples, 1, n_samples)
 
     # get Gini coefficients (area between curves)
     g_true = np.sum(l_ones - l_true)
@@ -101,7 +101,9 @@ def gini(y, p):
     return g_pred / g_true
 
 
-def regression_metrics(y, p, w=None, metrics={'RMSE': rmse, 'sMAPE': smape, 'Gini': gini}):
+def regression_metrics(
+    y, p, w=None, metrics={"RMSE": rmse, "sMAPE": smape, "Gini": gini}
+):
     """Log metrics for regressors.
 
     Args:
@@ -119,7 +121,7 @@ def regression_metrics(y, p, w=None, metrics={'RMSE': rmse, 'sMAPE': smape, 'Gin
             assert y.shape[0] == w.shape[0]
             if w.dtype != bool:
                 w = w == 1
-            logger.info('{:>8s}   (Control): {:10.4f}'.format(name, func(y[~w], p[~w])))
-            logger.info('{:>8s} (Treatment): {:10.4f}'.format(name, func(y[w], p[w])))
+            logger.info("{:>8s}   (Control): {:10.4f}".format(name, func(y[~w], p[~w])))
+            logger.info("{:>8s} (Treatment): {:10.4f}".format(name, func(y[w], p[w])))
         else:
-            logger.info('{:>8s}: {:10.4f}'.format(name, func(y, p)))
+            logger.info("{:>8s}: {:10.4f}".format(name, func(y, p)))

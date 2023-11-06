@@ -5,7 +5,7 @@ from .const import EPS
 from .regression import regression_metrics
 
 
-logger = logging.getLogger('causalml')
+logger = logging.getLogger("causalml")
 
 
 def logloss(y, p):
@@ -22,7 +22,9 @@ def logloss(y, p):
     return log_loss(y, p)
 
 
-def classification_metrics(y, p, w=None, metrics={'AUC': roc_auc_score, 'Log Loss': logloss}):
+def classification_metrics(
+    y, p, w=None, metrics={"AUC": roc_auc_score, "Log Loss": logloss}
+):
     """Log metrics for classifiers.
 
     Args:
