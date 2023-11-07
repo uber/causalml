@@ -411,9 +411,7 @@ def make_uplift_classification_logistic(
     
     # generate Y ------------------------------------------------------------#
     df1['conversion_prob'] = np.clip(df1['conversion_prob'].values, 0 , 1)
-    Y1 = np.random.binomial(1, df1['conversion_prob'].values)
-
-    df1[y_name] = Y1    
+    df1[y_name] = np.random.binomial(1, df1['conversion_prob'].values)
 
     return df1, x_name
 
