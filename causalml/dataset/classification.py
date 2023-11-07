@@ -410,8 +410,7 @@ def make_uplift_classification_logistic(
         df1['%s_true_effect'%(treatment_key_i)] = df1['%s_conversion_prob'%(treatment_key_i)].values - df1['control_conversion_prob'].values
     
     # generate Y ------------------------------------------------------------#
-    df1['conversion_prob'] = [max(0, min(1, xi)) 
-                              for xi in df1['conversion_prob'].values]
+    df1['conversion_prob'] = np.clip(df1['conversion_prob'].values, 0 , 1)
     Y1 = np.random.binomial(1, df1['conversion_prob'].values)
 
     df1[y_name] = Y1    
