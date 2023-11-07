@@ -115,11 +115,10 @@ def _fixed_transformation(fs, x, f_index=0):
     f_index : int, optional
         The function index to be used to select a transformation function.
     """
-    if f_index<len(fs):
-        fi = [f_index]
-    else:
-        fi = np.random.choice(range(len(fs)), 1)
-    y = fs[fi[0]](x)
+    try:
+        y = fs[f_index](x)
+    except IndexError:
+        y = fs[np.asscalar(np.random.choice(len(fs), 1))](x)
     y = _standardize(y)
     return y 
 
