@@ -383,9 +383,6 @@ def make_uplift_classification_logistic(
             # coefficient 
             coef_uplift = []
             for ci in range(n_uplift_dict[treatment_key_i]):
-                #rcoef = [0]
-                #while np.abs(rcoef) < 0.1:
-                #    rcoef = np.random.uniform(-1, 1, 1)
                 rcoef = [0.5]
                 coef_uplift.append(rcoef[0])
             x_uplift = df1.loc[:,x_name_uplift_transformed_dict[treatment_key_i]].values
