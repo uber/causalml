@@ -75,7 +75,7 @@ New contributors
 -----------------
 - CausalML surpassed `1MM downloads <https://pepy.tech/project/causalml>`_ on PyPI and `3,200 stars <https://github.com/uber/causalml/stargazers>`_ on GitHub. Thanks for choosing CausalML and supporting us on GitHub.
 - We have 7 new contributors @saiwing-yeung, @lixuan12315, @aldenrogers, @vincewu51, @AlkanSte, @enzoliao, and @alexander-pv. Thanks for your contributions!
-- @alexander-pv revamped `CausalTreeRegressor` and added `CausalRandomForestRegressor` with more seamless integration with `scikit-learn`'s Cython tree module. He also added integration with `shap` for causal tree/ random forest interpretation. Please check out the `example notebook <https://github.com/uber/causalml/blob/master/examples/causal_trees_interpretation.ipynb>`_.
+- @alexander-pv revamped `CausalTreeRegressor` and added `CausalRandomForestRegressor` with more seamless integration with `scikit-learn`'s Cython tree module. He also added integration with `shap` for causal tree/ random forest interpretation. Please check out the `example notebook <https://github.com/uber/causalml/blob/master/docs/examples/causal_trees_interpretation.ipynb>`_.
 - We dropped the support for Python 3.6 and removed its test workflow.
 
 Updates

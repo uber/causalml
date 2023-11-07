@@ -1,5 +1,5 @@
 Welcome to Causal ML's documentation
-================================================
+====================================
 
 Contents:
 
@@ -9,6 +9,7 @@ Contents:
     about
     methodology
     installation
+    quickstart
     examples
     interpretation
     validation
