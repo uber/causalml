@@ -4,6 +4,7 @@ import pandas as pd
 from sklearn.datasets import make_classification
 from scipy.optimize import fsolve
 from scipy.special import expit
+from scipy.special import logit
 
 #------ Define a list of functions for feature transformation
 # @staticmethod
@@ -367,7 +368,7 @@ def make_uplift_classification_logistic(
         coef_classify.append(rcoef[0])
     x_classify = df1[x_informative_transformed].values
     p1 = positive_class_proportion
-    a10 = np.log(p1/(1.-p1))
+    a10 = logit(p1)
     err = np.random.normal(0, error_std, df1.shape[0])
     xb_array = (x_classify * coef_classify).sum(axis=1) + err
     # solve for the constant value so that the output metric mean equal to the function input positive_class_proportion
