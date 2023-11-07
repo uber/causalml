@@ -112,7 +112,7 @@ pip install -U numpy							# this step is necessary to fix [#338](https://github
 ### Create a clean conda environment
 
 ```
-conda create -n causalml-py38 python=3.8
+conda create -n causalml-py38 -y python=3.8
 conda activate causalml-py38
 conda install -c conda-forge cxx-compiler
 conda install python-graphviz
