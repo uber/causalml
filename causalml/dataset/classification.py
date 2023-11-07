@@ -383,8 +383,7 @@ def make_uplift_classification_logistic(
             # coefficient 
             coef_uplift = []
             for ci in range(n_uplift_dict[treatment_key_i]):
-                rcoef = [0.5]
-                coef_uplift.append(rcoef[0])
+                coef_uplift.append(0.5)
             x_uplift = df1.loc[:,x_name_uplift_transformed_dict[treatment_key_i]].values
             p2 = mean_dict[treatment_key_i]
             a20 = np.log(p2/(1.- p2)) - a1
