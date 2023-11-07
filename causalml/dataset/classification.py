@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from sklearn.datasets import make_classification
 from scipy.optimize import fsolve
+from scipy.special import expit
 
 #------ Define a list of functions for feature transformation
 # @staticmethod
@@ -154,7 +155,7 @@ def _softmax(z,p,xb):
     xb : list 
         An array, with each element as the sum of product of coefficient and feature value 
     """
-    sm_arr = 1/(1+np.exp(-(z+np.array(xb))))
+    sm_arr = expit(z + np.array(xb))
     res = p - np.mean(sm_arr)
     return res
 
