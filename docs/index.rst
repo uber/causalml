@@ -9,6 +9,7 @@ Contents:
     about
     methodology
     installation
+    quickstart
     examples
     interpretation
     validation
