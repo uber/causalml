@@ -651,8 +651,3 @@ def make_uplift_classification(
     df_res[y_name] = Y
     df_res["treatment_effect"] = Y - Y1
     return df_res, x_name
-
-
-
-
-
