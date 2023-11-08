@@ -5,6 +5,7 @@ from .regression import simulate_easy_propensity_difficult_baseline
 from .regression import simulate_unrelated_treatment_control
 from .regression import simulate_hidden_confounder
 from .classification import make_uplift_classification
+from .classification import make_uplift_classification_logistic
 
 from .synthetic import get_synthetic_preds, get_synthetic_preds_holdout
 from .synthetic import get_synthetic_summary, get_synthetic_summary_holdout
