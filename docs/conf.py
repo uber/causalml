@@ -207,6 +207,10 @@ htmlhelp_basename = "causalml_doc"
 
 # -- Options for LaTeX output ------------------------------------------
 
+# To resolve a Unicode error as suggested in
+# https://docs.readthedocs.io/en/stable/guides/pdf-non-ascii-languages.html
+latex_engine = "xelatex"
+
 latex_elements = {
     # The paper size ('letterpaper' or 'a4paper').
     # 'papersize': 'letterpaper',
