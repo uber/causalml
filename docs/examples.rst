@@ -25,3 +25,4 @@ Working example notebooks are available in the `example folder <https://github.c
     examples/uplift_tree_visualization
     examples/uplift_trees_with_synthetic_data
     examples/validation_with_tmle
+    examples/logistic_regression_based_data_generation_for_uplift_classification
