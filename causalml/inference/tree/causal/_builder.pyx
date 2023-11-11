@@ -1,3 +1,4 @@
+# distutils: language = c++
 # cython: cdivision=True
 # cython: boundscheck=False
 # cython: wraparound=False
@@ -6,10 +7,17 @@
 
 
 from libc.stdint cimport SIZE_MAX
+from libcpp cimport bool
+from libcpp.stack cimport stack
+from libcpp.vector cimport vector
+from libcpp.algorithm cimport pop_heap
+from libcpp.algorithm cimport push_heap
 
 import numpy as np
 cimport numpy as np
 np.import_array()
+
+from .._tree._utils cimport FrontierRecord, StackRecord
 
 
 cdef double INFINITY = np.inf
@@ -24,7 +32,6 @@ TREE_LEAF = -1
 TREE_UNDEFINED = -2
 cdef SIZE_t _TREE_LEAF = TREE_LEAF
 cdef SIZE_t _TREE_UNDEFINED = TREE_UNDEFINED
-cdef SIZE_t INITIAL_STACK_SIZE = 10
 
 
 cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
@@ -95,19 +102,24 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef SIZE_t max_depth_seen = -1
         cdef int rc = 0
 
-        cdef Stack stack = Stack(INITIAL_STACK_SIZE)
+        cdef stack[StackRecord] builder_stack
         cdef StackRecord stack_record
 
         with nogil:
             # push root node onto stack
-            rc = stack.push(0, n_node_samples, 0, _TREE_UNDEFINED, 0, INFINITY, 0)
-            if rc == -1:
-                # got return code -1 - out-of-memory
-                with gil:
-                    raise MemoryError()
+            builder_stack.push({
+                "start": 0,
+                "end": n_node_samples,
+                "depth": 0,
+                "parent": _TREE_UNDEFINED,
+                "is_left": 0,
+                "impurity": INFINITY,
+                "n_constant_features": 0
+            })
 
-            while not stack.is_empty():
-                stack.pop(&stack_record)
+            while not builder_stack.empty():
+                stack_record = builder_stack.top()
+                builder_stack.pop()
 
                 start = stack_record.start
                 end = stack_record.end
@@ -158,16 +170,26 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
 
                 if not is_leaf:
                     # Push right child on stack
-                    rc = stack.push(split.pos, end, depth + 1, node_id, 0,
-                                    split.impurity_right, n_constant_features)
-                    if rc == -1:
-                        break
+                    builder_stack.push({
+                        "start": split.pos,
+                        "end": end,
+                        "depth": depth + 1,
+                        "parent": node_id,
+                        "is_left": 0,
+                        "impurity": split.impurity_right,
+                        "n_constant_features": n_constant_features
+                    })
 
                     # Push left child on stack
-                    rc = stack.push(start, split.pos, depth + 1, node_id, 1,
-                                    split.impurity_left, n_constant_features)
-                    if rc == -1:
-                        break
+                    builder_stack.push({
+                        "start": start,
+                        "end": split.pos,
+                        "depth": depth + 1,
+                        "parent": node_id,
+                        "is_left": 1,
+                        "impurity": split.impurity_left,
+                        "n_constant_features": n_constant_features
+                    })
 
                 if depth > max_depth_seen:
                     max_depth_seen = depth
@@ -181,15 +203,20 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
             raise MemoryError()
 
 
-cdef inline int _add_to_frontier(PriorityHeapRecord* rec,
-                                 PriorityHeap frontier) nogil except -1:
-    """Adds record ``rec`` to the priority queue ``frontier``
-    Returns -1 in case of failure to allocate memory (and raise MemoryError)
-    or 0 otherwise.
-    """
-    return frontier.push(rec.node_id, rec.start, rec.end, rec.pos, rec.depth,
-                         rec.is_leaf, rec.improvement, rec.impurity,
-                         rec.impurity_left, rec.impurity_right)
+cdef inline bool _compare_records(
+    const FrontierRecord& left,
+    const FrontierRecord& right,
+):
+    return left.improvement < right.improvement
+
+
+cdef inline void _add_to_frontier(
+    FrontierRecord rec,
+    vector[FrontierRecord]& frontier,
+) noexcept nogil:
+    """Adds record `rec` to the priority queue `frontier`."""
+    frontier.push_back(rec)
+    push_heap(frontier.begin(), frontier.end(), &_compare_records)
 
 
 cdef class BestFirstCausalTreeBuilder(TreeBuilder):
@@ -233,10 +260,10 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         # Recursive partition (without actual recursion)
         splitter.init(X, y, sample_weight_ptr)
 
-        cdef PriorityHeap frontier = PriorityHeap(INITIAL_STACK_SIZE)
-        cdef PriorityHeapRecord record
-        cdef PriorityHeapRecord split_node_left
-        cdef PriorityHeapRecord split_node_right
+        cdef vector[FrontierRecord] frontier
+        cdef FrontierRecord record
+        cdef FrontierRecord split_node_left
+        cdef FrontierRecord split_node_right
 
         cdef SIZE_t n_node_samples = splitter.n_samples
         cdef SIZE_t max_split_nodes = max_leaf_nodes - 1
@@ -255,14 +282,12 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
                                       INFINITY, IS_FIRST, IS_LEFT, NULL, 0,
                                       &split_node_left)
             if rc >= 0:
-                rc = _add_to_frontier(&split_node_left, frontier)
+                _add_to_frontier(split_node_left, frontier)
 
-            if rc == -1:
-                with gil:
-                    raise MemoryError()
-
-            while not frontier.is_empty():
-                frontier.pop(&record)
+            while not frontier.empty():
+                pop_heap(frontier.begin(), frontier.end(), &_compare_records)
+                record = frontier.back()
+                frontier.pop_back()
 
                 node = &tree.nodes[record.node_id]
                 is_leaf = (record.is_leaf or max_split_nodes <= 0)
@@ -304,13 +329,8 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
                         break
 
                     # Add nodes to queue
-                    rc = _add_to_frontier(&split_node_left, frontier)
-                    if rc == -1:
-                        break
-
-                    rc = _add_to_frontier(&split_node_right, frontier)
-                    if rc == -1:
-                        break
+                    _add_to_frontier(split_node_left, frontier)
+                    _add_to_frontier(split_node_right, frontier)
 
                 if record.depth > max_depth_seen:
                     max_depth_seen = record.depth
@@ -328,7 +348,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
                                     SIZE_t start, SIZE_t end, double impurity,
                                     bint is_first, bint is_left, Node* parent,
                                     SIZE_t depth,
-                                    PriorityHeapRecord* res) nogil except -1:
+                                    FrontierRecord* res) nogil except -1:
         """Adds node w/ partition ``[start, end)`` to the frontier. """
         cdef SplitRecord split
         cdef SIZE_t node_id
