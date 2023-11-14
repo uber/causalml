@@ -114,10 +114,10 @@ def get_cumlift(
             sorted_df["cumsum_ct"] = sorted_df.index.values - sorted_df["cumsum_tr"]
             sorted_df["cumsum_y_tr"] = (
                 sorted_df[outcome_col] * sorted_df[treatment_col]
-            ).cumsum()
+            ).fillna(0).cumsum(skipna=True).astype(float)
             sorted_df["cumsum_y_ct"] = (
                 sorted_df[outcome_col] * (1 - sorted_df[treatment_col])
-            ).cumsum()
+            ).fillna(0).cumsum(skipna=True).astype(float)
 
             lift.append(
                 sorted_df["cumsum_y_tr"] / sorted_df["cumsum_tr"]
