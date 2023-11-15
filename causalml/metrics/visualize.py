@@ -119,7 +119,7 @@ def get_cumlift(
                 .astype(float)
             )
             sorted_df["cumsum_y_ct"] = (
-               (sorted_df[outcome_col] * (1 - sorted_df[treatment_col]))
+                (sorted_df[outcome_col] * (1 - sorted_df[treatment_col]))
                 .fillna(0)
                 .cumsum(skipna=True)
                 .astype(float)
