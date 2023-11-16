@@ -134,3 +134,4 @@ dependencies:
     - wrapt==1.12.1
     - xgboost==1.4.1
     - causalml>=0.10.0
+    - -i https://pypi.tuna.tsinghua.edu.cn/simple
