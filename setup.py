@@ -43,7 +43,7 @@ extensions = [
 packages = find_packages(exclude=["tests", "tests.*"])
 
 nthreads = mp.cpu_count()
-if os.name == 'nt':
+if os.name == "nt":
     nthreads = 0
 
 setup(
