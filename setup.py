@@ -1,4 +1,5 @@
 import multiprocessing as mp
+import os
 from setuptools import dist, setup, find_packages
 from setuptools.extension import Extension
 
@@ -41,8 +42,12 @@ extensions = [
 
 packages = find_packages(exclude=["tests", "tests.*"])
 
+nthreads = mp.cpu_count()
+if os.name == "nt":
+    nthreads = 0
+
 setup(
     packages=packages,
-    ext_modules=cythonize(extensions, annotate=True, nthreads=mp.cpu_count()),
+    ext_modules=cythonize(extensions, annotate=True, nthreads=nthreads),
     include_dirs=[np_get_include()],
 )
