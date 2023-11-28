@@ -84,7 +84,7 @@ class TestCausalTreeRegressor(CausalTreeBase):
             treatment_col="is_treated",
             treatment_effect_col="treatment_effect",
         )
-        assert df_qini["pred"] > df_qini["Random"]
+        assert df_qini["ctree_ite_pred"] > df_qini["Random"]
 
     @pytest.mark.parametrize("return_ci", (False, True))
     @pytest.mark.parametrize("bootstrap_size", (500, 800))
@@ -165,7 +165,7 @@ class TestCausalRandomForestRegressor(CausalTreeBase):
             treatment_col="is_treated",
             treatment_effect_col="treatment_effect",
         )
-        assert df_qini["pred"] > df_qini["Random"]
+        assert df_qini["crforest_ite_pred"] > df_qini["Random"]
 
     @pytest.mark.parametrize("n_estimators", (5,))
     def test_predict(self, generate_regression_data, n_estimators):
