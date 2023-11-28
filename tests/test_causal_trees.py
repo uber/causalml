@@ -80,7 +80,7 @@ class TestCausalTreeRegressor(CausalTreeBase):
         )
         df_qini = qini_score(
             df_result,
-            outcome_col="outcome",
+            outcome_col="ctree_ite_pred",
             treatment_col="is_treated",
             treatment_effect_col="treatment_effect",
         )
@@ -161,7 +161,7 @@ class TestCausalRandomForestRegressor(CausalTreeBase):
         )
         df_qini = qini_score(
             df_result,
-            outcome_col="outcome",
+            outcome_col="crforest_ite_pred",
             treatment_col="is_treated",
             treatment_effect_col="treatment_effect",
         )

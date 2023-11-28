@@ -39,7 +39,7 @@ def test_CEVAE():
     ite = cevae.predict(X).flatten()
 
     auuc_metrics = pd.DataFrame(
-        {"ite": ite, "W": treatment, "y": y, "treatment_effect_col": tau}
+        {"ite": ite, "W": treatment, "y": y, "tau": tau}
     )
 
     cumgain = get_cumgain(

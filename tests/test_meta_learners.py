@@ -123,7 +123,7 @@ def test_BaseSRegressor(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -179,7 +179,7 @@ def test_BaseTLearner(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -229,7 +229,7 @@ def test_BaseTRegressor(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -268,7 +268,7 @@ def test_MLPTRegressor(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -307,7 +307,7 @@ def test_XGBTRegressor(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -346,7 +346,7 @@ def test_BaseXLearner(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -398,7 +398,7 @@ def test_BaseXRegressor(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -439,7 +439,7 @@ def test_BaseXLearner_without_p(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -478,7 +478,7 @@ def test_BaseXRegressor_without_p(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -517,7 +517,7 @@ def test_BaseRLearner(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -568,7 +568,7 @@ def test_BaseRRegressor(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -607,7 +607,7 @@ def test_BaseRLearner_without_p(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -646,7 +646,7 @@ def test_BaseRRegressor_without_p(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
@@ -698,7 +698,7 @@ def test_BaseSClassifier(generate_classification_data):
             "tau_pred": tau_pred.flatten(),
             "W": df_test["treatment_group_key"].values,
             CONVERSION: df_test[CONVERSION].values,
-            "treatment_effect_col": df_test["treatment_effect"].values,
+            "tau": df_test["treatment_effect"].values,
         }
     )
 
@@ -706,7 +706,7 @@ def test_BaseSClassifier(generate_classification_data):
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
-        treatment_effect_col="treatment_effect_col",
+        treatment_effect_col="tau",
     )
 
     # Check if the cumulative gain when using the model's prediction is
@@ -742,7 +742,7 @@ def test_BaseTClassifier(generate_classification_data):
             "tau_pred": tau_pred.flatten(),
             "W": df_test["treatment_group_key"].values,
             CONVERSION: df_test[CONVERSION].values,
-            "treatment_effect_col": df_test["treatment_effect"].values,
+            "tau": df_test["treatment_effect"].values,
         }
     )
 
@@ -750,7 +750,7 @@ def test_BaseTClassifier(generate_classification_data):
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
-        treatment_effect_col="treatment_effect_col",
+        treatment_effect_col="tau",
     )
 
     # Check if the cumulative gain when using the model's prediction is
@@ -812,7 +812,7 @@ def test_BaseXClassifier(generate_classification_data):
             "tau_pred": tau_pred.flatten(),
             "W": df_test["treatment_group_key"].values,
             CONVERSION: df_test[CONVERSION].values,
-            "treatment_effect_col": df_test["treatment_effect"].values,
+            "tau": df_test["treatment_effect"].values,
         }
     )
 
@@ -820,7 +820,7 @@ def test_BaseXClassifier(generate_classification_data):
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
-        treatment_effect_col="treatment_effect_col",
+        treatment_effect_col="tau",
     )
 
     # Check if the cumulative gain when using the model's prediction is
@@ -861,7 +861,7 @@ def test_BaseRClassifier(generate_classification_data):
             "tau_pred": tau_pred.flatten(),
             "W": df_test["treatment_group_key"].values,
             CONVERSION: df_test[CONVERSION].values,
-            "treatment_effect_col": df_test["treatment_effect"].values,
+            "tau": df_test["treatment_effect"].values,
         }
     )
 
@@ -869,7 +869,7 @@ def test_BaseRClassifier(generate_classification_data):
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
-        treatment_effect_col="treatment_effect_col",
+        treatment_effect_col="tau",
     )
 
     # Check if the cumulative gain when using the model's prediction is
@@ -912,7 +912,7 @@ def test_BaseRClassifier_with_sample_weights(generate_classification_data):
             "tau_pred": tau_pred.flatten(),
             "W": df_test["treatment_group_key"].values,
             CONVERSION: df_test[CONVERSION].values,
-            "treatment_effect_col": df_test["treatment_effect"].values,
+            "tau": df_test["treatment_effect"].values,
         }
     )
 
@@ -920,7 +920,7 @@ def test_BaseRClassifier_with_sample_weights(generate_classification_data):
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
-        treatment_effect_col="treatment_effect_col",
+        treatment_effect_col="tau",
     )
 
     # Check if the cumulative gain when using the model's prediction is
@@ -1005,7 +1005,7 @@ def test_BaseDRLearner(generate_regression_data):
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
