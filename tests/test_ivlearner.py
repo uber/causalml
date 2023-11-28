@@ -67,7 +67,12 @@ def test_drivlearner():
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(

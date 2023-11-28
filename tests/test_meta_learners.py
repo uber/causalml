@@ -119,7 +119,12 @@ def test_BaseSRegressor(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -170,7 +175,12 @@ def test_BaseTLearner(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -215,7 +225,12 @@ def test_BaseTRegressor(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -249,7 +264,12 @@ def test_MLPTRegressor(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -283,7 +303,12 @@ def test_XGBTRegressor(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -317,7 +342,12 @@ def test_BaseXLearner(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -364,7 +394,12 @@ def test_BaseXRegressor(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -400,7 +435,12 @@ def test_BaseXLearner_without_p(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -434,7 +474,12 @@ def test_BaseXRegressor_without_p(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -468,7 +513,12 @@ def test_BaseRLearner(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -514,7 +564,12 @@ def test_BaseRRegressor(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -548,7 +603,12 @@ def test_BaseRLearner_without_p(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -582,7 +642,12 @@ def test_BaseRRegressor_without_p(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
@@ -936,7 +1001,12 @@ def test_BaseDRLearner(generate_regression_data):
     )
 
     auuc_metrics = pd.DataFrame(
-        {"cate_p": cate_p.flatten(), "W": treatment, "y": y, "tau": tau,}
+        {
+            "cate_p": cate_p.flatten(),
+            "W": treatment,
+            "y": y,
+            "tau": tau,
+        }
     )
 
     cumgain = get_cumgain(
