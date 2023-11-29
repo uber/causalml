@@ -18,14 +18,10 @@ def test_qini_score():
     full_result = qini_score(test_df)
 
     # get qini score for learner_1 separately
-    learner_1_result = qini_score(
-        test_df[["y", "w", "learner_1"]], treatment_effect_col="learner_1"
-    )
+    learner_1_result = qini_score(test_df[["y", "w", "learner_1"]])
 
     # get qini score for learner_2 separately
-    learner_2_result = qini_score(
-        test_df[["y", "w", "learner_2"]], treatment_effect_col="learner_2"
-    )
+    learner_2_result = qini_score(test_df[["y", "w", "learner_2"]])
 
     # for each learner, its qini score should stay same no matter calling with another model or calling separately
     assert isclose(full_result["learner_1"], learner_1_result["learner_1"])
