@@ -77,11 +77,19 @@ def get_cumlift(
     Returns:
         (pandas.DataFrame): average uplifts of model estimates in cumulative population
     """
-
     assert (
-        (outcome_col in df.columns)
-        and (treatment_col in df.columns)
-        or treatment_effect_col in df.columns
+        (
+            outcome_col in df.columns
+            and df[[outcome_col]].notnull().all().bool()
+        )
+        and (
+            treatment_col in df.columns
+            and df[[treatment_col]].notnull().all().bool()
+        )
+        or (
+            treatment_effect_col in df.columns
+            and df[[treatment_effect_col]].notnull().all().bool()
+        )
     )
 
     df = df.copy()
@@ -214,9 +222,18 @@ def get_qini(
         (pandas.DataFrame): cumulative gains of model estimates in population
     """
     assert (
-        (outcome_col in df.columns)
-        and (treatment_col in df.columns)
-        or treatment_effect_col in df.columns
+        (
+            outcome_col in df.columns
+            and df[[outcome_col]].notnull().all().bool()
+        )
+        and (
+            treatment_col in df.columns
+            and df[[treatment_col]].notnull().all().bool()
+        )
+        or (
+            treatment_effect_col in df.columns
+            and df[[treatment_effect_col]].notnull().all().bool()
+        )
     )
 
     df = df.copy()
@@ -310,10 +327,20 @@ def get_tmlegain(
         (pandas.DataFrame): cumulative gains of model estimates based of TMLE
     """
     assert (
-        (outcome_col in df.columns)
-        and (treatment_col in df.columns)
-        or p_col in df.columns
+        (
+            outcome_col in df.columns
+            and df[[outcome_col]].notnull().all().bool()
+        )
+        and (
+            treatment_col in df.columns
+            and df[[treatment_col]].notnull().all().bool()
+        )
+        or (
+            p_col in df.columns
+            and df[[p_col]].notnull().all().bool()
+        )
     )
+
 
     inference_col = [x for x in inference_col if x in df.columns]
 
@@ -416,9 +443,18 @@ def get_tmleqini(
         (pandas.DataFrame): cumulative gains of model estimates based of TMLE
     """
     assert (
-        (outcome_col in df.columns)
-        and (treatment_col in df.columns)
-        or p_col in df.columns
+        (
+            outcome_col in df.columns
+            and df[[outcome_col]].notnull().all().bool()
+        )
+        and (
+            treatment_col in df.columns
+            and df[[treatment_col]].notnull().all().bool()
+        )
+        or (
+            p_col in df.columns
+            and df[[p_col]].notnull().all().bool()
+        )
     )
 
     inference_col = [x for x in inference_col if x in df.columns]
