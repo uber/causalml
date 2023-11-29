@@ -38,9 +38,7 @@ def test_CEVAE():
     # check the accuracy of the ite accuracy
     ite = cevae.predict(X).flatten()
 
-    auuc_metrics = pd.DataFrame(
-        {"ite": ite, "W": treatment, "y": y, "treatment_effect_col": tau}
-    )
+    auuc_metrics = pd.DataFrame({"ite": ite, "W": treatment, "y": y, "tau": tau})
 
     cumgain = get_cumgain(
         auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
