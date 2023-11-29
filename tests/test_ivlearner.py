@@ -71,7 +71,7 @@ def test_drivlearner():
             "cate_p": cate_p.flatten(),
             "W": treatment,
             "y": y,
-            "treatment_effect_col": tau,
+            "tau": tau,
         }
     )
 
