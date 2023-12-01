@@ -8,24 +8,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       # You can use PyPy versions in python-version.
-      # For example, pypy2 and pypy3
+      # For example, pypy3.10
       matrix:
-        python-version: [3.7, 3.8, 3.9]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
       # You can test your matrix by printing the current Python version
       - name: Display Python version
-        run: python -c "import sys; print(sys.version)"
+        run: python --version
       - name: Install dependencies
         run: |
             sudo apt install graphviz
-            pip install -U pip
-            pip install -U setuptools
+            pip install --upgrade pip
+            pip install --upgrade setuptools
             python -m pip install .[test]
             python setup.py build_ext --inplace
       - name: Test with pytest
