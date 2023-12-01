@@ -1,6 +1,6 @@
 [project]
 name = "causalml"
-version = "0.14.0"
+version = "0.14.1"
 description = "Python Package for Uplift Modeling and Causal Inference with Machine Learning Algorithms"
 readme = { file = "README.md", content-type = "text/markdown" }
 
@@ -26,13 +26,13 @@ dependencies = [
     "forestci==0.6",
     "pathos==0.2.9",
     "pip>=10.0",
-    "numpy<1.24",
+    "numpy>=1.18.5",
     "scipy>=1.4.1",
     "matplotlib",
     "pandas>=0.24.1,<1.4.0",
-    "scikit-learn<=1.0.2",
+    "scikit-learn>=0.22.0",
     "statsmodels>=0.9.0",
-    "Cython>=0.28.0",
+    "Cython<=0.29.34",
     "seaborn",
     "xgboost",
     "pydotplus",
@@ -61,9 +61,9 @@ tf = [
 requires = [
     "setuptools>=18.0",
     "wheel",
-    "Cython>=0.28.0",
-    "numpy<1.24",
-    "scikit-learn<=1.0.2",
+    "Cython<=0.29.34",
+    "numpy>=1.18.5",
+    "scikit-learn>=0.22.0",
 ]
 
 [project.urls]

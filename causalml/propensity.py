@@ -166,9 +166,7 @@ class GradientBoostedPropensityModel(PropensityModel):
         """
         if self.early_stop:
             return np.clip(
-                self.model.predict_proba(X, ntree_limit=self.model.best_ntree_limit)[
-                    :, 1
-                ],
+                self.model.predict_proba(X)[:, 1],
                 *self.clip_bounds,
             )
         else:

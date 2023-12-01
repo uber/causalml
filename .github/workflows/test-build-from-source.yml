@@ -1,0 +1,81 @@
+name: Test build from source install
+
+on:
+  push:
+    paths:
+      - 'envs/*.yml'
+      - '.github/workflows/test-build-from-source.yml'
+
+jobs:
+  build:
+    name: ${{ matrix.os }}${{ matrix.tf-label }}-py${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        python-version: [3.7, 3.8, 3.9]
+        tf-label: ['', '-tf']
+        include:
+          - python-version: 3.7
+            python-version-nd: 37
+          - python-version: 3.8
+            python-version-nd: 38
+          - python-version: 3.9
+            python-version-nd: 39
+          - tf-label: '-tf'
+            tf-label-pip: '[tf]'
+
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+
+      - name: create environment
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version-nd }} 
+          python-version: ${{ matrix.python-version }}
+          channels: defaults
+
+      - name: install cxx-compiler 
+        run: |
+          conda install -c conda-forge cxx-compiler
+          conda install python-graphviz
+          conda install -c conda-forge xorg-libxrender
+
+      - name: echo conda config
+        run: |
+          conda info
+          conda list
+          conda config --show-sources
+          conda config --show  
+
+      - name: Build
+        run: |
+            pip install -U pip
+            pip install -U setuptools
+            python -m pip install .${{ matrix.tf-label-pip}}
+            python -m pip install .[test]
+            python setup.py build_ext --inplace
+
+      - name: Test with pytest
+        run: pytest -vs tests/ --cov causalml/
+
+      - name: echo conda env
+        run: |
+          conda env export
+
+

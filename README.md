@@ -7,7 +7,7 @@
 [![PyPI Version](https://badge.fury.io/py/causalml.svg)](https://pypi.org/project/causalml/)
 [![Build Status](https://github.com/uber/causalml/actions/workflows/python-test.yaml/badge.svg)](https://github.com/uber/causalml/actions/workflows/python-test.yaml)
 [![Documentation Status](https://readthedocs.org/projects/causalml/badge/?version=latest)](http://causalml.readthedocs.io/en/latest/?badge=latest)
-[![Downloads](https://pepy.tech/badge/causalml)](https://pepy.tech/project/causalml)
+[![Downloads](https://static.pepy.tech/badge/causalml)](https://pepy.tech/project/causalml)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3015/badge)](https://bestpractices.coreinfrastructure.org/projects/3015)
 
 
@@ -52,56 +52,84 @@ The package currently supports the following methods
 
 # Installation
 
-Installation with `conda` is recommended. `conda` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
+Installation with `conda` is recommended.
+
+`conda` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the `inference.tf` module (e.g. `DragonNet`), additional dependency of `tensorflow` is required. For detailed instructions, see below.
 
 ## Install using `conda`:
+
+Install `conda` with:
+
+```
+wget https://repo.anaconda.com/miniconda/Miniconda3-py38_23.5.0-3-Linux-x86_64.sh
+bash Miniconda3-py38_23.5.0-3-Linux-x86_64.sh -b
+source miniconda3/bin/activate 
+conda init
+source ~/.bashrc 
+```
+
 ### Install from `conda-forge`
 Directly install from the conda-forge channel using conda.
 
 ```sh
-$ conda install -c conda-forge causalml
+conda install -c conda-forge causalml
 ```
 
 ### Install with the `conda` virtual environment
 This will create a new `conda` virtual environment named `causalml-[tf-]py3x`, where `x` is in `[6, 7, 8, 9]`. e.g. `causalml-py37` or `causalml-tf-py38`. If you want to change the name of the environment, update the relevant YAML file in `envs/`
 
 ```bash
-$ git clone https://github.com/uber/causalml.git
-$ cd causalml/envs/
-$ conda env create -f environment-py38.yml	# for the virtual environment with Python 3.8 and CausalML
-$ conda activate causalml-py38
+git clone https://github.com/uber/causalml.git
+cd causalml/envs/
+conda env create -f environment-py38.yml	# for the virtual environment with Python 3.8 and CausalML
+conda activate causalml-py38
 (causalml-py38)
 ```
 
 ### Install `causalml` with `tensorflow`
 ```bash
-$ git clone https://github.com/uber/causalml.git
-$ cd causalml/envs/
-$ conda env create -f environment-tf-py38.yml	# for the virtual environment with Python 3.8 and CausalML
-$ conda activate causalml-tf-py38
+git clone https://github.com/uber/causalml.git
+cd causalml/envs/
+conda env create -f environment-tf-py38.yml	# for the virtual environment with Python 3.8 and CausalML
+conda activate causalml-tf-py38
 (causalml-tf-py38) pip install -U numpy			# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
 ```
 
 ## Install from `PyPI`:
 
 ```bash
-$ pip install causalml
+pip install causalml
 ```
 
 ### Install `causalml` with `tensorflow`
 ```bash
-$ pip install causalml[tf]
-$ pip install -U numpy							# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
+pip install causalml[tf]
+pip install -U numpy							# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
 ```
 
 ## Install from source:
 
-```bash
-$ git clone https://github.com/uber/causalml.git
-$ cd causalml
-$ pip install .
+### Create a clean conda environment
+
 ```
+conda create -n causalml-py38 -y python=3.8
+conda activate causalml-py38
+conda install -c conda-forge cxx-compiler
+conda install python-graphviz
+conda install -c conda-forge xorg-libxrender
+```
+
+Then:
+
+```bash
+git clone https://github.com/uber/causalml.git
+cd causalml
+pip install .
+python setup.py build_ext --inplace
+```
+
 with `tensorflow`:
+
 ```bash
 pip install .[tf]
 ```
@@ -145,7 +173,7 @@ te, lb, ub =  rl.estimate_ate(X=X, p=e, treatment=treatment, y=y)
 print('Average Treatment Effect (BaseRRegressor using XGBoost): {:.2f} ({:.2f}, {:.2f})'.format(te[0], lb[0], ub[0]))
 ```
 
-See the [Meta-learner example notebook](https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data.ipynb) for details.
+See the [Meta-learner example notebook](https://github.com/uber/causalml/blob/master/docs/examples/meta_learners_with_synthetic_data.ipynb) for details.
 
 
 ## Interpretable Causal ML
@@ -197,7 +225,7 @@ slearner.plot_shap_dependence(treatment_group='treatment_A',
   <img width="629px" height="618px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/shap_vis.png">
 </div>
 
-See the [feature interpretations example notebook](https://github.com/uber/causalml/blob/master/examples/feature_interpretations_example.ipynb) for details.
+See the [feature interpretations example notebook](https://github.com/uber/causalml/blob/master/docs/examples/feature_interpretations_example.ipynb) for details.
 
 ### Uplift Tree Visualization
 
@@ -220,7 +248,7 @@ Image(graph.create_png())
   <img width="800px" height="479px" src="https://raw.githubusercontent.com/uber/causalml/master/docs/_static/img/uplift_tree_vis.png">
 </div>
 
-See the [Uplift Tree visualization example notebook](https://github.com/uber/causalml/blob/master/examples/uplift_tree_visualization.ipynb) for details.
+See the [Uplift Tree visualization example notebook](https://github.com/uber/causalml/blob/master/docs/examples/uplift_tree_visualization.ipynb) for details.
 
 # Contributing
 

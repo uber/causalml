@@ -2,7 +2,7 @@ name: causalml-py37
 channels:
   - defaults
 dependencies:
-  - pip=21.0.1
+  - pip
   - python=3.7
   - setuptools=52.0.0
   - graphviz

@@ -2,7 +2,7 @@
 Interpretable Causal ML
 =======================
 
-Causal ML provides methods to interpret the treatment effect models trained, where we provide more sample code in `feature_interpretations_example.ipynb notebook <https://github.com/uber/causalml/blob/master/examples/feature_interpretations_example.ipynb>`_.
+Causal ML provides methods to interpret the treatment effect models trained, where we provide more sample code in `feature_interpretations_example.ipynb notebook <https://github.com/uber/causalml/blob/master/docs/examples/feature_interpretations_example.ipynb>`_.
 
 Meta-Learner Feature Importances
 --------------------------------
@@ -75,7 +75,7 @@ Uplift Tree Visualization
 .. image:: ./_static/img/uplift_tree_vis.png
     :width: 629
 
-Please see below for how to read the plot, and `uplift_tree_visualization.ipynb example notebook <https://github.com/uber/causalml/blob/master/examples/uplift_tree_visualization.ipynb>`_ is provided in the repo.
+Please see below for how to read the plot, and `uplift_tree_visualization.ipynb example notebook <https://github.com/uber/causalml/blob/master/docs/examples/uplift_tree_visualization.ipynb>`_ is provided in the repo.
 
 - feature_name > threshold: For non-leaf node, the first line is an inequality indicating the splitting rule of this node to its children nodes.
 - impurity: the impurity is defined as the value of the split criterion function (such as KL, Chi, or ED) evaluated at this current node
@@ -86,7 +86,7 @@ Please see below for how to read the plot, and `uplift_tree_visualization.ipynb 
 - validation uplift score:  all the information above is static once the tree is trained (based on the trained trees), while the validation uplift score represents the treatment effect of the testing data when the method fill() is used. This score can be used as a comparison to the training uplift score, to evaluate if the tree has an overfitting issue.
 
 Uplift Tree Feature Importances
--------------------------
+-------------------------------
 
 .. code-block:: python
 

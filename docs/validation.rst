@@ -90,9 +90,9 @@ Mechanism 4
 |
 
 Validation with Uplift Curve (AUUC)
-----------------------------------
+-----------------------------------
 
-We can validate the estimation by evaluating and comparing the uplift gains with AUUC (Area Under Uplift Curve), it calculates cumulative gains. Please find more details in `meta_learners_with_synthetic_data.ipynb example notebook <https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data.ipynb>`_.
+We can validate the estimation by evaluating and comparing the uplift gains with AUUC (Area Under Uplift Curve), it calculates cumulative gains. Please find more details in `meta_learners_with_synthetic_data.ipynb example notebook <https://github.com/uber/causalml/blob/master/docs/examples/meta_learners_with_synthetic_data.ipynb>`_.
 
 .. code-block:: python
 
@@ -112,10 +112,10 @@ We can validate the estimation by evaluating and comparing the uplift gains with
 .. image:: ./_static/img/auuc_vis.png
     :width: 629
 
-For data with skewed treatment, it is sometimes advantageous to use :ref:`Targeted maximum likelihood estimation (TMLE) for ATE` to generate the AUUC curve for validation, as TMLE provides a more accurate estimation of ATE. Please find `validation_with_tmle.ipynb example notebook <https://github.com/uber/causalml/blob/master/examples/validation_with_tmle.ipynb>`_ for details.
+For data with skewed treatment, it is sometimes advantageous to use :ref:`Targeted maximum likelihood estimation (TMLE) for ATE` to generate the AUUC curve for validation, as TMLE provides a more accurate estimation of ATE. Please find `validation_with_tmle.ipynb example notebook <https://github.com/uber/causalml/blob/master/docs/examples/validation_with_tmle.ipynb>`_ for details.
 
 Validation with Sensitivity Analysis
-----------------------------------
+------------------------------------
 Sensitivity analysis aim to check the robustness of the unconfoundeness assumption. If there is hidden bias (unobserved confounders), it detemineds how severe whould have to be to change conclusion by examine the average treatment effect estimation.
 
 We implemented the following methods to conduct sensitivity analysis:

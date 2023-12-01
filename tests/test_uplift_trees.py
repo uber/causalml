@@ -8,6 +8,8 @@ from sklearn.model_selection import train_test_split
 
 from causalml.inference.tree import UpliftTreeClassifier, UpliftRandomForestClassifier
 from causalml.metrics import get_cumgain
+from causalml.dataset import make_uplift_classification
+from causalml.inference.tree import uplift_tree_string, uplift_tree_plot
 
 from .const import RANDOM_SEED, N_SAMPLE, CONTROL_NAME, TREATMENT_NAMES, CONVERSION
 
@@ -19,11 +21,24 @@ def test_make_uplift_classification(generate_classification_data):
 
 @pytest.mark.parametrize("backend", ["loky", "threading", "multiprocessing"])
 @pytest.mark.parametrize("joblib_prefer", ["threads", "processes"])
+@pytest.mark.parametrize("early_stopping", ["true", "false"])
 def test_UpliftRandomForestClassifier(
-    generate_classification_data, backend, joblib_prefer
+    generate_classification_data, backend, joblib_prefer, early_stopping
 ):
     df, x_names = generate_classification_data()
-    df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
+    df_train, df_test, df_val = None, None, None
+
+    if early_stopping == "true":
+        df_train, df_test_val = train_test_split(
+            df, test_size=0.2, random_state=RANDOM_SEED
+        )
+        df_test, df_val = train_test_split(
+            df_test_val, test_size=0.5, random_state=RANDOM_SEED
+        )
+    else:
+        df_train, df_test = train_test_split(
+            df, test_size=0.2, random_state=RANDOM_SEED
+        )
 
     with parallel_backend(backend):
         # Train the UpLift Random Forest classifier
@@ -32,14 +47,23 @@ def test_UpliftRandomForestClassifier(
             control_name=TREATMENT_NAMES[0],
             random_state=RANDOM_SEED,
             joblib_prefer=joblib_prefer,
+            early_stopping_eval_diff_scale=1,
         )
-
-        uplift_model.fit(
-            df_train[x_names].values,
-            treatment=df_train["treatment_group_key"].values,
-            y=df_train[CONVERSION].values,
-        )
-
+        if early_stopping == "true":
+            uplift_model.fit(
+                df_train[x_names].values,
+                treatment=df_train["treatment_group_key"].values,
+                y=df_train[CONVERSION].values,
+                X_val=df_val[x_names].values,
+                treatment_val=df_val["treatment_group_key"].values,
+                y_val=df_val[CONVERSION].values,
+            )
+        else:
+            uplift_model.fit(
+                df_train[x_names].values,
+                treatment=df_train["treatment_group_key"].values,
+                y=df_train[CONVERSION].values,
+            )
         predictions = {}
         predictions["single"] = uplift_model.predict(df_test[x_names].values)
         with parallel_backend("loky", n_jobs=2):
@@ -225,3 +249,41 @@ def test_UpliftTreeClassifier_feature_importance(generate_classification_data):
     # would evaluate the same feature, thus the number of features with importance value
     # shouldn't be larger than the number of non-leaf node
     assert num_non_zero_imp_features <= num_non_leaf_nodes
+
+
+def test_uplift_tree_visualization():
+    # Data generation
+    df, x_names = make_uplift_classification()
+
+    # Rename features for easy interpretation of visualization
+    x_names_new = ["feature_%s" % (i) for i in range(len(x_names))]
+    rename_dict = {x_names[i]: x_names_new[i] for i in range(len(x_names))}
+    df = df.rename(columns=rename_dict)
+    x_names = x_names_new
+
+    df.head()
+
+    df = df[df["treatment_group_key"].isin(["control", "treatment1"])]
+
+    # Split data to training and testing samples for model validation (next section)
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=111)
+
+    # Train uplift tree
+    uplift_model = UpliftTreeClassifier(
+        max_depth=4,
+        min_samples_leaf=200,
+        min_samples_treatment=50,
+        n_reg=100,
+        evaluationFunction="KL",
+        control_name="control",
+    )
+
+    uplift_model.fit(
+        df_train[x_names].values,
+        treatment=df_train["treatment_group_key"].values,
+        y=df_train["conversion"].values,
+    )
+
+    # Plot uplift tree
+    graph = uplift_tree_plot(uplift_model.fitted_uplift_tree, x_names)
+    graph.create_png()
