@@ -78,11 +78,11 @@ def get_cumlift(
         (pandas.DataFrame): average uplifts of model estimates in cumulative population
     """
     assert (
-        (outcome_col in df.columns and df[[outcome_col]].notnull().all())
-        and (treatment_col in df.columns and df[[treatment_col]].notnull().all())
+        (outcome_col in df.columns and df[outcome_col].notnull().all())
+        and (treatment_col in df.columns and df[treatment_col].notnull().all())
         or (
             treatment_effect_col in df.columns
-            and df[[treatment_effect_col]].notnull().all()
+            and df[treatment_effect_col].notnull().all()
         )
     )
 
@@ -216,11 +216,11 @@ def get_qini(
         (pandas.DataFrame): cumulative gains of model estimates in population
     """
     assert (
-        (outcome_col in df.columns and df[[outcome_col]].notnull().all())
-        and (treatment_col in df.columns and df[[treatment_col]].notnull().all())
+        (outcome_col in df.columns and df[outcome_col].notnull().all())
+        and (treatment_col in df.columns and df[treatment_col].notnull().all())
         or (
             treatment_effect_col in df.columns
-            and df[[treatment_effect_col]].notnull().all()
+            and df[treatment_effect_col].notnull().all()
         )
     )
 
@@ -315,9 +315,9 @@ def get_tmlegain(
         (pandas.DataFrame): cumulative gains of model estimates based of TMLE
     """
     assert (
-        (outcome_col in df.columns and df[[outcome_col]].notnull().all())
-        and (treatment_col in df.columns and df[[treatment_col]].notnull().all())
-        or (p_col in df.columns and df[[p_col]].notnull().all())
+        (outcome_col in df.columns and df[outcome_col].notnull().all())
+        and (treatment_col in df.columns and df[treatment_col].notnull().all())
+        or (p_col in df.columns and df[p_col].notnull().all())
     )
 
     inference_col = [x for x in inference_col if x in df.columns]
@@ -421,9 +421,9 @@ def get_tmleqini(
         (pandas.DataFrame): cumulative gains of model estimates based of TMLE
     """
     assert (
-        (outcome_col in df.columns and df[[outcome_col]].notnull().all())
-        and (treatment_col in df.columns and df[[treatment_col]].notnull().all())
-        or (p_col in df.columns and df[[p_col]].notnull().all())
+        (outcome_col in df.columns and df[outcome_col].notnull().all())
+        and (treatment_col in df.columns and df[treatment_col].notnull().all())
+        or (p_col in df.columns and df[p_col].notnull().all())
     )
 
     inference_col = [x for x in inference_col if x in df.columns]
