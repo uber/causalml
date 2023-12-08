@@ -2,6 +2,11 @@
 Methodology
 ===========
 
+In this section we dive more deeply into the algorithms implemented in CausalML.  To provide a basis for the discussion, we review some of the frameworks and definitions used in the literature.
+
+We use the Neyman-Rubin potential outcomes framework and assume Y represents the outcome, W represents the treatment assignment, and X_i the observed covariates.
+
+
 Supported Algorithms
 --------------------
 CausalML currently supports the following methods:
@@ -28,6 +33,12 @@ CausalML currently supports the following methods:
 - Treatment optimization algorithms
     - :ref:`Counterfactual Unit Selection`
     - :ref:`Counterfactual Value Estimator`
+
+
+Decision Guide
+--------------
+
+See image in: https://github.com/uber/causalml/issues/677#issuecomment-1712088558
 
 
 Meta-Learner Algorithms
