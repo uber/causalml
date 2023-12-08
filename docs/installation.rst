@@ -6,11 +6,11 @@ Installation with ``conda`` is recommended.
 
 ``conda`` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the ``inference.tf`` module (e.g. ``DragonNet``), additional dependency of ``tensorflow`` is required. For detailed instructions, see below.
 
-Install using ``conda``:
-------------------------
+Install using ``conda``
+-----------------------
 
-Install ``conda`` with:
-^^^^^^^^^^^^^^^^^^^^^^^
+Install ``conda``
+^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
     
@@ -52,15 +52,15 @@ Install ``causalml`` with ``tensorflow``
     conda activate causalml-tf-py38
     pip install -U numpy			# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
 
-Install from ``PyPI``:
-----------------------
+Install from ``PyPI``
+---------------------
 
 .. code-block:: bash
 
     pip install causalml
 
-Install ``causalml`` with ``tensorflow`` from ``PyPI``:
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Install ``causalml`` with ``tensorflow`` from ``PyPI``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -68,8 +68,8 @@ Install ``causalml`` with ``tensorflow`` from ``PyPI``:
     pip install -U numpy                            # this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
 
 
-Install from source:
---------------------
+Install from source
+-------------------
 
 Create a clean ``conda`` environment.
 
@@ -94,3 +94,11 @@ with ``tensorflow``:
 .. code-block:: bash
 
     pip install .[tf]
+
+
+Windows
+-------
+
+See content in https://github.com/uber/causalml/issues/678
+
+
