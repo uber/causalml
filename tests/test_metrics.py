@@ -41,4 +41,4 @@ def test_multiqini():
     mq.fit(tau_hat, cost, DR_scores)
 
     #    (0.005729002695991717, 0.019814651108894354)
-    assert isclose(mq.average_gain(spend=0.1)[0],0.005729)
+    assert isclose(mq.average_gain(spend=0.1)[0], 0.005729)
