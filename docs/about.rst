@@ -53,15 +53,9 @@ In essence, while traditional machine learning can tell us “what is”, causal
 Measuring Causal Effects
 ------------------------
 
-Different causal effects can be measured using varying techniques.  
-
 **Randomized Control Trials (RCT)** are the gold standard for causal effect measurements.  Subjects are randomly exposed to a treatment and the Average Treatment Effect (ATE) is measured as the difference between the mean effects in the treatment and control groups.  Random assignment removes the effect of any confounders on the treatment.
 
-**Instrumental Variables (IV)** is a technique in which subjects are randomly exposed to a variable that influences treatment, but has no direct effect on the outcome.
-
-An example of an instrumental variable is a streamlined sign-up page that allows an Uber user to sign up for Uber Eats.  Not all subjects will sign up for Uber Eats, but the streamlined sign-up makes it easier for them to experience both Uber and Uber Eats.  Thereafter, the subject’s outcome is unrelated to their signup experience.  In other words, the streamlined signup influences the treatment, not the outcome.
-
-If RCTs are not an option and hence confounders cannot be controlled for, the next best option is to attempt to **control for confounders** and measure the Conditional Average Treatment Effect (CATE).  The CATE is an estimate of the treatment effect conditioned on all available covariates and confounders.  Even if an RCT is available, if the treatment effects are heterogeneous across covariates, it might be preferable to measure the CATE.  We call these Heterogeneous Treatment Effects (HTEs).
+If an RCT is available and the treatment effects are heterogeneous across covariates, measuring the conditional average treatment effect(CATE) can be of interest.  The CATE is an estimate of the treatment effect conditioned on all available experiment covariates and confounders.  We call these Heterogeneous Treatment Effects (HTEs).
 
 
 Example Use Cases
