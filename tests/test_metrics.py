@@ -29,6 +29,7 @@ def test_qini_score():
     assert isclose(full_result["learner_1"], learner_1_result["learner_1"])
     assert isclose(full_result["learner_2"], learner_2_result["learner_2"])
 
+
 def test_multiqini():
     np.random.seed(42)
     n = 1000
