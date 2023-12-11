@@ -1,5 +1,5 @@
 from causalml.inference.tf import DragonNet
-from causalml.dataset.regression import *
+from causalml.dataset.regression import simulate_nuisance_and_easy_treatment
 import shutil
 
 
