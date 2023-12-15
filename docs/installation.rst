@@ -102,3 +102,14 @@ Windows
 See content in https://github.com/uber/causalml/issues/678
 
 
+Running Tests
+-------------
+
+Run all tests with:
+
+.. code-block:: bash
+
+    pytest -vs tests/ --cov causalml/
+
+
+Add ``--runtf`` to run optional tensorflow tests which will be skipped by default.
