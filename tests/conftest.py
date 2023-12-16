@@ -67,10 +67,9 @@ def generate_classification_data_two_treatments():
 
     yield _generate_data
 
+
 def pytest_addoption(parser):
-    parser.addoption(
-        "--runtf", action="store_true", default=False, help="run tf tests"
-    )
+    parser.addoption("--runtf", action="store_true", default=False, help="run tf tests")
 
 
 def pytest_configure(config):
@@ -85,4 +84,3 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if "tf" in item.keywords:
             item.add_marker(skip_tf)
-

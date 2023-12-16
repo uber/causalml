@@ -3,6 +3,7 @@ from causalml.dataset.regression import simulate_nuisance_and_easy_treatment
 import shutil
 import pytest
 
+
 @pytest.mark.tf
 def test_save_load_dragonnet():
     y, X, w, tau, b, e = simulate_nuisance_and_easy_treatment(n=1000)
