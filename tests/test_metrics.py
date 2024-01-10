@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 from numpy import isclose
 from causalml.metrics.visualize import qini_score
-from causalml.metrics.multiqini import get_mq_ipw_scores, MultiQini
+from causalml.metrics import MAQ, get_ipw_scores
 
 
 def test_qini_score():
@@ -30,7 +30,7 @@ def test_qini_score():
     assert isclose(full_result["learner_2"], learner_2_result["learner_2"])
 
 
-def test_multiqini():
+def test_MAQ():
     np.random.seed(42)
     n = 1000
     K = 5
@@ -38,7 +38,7 @@ def test_multiqini():
     cost = np.random.rand(n, K)
     DR_scores = np.random.randn(n, K)
 
-    mq = MultiQini(n_bootstrap=200)
+    mq = MAQ(n_bootstrap=200)
     mq.fit(tau_hat, cost, DR_scores)
 
     #    (0.005729002695991717, 0.019814651108894354)
