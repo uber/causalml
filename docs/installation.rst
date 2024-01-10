@@ -74,6 +74,7 @@ Install from source
 Create a clean ``conda`` environment.
 
 .. code-block:: bash
+
     conda create -n causalml-py38 -y python=3.8
     conda activate causalml-py38
     conda install -c conda-forge cxx-compiler
