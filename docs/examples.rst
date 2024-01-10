@@ -28,4 +28,5 @@ Follow the below links for an approximate ordering of example tutorials from int
     examples/causal_trees_with_synthetic_data
     examples/causal_trees_interpretation
     examples/logistic_regression_based_data_generation_for_uplift_classification
+    examples/qini_curves_for_costly_treatment_arms
 
