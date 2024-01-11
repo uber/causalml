@@ -1,4 +1,7 @@
-from causalml.inference.tf import DragonNet
+try:
+    from causalml.inference.tf import DragonNet
+except ImportError:
+    pass
 from causalml.dataset.regression import simulate_nuisance_and_easy_treatment
 import shutil
 import pytest
