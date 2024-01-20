@@ -95,3 +95,27 @@ with ``tensorflow``:
 .. code-block:: bash
 
     pip install .[tf]
+
+Testing:
+--------
+
+Make sure pytest is installed before attempting to run tests.
+
+Tests can be run with the following command:
+
+.. code-block:: bash
+
+    pytest -vs tests/ --cov causalml/
+
+To run tests that require tensorflow (i.e. DragonNet), make sure tensorflow is installed and include the ``--runtf`` option with the ``pytest`` command.  For example:
+
+.. code-block:: bash
+
+    pytest --runtf -vs tests/test_dragonnet.py
+
+You can also run tests via make:
+ 
+.. code-block:: bash
+
+    make test
+
