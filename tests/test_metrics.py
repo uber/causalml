@@ -1,6 +1,8 @@
 import pandas as pd
+import numpy as np
 from numpy import isclose
 from causalml.metrics.visualize import qini_score
+from causalml.metrics import MAQ, get_ipw_scores
 
 
 def test_qini_score():
@@ -26,3 +28,18 @@ def test_qini_score():
     # for each learner, its qini score should stay same no matter calling with another model or calling separately
     assert isclose(full_result["learner_1"], learner_1_result["learner_1"])
     assert isclose(full_result["learner_2"], learner_2_result["learner_2"])
+
+
+def test_MAQ():
+    np.random.seed(42)
+    n = 1000
+    K = 5
+    tau_hat = np.random.randn(n, K)
+    cost = np.random.rand(n, K)
+    DR_scores = np.random.randn(n, K)
+
+    mq = MAQ(n_bootstrap=200)
+    mq.fit(tau_hat, cost, DR_scores)
+
+    #    (0.005729002695991717, 0.019814651108894354)
+    assert isclose(mq.average_gain(spend=0.1)[0], 0.005729)

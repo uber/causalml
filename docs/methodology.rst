@@ -2,6 +2,45 @@
 Methodology
 ===========
 
+In this section we dive more deeply into the algorithms implemented in CausalML.  To provide a basis for the discussion, we review some of the frameworks and definitions used in the literature.
+
+We use the Neyman-Rubin potential outcomes framework and assume Y represents the outcome, W represents the treatment assignment, and X_i the observed covariates.
+
+
+Supported Algorithms
+--------------------
+CausalML currently supports the following methods:
+
+- Tree-based algorithms
+    - :ref:`Uplift Random Forests <Uplift Tree>` on KL divergence, Euclidean Distance, and Chi-Square
+    - :ref:`Uplift Random Forests <Uplift Tree>` on Contextual Treatment Selection
+    - :ref:`Uplift Random Forests <DDP>` on delta-delta-p (:math:`\Delta\Delta P`) criterion (only for binary trees and two-class problems)
+    - :ref:`Uplift Random Forests <IDDP>` on IDDP (only for binary trees and two-class problems)
+    - :ref:`Interaction Tree <IT>` (only for binary trees and two-class problems)
+    - :ref:`Causal Inference Tree <CIT>` (only for binary trees and two-class problems)
+- Meta-learner algorithms
+    - :ref:`S-learner`
+    - :ref:`T-learner`
+    - :ref:`X-learner`
+    - :ref:`R-learner`
+    - :ref:`Doubly Robust (DR) learner`
+- Instrumental variables algorithms
+    - :ref:`2-Stage Least Squares (2SLS)`
+    - :ref:`Doubly Robust Instrumental Variable (DRIV) learner`
+- Neural network based algorithms
+    - CEVAE
+    - DragonNet
+- Treatment optimization algorithms
+    - :ref:`Counterfactual Unit Selection`
+    - :ref:`Counterfactual Value Estimator`
+
+
+Decision Guide
+--------------
+
+See image in: https://github.com/uber/causalml/issues/677#issuecomment-1712088558
+
+
 Meta-Learner Algorithms
 -----------------------
 
