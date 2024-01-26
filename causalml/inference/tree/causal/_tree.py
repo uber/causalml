@@ -33,6 +33,14 @@ class BaseCausalDecisionTree(BaseDecisionTree):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+    def _support_missing_values(self, X) -> bool:
+        """
+        TODO: Add support for missing values
+        See sklearn PR: ENH Adds missing value support for trees (#23595)
+        https://github.com/scikit-learn/scikit-learn/commit/6392148d80e9f14a9524c137ac5cfa04f2274d48
+        """
+        return False
+
     def fit(
         self, X, y, sample_weight=None, check_input=True, X_idx_sorted="deprecated"
     ):
