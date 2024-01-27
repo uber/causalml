@@ -83,9 +83,11 @@ class LogisticRegressionPropensityModel(PropensityModel):
             "Cs": np.logspace(1e-3, 1 - 1e-3, 4),
             "l1_ratios": np.linspace(1e-3, 1 - 1e-3, 4),
             "cv": StratifiedKFold(
-                n_splits=self.model_kwargs.pop("n_fold")
-                if "n_fold" in self.model_kwargs
-                else 4,
+                n_splits=(
+                    self.model_kwargs.pop("n_fold")
+                    if "n_fold" in self.model_kwargs
+                    else 4
+                ),
                 shuffle=True,
                 random_state=self.model_kwargs.get("random_state", 42),
             ),

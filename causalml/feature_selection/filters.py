@@ -303,9 +303,11 @@ class FilterSelect:
                 if smooth:
                     results[ti].update(
                         {
-                            ci: results_series[ti, ci]
-                            if results_series.index.isin([(ti, ci)]).any()
-                            else 1
+                            ci: (
+                                results_series[ti, ci]
+                                if results_series.index.isin([(ti, ci)]).any()
+                                else 1
+                            )
                         }
                     )
                 else:
