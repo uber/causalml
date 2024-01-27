@@ -383,30 +383,30 @@ def get_synthetic_preds_holdout(
                 # fit the model on training data only
                 learner.fit(X=X_train, treatment=w_train, y=y_train)
                 try:
-                    preds_dict_train[
-                        "{} Learner ({})".format(label_l, label_m)
-                    ] = learner.predict(X=X_train, p=p_hat_train).flatten()
-                    preds_dict_valid[
-                        "{} Learner ({})".format(label_l, label_m)
-                    ] = learner.predict(X=X_val, p=p_hat_val).flatten()
+                    preds_dict_train["{} Learner ({})".format(label_l, label_m)] = (
+                        learner.predict(X=X_train, p=p_hat_train).flatten()
+                    )
+                    preds_dict_valid["{} Learner ({})".format(label_l, label_m)] = (
+                        learner.predict(X=X_val, p=p_hat_val).flatten()
+                    )
                 except TypeError:
-                    preds_dict_train[
-                        "{} Learner ({})".format(label_l, label_m)
-                    ] = learner.predict(
-                        X=X_train, treatment=w_train, y=y_train
-                    ).flatten()
-                    preds_dict_valid[
-                        "{} Learner ({})".format(label_l, label_m)
-                    ] = learner.predict(X=X_val, treatment=w_val, y=y_val).flatten()
+                    preds_dict_train["{} Learner ({})".format(label_l, label_m)] = (
+                        learner.predict(
+                            X=X_train, treatment=w_train, y=y_train
+                        ).flatten()
+                    )
+                    preds_dict_valid["{} Learner ({})".format(label_l, label_m)] = (
+                        learner.predict(X=X_val, treatment=w_val, y=y_val).flatten()
+                    )
             else:
                 learner = base_learner(model())
                 learner.fit(X=X_train, p=p_hat_train, treatment=w_train, y=y_train)
-                preds_dict_train[
-                    "{} Learner ({})".format(label_l, label_m)
-                ] = learner.predict(X=X_train).flatten()
-                preds_dict_valid[
-                    "{} Learner ({})".format(label_l, label_m)
-                ] = learner.predict(X=X_val).flatten()
+                preds_dict_train["{} Learner ({})".format(label_l, label_m)] = (
+                    learner.predict(X=X_train).flatten()
+                )
+                preds_dict_valid["{} Learner ({})".format(label_l, label_m)] = (
+                    learner.predict(X=X_val).flatten()
+                )
 
     return preds_dict_train, preds_dict_valid
 

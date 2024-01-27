@@ -192,9 +192,9 @@ class Explainer(object):
         for group, mod in self.models_tau.items():
             explainer = shap.TreeExplainer(mod)
             if self.r_learners is not None:
-                explainer.model.original_model.params[
-                    "objective"
-                ] = None  # hacky way of running shap without error
+                explainer.model.original_model.params["objective"] = (
+                    None  # hacky way of running shap without error
+                )
             shap_values = explainer.shap_values(self.X)
             shap_dict[group] = shap_values
 
