@@ -147,27 +147,48 @@ def cat_continuous(x, granularity="Medium"):
             np.percentile(x, 99),
         ]
         res = [
-            "> p90 (%s)" % (lspercentile[8])
-            if z > lspercentile[8]
-            else "<= p10 (%s)" % (lspercentile[0])
-            if z <= lspercentile[0]
-            else "<= p20 (%s)" % (lspercentile[1])
-            if z <= lspercentile[1]
-            else "<= p30 (%s)" % (lspercentile[2])
-            if z <= lspercentile[2]
-            else "<= p40 (%s)" % (lspercentile[3])
-            if z <= lspercentile[3]
-            else "<= p50 (%s)" % (lspercentile[4])
-            if z <= lspercentile[4]
-            else "<= p60 (%s)" % (lspercentile[5])
-            if z <= lspercentile[5]
-            else "<= p70 (%s)" % (lspercentile[6])
-            if z <= lspercentile[6]
-            else "<= p80 (%s)" % (lspercentile[7])
-            if z <= lspercentile[7]
-            else "<= p90 (%s)" % (lspercentile[8])
-            if z <= lspercentile[8]
-            else "> p90 (%s)" % (lspercentile[8])
+            (
+                "> p90 (%s)" % (lspercentile[8])
+                if z > lspercentile[8]
+                else (
+                    "<= p10 (%s)" % (lspercentile[0])
+                    if z <= lspercentile[0]
+                    else (
+                        "<= p20 (%s)" % (lspercentile[1])
+                        if z <= lspercentile[1]
+                        else (
+                            "<= p30 (%s)" % (lspercentile[2])
+                            if z <= lspercentile[2]
+                            else (
+                                "<= p40 (%s)" % (lspercentile[3])
+                                if z <= lspercentile[3]
+                                else (
+                                    "<= p50 (%s)" % (lspercentile[4])
+                                    if z <= lspercentile[4]
+                                    else (
+                                        "<= p60 (%s)" % (lspercentile[5])
+                                        if z <= lspercentile[5]
+                                        else (
+                                            "<= p70 (%s)" % (lspercentile[6])
+                                            if z <= lspercentile[6]
+                                            else (
+                                                "<= p80 (%s)" % (lspercentile[7])
+                                                if z <= lspercentile[7]
+                                                else (
+                                                    "<= p90 (%s)" % (lspercentile[8])
+                                                    if z <= lspercentile[8]
+                                                    else "> p90 (%s)"
+                                                    % (lspercentile[8])
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
             for z in x
         ]
     elif granularity == "Medium":
@@ -183,25 +204,43 @@ def cat_continuous(x, granularity="Medium"):
             np.percentile(x, 90),
         ]
         res = [
-            "<= p10 (%s)" % (lspercentile[0])
-            if z <= lspercentile[0]
-            else "<= p20 (%s)" % (lspercentile[1])
-            if z <= lspercentile[1]
-            else "<= p30 (%s)" % (lspercentile[2])
-            if z <= lspercentile[2]
-            else "<= p40 (%s)" % (lspercentile[3])
-            if z <= lspercentile[3]
-            else "<= p50 (%s)" % (lspercentile[4])
-            if z <= lspercentile[4]
-            else "<= p60 (%s)" % (lspercentile[5])
-            if z <= lspercentile[5]
-            else "<= p70 (%s)" % (lspercentile[6])
-            if z <= lspercentile[6]
-            else "<= p80 (%s)" % (lspercentile[7])
-            if z <= lspercentile[7]
-            else "<= p90 (%s)" % (lspercentile[8])
-            if z <= lspercentile[8]
-            else "> p90 (%s)" % (lspercentile[8])
+            (
+                "<= p10 (%s)" % (lspercentile[0])
+                if z <= lspercentile[0]
+                else (
+                    "<= p20 (%s)" % (lspercentile[1])
+                    if z <= lspercentile[1]
+                    else (
+                        "<= p30 (%s)" % (lspercentile[2])
+                        if z <= lspercentile[2]
+                        else (
+                            "<= p40 (%s)" % (lspercentile[3])
+                            if z <= lspercentile[3]
+                            else (
+                                "<= p50 (%s)" % (lspercentile[4])
+                                if z <= lspercentile[4]
+                                else (
+                                    "<= p60 (%s)" % (lspercentile[5])
+                                    if z <= lspercentile[5]
+                                    else (
+                                        "<= p70 (%s)" % (lspercentile[6])
+                                        if z <= lspercentile[6]
+                                        else (
+                                            "<= p80 (%s)" % (lspercentile[7])
+                                            if z <= lspercentile[7]
+                                            else (
+                                                "<= p90 (%s)" % (lspercentile[8])
+                                                if z <= lspercentile[8]
+                                                else "> p90 (%s)" % (lspercentile[8])
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
             for z in x
         ]
     else:
@@ -211,13 +250,15 @@ def cat_continuous(x, granularity="Medium"):
             np.percentile(x, 85),
         ]
         res = [
-            "1-Very Low"
-            if z < lspercentile[0]
-            else "2-Low"
-            if z < lspercentile[1]
-            else "3-High"
-            if z < lspercentile[2]
-            else "4-Very High"
+            (
+                "1-Very Low"
+                if z < lspercentile[0]
+                else (
+                    "2-Low"
+                    if z < lspercentile[1]
+                    else "3-High" if z < lspercentile[2] else "4-Very High"
+                )
+            )
             for z in x
         ]
     return res
