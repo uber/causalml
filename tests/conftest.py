@@ -66,3 +66,21 @@ def generate_classification_data_two_treatments():
         return data
 
     yield _generate_data
+
+
+def pytest_addoption(parser):
+    parser.addoption("--runtf", action="store_true", default=False, help="run tf tests")
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "tf: mark test as tf to run")
+
+
+def pytest_collection_modifyitems(config, items):
+    if config.getoption("--runtf"):
+        # --runtf given in cli: do not skip tf tests
+        return
+    skip_tf = pytest.mark.skip(reason="need --runtf option to run")
+    for item in items:
+        if "tf" in item.keywords:
+            item.add_marker(skip_tf)

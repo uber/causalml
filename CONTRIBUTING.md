@@ -85,10 +85,17 @@ Before submitting a PR, make sure the change to pass all tests and test coverage
 $ pytest -vs tests/ --cov causalml/
 ```
 
+To run tests that require tensorflow (i.e. DragonNet), make sure tensorflow is installed and include the `--runtf` option with the `pytest` command.  For example:
+
+```bash
+$ pytest --runtf -vs tests/test_dragonnet.py
+```
+
 You can also run tests via make:
 ```bash
 $ make test
 ```
+
 
 
 ## Submission :tada:

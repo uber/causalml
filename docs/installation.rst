@@ -96,6 +96,7 @@ with ``tensorflow``:
 
     pip install .[tf]
 
+=======
 
 Windows
 -------
@@ -106,11 +107,19 @@ See content in https://github.com/uber/causalml/issues/678
 Running Tests
 -------------
 
+Make sure pytest is installed before attempting to run tests.
+
 Run all tests with:
 
 .. code-block:: bash
 
     pytest -vs tests/ --cov causalml/
 
-
 Add ``--runtf`` to run optional tensorflow tests which will be skipped by default.
+
+You can also run tests via make:
+ 
+.. code-block:: bash
+
+    make test
+

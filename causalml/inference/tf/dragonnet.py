@@ -21,6 +21,7 @@ from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau, Termina
 from tensorflow.keras.layers import Dense, Concatenate
 from tensorflow.keras.optimizers import SGD, Adam
 from tensorflow.keras.regularizers import l2
+from tensorflow.keras.models import load_model
 
 from causalml.inference.tf.utils import (
     dragonnet_loss_binarycross,
@@ -290,3 +291,36 @@ class DragonNet:
         """
         self.fit(X, treatment, y)
         return self.predict_tau(X)
+
+    def save(self, h5_filepath):
+        """
+        Save the dragonnet model as a H5 file.
+
+        Args:
+            h5_filepath (H5 file path): H5 file path
+        """
+        self.dragonnet.save(h5_filepath)
+
+    def load(self, h5_filepath, ratio=1.0, dragonnet_loss=dragonnet_loss_binarycross):
+        """
+        Load the dragonnet model from a H5 file.
+
+        Args:
+            h5_filepath (H5 file path): H5 file path
+            ratio (float): weight assigned to the targeted regularization loss component
+            dragonnet_loss (function): a loss function
+        """
+        self.dragonnet = load_model(
+            h5_filepath,
+            custom_objects={
+                "EpsilonLayer": EpsilonLayer,
+                "dragonnet_loss_binarycross": dragonnet_loss_binarycross,
+                "tarreg_ATE_unbounded_domain_loss": make_tarreg_loss(
+                    ratio=ratio, dragonnet_loss=dragonnet_loss
+                ),
+                "regression_loss": regression_loss,
+                "binary_classification_loss": binary_classification_loss,
+                "treatment_accuracy": treatment_accuracy,
+                "track_epsilon": track_epsilon,
+            },
+        )
