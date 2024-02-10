@@ -45,7 +45,6 @@ dependencies = [
     "torch",
     "pyro-ppl",
     "graphviz",
-    "maq@git+https://github.com/grf-labs/maq.git@py0.2.2#egg=maq&subdirectory=python-package",
 ]
 
 [project.optional-dependencies]
