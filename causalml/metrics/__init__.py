@@ -32,4 +32,3 @@ from .sensitivity import (
     SensitivitySubsetData,
     SensitivitySelectionBias,
 )  # noqa
-from maq import MAQ, get_ipw_scores  # noqa
