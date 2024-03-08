@@ -12,6 +12,7 @@ dist
 _build/
 .ipynb_checkpoints/
 *.c
+*.cpp
 *.so
 .coverage*
 *.html
