@@ -31,7 +31,7 @@ def smd(feature, treatment):
     return (t.mean() - c.mean()) / np.sqrt(0.5 * (t.var() + c.var()))
 
 
-def create_table_one(data, treatment_col, features, with_std = True, with_counts = True):
+def create_table_one(data, treatment_col, features, with_std=True, with_counts=True):
     """Report balance in input features between the treatment and control groups.
 
     References:
@@ -53,7 +53,11 @@ def create_table_one(data, treatment_col, features, with_std = True, with_counts
     t1 = pd.pivot_table(
         data[features + [treatment_col]],
         columns=treatment_col,
-        aggfunc=[lambda x: "{:.2f} ({:.2f})".format(x.mean(), x.std()) if with_std else "{:.2f}".format(x.mean())],
+        aggfunc=[
+            lambda x: "{:.2f} ({:.2f})".format(x.mean(), x.std())
+            if with_std
+            else "{:.2f}".format(x.mean())
+        ],
     )
     t1.columns = t1.columns.droplevel(level=0)
     t1["SMD"] = data[features].apply(lambda x: smd(x, data[treatment_col])).round(4)
