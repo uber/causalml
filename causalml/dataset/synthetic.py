@@ -226,8 +226,8 @@ def distr_plot_single_sim(
 
     # deleted generated data and assign actual value
     del preds_for_plot[KEY_GENERATED_DATA]
-    global_lower = np.percentile(np.hstack(preds_for_plot.values()), 1)
-    global_upper = np.percentile(np.hstack(preds_for_plot.values()), 99)
+    global_lower = np.percentile(np.hstack(list(preds_for_plot.values())), 1)
+    global_upper = np.percentile(np.hstack(list(preds_for_plot.values())), 99)
     learners = list(preds_for_plot.keys())
     learners = [learner for learner in learners if learner not in drop_learners]
 
