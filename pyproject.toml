@@ -42,9 +42,8 @@ dependencies = [
     "lightgbm",
     "pygam",
     "packaging",
-    "torch",
-    "pyro-ppl",
     "graphviz",
+    "duecredit",
 ]
 
 [project.optional-dependencies]
@@ -54,6 +53,10 @@ test = [
 ]
 tf = [
     "tensorflow>=2.4.0"
+]
+torch = [
+    "torch",
+    "pyro-ppl",
 ]
 
 
