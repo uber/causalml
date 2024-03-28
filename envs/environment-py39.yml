@@ -91,8 +91,6 @@ dependencies:
     - pygam==0.8.0
     - pygments==2.8.1
     - pyparsing==2.4.7
-    - pyro-api==0.1.2
-    - pyro-ppl==1.6.0
     - pyrsistent==0.17.3
     - pytest==6.2.3
     - pytest-cov==2.11.1
@@ -120,7 +118,6 @@ dependencies:
     - testpath==0.4.4
     - threadpoolctl==2.1.0
     - toml==0.10.2
-    - torch==1.9.0
     - tornado==6.1
     - tqdm==4.60.0
     - traitlets==5.0.5
