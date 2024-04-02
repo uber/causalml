@@ -2289,7 +2289,7 @@ class UpliftTreeClassifier:
             tree.results, tree.upliftScore :
                 The results in the leaf node.
             '''
-            if tree.is_leaf_node:
+            if tree.results is not None: # leaf:
                 return tree.results, tree.upliftScore
             else:
                 v = observations[tree.col]
