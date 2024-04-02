@@ -580,6 +580,7 @@ class UpliftTreeClassifier:
         tree : object
             object of DecisionTree class - the current decision tree that shall be modified
         """
+        tree.nodeSummary = self.tree_node_summary(t_est,y_est, min_samples_treatment=0, n_reg=0)
 
         # Divide sets for child nodes
         if tree.trueBranch or tree.falseBranch:
@@ -2288,7 +2289,7 @@ class UpliftTreeClassifier:
             tree.results, tree.upliftScore :
                 The results in the leaf node.
             '''
-            if tree.results is not None:  # leaf
+            if tree.is_leaf_node:
                 return tree.results, tree.upliftScore
             else:
                 v = observations[tree.col]
