@@ -488,7 +488,7 @@ class UpliftTreeClassifier:
 
         if self.honesty:
             try:
-                X, X_est, treatment_idx, treatment_idx_est, y, y_est = train_test_split(X, treatment_idx, y, stratify=[treatment_idx, y], test_size=self.estimation_sample_size,
+                X, X_est, treatment_idx, treatment_idx_est, y, y_est = train_test_split(X, treatment_idx, y, stratify=np.stack([treatment_idx, y], axis=1), test_size=self.estimation_sample_size,
                                                                                         shuffle=True, random_state=self.random_state)
             except ValueError:
                 logger.warning(f"Stratified sampling failed. Falling back to random sampling.")
