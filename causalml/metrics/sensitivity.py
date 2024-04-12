@@ -144,9 +144,6 @@ class Sensitivity(object):
             (numpy.ndarray): Mean and confidence interval (LB, UB) of the ATE estimate.
         """
 
-        learner = self.learner
-        from ..inference.meta.tlearner import BaseTLearner
-
         try:
             ate, ate_lower, ate_upper = self.learner.estimate_ate(
                 X=X, p=p, treatment=treatment, y=y, return_ci=True
