@@ -54,9 +54,11 @@ def create_table_one(data, treatment_col, features, with_std=True, with_counts=T
         data[features + [treatment_col]],
         columns=treatment_col,
         aggfunc=[
-            lambda x: "{:.2f} ({:.2f})".format(x.mean(), x.std())
-            if with_std
-            else "{:.2f}".format(x.mean())
+            lambda x: (
+                "{:.2f} ({:.2f})".format(x.mean(), x.std())
+                if with_std
+                else "{:.2f}".format(x.mean())
+            )
         ],
     )
     t1.columns = t1.columns.droplevel(level=0)
