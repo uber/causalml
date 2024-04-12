@@ -148,9 +148,13 @@ class Sensitivity(object):
         from ..inference.meta.tlearner import BaseTLearner
 
         try:
-            ate, ate_lower, ate_upper = self.learner.estimate_ate(X=X, p=p, treatment=treatment, y=y, return_ci=True)
+            ate, ate_lower, ate_upper = self.learner.estimate_ate(
+                X=X, p=p, treatment=treatment, y=y, return_ci=True
+            )
         except TypeError:
-            ate, ate_lower, ate_upper = self.learner.estimate_ate(X=X, p=p, treatment=treatment, y=y)
+            ate, ate_lower, ate_upper = self.learner.estimate_ate(
+                X=X, p=p, treatment=treatment, y=y
+            )
         return ate[0], ate_lower[0], ate_upper[0]
 
     @staticmethod
