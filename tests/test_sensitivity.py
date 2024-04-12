@@ -4,7 +4,13 @@ import numpy as np
 from sklearn.linear_model import LinearRegression
 
 from causalml.dataset import synthetic_data
-from causalml.inference.meta import BaseSLearner, BaseTLearner, XGBTRegressor, BaseXLearner, BaseRLearner
+from causalml.inference.meta import (
+    BaseSLearner,
+    BaseTLearner,
+    XGBTRegressor,
+    BaseXLearner,
+    BaseRLearner,
+)
 from causalml.metrics.sensitivity import Sensitivity
 from causalml.metrics.sensitivity import (
     SensitivityPlaceboTreatment,
