@@ -81,7 +81,7 @@ def create_table_one(data, treatment_col, features, with_std=True, with_counts=T
     return t1
 
 
-class NearestNeighborMatch(object):
+class NearestNeighborMatch:
     """
     Propensity score matching based on the nearest neighbor algorithm.
 
@@ -233,7 +233,7 @@ class NearestNeighborMatch(object):
         return matched.reset_index(level=0, drop=True)
 
 
-class MatchOptimizer(object):
+class MatchOptimizer:
     def __init__(
         self,
         treatment_col="is_treatment",

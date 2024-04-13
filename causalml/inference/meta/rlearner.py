@@ -1,7 +1,6 @@
 from copy import deepcopy
 import logging
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
@@ -14,7 +13,7 @@ from causalml.inference.meta.utils import (
     convert_pd_to_np,
     get_weighted_variance,
 )
-from causalml.propensity import compute_propensity_score, ElasticNetPropensityModel
+from causalml.propensity import ElasticNetPropensityModel
 
 
 logger = logging.getLogger("causalml")
@@ -25,7 +24,7 @@ class BaseRLearner(BaseLearner):
 
     An R-learner estimates treatment effects with two machine learning models and the propensity score.
 
-    Details of R-learner are available at Nie and Wager (2019) (https://arxiv.org/abs/1712.04912).
+    Details of R-learner are available at `Nie and Wager (2019) <https://arxiv.org/abs/1712.04912>`_.
     """
 
     def __init__(
@@ -53,7 +52,8 @@ class BaseRLearner(BaseLearner):
             control_name (str or int, optional): name of control group
             n_fold (int, optional): the number of cross validation folds for outcome_learner
             random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
-            cv_n_jobs (int, optional): number of parallel jobs to run for cross_val_predict. -1 means using all processors
+            cv_n_jobs (int, optional): number of parallel jobs to run for cross_val_predict. -1 means using all
+                processors
         """
         assert (learner is not None) or (
             (outcome_learner is not None) and (effect_learner is not None)
@@ -651,7 +651,6 @@ class XGBRRegressor(BaseRRegressor):
                     random_state=self.random_state,
                 )
 
-                weight = sample_weight_filt
                 self.models_tau[group].fit(
                     X=X_train_filt,
                     y=(y_train_filt - yhat_train_filt) / (w_train - p_train_filt),

@@ -1,9 +1,16 @@
 import pandas as pd
+import pytest
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
 from causalml.dataset import synthetic_data
-from causalml.inference.meta import BaseXLearner
+from causalml.inference.meta import (
+    BaseSLearner,
+    BaseTLearner,
+    XGBTRegressor,
+    BaseXLearner,
+    BaseRLearner,
+)
 from causalml.metrics.sensitivity import Sensitivity
 from causalml.metrics.sensitivity import (
     SensitivityPlaceboTreatment,
@@ -23,7 +30,17 @@ from causalml.metrics.sensitivity import (
 from .const import TREATMENT_COL, SCORE_COL, OUTCOME_COL, NUM_FEATURES
 
 
-def test_Sensitivity():
+@pytest.mark.parametrize(
+    "learner",
+    [
+        BaseSLearner(LinearRegression()),
+        BaseTLearner(LinearRegression()),
+        XGBTRegressor(),
+        BaseXLearner(LinearRegression()),
+        BaseRLearner(LinearRegression()),
+    ],
+)
+def test_Sensitivity(learner):
     y, X, treatment, tau, b, e = synthetic_data(
         mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
     )
@@ -36,7 +53,6 @@ def test_Sensitivity():
     df[SCORE_COL] = e
 
     # calling the Base XLearner class and return the sensitivity analysis summary report
-    learner = BaseXLearner(LinearRegression())
     sens = Sensitivity(
         df=df,
         inference_features=INFERENCE_FEATURES,

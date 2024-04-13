@@ -1,19 +1,15 @@
 from copy import deepcopy
 import logging
 import numpy as np
-import pandas as pd
 from tqdm import tqdm
 from scipy.stats import norm
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
     check_treatment_vector,
-    check_p_conditions,
     convert_pd_to_np,
 )
-from causalml.inference.meta.explainer import Explainer
 from causalml.metrics import regression_metrics, classification_metrics
-from causalml.propensity import compute_propensity_score
 
 logger = logging.getLogger("causalml")
 
@@ -23,7 +19,7 @@ class BaseXLearner(BaseLearner):
 
     An X-learner estimates treatment effects with four machine learning models.
 
-    Details of X-learner are available at Kunzel et al. (2018) (https://arxiv.org/abs/1706.03461).
+    Details of X-learner are available at `Kunzel et al. (2018) <https://arxiv.org/abs/1706.03461>`_.
     """
 
     def __init__(

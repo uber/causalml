@@ -3,19 +3,19 @@ import logging
 import numpy as np
 from causalml.propensity import compute_propensity_score
 from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
-from sklearn.model_selection import cross_val_predict, KFold
+from sklearn.model_selection import KFold
 from sklearn.tree import DecisionTreeClassifier
 
 
 logger = logging.getLogger("causalml")
 
 
-class PolicyLearner(object):
+class PolicyLearner:
     """
     A Learner that learns a treatment assignment policy with observational data using doubly robust estimator of causal
     effect for binary treatment.
 
-    Details of the policy learner are available at Athey and Wager (2018) (https://arxiv.org/abs/1702.02896).
+    Details of the policy learner are available at `Athey and Wager (2018) <https://arxiv.org/abs/1702.02896>`_.
 
     """
 
@@ -58,7 +58,7 @@ class PolicyLearner(object):
         return (
             "{}(model_mu={},\n"
             "\tmodel_w={},\n"
-            "\model_pi={})".format(
+            "\tmodel_pi={})".format(
                 self.__class__.__name__,
                 self.model_mu.__repr__(),
                 self.model_w.__repr__(),
@@ -73,7 +73,7 @@ class PolicyLearner(object):
         for train_index, test_index in self.cv.split(y):
             X_train, X_test = X[train_index], X[test_index]
             w_train, w_test = w[train_index], w[test_index]
-            y_train, y_test = y[train_index], y[test_index]
+            y_train, _ = y[train_index], y[test_index]
 
             self.model_mu.fit(
                 np.concatenate([X_train, w_train.reshape(-1, 1)], axis=1), y_train

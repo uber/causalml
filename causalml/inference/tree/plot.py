@@ -4,6 +4,7 @@ Problem.
 """
 
 from collections import defaultdict
+from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -399,7 +400,7 @@ class _MPLCTreeExporter(_MPLTreeExporter):
         self.treatment_groups = treatment_groups
 
     def node_to_str(
-        self, tree: _tree.Tree, node_id: int, criterion: str or object
+        self, tree: _tree.Tree, node_id: int, criterion: Union[str, object]
     ) -> str:
         """
         Generate the node content string

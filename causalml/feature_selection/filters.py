@@ -9,7 +9,6 @@ import pandas as pd
 import statsmodels.api as sm
 from scipy import stats
 from sklearn.impute import SimpleImputer
-import warnings
 
 
 class FilterSelect:
@@ -25,10 +24,12 @@ class FilterSelect:
 
         Args:
             data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            treatment_indicator (string): the column name for binary indicator of treatment (1) or control (0)
             feature_name (string): feature name, as one column in the data DataFrame
             y_name (string): name of the outcome variable
-            order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
+            order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3.
+                order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear
+                importance of the feature,
             order= 3 will calculate feature importance up to cubic forms.
 
         Returns:
@@ -105,10 +106,12 @@ class FilterSelect:
 
         Args:
             data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            treatment_indicator (string): the column name for binary indicator of treatment (1) or control (0)
             features (list of string): list of feature names, that are columns in the data DataFrame
             y_name (string): name of the outcome variable
-            order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
+            order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3.
+                order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear
+                importance of the feature,
             order= 3 will calculate feature importance up to cubic forms.
 
         Returns:
@@ -143,10 +146,12 @@ class FilterSelect:
 
         Args:
             data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            treatment_indicator (string): the column name for binary indicator of treatment (1) or control (0)
             feature_name (string): feature name, as one column in the data DataFrame
             y_name (string): name of the outcome variable
-            order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
+            order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3.
+                order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear
+                importance of the feature,
             order= 3 will calculate feature importance up to cubic forms.
 
         Returns:
@@ -222,10 +227,12 @@ class FilterSelect:
 
         Args:
             data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            treatment_indicator (string): the column name for binary indicator of treatment (1) or control (0)
             feature_name (string): feature name, as one column in the data DataFrame
             y_name (string): name of the outcome variable
-            order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
+            order (int): the order of feature to be evaluated with the treatment effect, order takes 3 values: 1,2,3.
+                order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear
+                importance of the feature,
             order= 3 will calculate feature importance up to cubic forms.
 
         Returns:
@@ -261,7 +268,8 @@ class FilterSelect:
         smooth=True,
     ):
         """
-        To count the conversions and get the probabilities by treatment groups. This function comes from the uplift tree algorithm, that is used for tree node split evaluation.
+        To count the conversions and get the probabilities by treatment groups. This function comes from the uplift
+        tree algorithm, that is used for tree node split evaluation.
 
         Parameters
         ----------
@@ -420,18 +428,23 @@ class FilterSelect:
 
         Args:
             data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            treatment_indicator (string): the column name for binary indicator of treatment (1) or control (0)
             feature_name (string): feature name, as one column in the data DataFrame
             y_name (string): name of the outcome variable
             method (string, optional, default = 'KL'): taking one of the following values {'F', 'LR', 'KL', 'ED', 'Chi'}
-                    The feature selection method to be used to rank the features.
-                    'F' for F-test
-                    'LR' for likelihood ratio test
-                    'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square respectively
-            experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in the DataFrame, which contains the treatment and control assignment label
-            control_group (string, optional, default = 'control'): name for control group, value in the experiment group column
+                The feature selection method to be used to rank the features.
+                'F' for F-test
+                'LR' for likelihood ratio test
+                'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance,
+                Chi-Square respectively
+            experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in
+                the DataFrame, which contains the treatment and control assignment label
+            control_group (string, optional, default = 'control'): name for control group, value in the experiment
+                group column
             n_bins (int, optional, default = 10): number of bins to be used for bin-based uplift filter methods
-            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then exception will be raised
+            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following
+                strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then
+                exception will be raised
 
         Returns:
             D_result : pd.DataFrame
@@ -455,9 +468,8 @@ class FilterSelect:
             ).fit_transform(data[feature_name].values.reshape(-1, 1))
         elif data[feature_name].isna().any():
             raise Exception(
-                "Null value(s) present in column '{}'. Please impute the null value or use null_impute parameter provided!!!".format(
-                    feature_name
-                )
+                "Null value(s) present in column '{}'. Please impute the null value or use null_impute parameter "
+                "provided.".format(feature_name)
             )
 
         # drop duplicate edges in pq.cut result to avoid issues
@@ -515,18 +527,23 @@ class FilterSelect:
 
         Args:
             data (pd.Dataframe): DataFrame containing outcome, features, and experiment group
-            treatment_indicator (string): the column name for binary indicator of treatment (value 1) or control (value 0)
+            treatment_indicator (string): the column name for binary indicator of treatment (1) or control (0)
             features (list of string): list of feature names, that are columns in the data DataFrame
             y_name (string): name of the outcome variable
             method (string, optional, default = 'KL'): taking one of the following values {'F', 'LR', 'KL', 'ED', 'Chi'}
-                    The feature selection method to be used to rank the features.
-                    'F' for F-test
-                    'LR' for likelihood ratio test
-                    'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square respectively
-            experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in the DataFrame, which contains the treatment and control assignment label
-            control_group (string, optional, default = 'control'): name for control group, value in the experiment group column
+                The feature selection method to be used to rank the features.
+                'F' for F-test
+                'LR' for likelihood ratio test
+                'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square
+                respectively
+            experiment_group_column (string, optional, default = 'treatment_group_key'): the experiment column name in
+                the DataFrame, which contains the treatment and control assignment label
+            control_group (string, optional, default = 'control'): name for control group, value in the experiment
+                group column
             n_bins (int, optional, default = 10): number of bins to be used for bin-based uplift filter methods
-            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then exception will be raised
+            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the followin
+                strategy values {'mean', 'median', 'most_frequent', None}. If Value is None and null is present then
+                exception will be raised
 
         Returns:
             all_result : pd.DataFrame
@@ -578,13 +595,19 @@ class FilterSelect:
                 The feature selection method to be used to rank the features.
                 'F' for F-test
                 'LR' for likelihood ratio test
-                'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square respectively
-            experiment_group_column (string): the experiment column name in the DataFrame, which contains the treatment and control assignment label
+                'KL', 'ED', 'Chi' for bin-based uplift filter methods, KL divergence, Euclidean distance, Chi-Square
+                respectively
+            experiment_group_column (string): the experiment column name in the DataFrame, which contains the treatment
+                and control assignment label
             control_group (string): name for control group, value in the experiment group column
             treatment_group (string): name for treatment group, value in the experiment group column
             n_bins (int, optional): number of bins to be used for bin-based uplift filter methods
-            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following strategy values {'mean', 'median', 'most_frequent', None}. If value is None and null is present then exception will be raised
-            order (int): the order of feature to be evaluated with the treatment effect for F filter and LR filter, order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2 corresponds to quadratic and linear importance of the feature,
+            null_impute (str, optional, default=None): impute np.nan present in the data taking on of the following
+                strategy values {'mean', 'median', 'most_frequent', None}. If value is None and null is present then
+                exception will be raised
+            order (int): the order of feature to be evaluated with the treatment effect for F filter and LR filter,
+                order takes 3 values: 1,2,3. order = 1 corresponds to linear importance of the feature, order=2
+                corresponds to quadratic and linear importance of the feature,
             order= 3 will calculate feature importance up to cubic forms.
             disp (bool): Set to True to print convergence messages for Logistic regression convergence in LR method.
 
