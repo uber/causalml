@@ -11,7 +11,7 @@ from causalml.inference.meta.utils import convert_pd_to_np
 VALID_METHODS = ("auto", "permutation", "shapley")
 
 
-class Explainer(object):
+class Explainer:
     def __init__(
         self,
         method,
@@ -205,7 +205,8 @@ class Explainer(object):
         Calculates and plots feature importances for each treatment group, based on specified method in __init__.
         Skips the calculation part if importance_dict is given.
         Args:
-            importance_dict (optional, dict): a dict of feature importance matrics. If None, importance_dict will be computed.
+            importance_dict (optional, dict): a dict of feature importance matrics. If None, importance_dict will be
+                computed.
             title_prefix (optional, str): a prefix to the title of the plot.
             figsize (optional, tuple): the size of the figure.
         """

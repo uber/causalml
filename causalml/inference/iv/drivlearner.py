@@ -9,23 +9,24 @@ from causalml.inference.meta.utils import (
     check_p_conditions,
     convert_pd_to_np,
 )
-from causalml.metrics import regression_metrics, classification_metrics
+from causalml.metrics import regression_metrics
 from causalml.propensity import compute_propensity_score
 from scipy.stats import norm
-from sklearn.model_selection import cross_val_predict, KFold
+from sklearn.model_selection import KFold
 from tqdm import tqdm
 from xgboost import XGBRegressor
 
 logger = logging.getLogger("causalml")
 
 
-class BaseDRIVLearner(object):
+class BaseDRIVLearner:
     """A parent class for DRIV-learner regressor classes.
 
     A DRIV-learner estimates endogenous treatment effects for compliers with machine learning models.
 
-    Details of DR-learner are available at Kennedy (2020) (https://arxiv.org/abs/2004.14497).
-    The DR moment condition for LATE comes from Chernozhukov et al (2018) (https://academic.oup.com/ectj/article/21/1/C1/5056401).
+    Details of DR-learner are available at `Kennedy (2020) <https://arxiv.org/abs/2004.14497>`_.
+    The DR moment condition for LATE comes from
+    `Chernozhukov et al (2018) <https://academic.oup.com/ectj/article/21/1/C1/5056401>`_.
     """
 
     def __init__(
@@ -103,9 +104,9 @@ class BaseDRIVLearner(object):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
             p (2-tuple of np.ndarray or pd.Series or dict, optional): The first (second) element corresponds to
-                unassigned (assigned) units. Each is an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1). If None will run
-                ElasticNetPropensityModel() to generate the propensity scores.
+                unassigned (assigned) units. Each is an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of float
+                (0,1). If None will run ElasticNetPropensityModel() to generate the propensity scores.
             pZ (np.array or pd.Series, optional): an array of assignment probability of float (0,1); if None
                 will run ElasticNetPropensityModel() to generate the assignment probability score.
             seed (int): random seed for cross-fitting
@@ -301,7 +302,6 @@ class BaseDRIVLearner(object):
             if (y is not None) and (treatment is not None) and verbose:
                 mask = (treatment == group) | (treatment == self.control_name)
                 treatment_filt = treatment[mask]
-                X_filt = X[mask]
                 y_filt = y[mask]
                 w = (treatment_filt == group).astype(int)
 
@@ -344,9 +344,9 @@ class BaseDRIVLearner(object):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
             p (2-tuple of np.ndarray or pd.Series or dict, optional): The first (second) element corresponds to
-                unassigned (assigned) units. Each is an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1). If None will run
-                ElasticNetPropensityModel() to generate the propensity scores.
+                unassigned (assigned) units. Each is an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of float
+                (0,1). If None will run ElasticNetPropensityModel() to generate the propensity scores.
             pZ (np.array or pd.Series, optional): an array of assignment probability of float (0,1); if None
                 will run ElasticNetPropensityModel() to generate the assignment probability score.
             return_ci (bool): whether to return confidence intervals
@@ -453,9 +453,9 @@ class BaseDRIVLearner(object):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
             p (2-tuple of np.ndarray or pd.Series or dict, optional): The first (second) element corresponds to
-                unassigned (assigned) units. Each is an array of propensity scores of float (0,1) in the single-treatment
-                case; or, a dictionary of treatment groups that map to propensity vectors of float (0,1). If None will run
-                ElasticNetPropensityModel() to generate the propensity scores.
+                unassigned (assigned) units. Each is an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of float
+                (0,1). If None will run ElasticNetPropensityModel() to generate the propensity scores.
             pZ (np.array or pd.Series, optional): an array of assignment probability of float (0,1); if None
                 will run ElasticNetPropensityModel() to generate the assignment probability score.
             bootstrap_ci (bool): whether run bootstrap for confidence intervals

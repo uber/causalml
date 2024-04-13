@@ -347,10 +347,7 @@ def timeit(exclude_kwargs: tuple = ()) -> Callable:
             result = f(*args, **kw)
             te = time.time()
             display_kw = {k: v for k, v in kw.items() if k not in exclude_kwargs}
-            print(
-                f"Function: %s Kwargs:%r Elapsed time: %2.4f"
-                % (f.__name__, display_kw, te - ts)
-            )
+            print("Function: {} Kwargs: {} Elapsed time: {:2.4f}".format(f.__name__, display_kw, te - ts))
             return result
 
         return wrapped

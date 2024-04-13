@@ -398,9 +398,7 @@ class _MPLCTreeExporter(_MPLTreeExporter):
         self.groups_count = groups_count
         self.treatment_groups = treatment_groups
 
-    def node_to_str(
-        self, tree: _tree.Tree, node_id: int, criterion: str or object
-    ) -> str:
+    def node_to_str(self, tree: _tree.Tree, node_id: int, criterion: str | object) -> str:
         """
         Generate the node content string
         Args:

@@ -27,10 +27,12 @@ class CounterfactualValueEstimator:
         Value of converting each unit.
 
     conversion_cost : shape = (num_samples, len(set(treatment)))
-        The cost of a treatment that is triggered if a unit converts after having been in the treatment, such as a promotion code.
+        The cost of a treatment that is triggered if a unit converts after having been in the treatment, such as a
+        promotion code.
 
     impression_cost : shape = (num_samples, len(set(treatment)))
-       The cost of a treatment that is the same for each unit whether or not they convert, such as a cost associated with a promotion channel.
+       The cost of a treatment that is the same for each unit whether or not they convert, such as a cost associated
+       with a promotion channel.
 
 
     Notes

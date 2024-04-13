@@ -1,7 +1,3 @@
-import numpy as np
-import pandas as pd
-
-
 def get_pns_bounds(data_exp, data_obs, T, Y, type="PNS"):
     """
     Args
@@ -14,26 +10,26 @@ def get_pns_bounds(data_exp, data_obs, T, Y, type="PNS"):
         Name of the binary treatment indicator
     y : str
         Name of the binary outcome indicator
-    'type' : str
+    type : str
         Type of probability of causation desired. Acceptable args are:
-        * 'PNS': Probability of necessary and sufficient causation
-        * 'PS': Probability of sufficient causation
-        * 'PN': Probability of necessary causation
+            - ``PNS``: Probability of necessary and sufficient causation
+            - ``PS``: Probability of sufficient causation
+            - ``PN``: Probability of necessary causation
 
     Notes
     -----
-    Based on Equation (24) in Tian and Pearl: https://ftp.cs.ucla.edu/pub/stat_ser/r271-A.pdf
+    Based on Equation (24) in `Tian and Pearl (2000) <https://ftp.cs.ucla.edu/pub/stat_ser/r271-A.pdf>`_.
 
-    To capture the counterfactual notation, we use `1' and `0' to indicate the actual and
-    counterfactual values of a variable, respectively, and we use `do' to indicate the effect
+    To capture the counterfactual notation, we use ``1`` and ``0`` to indicate the actual and
+    counterfactual values of a variable, respectively, and we use ``do`` to indicate the effect
     of an intervention.
 
     The experimental and observational data are either assumed to come to the same population,
     or from random samples of the population. If the data are from a sample, the bounds may
     be incorrectly calculated because the relevant quantities in the Tian-Pearl equations are
-    defined e.g. as P(YifT), not P(YifT \mid S) where S corresponds to sample selection.
-    Bareinboim and Pearl (https://www.pnas.org/doi/10.1073/pnas.1510507113) discuss conditions
-    under which P(YifT) can be recovered from P(YifT \mid S).
+    defined e.g. as :math:`P(Y|do(T))`, not :math:`P(Y|do(T), S)` where :math:`S` corresponds to sample selection.
+    `Bareinboim and Pearl (2016) <https://www.pnas.org/doi/10.1073/pnas.1510507113>`_ discuss conditions
+    under which :math:`P(Y|do(T))` can be recovered from :math:`P(Y|do(T), S)`.
     """
 
     # Probabilities calculated from observational data
