@@ -31,7 +31,7 @@ def smd(feature, treatment):
     return (t.mean() - c.mean()) / np.sqrt(0.5 * (t.var() + c.var()))
 
 
-def create_table_one(data, treatment_col, features):
+def create_table_one(data, treatment_col, features, with_std=True, with_counts=True):
     """Report balance in input features between the treatment and control groups.
 
     References:
@@ -42,6 +42,8 @@ def create_table_one(data, treatment_col, features):
         data (pandas.DataFrame): total or matched sample data
         treatment_col (str): the column name for the treatment
         features (list of str): the column names of features
+        with_std (bool): whether to output std together with mean values as in <mean> (<std>) format
+        with_counts (bool): whether to include a row counting the total number of samples
 
     Returns:
         (pandas.DataFrame): A table with the means and standard deviations in
@@ -51,19 +53,27 @@ def create_table_one(data, treatment_col, features):
     t1 = pd.pivot_table(
         data[features + [treatment_col]],
         columns=treatment_col,
-        aggfunc=[lambda x: "{:.2f} ({:.2f})".format(x.mean(), x.std())],
+        aggfunc=[
+            lambda x: (
+                "{:.2f} ({:.2f})".format(x.mean(), x.std())
+                if with_std
+                else "{:.2f}".format(x.mean())
+            )
+        ],
     )
     t1.columns = t1.columns.droplevel(level=0)
     t1["SMD"] = data[features].apply(lambda x: smd(x, data[treatment_col])).round(4)
 
-    n_row = pd.pivot_table(
-        data[[features[0], treatment_col]], columns=treatment_col, aggfunc=["count"]
-    )
-    n_row.columns = n_row.columns.droplevel(level=0)
-    n_row["SMD"] = ""
-    n_row.index = ["n"]
+    if with_counts:
+        n_row = pd.pivot_table(
+            data[[features[0], treatment_col]], columns=treatment_col, aggfunc=["count"]
+        )
+        n_row.columns = n_row.columns.droplevel(level=0)
+        n_row["SMD"] = ""
+        n_row.index = ["n"]
 
-    t1 = pd.concat([n_row, t1], axis=0)
+        t1 = pd.concat([n_row, t1], axis=0)
+
     t1.columns.name = ""
     t1.columns = ["Control", "Treatment", "SMD"]
     t1.index.name = "Variable"
@@ -71,7 +81,7 @@ def create_table_one(data, treatment_col, features):
     return t1
 
 
-class NearestNeighborMatch(object):
+class NearestNeighborMatch:
     """
     Propensity score matching based on the nearest neighbor algorithm.
 
@@ -223,7 +233,7 @@ class NearestNeighborMatch(object):
         return matched.reset_index(level=0, drop=True)
 
 
-class MatchOptimizer(object):
+class MatchOptimizer:
     def __init__(
         self,
         treatment_col="is_treatment",
@@ -424,18 +434,22 @@ class MatchOptimizer(object):
 
 
 if __name__ == "__main__":
-    from .features import TREATMENT_COL, SCORE_COL, GROUPBY_COL, PROPENSITY_FEATURES
-    from .features import PROPENSITY_FEATURE_TRANSFORMATIONS, MATCHING_COVARIATES
     from .features import load_data
     from .propensity import ElasticNetPropensityModel
+
+    TREATMENT_COL = "treatment"
+    SCORE_COL = "score"
+    GROUPBY_COL = "group"
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-file", required=True, dest="input_file")
     parser.add_argument("--output-file", required=True, dest="output_file")
     parser.add_argument("--treatment-col", default=TREATMENT_COL, dest="treatment_col")
     parser.add_argument("--groupby-col", default=GROUPBY_COL, dest="groupby_col")
+    parser.add_argument("--score-col", default=SCORE_COL, dest="score_col")
+    parser.add_argument("--feature-cols", nargs="+", required=True, dest="feature_cols")
     parser.add_argument(
-        "--feature-cols", nargs="+", default=PROPENSITY_FEATURES, dest="feature_cols"
+        "--matching-cols", nargs="+", required=True, dest="matching_cols"
     )
     parser.add_argument("--caliper", type=float, default=0.2)
     parser.add_argument("--replace", default=False, action="store_true")
@@ -455,16 +469,15 @@ if __name__ == "__main__":
     X = load_data(
         data=df,
         features=args.feature_cols,
-        transformations=PROPENSITY_FEATURE_TRANSFORMATIONS,
     )
 
     logger.info("Scoring with a propensity model: {}".format(pm))
-    df[SCORE_COL] = pm.fit_predict(X, w)
+    df[args.score_col] = pm.fit_predict(X, w)
 
     logger.info(
         "Balance before matching:\n{}".format(
             create_table_one(
-                data=df, treatment_col=args.treatment_col, features=MATCHING_COVARIATES
+                data=df, treatment_col=args.treatment_col, features=args.matching_cols
             )
         )
     )
@@ -475,7 +488,7 @@ if __name__ == "__main__":
     matched = psm.match_by_group(
         data=df,
         treatment_col=args.treatment_col,
-        score_cols=[SCORE_COL],
+        score_cols=[args.score_col],
         groupby_col=args.groupby_col,
     )
     logger.info("shape: {}\n{}".format(matched.shape, matched.head()))
@@ -485,7 +498,7 @@ if __name__ == "__main__":
             create_table_one(
                 data=matched,
                 treatment_col=args.treatment_col,
-                features=MATCHING_COVARIATES,
+                features=args.matching_cols,
             )
         )
     )

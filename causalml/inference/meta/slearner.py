@@ -47,7 +47,7 @@ class StatsmodelsOLS:
 class BaseSLearner(BaseLearner):
     """A parent class for S-learner classes.
     An S-learner estimates treatment effects with one machine learning model.
-    Details of S-learner are available at Kunzel et al. (2018) (https://arxiv.org/abs/1706.03461).
+    Details of S-learner are available at `Kunzel et al. (2018) <https://arxiv.org/abs/1706.03461>`_.
     """
 
     def __init__(self, learner=None, ate_alpha=0.05, control_name=0):

@@ -27,7 +27,7 @@ class BaseTLearner(BaseLearner):
 
     A T-learner estimates treatment effects with two machine learning models.
 
-    Details of T-learner are available at Kunzel et al. (2018) (https://arxiv.org/abs/1706.03461).
+    Details of T-learner are available at `Kunzel et al. (2018) <https://arxiv.org/abs/1706.03461>`_.
     """
 
     def __init__(

@@ -5,7 +5,7 @@ import statsmodels.api as sm
 from statsmodels.sandbox.regression.gmm import IV2SLS
 
 
-class IVRegressor(object):
+class IVRegressor:
     """A wrapper class that uses IV2SLS from statsmodel
 
     A linear 2SLS model that estimates the average treatment effect with endogenous treatment variable.

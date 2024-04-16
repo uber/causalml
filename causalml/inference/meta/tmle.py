@@ -93,7 +93,7 @@ def simple_tmle(y, w, q0w, q1w, p, alpha=0.0001):
     return np.mean(q1star - q0star), np.sqrt(np.var(ic) / np.size(y))
 
 
-class TMLELearner(object):
+class TMLELearner:
     """Targeted maximum likelihood estimation.
 
     Ref: Gruber, S., & Van Der Laan, M. J. (2009). Targeted maximum likelihood estimation: A gentle introduction.

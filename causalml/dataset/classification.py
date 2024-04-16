@@ -2,9 +2,9 @@ import random
 import numpy as np
 import pandas as pd
 from sklearn.datasets import make_classification
+from scipy.interpolate import UnivariateSpline
 from scipy.optimize import fsolve
-from scipy.special import expit
-from scipy.special import logit
+from scipy.special import expit, logit
 
 
 # ------ Define a list of functions for feature transformation
@@ -119,8 +119,9 @@ def _standardize(x):
 def _fixed_transformation(fs, x, f_index=0):
     """
     Transform and standardize a vector by a transformation function.
-    If the given index is within the function list f_index < len(fs), then use fs[f_index] as the transformation function
-    otherwise, randomly choose a function from the function list.
+    If the given index is within the function list f_index < len(fs), then use fs[f_index] as the transformation
+    function. Otherwise, randomly choose a function from the function list.
+
     Parameters
     ----------
     fs : list
@@ -160,7 +161,8 @@ def _random_transformation(fs, x):
 # @staticmethod
 def _softmax(z, p, xb):
     """
-    Softmax function. This function is used to reversely solve the constant root value in the linear part to make the softmax function output mean to be a given value.
+    Softmax function. This function is used to reversely solve the constant root value in the linear part to make the
+    softmax function output mean to be a given value.
 
     Parameters
     ----------
@@ -201,7 +203,8 @@ def make_uplift_classification_logistic(
     n_samples : int, optional (default=1000)
         The number of samples to be generated for each treatment group.
     treatment_name: list, optional (default = ['control','treatment1','treatment2','treatment3'])
-        The list of treatment names. The first element must be 'control' as control group, and the rest are treated as treatment groups.
+        The list of treatment names. The first element must be 'control' as control group, and the rest are treated as
+        treatment groups.
     y_name: string, optional (default = 'conversion')
         The name of the outcome variable to be used as a column in the output dataframe.
     n_classification_features: int, optional (default = 10)
@@ -218,7 +221,8 @@ def make_uplift_classification_logistic(
     n_mix_informative_uplift_dict: dictionary, optional (default: {'treatment1': 1, 'treatment2': 1, 'treatment3': 1})
         Number of mix features for each treatment. The mix feature is defined as a linear combination
         of a randomly selected informative classification feature and a randomly selected uplift feature.
-        The mixture is made by a weighted sum (p*feature1 + (1-p)*feature2), where the weight p is drawn from a uniform distribution between 0 and 1.
+        The mixture is made by a weighted sum (p*feature1 + (1-p)*feature2), where the weight p is drawn from a uniform
+        distribution between 0 and 1.
     delta_uplift_dict: dictionary, optional (default: {'treatment1': .02, 'treatment2': .05, 'treatment3': -.05})
         Treatment effect (delta), can be positive or negative.
         Dictionary of {treatment_key: delta}.
@@ -227,14 +231,18 @@ def make_uplift_classification_logistic(
     random_seed : int, optional (default = 20200101)
         The random seed to be used in the data generation process.
     feature_association_list : list, optional (default = ['linear','quadratic','cubic','relu','sin','cos'])
-        List of uplift feature association patterns to the treatment effect. For example, if the feature pattern is 'quadratic', then the treatment effect will increase or decrease quadratically with the feature.
-        The values in the list must be one of ('linear','quadratic','cubic','relu','sin','cos'). However, the same value can appear multiple times in the list.
+        List of uplift feature association patterns to the treatment effect. For example, if the feature pattern is
+        'quadratic', then the treatment effect will increase or decrease quadratically with the feature.
+        The values in the list must be one of ('linear','quadratic','cubic','relu','sin','cos'). However, the same
+        value can appear multiple times in the list.
     random_select_association : boolean, optional (default = True)
-        How the feature patterns are selected from the feature_association_list to be applied in the data generation process.
-        If random_select_association = True, then for every uplift feature, a random feature association pattern is selected from the list.
-        If random_select_association = False, then the feature association pattern is selected from the list in turns to be applied to each feature one by one.
+        How the feature patterns are selected from the feature_association_list to be applied in the data generation
+        process. If random_select_association = True, then for every uplift feature, a random feature association
+        pattern is selected from the list. If random_select_association = False, then the feature association pattern
+        is selected from the list in turns to be applied to each feature one by one.
     error_std : float, optional (default = 0.05)
-        Standard deviation to be used in the error term of the logistic regression. The error is drawn from a normal distribution with mean 0 and standard deviation specified in this argument.
+        Standard deviation to be used in the error term of the logistic regression. The error is drawn from a normal
+        distribution with mean 0 and standard deviation specified in this argument.
 
     Returns
     -------
@@ -273,7 +281,6 @@ def make_uplift_classification_logistic(
         f_list.append(feature_association_pattern_dict[fi])
 
     # generate treatment key ------------------------------------------------#
-    n_all = n * len(treatment_name)
     treatment_list = []
     for ti in treatment_name:
         treatment_list += [ti] * n
@@ -518,14 +525,16 @@ def make_uplift_classification(
     delta_uplift_decrease_dict: dictionary, optional (default: {'treatment1': 0., 'treatment2': 0., 'treatment3': 0.})
         Negative treatment effect created by the negative uplift features on the base classification label.
         Dictionary of {treatment_key: increase_delta}.
-    n_uplift_increase_mix_informative_dict: dictionary, optional (default: {'treatment1': 1, 'treatment2': 1, 'treatment3': 1})
+    n_uplift_increase_mix_informative_dict: dictionary, optional
         Number of positive mix features for each treatment. The positive mix feature is defined as a linear combination
         of a randomly selected informative classification feature and a randomly selected positive uplift feature.
         The linear combination is made by two coefficients sampled from a uniform distribution between -1 and 1.
-    n_uplift_decrease_mix_informative_dict: dictionary, optional (default: {'treatment1': 0, 'treatment2': 0, 'treatment3': 0})
+        default: {'treatment1': 1, 'treatment2': 1, 'treatment3': 1}
+    n_uplift_decrease_mix_informative_dict: dictionary, optional
         Number of negative mix features for each treatment. The negative mix feature is defined as a linear combination
         of a randomly selected informative classification feature and a randomly selected negative uplift feature. The
         linear combination is made by two coefficients sampled from a uniform distribution between -1 and 1.
+        default: {'treatment1': 0, 'treatment2': 0, 'treatment3': 0}
     positive_class_proportion: float, optional (default = 0.5)
         The proportion of positive label (1) in the control group.
     random_seed : int, optional (default = 20190101)

@@ -1,7 +1,6 @@
 import logging
 import numpy as np
 import pandas as pd
-from collections import defaultdict
 import matplotlib.pyplot as plt
 from importlib import import_module
 
@@ -77,7 +76,7 @@ def alignment_att(alpha, p, treatment):
     return adj
 
 
-class Sensitivity(object):
+class Sensitivity:
     """A Sensitivity Check class to support Placebo Treatment, Irrelevant Additional Confounder
     and Subset validation refutation methods to verify causal inference.
 
@@ -144,22 +143,14 @@ class Sensitivity(object):
             (numpy.ndarray): Mean and confidence interval (LB, UB) of the ATE estimate.
         """
 
-        learner = self.learner
-        from ..inference.meta.tlearner import BaseTLearner
-
-        if isinstance(learner, BaseTLearner):
-            ate, ate_lower, ate_upper = learner.estimate_ate(
-                X=X, treatment=treatment, y=y
+        try:
+            ate, ate_lower, ate_upper = self.learner.estimate_ate(
+                X=X, p=p, treatment=treatment, y=y, return_ci=True
             )
-        else:
-            try:
-                ate, ate_lower, ate_upper = learner.estimate_ate(
-                    X=X, p=p, treatment=treatment, y=y
-                )
-            except TypeError:
-                ate, ate_lower, ate_upper = learner.estimate_ate(
-                    X=X, treatment=treatment, y=y, return_ci=True
-                )
+        except TypeError:
+            ate, ate_lower, ate_upper = self.learner.estimate_ate(
+                X=X, p=p, treatment=treatment, y=y
+            )
         return ate[0], ate_lower[0], ate_upper[0]
 
     @staticmethod

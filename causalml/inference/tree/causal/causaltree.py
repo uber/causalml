@@ -1,5 +1,4 @@
 import logging
-import sys
 from typing import Union
 
 import tqdm
@@ -23,7 +22,7 @@ logger = logging.getLogger("causalml")
 class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
     """A Causal Tree regressor class.
     The Causal Tree is a decision tree regressor with a split criteria for treatment effects.
-    Details are available at Athey and Imbens (2015) (https://arxiv.org/abs/1504.01132)
+    Details are available at `Athey and Imbens (2015) <https://arxiv.org/abs/1504.01132)>`_.
     """
 
     def __init__(
