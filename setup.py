@@ -45,6 +45,8 @@ packages = find_packages(exclude=["tests", "tests.*"])
 nthreads = mp.cpu_count()
 if os.name == "nt":
     nthreads = 0
+else:
+    mp.set_start_method("fork", force=True)
 
 setup(
     packages=packages,
