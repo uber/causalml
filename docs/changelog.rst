@@ -3,6 +3,28 @@
 Changelog
 =========
 
+0.15.1 (Apr 2024)
+-----------------
+* This release fixes the build failure on macOS and a few bugs in ``UpliftTreeClassifier``.
+* We have two new contributors, @lee-junseok and @IanDelbridge. Thanks for your contributions!
+
+Updates
+~~~~~~~
+* Relax ``pandas`` version requirement by @jeongyoonlee in https://github.com/uber/causalml/pull/743
+* Remove undefined variables in ``match.__main__()`` by @jeongyoonlee in https://github.com/uber/causalml/pull/749
+* Fix ``distr_plot_single_sim()`` by @jeongyoonlee in https://github.com/uber/causalml/pull/750
+* Add ``with_std``, ``with_counts`` to ``create_table_one`` by @lee-junseok in https://github.com/uber/causalml/pull/748
+* fix stratified sampling call by @IanDelbridge in https://github.com/uber/causalml/pull/756
+* 20240207 honest leaf size by @IanDelbridge in https://github.com/uber/causalml/pull/753
+* 757: add ``return_ci=True`` in sensitivity by @lee-junseok in https://github.com/uber/causalml/pull/758
+* Update sensitivity tests with more meta-learners by @jeongyoonlee in https://github.com/uber/causalml/pull/759
+* manually specify ``multiprocessing`` use ``fork`` in ``setup.py`` by @IanDelbridge in https://github.com/uber/causalml/pull/754
+
+New contributors
+~~~~~~~~~~~~~~~~
+* @lee-junseok made their first contribution in https://github.com/uber/causalml/pull/748
+* @IanDelbridge made their first contribution in https://github.com/uber/causalml/pull/756
+
 0.15.0 (Feb 2024)
 -----------------
 * In this release, we revamped documentation, cleaned up dependencies, and improved installation - in addition to the long list of bug fixes.
