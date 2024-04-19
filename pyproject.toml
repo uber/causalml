@@ -68,3 +68,7 @@ requires = [
 
 [project.urls]
 homepage = "https://github.com/uber/causalml"
+
+[tool.cibuildwheel]
+build = ["cp38-*", "cp39-*", "cp310-*", "cp311-*"]
+build-verbosity = 1

@@ -8,6 +8,7 @@ env_docs/
 __pycache__
 build
 dist
+wheelhouse
 *.pyc
 _build/
 .ipynb_checkpoints/
