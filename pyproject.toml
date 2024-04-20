@@ -73,4 +73,4 @@ homepage = "https://github.com/uber/causalml"
 build = ["cp38-*", "cp39-*", "cp310-*", "cp311-*"]
 build-verbosity = 1
 # Skip 32-bit builds
-skip = ["*-win32", "*-manylinux_i686"]
+skip = ["*-win32", "*-manylinux_i686", "*-musllinux*"]
