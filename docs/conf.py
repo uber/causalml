@@ -13,7 +13,6 @@
 # serve to show the default.
 
 import matplotlib
-import sphinx_rtd_theme
 import importlib.metadata
 
 matplotlib.use("agg")
