@@ -18,3 +18,5 @@ _build/
 .coverage*
 *.html
 *.prof
+.trunk/**
+.venv/**
