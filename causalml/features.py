@@ -196,10 +196,11 @@ class OneHotEncoder(base.BaseEstimator):
                                              variables into dummy variables
         """
 
+        X_new = None
         for i, col in enumerate(X.columns):
             X_col = self._transform_col(X[col], i)
             if X_col is not None:
-                if i == 0:
+                if X_new is None:
                     X_new = X_col
                 else:
                     X_new = sparse.hstack((X_new, X_col))
@@ -208,6 +209,9 @@ class OneHotEncoder(base.BaseEstimator):
                 "{} --> {} features".format(col, self.label_encoder.label_maxes[i])
             )
 
+        assert (
+            X_new is not None
+        ), "no column was transformed, please check your dataframe input"
         return X_new
 
     def fit_transform(self, X, y=None):
