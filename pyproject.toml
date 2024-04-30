@@ -1,6 +1,6 @@
 [project]
 name = "causalml"
-version = "0.15.1+torchless0"
+version = "0.15.1+torchless1"
 description = "Python Package for Uplift Modeling and Causal Inference with Machine Learning Algorithms"
 readme = { file = "README.md", content-type = "text/markdown" }
 
