@@ -340,12 +340,16 @@ def get_tmlegain(
     lift_ub = []
 
     for col in model_names:
+        # Create `n_segment` equal segments from sorted model estimates. Rank is used to break ties.
+        # ref: https://stackoverflow.com/a/46979206/3216742
+        segments = pd.qcut(df[col].rank(method="first"), n_segment, labels=False)
+
         ate_model, ate_model_lb, ate_model_ub = tmle.estimate_ate(
             X=df[inference_col],
             p=df[p_col],
             treatment=df[treatment_col],
             y=df[outcome_col],
-            segment=pd.qcut(df[col], n_segment, labels=False),
+            segment=segments,
         )
         lift_model = [0.0] * (n_segment + 1)
         lift_model[n_segment] = ate_all[0]
@@ -446,19 +450,21 @@ def get_tmleqini(
     qini_ub = []
 
     for col in model_names:
+        # Create `n_segment` equal segments from sorted model estimates. Rank is used to break ties.
+        # ref: https://stackoverflow.com/a/46979206/3216742
+        segments = pd.qcut(df[col].rank(method="first"), n_segment, labels=False)
+
         ate_model, ate_model_lb, ate_model_ub = tmle.estimate_ate(
             X=df[inference_col],
             p=df[p_col],
             treatment=df[treatment_col],
             y=df[outcome_col],
-            segment=pd.qcut(df[col], n_segment, labels=False),
+            segment=segments,
         )
 
         qini_model = [0]
         for i in range(1, n_segment):
-            n_tr = df[pd.qcut(df[col], n_segment, labels=False) == (n_segment - i)][
-                treatment_col
-            ].sum()
+            n_tr = df[segments == (n_segment - i)][treatment_col].sum()
             qini_model.append(ate_model[0][n_segment - i] * n_tr)
 
         qini.append(qini_model)
@@ -467,9 +473,7 @@ def get_tmleqini(
             qini_lb_model = [0]
             qini_ub_model = [0]
             for i in range(1, n_segment):
-                n_tr = df[pd.qcut(df[col], n_segment, labels=False) == (n_segment - i)][
-                    treatment_col
-                ].sum()
+                n_tr = df[segments == (n_segment - i)][treatment_col].sum()
                 qini_lb_model.append(ate_model_lb[0][n_segment - i] * n_tr)
                 qini_ub_model.append(ate_model_ub[0][n_segment - i] * n_tr)
 
