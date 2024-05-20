@@ -42,7 +42,13 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         return False
 
     def fit(
-        self, X, y, treatment, sample_weight=None, check_input=True, X_idx_sorted="deprecated"
+        self,
+        X,
+        y,
+        treatment,
+        sample_weight=None,
+        check_input=True,
+        X_idx_sorted="deprecated",
     ):
         random_state = check_random_state(self.random_state)
 

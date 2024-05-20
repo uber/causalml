@@ -205,7 +205,13 @@ class CausalRandomForestRegressor(ForestRegressor):
         self.alpha = alpha
         self.groups_cnt = groups_cnt
 
-    def _fit(self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None):
+    def _fit(
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+        sample_weight: np.ndarray = None,
+    ):
         """
         Build a forest of trees from the training set (X, y).
         With modified _parallel_build_trees for Causal Trees used in BaseForest.fit()
@@ -377,7 +383,13 @@ class CausalRandomForestRegressor(ForestRegressor):
 
         return self
 
-    def fit(self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None):
+    def fit(
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+        sample_weight: np.ndarray = None,
+    ):
         """
         Fit Causal RandomForest
         Args:

@@ -179,7 +179,9 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         X, y, w = self._prepare_data(X=X, y=y, treatment=treatment)
         self.treatment_groups = np.unique(w)
 
-        super().fit(X=X, treatment=w, y=y, sample_weight=sample_weight, check_input=check_input)
+        super().fit(
+            X=X, treatment=w, y=y, sample_weight=sample_weight, check_input=check_input
+        )
 
         if self.groups_cnt:
             self._groups_cnt = self._count_groups_distribution(X=X, treatment=w)
