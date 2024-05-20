@@ -29,6 +29,7 @@ cdef class Criterion:
 
     # Internal structures
     cdef const DOUBLE_t[:, ::1] y        # Values of y
+    cdef DOUBLE_t* treatment             # Treatment assignment
     cdef DOUBLE_t* sample_weight         # Sample weights
 
     cdef SIZE_t* samples                 # Sample indices in X, y
@@ -56,7 +57,7 @@ cdef class Criterion:
     # statistics correspond to samples[start:pos] and samples[pos:end].
 
     # Methods
-    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
+    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* treatment, DOUBLE_t* sample_weight,
                   double weighted_n_samples, SIZE_t* samples, SIZE_t start,
                   SIZE_t end) nogil except -1
     cdef int reset(self) nogil except -1
