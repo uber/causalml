@@ -51,12 +51,14 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         self.min_impurity_decrease = min_impurity_decrease
 
     cpdef build(self, Tree tree, object X, np.ndarray y,
+                np.ndarray treatment,
                 np.ndarray sample_weight=None):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
-        X, y, sample_weight = self._check_input(X, y, sample_weight)
+        X, y, treatment, sample_weight = self._check_input(X, y, treatment, sample_weight)
 
+        cdef DOUBLE_t* treatment_ptr = <DOUBLE_t*> treatment.data
         cdef DOUBLE_t* sample_weight_ptr = NULL
         if sample_weight is not None:
             sample_weight_ptr = <DOUBLE_t*> sample_weight.data
@@ -80,7 +82,7 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef double min_impurity_decrease = self.min_impurity_decrease
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, sample_weight_ptr)
+        splitter.init(X, y, treatment_ptr, sample_weight_ptr)
 
         cdef SIZE_t start
         cdef SIZE_t end
@@ -239,13 +241,20 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
 
-    cpdef build(self, Tree tree, object X, np.ndarray y,
-                np.ndarray sample_weight=None):
+    cpdef build(
+        self,
+        Tree tree,
+        object X,
+        np.ndarray y,
+        np.ndarray treatment,
+        np.ndarray sample_weight=None
+    ):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
-        X, y, sample_weight = self._check_input(X, y, sample_weight)
+        X, y, treatment, sample_weight = self._check_input(X, y, treatment, sample_weight)
 
+        cdef DOUBLE_t* treatment_ptr = <DOUBLE_t*> treatment.data
         cdef DOUBLE_t* sample_weight_ptr = NULL
         if sample_weight is not None:
             sample_weight_ptr = <DOUBLE_t*> sample_weight.data
@@ -258,7 +267,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         cdef SIZE_t min_samples_split = self.min_samples_split
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, sample_weight_ptr)
+        splitter.init(X, y, treatment_ptr, sample_weight_ptr)
 
         cdef vector[FrontierRecord] frontier
         cdef FrontierRecord record

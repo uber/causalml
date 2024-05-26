@@ -15,17 +15,24 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
     """
     cdef public SplitState state
     cdef public double groups_penalty
-    cdef public double eps
 
-    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
-                    double weighted_n_samples, SIZE_t* samples, SIZE_t start,
-                    SIZE_t end) nogil except -1:
+    cdef int init(
+        self,
+        const DOUBLE_t[:, ::1] y,
+        DOUBLE_t* treatment,
+        DOUBLE_t* sample_weight,
+        double weighted_n_samples,
+        SIZE_t* samples,
+        SIZE_t start,
+        SIZE_t end
+    ) nogil except -1:
         """Initialize the criterion.
         This initializes the criterion at node samples[start:end] and children
         samples[start:start] and samples[start:end].
         """
         # Initialize fields
         self.y = y
+        self.treatment = treatment
         self.sample_weight = sample_weight
         self.samples = samples
         self.start = start
@@ -43,14 +50,13 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
         memset(&self.sum_total[0], 0, self.n_outputs * sizeof(double))
         self.sq_sum_total = 0.
-        self.eps = 1e-5
         self.state.node = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
         self.state.left = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
         self.state.right = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
 
         for p in range(start, end):
             i = samples[p]
-            is_treated = sample_weight[i] - self.eps
+            is_treated = treatment[i]
 
             self.sum_total[k] += self.y[i, k]
             self.sq_sum_total += self.y[i, k] * self.y[i, k]
@@ -139,6 +145,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
     cdef int update(self, SIZE_t new_pos) nogil except -1:
         """Updated statistics by moving samples[pos:new_pos] to the left."""
         cdef double * sample_weight = self.sample_weight
+        cdef double * treatment = self.treatment
         cdef SIZE_t * samples = self.samples
 
         cdef SIZE_t pos = self.pos
@@ -159,7 +166,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         if (new_pos - pos) <= (end - new_pos):
             for p in range(pos, new_pos):
                 i = samples[p]
-                is_treated = sample_weight[i] - self.eps
+                is_treated = treatment[i]
 
                 self.sum_left[k] += self.y[i, k]
                 self.state.left.tr_y_sum += is_treated * self.y[i, k]
@@ -175,7 +182,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
             for p in range(end - 1, new_pos - 1, -1):
                 i = samples[p]
-                is_treated = sample_weight[i] - self.eps
+                is_treated = treatment[i]
 
                 self.sum_left[k] -= self.y[i, k]
                 self.state.left.tr_y_sum -= is_treated * self.y[i, k]
@@ -267,8 +274,11 @@ cdef class StandardMSE(CausalRegressionCriterion):
         return (proxy_impurity_left / self.weighted_n_left +
                 proxy_impurity_right / self.weighted_n_right)
 
-    cdef void children_impurity(self, double * impurity_left,
-                                double * impurity_right) nogil:
+    cdef void children_impurity(
+        self,
+        double * impurity_left,
+        double * impurity_right
+    ) nogil:
         """Evaluate the impurity in children nodes.
         i.e. the impurity of the left child (samples[start:pos]) and the
         impurity the right child (samples[pos:end]).

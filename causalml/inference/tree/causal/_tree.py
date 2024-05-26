@@ -42,7 +42,13 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         return False
 
     def fit(
-        self, X, y, sample_weight=None, check_input=True, X_idx_sorted="deprecated"
+        self,
+        X,
+        treatment,
+        y,
+        sample_weight=None,
+        check_input=True,
+        X_idx_sorted="deprecated",
     ):
         random_state = check_random_state(self.random_state)
 
@@ -83,7 +89,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             y = np.reshape(y, (-1, 1))
 
         # For memory allocation to store control, treatment outcomes
-        self.n_outputs_ = np.unique(sample_weight).astype(int).size
+        self.n_outputs_ = np.unique(treatment).astype(int).size
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
@@ -204,7 +210,6 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             criterion = CAUSAL_TREES_CRITERIA[self.criterion](
                 self.n_outputs_, n_samples
             )
-            criterion.eps = self.eps
             criterion.groups_penalty = self.groups_penalty
         else:
             # Make a deepcopy in case the criterion has mutable attributes that
@@ -249,7 +254,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 self.min_impurity_decrease,
             )
 
-        builder.build(self.tree_, X, y, sample_weight)
+        builder.build(self.tree_, X, y, treatment, sample_weight)
 
         self._prune_tree()
 

@@ -33,6 +33,7 @@ def _parallel_build_trees(
     tree,
     forest,
     X,
+    treatment,
     y,
     sample_weight,
     tree_idx,
@@ -48,11 +49,16 @@ def _parallel_build_trees(
 
     if forest.bootstrap:
         n_samples = X.shape[0]
+        if sample_weight is None:
+            curr_sample_weight = np.ones((n_samples,), dtype=np.float64)
+        else:
+            curr_sample_weight = sample_weight.copy()
+
         indices = _generate_sample_indices(
             tree.random_state, n_samples, n_samples_bootstrap
         )
-        X, y = X[indices].copy(), y[indices].copy()
-        curr_sample_weight = sample_weight[indices].copy()
+        sample_counts = np.bincount(indices, minlength=n_samples)
+        curr_sample_weight *= sample_counts
 
         if class_weight == "subsample":
             with catch_warnings():
@@ -61,9 +67,9 @@ def _parallel_build_trees(
         elif class_weight == "balanced_subsample":
             curr_sample_weight *= compute_sample_weight("balanced", y, indices=indices)
 
-        tree.fit(X, y, sample_weight=curr_sample_weight, check_input=False)
+        tree.fit(X, treatment, y, sample_weight=curr_sample_weight, check_input=False)
     else:
-        tree.fit(X, y, sample_weight=sample_weight, check_input=False)
+        tree.fit(X, treatment, y, sample_weight=sample_weight, check_input=False)
 
     return tree
 
@@ -199,7 +205,13 @@ class CausalRandomForestRegressor(ForestRegressor):
         self.alpha = alpha
         self.groups_cnt = groups_cnt
 
-    def _fit(self, X: np.ndarray, y: np.ndarray, sample_weight: np.ndarray = None):
+    def _fit(
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+        sample_weight: np.ndarray = None,
+    ):
         """
         Build a forest of trees from the training set (X, y).
         With modified _parallel_build_trees for Causal Trees used in BaseForest.fit()
@@ -211,6 +223,9 @@ class CausalRandomForestRegressor(ForestRegressor):
             The training input samples. Internally, its dtype will be converted
             to ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csc_matrix``.
+
+        treatment : array-like of shape (n_samples,)
+            The treatment assignments.
 
         y : array-like of shape (n_samples,) or (n_samples, n_outputs)
             The target values (class labels in classification, real numbers in
@@ -267,8 +282,7 @@ class CausalRandomForestRegressor(ForestRegressor):
                     "is necessary for Poisson regression."
                 )
 
-        self.n_outputs_ = np.unique(sample_weight).astype(int).size + 1
-        self.max_outputs_ = self.n_outputs_
+        self.max_outputs_ = np.unique(treatment).astype(int).size + 1
         y, expanded_class_weight = self._validate_y_class_weight(y)
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
@@ -335,13 +349,14 @@ class CausalRandomForestRegressor(ForestRegressor):
                 **_joblib_parallel_args,
             )(
                 delayed(_parallel_build_trees)(
-                    t,
-                    self,
-                    X,
-                    y,
-                    sample_weight,
-                    i,
-                    len(trees),
+                    tree=t,
+                    forest=self,
+                    X=X,
+                    treatment=treatment,
+                    y=y,
+                    sample_weight=sample_weight,
+                    tree_idx=i,
+                    n_trees=len(trees),
                     verbose=self.verbose,
                     class_weight=self.class_weight,
                     n_samples_bootstrap=n_samples_bootstrap,
@@ -368,18 +383,25 @@ class CausalRandomForestRegressor(ForestRegressor):
 
         return self
 
-    def fit(self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray):
+    def fit(
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+        sample_weight: np.ndarray = None,
+    ):
         """
         Fit Causal RandomForest
         Args:
             X: (np.ndarray), feature matrix
             treatment: (np.ndarray), treatment vector
             y: (np.ndarray), outcome vector
+            sample_weight: (np.ndarray), sample weights
         Returns:
              self
         """
-        X, y, w = self._estimator._prepare_data(X=X, y=y, treatment=treatment)
-        return self._fit(X=X, y=y, sample_weight=w)
+        X, y, w = self._estimator._prepare_data(X=X, treatment=treatment, y=y)
+        return self._fit(X=X, treatment=w, y=y, sample_weight=sample_weight)
 
     def predict(self, X: np.ndarray, with_outcomes: bool = False) -> np.ndarray:
         """Predict individual treatment effects

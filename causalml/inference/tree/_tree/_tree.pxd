@@ -103,6 +103,7 @@ cdef class TreeBuilder:
         Tree tree,
         object X,
         cnp.ndarray y,
+        cnp.ndarray treatment,
         cnp.ndarray sample_weight=*,
     )
 
@@ -110,5 +111,6 @@ cdef class TreeBuilder:
         self,
         object X,
         cnp.ndarray y,
+        cnp.ndarray treatment,
         cnp.ndarray sample_weight,
     )

@@ -129,7 +129,6 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         self.min_samples_leaf = min_samples_leaf
         self.random_state = random_state
 
-        self.eps = 1e-5
         self._classes = {}
         self.groups_cnt = groups_cnt
         self.groups_cnt_mode = groups_cnt_mode
@@ -153,19 +152,19 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
     def fit(
         self,
         X: np.ndarray,
+        treatment: np.ndarray,
         y: np.ndarray,
-        treatment: np.ndarray = None,
         sample_weight: np.ndarray = None,
         check_input=False,
     ):
         """
         Fit CausalTreeRegressor
         Args:
-            X: : (np.ndarray), feature matrix
-            y: : (np.ndarray), outcome vector
-            treatment: : (np.ndarray), treatment vector
-            sample_weight: (np.ndarray), sample_weight
-            check_input: (bool)
+            X (np.ndarray): feature matrix
+            treatment (np.ndarray): treatment vector
+            y (np.ndarray): outcome vector
+            sample_weight (np.ndarray): sample_weight
+            check_input (bool, optional): default=False
         Returns:
             self
         """
@@ -177,16 +176,12 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 "min_impurity_decrease must be set to -inf for causal_mse criterion"
             )
 
-        if treatment is None and sample_weight is None:
-            raise ValueError("`treatment` or `sample_weight` must be provided")
-
-        if treatment is None:
-            X, y, w = X, y, sample_weight
-        else:
-            X, y, w = self._prepare_data(X=X, y=y, treatment=treatment)
+        X, y, w = self._prepare_data(X=X, y=y, treatment=treatment)
         self.treatment_groups = np.unique(w)
 
-        super().fit(X=X, y=y, sample_weight=self.eps + w, check_input=check_input)
+        super().fit(
+            X=X, treatment=w, y=y, sample_weight=sample_weight, check_input=check_input
+        )
 
         if self.groups_cnt:
             self._groups_cnt = self._count_groups_distribution(X=X, treatment=w)
