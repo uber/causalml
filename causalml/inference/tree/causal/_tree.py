@@ -44,8 +44,8 @@ class BaseCausalDecisionTree(BaseDecisionTree):
     def fit(
         self,
         X,
-        y,
         treatment,
+        y,
         sample_weight=None,
         check_input=True,
         X_idx_sorted="deprecated",

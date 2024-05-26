@@ -164,7 +164,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             treatment (np.ndarray): treatment vector
             y (np.ndarray): outcome vector
             sample_weight (np.ndarray): sample_weight
-            check_input (bool, optional), default=False
+            check_input (bool, optional): default=False
         Returns:
             self
         """
