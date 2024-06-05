@@ -80,6 +80,7 @@ Create a clean ``conda`` environment.
     conda install -c conda-forge cxx-compiler
     conda install python-graphviz
     conda install -c conda-forge xorg-libxrender
+    conda install -c conda-forge libxcrypt
 
 Then:
 
