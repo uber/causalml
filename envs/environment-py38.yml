@@ -22,7 +22,7 @@ dependencies:
     - cython==0.29.23
     - decorator==5.0.7
     - defusedxml==0.7.1
-    - dill==0.3.5.1
+    - dill==0.3.3
     - entrypoints==0.3
     - future==0.18.2
     - gast==0.3.3
@@ -133,4 +133,4 @@ dependencies:
     - widgetsnbextension==3.5.1
     - wrapt==1.12.1
     - xgboost==1.4.1
-    - causalml>=0.15.1
+    - causalml>=0.10.0
