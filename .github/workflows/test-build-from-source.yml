@@ -55,6 +55,7 @@ jobs:
           conda install -c conda-forge cxx-compiler
           conda install python-graphviz
           conda install -c conda-forge xorg-libxrender
+          conda install -c conda-forge libxcrypt
 
       - name: echo conda config
         run: |
