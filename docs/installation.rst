@@ -29,29 +29,6 @@ Directly install from the ``conda-forge`` channel using ``conda``.
 
     conda install -c conda-forge causalml
 
-Install from the ``conda`` virtual environment
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-This will create a new ``conda`` virtual environment named ``causalml-[tf-]py3x``, where ``x`` is in ``[7, 8, 9]``. e.g. ``causalml-py37`` or ``causalml-tf-py38``. If you want to change the name of the environment, update the relevant YAML file in ``envs/``.
-
-.. code-block:: bash
-
-    git clone https://github.com/uber/causalml.git
-    cd causalml/envs/
-    conda env create -f environment-py38.yml	# for the virtual environment with Python 3.8 and CausalML
-    conda activate causalml-py38
-
-Install ``causalml`` with ``tensorflow``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: bash
-
-    git clone https://github.com/uber/causalml.git
-    cd causalml/envs/
-    conda env create -f environment-tf-py38.yml	# for the virtual environment with Python 3.8 and CausalML
-    conda activate causalml-tf-py38
-    pip install -U numpy			# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
-
 Install from ``PyPI``
 ---------------------
 
