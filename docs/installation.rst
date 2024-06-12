@@ -2,9 +2,9 @@
 Installation
 ============
 
-Installation with ``conda`` is recommended.
+Installation with ``conda`` or ``pip`` is recommended.  Developers can follow the **Install from source** instructions below.  If building from source, consider doing so within a conda environment and then exporting the environment for reproducibility. 
 
-``conda`` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the ``inference.tf`` module (e.g. ``DragonNet``), additional dependency of ``tensorflow`` is required. For detailed instructions, see below.
+To use models under the ``inference.tf`` module (e.g. ``DragonNet``), additional dependency of ``tensorflow`` is required. For detailed instructions, see below.
 
 Install using ``conda``
 -----------------------
