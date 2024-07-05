@@ -48,7 +48,7 @@ cdef class Criterion:
     def __setstate__(self, d):
         pass
 
-    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
+    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* treatment, DOUBLE_t* sample_weight,
                   double weighted_n_samples, SIZE_t* samples, SIZE_t start,
                   SIZE_t end) nogil except -1:
         """Placeholder for a method which will initialize the criterion.
@@ -60,6 +60,8 @@ cdef class Criterion:
         ----------
         y : array-like, dtype=DOUBLE_t
             y is a buffer that can store values for n_outputs target variables
+        treatment : array-like, dtype=DOUBLE_t
+            The treatment assignment of each sample.
         sample_weight : array-like, dtype=DOUBLE_t
             The weight of each sample
         weighted_n_samples : double
@@ -224,6 +226,7 @@ cdef class RegressionCriterion(Criterion):
             The total number of samples to fit on
         """
         # Default values
+        self.treatment = NULL
         self.sample_weight = NULL
 
         self.samples = NULL
@@ -259,7 +262,7 @@ cdef class RegressionCriterion(Criterion):
     def __reduce__(self):
         return (type(self), (self.n_outputs, self.n_samples), self.__getstate__())
 
-    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* sample_weight,
+    cdef int init(self, const DOUBLE_t[:, ::1] y, DOUBLE_t* treatment, DOUBLE_t* sample_weight,
                   double weighted_n_samples, SIZE_t* samples, SIZE_t start,
                   SIZE_t end) nogil except -1:
         """Initialize the criterion.
@@ -269,6 +272,7 @@ cdef class RegressionCriterion(Criterion):
         """
         # Initialize fields
         self.y = y
+        self.treatment = treatment
         self.sample_weight = sample_weight
         self.samples = samples
         self.start = start

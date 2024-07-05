@@ -115,7 +115,7 @@ class TestCausalTreeRegressor(CausalTreeBase):
     def test_predict(self, generate_regression_data):
         y, X, treatment, tau, b, e = generate_regression_data(mode=2)
         ctree = self.prepare_model()
-        ctree.fit(X=X, y=y, treatment=treatment)
+        ctree.fit(X=X, treatment=treatment, y=y)
         y_pred = ctree.predict(X[:1, :])
         y_pred_with_outcomes = ctree.predict(X[:1, :], with_outcomes=True)
         assert y_pred.shape == (1,)
