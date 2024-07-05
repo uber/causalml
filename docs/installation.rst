@@ -2,9 +2,9 @@
 Installation
 ============
 
-Installation with ``conda`` is recommended.
+Installation with ``conda`` or ``pip`` is recommended.  Developers can follow the **Install from source** instructions below.  If building from source, consider doing so within a conda environment and then exporting the environment for reproducibility. 
 
-``conda`` environment files for Python 3.7, 3.8 and 3.9 are available in the repository. To use models under the ``inference.tf`` module (e.g. ``DragonNet``), additional dependency of ``tensorflow`` is required. For detailed instructions, see below.
+To use models under the ``inference.tf`` module (e.g. ``DragonNet``), additional dependency of ``tensorflow`` is required. For detailed instructions, see below.
 
 Install using ``conda``
 -----------------------
@@ -28,31 +28,6 @@ Directly install from the ``conda-forge`` channel using ``conda``.
 .. code-block:: bash
 
     conda install -c conda-forge causalml
-
-Install from the ``conda`` virtual environment
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-This will create a new ``conda`` virtual environment named ``causalml-[tf-]py3x``, where ``x`` is in ``[7, 8, 9]``. e.g. ``causalml-py37`` or ``causalml-tf-py38``. If you want to change the name of the environment, update the relevant YAML file in ``envs/``.
-
-Note: if you do not have the base cxx-compiler libraries installed, follow the ``Install from source`` instructions below to install them first.
-
-.. code-block:: bash
-
-    git clone https://github.com/uber/causalml.git
-    cd causalml/envs/
-    conda env create -f environment-py38.yml	# for the virtual environment with Python 3.8 and CausalML
-    conda activate causalml-py38
-
-Install ``causalml`` with ``tensorflow``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: bash
-
-    git clone https://github.com/uber/causalml.git
-    cd causalml/envs/
-    conda env create -f environment-tf-py38.yml	# for the virtual environment with Python 3.8 and CausalML
-    conda activate causalml-tf-py38
-    pip install -U numpy			# this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
 
 Install from ``PyPI``
 ---------------------
