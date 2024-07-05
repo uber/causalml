@@ -97,11 +97,13 @@ cdef class TreeBuilder:
     """Interface for different tree building strategies."""
 
     cpdef build(self, Tree tree, object X, cnp.ndarray y,
+                cnp.ndarray treatment,
                 cnp.ndarray sample_weight=None):
         """Build a decision tree from the training set (X, y)."""
         pass
 
     cdef inline _check_input(self, object X, cnp.ndarray y,
+                             cnp.ndarray treatment,
                              cnp.ndarray sample_weight):
         """Check input dtype, layout and format"""
         if issparse(X):
@@ -122,13 +124,16 @@ cdef class TreeBuilder:
         if y.dtype != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
 
+        if treatment.dtype != DOUBLE or not treatment.flags.contiguous:
+            treatment = np.ascontiguousarray(treatment, dtype=DOUBLE)
+
         if (sample_weight is not None and
             (sample_weight.dtype != DOUBLE or
             not sample_weight.flags.contiguous)):
                 sample_weight = np.asarray(sample_weight, dtype=DOUBLE,
                                            order="C")
 
-        return X, y, sample_weight
+        return X, y, treatment, sample_weight
 
 # Depth first builder ---------------------------------------------------------
 
@@ -146,12 +151,14 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
         self.min_impurity_decrease = min_impurity_decrease
 
     cpdef build(self, Tree tree, object X, cnp.ndarray y,
+                cnp.ndarray treatment,
                 cnp.ndarray sample_weight=None):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
-        X, y, sample_weight = self._check_input(X, y, sample_weight)
+        X, y, treatment, sample_weight = self._check_input(X, y, treatment, sample_weight)
 
+        cdef DOUBLE_t* treatment_ptr = <DOUBLE_t*> treatment.data
         cdef DOUBLE_t* sample_weight_ptr = NULL
         if sample_weight is not None:
             sample_weight_ptr = <DOUBLE_t*> sample_weight.data
@@ -175,7 +182,7 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
         cdef double min_impurity_decrease = self.min_impurity_decrease
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, sample_weight_ptr)
+        splitter.init(X, y, treatment_ptr, sample_weight_ptr)
 
         cdef SIZE_t start
         cdef SIZE_t end
@@ -328,12 +335,14 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
         self.min_impurity_decrease = min_impurity_decrease
 
     cpdef build(self, Tree tree, object X, cnp.ndarray y,
+                cnp.ndarray treatment,
                 cnp.ndarray sample_weight=None):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
-        X, y, sample_weight = self._check_input(X, y, sample_weight)
+        X, y, treatment, sample_weight = self._check_input(X, y, treatment, sample_weight)
 
+        cdef DOUBLE_t* treatment_ptr = <DOUBLE_t*> treatment.data
         cdef DOUBLE_t* sample_weight_ptr = NULL
         if sample_weight is not None:
             sample_weight_ptr = <DOUBLE_t*> sample_weight.data
@@ -346,7 +355,7 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
         cdef SIZE_t min_samples_split = self.min_samples_split
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, sample_weight_ptr)
+        splitter.init(X, y, treatment_ptr, sample_weight_ptr)
 
         cdef vector[FrontierRecord] frontier
         cdef FrontierRecord record

@@ -89,7 +89,13 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
 
     @abstractmethod
     def fit(
-        self, X, y, sample_weight=None, check_input=True, X_idx_sorted="deprecated"
+        self,
+        X,
+        treatment,
+        y,
+        sample_weight=None,
+        check_input=True,
+        X_idx_sorted="deprecated",
     ):
         pass
 

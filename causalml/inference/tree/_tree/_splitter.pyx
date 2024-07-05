@@ -94,6 +94,7 @@ cdef class Splitter:
         self.n_features = 0
         self.feature_values = NULL
 
+        self.treatment = NULL
         self.sample_weight = NULL
 
         self.max_features = max_features
@@ -118,6 +119,7 @@ cdef class Splitter:
     cdef int init(self,
                    object X,
                    const DOUBLE_t[:, ::1] y,
+                   DOUBLE_t* treatment,
                    DOUBLE_t* sample_weight) except -1:
         """Initialize the splitter.
 
@@ -133,6 +135,9 @@ cdef class Splitter:
 
         y : ndarray, dtype=DOUBLE_t
             This is the vector of targets, or true labels, for the samples
+
+        treatment : DOUBLE_t*
+            The treatment assignments of the samples.
 
         sample_weight : DOUBLE_t*
             The weights of the samples, where higher weighted samples are fit
@@ -180,6 +185,7 @@ cdef class Splitter:
         self.y = y
 
         self.sample_weight = sample_weight
+        self.treatment = treatment
         return 0
 
     cdef int node_reset(self, SIZE_t start, SIZE_t end,
@@ -203,6 +209,7 @@ cdef class Splitter:
         self.end = end
 
         self.criterion.init(self.y,
+                            self.treatment,
                             self.sample_weight,
                             self.weighted_n_samples,
                             self.samples,
@@ -243,6 +250,7 @@ cdef class BaseDenseSplitter(Splitter):
     cdef int init(self,
                   object X,
                   const DOUBLE_t[:, ::1] y,
+                  DOUBLE_t* treatment,
                   DOUBLE_t* sample_weight) except -1:
         """Initialize the splitter
 
@@ -251,7 +259,7 @@ cdef class BaseDenseSplitter(Splitter):
         """
 
         # Call parent init
-        Splitter.init(self, X, y, sample_weight)
+        Splitter.init(self, X, y, treatment, sample_weight)
 
         self.X = X
         return 0
@@ -802,6 +810,7 @@ cdef class BaseSparseSplitter(Splitter):
     cdef int init(self,
                   object X,
                   const DOUBLE_t[:, ::1] y,
+                  DOUBLE_t* treatment,
                   DOUBLE_t* sample_weight) except -1:
         """Initialize the splitter
 
@@ -809,7 +818,7 @@ cdef class BaseSparseSplitter(Splitter):
         or 0 otherwise.
         """
         # Call parent init
-        Splitter.init(self, X, y, sample_weight)
+        Splitter.init(self, X, y, treatment, sample_weight)
 
         if not isinstance(X, csc_matrix):
             raise ValueError("X should be in csc format")
