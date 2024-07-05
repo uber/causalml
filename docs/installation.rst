@@ -34,6 +34,8 @@ Install from the ``conda`` virtual environment
 
 This will create a new ``conda`` virtual environment named ``causalml-[tf-]py3x``, where ``x`` is in ``[7, 8, 9]``. e.g. ``causalml-py37`` or ``causalml-tf-py38``. If you want to change the name of the environment, update the relevant YAML file in ``envs/``.
 
+Note: if you do not have the base cxx-compiler libraries installed, follow the ``Install from source`` instructions below to install them first.
+
 .. code-block:: bash
 
     git clone https://github.com/uber/causalml.git
@@ -80,6 +82,7 @@ Create a clean ``conda`` environment.
     conda install -c conda-forge cxx-compiler
     conda install python-graphviz
     conda install -c conda-forge xorg-libxrender
+    conda install -c conda-forge libxcrypt
 
 Then:
 
