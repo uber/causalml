@@ -115,7 +115,9 @@ class GradientBoostedPropensityModel(PropensityModel):
     def __init__(self, early_stop=False, clip_bounds=(1e-3, 1 - 1e-3), **model_kwargs):
         self.early_stop = early_stop
 
-        super(GradientBoostedPropensityModel, self).__init__(clip_bounds, **model_kwargs)
+        super(GradientBoostedPropensityModel, self).__init__(
+            clip_bounds, **model_kwargs
+        )
 
     @property
     def _model(self):
