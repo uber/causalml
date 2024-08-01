@@ -113,10 +113,9 @@ class GradientBoostedPropensityModel(PropensityModel):
     """
 
     def __init__(self, early_stop=False, clip_bounds=(1e-3, 1 - 1e-3), **model_kwargs):
-        super(GradientBoostedPropensityModel, self).__init__(
-            clip_bounds, **model_kwargs
-        )
         self.early_stop = early_stop
+
+        super(GradientBoostedPropensityModel, self).__init__(clip_bounds, **model_kwargs)
 
     @property
     def _model(self):
@@ -131,9 +130,12 @@ class GradientBoostedPropensityModel(PropensityModel):
         }
         kwargs.update(self.model_kwargs)
 
+        if self.early_stop:
+            kwargs.update({"early_stopping_rounds": 10})
+
         return xgb.XGBClassifier(**kwargs)
 
-    def fit(self, X, y, early_stopping_rounds=10, stop_val_size=0.2):
+    def fit(self, X, y, stop_val_size=0.2):
         """
         Fit a propensity model.
 
@@ -151,7 +153,6 @@ class GradientBoostedPropensityModel(PropensityModel):
                 X_train,
                 y_train,
                 eval_set=[(X_val, y_val)],
-                early_stopping_rounds=early_stopping_rounds,
             )
         else:
             super(GradientBoostedPropensityModel, self).fit(X, y)

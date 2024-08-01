@@ -555,15 +555,28 @@ class XGBRRegressor(BaseRRegressor):
             self.test_size = test_size
             self.early_stopping_rounds = early_stopping_rounds
 
-        super().__init__(
-            outcome_learner=XGBRegressor(random_state=random_state, *args, **kwargs),
-            effect_learner=XGBRegressor(
+            effect_learner = XGBRegressor(
                 objective=self.effect_learner_objective,
                 n_estimators=self.effect_learner_n_estimators,
+                eval_metric=self.effect_learner_eval_metric,
+                early_stopping_rounds=self.early_stopping_rounds,
                 random_state=random_state,
                 *args,
                 **kwargs,
-            ),
+            )
+        else:
+            effect_learner = XGBRegressor(
+                objective=self.effect_learner_objective,
+                n_estimators=self.effect_learner_n_estimators,
+                eval_metric=self.effect_learner_eval_metric,
+                random_state=random_state,
+                *args,
+                **kwargs,
+            )
+
+        super().__init__(
+            outcome_learner=XGBRegressor(random_state=random_state, *args, **kwargs),
+            effect_learner=effect_learner,
         )
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
@@ -654,19 +667,14 @@ class XGBRRegressor(BaseRRegressor):
                 self.models_tau[group].fit(
                     X=X_train_filt,
                     y=(y_train_filt - yhat_train_filt) / (w_train - p_train_filt),
-                    sample_weight=sample_weight_train_filt
-                    * ((w_train - p_train_filt) ** 2),
+                    sample_weight=sample_weight_train_filt * ((w_train - p_train_filt) ** 2),
                     eval_set=[
                         (
                             X_test_filt,
                             (y_test_filt - yhat_test_filt) / (w_test - p_test_filt),
                         )
                     ],
-                    sample_weight_eval_set=[
-                        sample_weight_test_filt * ((w_test - p_test_filt) ** 2)
-                    ],
-                    eval_metric=self.effect_learner_eval_metric,
-                    early_stopping_rounds=self.early_stopping_rounds,
+                    sample_weight_eval_set=[sample_weight_test_filt * ((w_test - p_test_filt) ** 2)],
                     verbose=verbose,
                 )
 
@@ -675,7 +683,6 @@ class XGBRRegressor(BaseRRegressor):
                     X_filt,
                     (y_filt - yhat_filt) / (w - p_filt),
                     sample_weight=sample_weight_filt * ((w - p_filt) ** 2),
-                    eval_metric=self.effect_learner_eval_metric,
                 )
 
             diff_c = y_filt[w == 0] - yhat_filt[w == 0]

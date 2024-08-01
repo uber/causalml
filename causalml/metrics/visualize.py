@@ -640,7 +640,7 @@ def plot_qini(
 def plot_tmlegain(
     df,
     inference_col,
-    learner=LGBMRegressor(num_leaves=64, learning_rate=0.05, n_estimators=300),
+    learner=LGBMRegressor(num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1),
     outcome_col="y",
     treatment_col="w",
     p_col="tau",
