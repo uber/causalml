@@ -34,10 +34,18 @@ def generate_unmatched_data(generate_regression_data):
     yield _generate_data
 
 
+def test_nearest_neighbor_match_ratio_2(generate_unmatched_data):
+    df, features = generate_unmatched_data()
+
+    psm = NearestNeighborMatch(replace=False, ratio=2, random_state=RANDOM_SEED)
+    matched = psm.match(data=df, treatment_col=TREATMENT_COL, score_cols=[SCORE_COL])
+    assert sum(matched[TREATMENT_COL] == 0) == 2 * sum(matched[TREATMENT_COL] != 0)
+
+
 def test_nearest_neighbor_match_by_group(generate_unmatched_data):
     df, features = generate_unmatched_data()
 
-    psm = NearestNeighborMatch(replace=False, ratio=1.0, random_state=RANDOM_SEED)
+    psm = NearestNeighborMatch(replace=False, ratio=1, random_state=RANDOM_SEED)
 
     matched = psm.match_by_group(
         data=df,
