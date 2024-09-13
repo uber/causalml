@@ -70,7 +70,9 @@ def generate_classification_data_two_treatments():
 
 def pytest_addoption(parser):
     parser.addoption("--runtf", action="store_true", default=False, help="run tf tests")
-    parser.addoption("--runtorch", action="store_true", default=False, help="run torch tests")
+    parser.addoption(
+        "--runtorch", action="store_true", default=False, help="run torch tests"
+    )
 
 
 def pytest_configure(config):
