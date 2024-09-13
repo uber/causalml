@@ -159,7 +159,7 @@ Interpretation
 Please see :ref:`Interpretable Causal ML` section
 
 Validation
-----------------
+----------
 
 Please see :ref:`validation` section
 
@@ -306,4 +306,3 @@ For more details, please refer to the `feature_selection.ipynb notebook <https:/
                           treatment_group = 'treatment1',
                           n_bins=10)
     print(kl_imp)
-

@@ -1,11 +1,16 @@
 import pandas as pd
-import torch
+import pytest
 
-from causalml.inference.nn import CEVAE
+try:
+    import torch
+    from causalml.inference.torch import CEVAE
+except ImportError:
+    pass
 from causalml.dataset import simulate_hidden_confounder
 from causalml.metrics import get_cumgain
 
 
+@pytest.mark.torch
 def test_CEVAE():
     y, X, treatment, tau, b, e = simulate_hidden_confounder(
         n=10000, p=5, sigma=1.0, adj=0.0

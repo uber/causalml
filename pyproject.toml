@@ -42,8 +42,6 @@ dependencies = [
     "lightgbm",
     "pygam",
     "packaging",
-    "torch",
-    "pyro-ppl",
     "graphviz",
 ]
 
@@ -55,7 +53,10 @@ test = [
 tf = [
     "tensorflow>=2.4.0"
 ]
-
+torch = [
+    "torch",
+    "pyro-ppl"
+]
 
 [build-system]
 requires = [

@@ -70,17 +70,21 @@ def generate_classification_data_two_treatments():
 
 def pytest_addoption(parser):
     parser.addoption("--runtf", action="store_true", default=False, help="run tf tests")
+    parser.addoption("--runtorch", action="store_true", default=False, help="run torch tests")
 
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "tf: mark test as tf to run")
+    config.addinivalue_line("markers", "torch: mark test as torch to run")
 
 
 def pytest_collection_modifyitems(config, items):
-    if config.getoption("--runtf"):
-        # --runtf given in cli: do not skip tf tests
-        return
-    skip_tf = pytest.mark.skip(reason="need --runtf option to run")
+
+    skip_tf = False if config.getoption("--runtf") else True
+    skip_torch = False if config.getoption("--runtorch") else True
+
     for item in items:
-        if "tf" in item.keywords:
-            item.add_marker(skip_tf)
+        if "tf" in item.keywords and skip_tf:
+            item.add_marker(pytest.mark.skip(reason="need --runtf option to run"))
+        if "torch" in item.keywords and skip_torch:
+            item.add_marker(pytest.mark.skip(reason="need --runtorch option to run"))
