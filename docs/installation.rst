@@ -2,9 +2,9 @@
 Installation
 ============
 
-Installation with ``conda`` or ``pip`` is recommended.  Developers can follow the **Install from source** instructions below.  If building from source, consider doing so within a conda environment and then exporting the environment for reproducibility. 
+Installation with ``conda`` or ``pip`` is recommended.  Developers can follow the **Install from source** instructions below.  If building from source, consider doing so within a conda environment and then exporting the environment for reproducibility.
 
-To use models under the ``inference.tf`` module (e.g. ``DragonNet``), additional dependency of ``tensorflow`` is required. For detailed instructions, see below.
+To use models under the ``inference.tf`` or ``inference.torch`` module (e.g. ``DragonNet`` or ``CEVAE``), additional dependency of ``tensorflow`` or ``torch`` is required. For detailed instructions, see below.
 
 Install using ``conda``
 -----------------------
@@ -13,7 +13,7 @@ Install ``conda``
 ^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
-    
+
     wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
     bash Miniconda3-latest-Linux-x86_64.sh -b
     source miniconda3/bin/activate
@@ -36,13 +36,20 @@ Install from ``PyPI``
 
     pip install causalml
 
-Install ``causalml`` with ``tensorflow`` from ``PyPI``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Install ``causalml`` with ``tensorflow`` for ``DragonNet`` from ``PyPI``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
     pip install causalml[tf]
     pip install -U numpy                            # this step is necessary to fix [#338](https://github.com/uber/causalml/issues/338)
+
+Install ``causalml`` with ``torch`` for ``CEVAE`` from ``PyPI``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+    pip install causalml[torch]
 
 
 Install from source
@@ -68,11 +75,17 @@ Then:
     pip install .
     python setup.py build_ext --inplace
 
-with ``tensorflow``:
+with ``tensorflow`` for ``DragonNet``:
 
 .. code-block:: bash
 
     pip install .[tf]
+
+with ``torch`` for ``CEVAE``:
+
+.. code-block:: bash
+
+    pip install .[torch]
 
 =======
 
@@ -93,11 +106,10 @@ Run all tests with:
 
     pytest -vs tests/ --cov causalml/
 
-Add ``--runtf`` to run optional tensorflow tests which will be skipped by default.
+Add ``--runtf`` and/or ``--runtorch`` to run optional tensorflow/torch tests which will be skipped by default.
 
 You can also run tests via make:
- 
+
 .. code-block:: bash
 
     make test
-
