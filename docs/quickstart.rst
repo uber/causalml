@@ -43,12 +43,12 @@ Meta-learners and Uplift Trees
 
 In addition to the Methodology section, you can find examples in the links below for :ref:`Meta-Learner Algorithms` and :ref:`Tree-Based Algorithms`
 
-- Meta-learners (S/T/X/R): `meta_learners_with_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data.ipynb>`_
-- Meta-learners (S/T/X/R) with multiple treatment: `meta_learners_with_synthetic_data_multiple_treatment.ipynb <https://github.com/uber/causalml/blob/master/examples/meta_learners_with_synthetic_data_multiple_treatment.ipynb>`_
-- Comparing meta-learners across simulation setups: `benchmark_simulation_studies.ipynb <https://github.com/uber/causalml/blob/master/examples/benchmark_simulation_studies.ipynb>`_
-- Doubly Robust (DR) learner: `dr_learner_with_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/examples/dr_learner_with_synthetic_data.ipynb>`_
-- TMLE learner: `validation_with_tmle.ipynb <https://github.com/uber/causalml/blob/master/examples/validation_with_tmle.ipynb>`_
-- Uplift Trees: `uplift_trees_with_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/examples/uplift_trees_with_synthetic_data.ipynb>`_
+- Meta-learners (S/T/X/R): `meta_learners_with_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/meta_learners_with_synthetic_data.ipynb>`_
+- Meta-learners (S/T/X/R) with multiple treatment: `meta_learners_with_synthetic_data_multiple_treatment.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/meta_learners_with_synthetic_data_multiple_treatment.ipynb>`_
+- Comparing meta-learners across simulation setups: `benchmark_simulation_studies.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/benchmark_simulation_studies.ipynb>`_
+- Doubly Robust (DR) learner: `dr_learner_with_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/dr_learner_with_synthetic_data.ipynb>`_
+- TMLE learner: `validation_with_tmle.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/validation_with_tmle.ipynb>`_
+- Uplift Trees: `uplift_trees_with_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/uplift_trees_with_synthetic_data.ipynb>`_
 
 .. code-block:: python
 
@@ -93,8 +93,8 @@ Treatment optimization algorithms
 
 We have developed :ref:`Counterfactual Unit Selection` and :ref:`Counterfactual Value Estimator` methods, please find the code snippet below and details in the following notebooks:
 
-- `counterfactual_unit_selection.ipynb <https://github.com/uber/causalml/blob/master/examples/counterfactual_unit_selection.ipynb>`_
-- `counterfactual_value_optimization.ipynb <https://github.com/uber/causalml/blob/master/examples/counterfactual_value_optimization.ipynb>`_
+- `counterfactual_unit_selection.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/counterfactual_unit_selection.ipynb>`_
+- `counterfactual_value_optimization.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/counterfactual_value_optimization.ipynb>`_
 
 .. code-block:: python
 
@@ -144,14 +144,14 @@ We have developed :ref:`Counterfactual Unit Selection` and :ref:`Counterfactual 
 Instrumental variables algorithms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- 2-Stage Least Squares (2SLS): `iv_nlsym_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/examples/iv_nlsym_synthetic_data.ipynb>`_
+- 2-Stage Least Squares (2SLS): `iv_nlsym_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/iv_nlsym_synthetic_data.ipynb>`_
 
 
 Neural network based algorithms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-- CEVAE: `cevae_example.ipynb <https://github.com/uber/causalml/blob/master/examples/cevae_example.ipynb>`_
-- DragonNet: `dragonnet_example.ipynb <https://github.com/uber/causalml/blob/master/examples/dragonnet_example.ipynb>`_
+- CEVAE: `cevae_example.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/cevae_example.ipynb>`_
+- DragonNet: `dragonnet_example.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/dragonnet_example.ipynb>`_
 
 
 Interpretation
@@ -218,7 +218,7 @@ Multiple Simulations
 Sensitivity Analysis
 ---------------------------
 
-For more details, please refer to the `sensitivity_example_with_synthetic_data.ipynb notebook <https://github.com/uber/causalml/blob/master/examples/sensitivity_example_with_synthetic_data.ipynb>`_.
+For more details, please refer to the `sensitivity_example_with_synthetic_data.ipynb notebook <https://github.com/uber/causalml/blob/master/docs/examples/sensitivity_example_with_synthetic_data.ipynb>`_.
 
 .. code-block:: python
 
@@ -252,7 +252,7 @@ For more details, please refer to the `sensitivity_example_with_synthetic_data.i
 Feature Selection
 ---------------------------
 
-For more details, please refer to the `feature_selection.ipynb notebook <https://github.com/uber/causalml/blob/master/examples/feature_selection.ipynb>`_ and the associated paper reference by Zhao, Zhenyu, et al.
+For more details, please refer to the `feature_selection.ipynb notebook <https://github.com/uber/causalml/blob/master/docs/examples/feature_selection.ipynb>`_ and the associated paper reference by Zhao, Zhenyu, et al.
 
 .. code-block:: python
 
