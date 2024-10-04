@@ -151,17 +151,16 @@ class NearestNeighborMatch:
         # Picks whether to use treatment or control for matching direction
         match_from = treatment if self.treatment_to_control else control
         match_to = control if self.treatment_to_control else treatment
-
         sdcal = self.caliper * np.std(data[score_cols].values)
 
         if self.replace:
             scaler = StandardScaler()
             scaler.fit(data[score_cols])
             match_from_scaled = pd.DataFrame(
-                scaler.transform(match_from), index=treatment.index
+                scaler.transform(match_from), index=match_from.index
             )
             match_to_scaled = pd.DataFrame(
-                scaler.transform(match_to), index=control.index
+                scaler.transform(match_to), index=match_to.index
             )
 
             # SD is the same as caliper because we use a StandardScaler above
@@ -172,13 +171,12 @@ class NearestNeighborMatch:
             )
             matching_model.fit(match_to_scaled)
             distances, indices = matching_model.kneighbors(match_from_scaled)
-
             # distances and indices are (n_obs, self.ratio) matrices.
             # To index easily, reshape distances, indices and treatment into
             # the (n_obs * self.ratio, 1) matrices and data frame.
             distances = distances.T.flatten()
             indices = indices.T.flatten()
-            match_from = pd.concat([match_from_scaled] * self.ratio, axis=0)
+            match_from_scaled = pd.concat([match_from_scaled] * self.ratio, axis=0)
 
             cond = (distances / np.sqrt(len(score_cols))) < sdcal
             # Deduplicate the indices of the treatment group
