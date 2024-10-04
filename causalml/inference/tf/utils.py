@@ -145,11 +145,11 @@ class EpsilonLayer(Layer):
     Custom keras layer to allow epsilon to be learned during training process.
     """
 
-    def __init__(self):
+    def __init__(self, **kwargs):
         """
         Inherits keras' Layer object.
         """
-        super(EpsilonLayer, self).__init__()
+        super(EpsilonLayer, self).__init__(**kwargs)
 
     def build(self, input_shape):
         """
@@ -162,3 +162,11 @@ class EpsilonLayer(Layer):
 
     def call(self, inputs, **kwargs):
         return self.epsilon * tf.ones_like(inputs)[:, 0:1]
+
+    def get_config(self):
+        config = super().get_config()
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

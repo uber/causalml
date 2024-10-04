@@ -18,3 +18,4 @@ _build/
 .coverage*
 *.html
 *.prof
+.venv/

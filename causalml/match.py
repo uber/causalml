@@ -88,7 +88,7 @@ class NearestNeighborMatch:
     Attributes:
         caliper (float): threshold to be considered as a match.
         replace (bool): whether to match with replacement or not
-        ratio (int): ratio of control / treatment to be matched. 
+        ratio (int): ratio of control / treatment to be matched.
         shuffle (bool): whether to shuffle the treatment group data before
             matching
         random_state (numpy.random.RandomState or int): RandomState or an int
@@ -111,7 +111,7 @@ class NearestNeighborMatch:
         Args:
             caliper (float): threshold to be considered as a match.
             replace (bool): whether to match with replacement or not
-            ratio (int): ratio of control / treatment to be matched. 
+            ratio (int): ratio of control / treatment to be matched.
             shuffle (bool): whether to shuffle the treatment group data before
                 matching or not
             random_state (numpy.random.RandomState or int): RandomState or an
@@ -201,7 +201,7 @@ class NearestNeighborMatch:
                     - treatment.loc[t_idx, score_col]
                 )
                 # Gets self.ratio lowest dists
-                c_np_idx_list = np.argpartition(dist, self.ratio)[:self.ratio]
+                c_np_idx_list = np.argpartition(dist, self.ratio)[: self.ratio]
                 c_idx_list = dist.index[c_np_idx_list]
                 for i, c_idx in enumerate(c_idx_list):
                     if dist[c_idx] <= sdcal:

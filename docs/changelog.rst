@@ -3,6 +3,8 @@
 Changelog
 =========
 
+You can find the latest changes in the `GitHub releases <https://github.com/uber/causalml/releases>`_
+
 0.15.1 (Apr 2024)
 -----------------
 * This release fixes the build failure on macOS and a few bugs in ``UpliftTreeClassifier``.
