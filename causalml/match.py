@@ -207,7 +207,7 @@ class NearestNeighborMatch:
                     - match_from.loc[from_idx, score_col]
                 )
                 # Gets self.ratio lowest dists
-                to_np_idx_list = np.argpartition(dist, self.ratio)[:self.ratio]
+                to_np_idx_list = np.argpartition(dist, self.ratio)[: self.ratio]
                 to_idx_list = dist.index[to_np_idx_list]
                 for i, to_idx in enumerate(to_idx_list):
                     if dist[to_idx] <= sdcal:
