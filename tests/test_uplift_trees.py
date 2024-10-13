@@ -7,9 +7,9 @@ from joblib import parallel_backend
 from sklearn.model_selection import train_test_split
 
 from causalml.inference.tree import UpliftTreeClassifier, UpliftRandomForestClassifier
-from causalml.metrics import get_cumgain
+from causalml.metrics import auuc_score
 from causalml.dataset import make_uplift_classification
-from causalml.inference.tree import uplift_tree_string, uplift_tree_plot
+from causalml.inference.tree import uplift_tree_plot
 
 from .const import RANDOM_SEED, N_SAMPLE, CONTROL_NAME, TREATMENT_NAMES, CONVERSION
 
@@ -104,16 +104,19 @@ def test_UpliftRandomForestClassifier(
         auuc_metrics = synth.assign(
             is_treated=1 - actual_is_control[synthetic],
             conversion=df_test.loc[synthetic, CONVERSION].values,
+            treatment_effect=df_test.loc[synthetic, "treatment_effect"].values,
             uplift_tree=synth.max(axis=1),
         ).drop(columns=list(uplift_model.classes_[1:]))
 
-        cumgain = get_cumgain(
-            auuc_metrics, outcome_col=CONVERSION, treatment_col="is_treated"
+        # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+        auuc = auuc_score(
+            auuc_metrics,
+            outcome_col=CONVERSION,
+            treatment_col="is_treated",
+            treatment_effect_col="treatment_effect",
+            normalize=True,
         )
-
-        # Check if the cumulative gain of UpLift Random Forest is higher than
-        # random
-        assert cumgain["uplift_tree"].sum() > cumgain["Random"].sum()
+        assert auuc["uplift_tree"] > 0.5
 
 
 @pytest.mark.parametrize("evaluation_function", ["DDP", "IT", "CIT", "IDDP"])
@@ -179,16 +182,19 @@ def UpliftTreeClassifierTesting(df, x_names, evaluation_function):
     auuc_metrics = synth.assign(
         is_treated=1 - actual_is_control[synthetic],
         conversion=df_test.loc[synthetic, CONVERSION].values,
+        treatment_effect=df_test.loc[synthetic, "treatment_effect"].values,
         uplift_tree=synth.max(axis=1),
     ).drop(columns=result.columns)
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col=CONVERSION, treatment_col="is_treated"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col=CONVERSION,
+        treatment_col="is_treated",
+        treatment_effect_col="treatment_effect",
+        normalize=True,
     )
-
-    # Check if the cumulative gain of UpLift Random Forest is higher than
-    # random (sometimes IT and IDDP are not better than random)
-    assert cumgain["uplift_tree"].sum() > cumgain["Random"].sum()
+    assert auuc["uplift_tree"] > 0.5
 
     # Check if the total count is split correctly, at least for control group in the first level
     def validate_cnt(cur_tree):

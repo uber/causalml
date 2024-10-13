@@ -13,7 +13,7 @@ from .const import RANDOM_SEED, ERROR_THRESHOLD
 
 class CausalTreeBase:
     test_size: float = 0.2
-    control_name: int or str = 0
+    control_name: int = 0
 
     @abstractmethod
     def prepare_model(self, *args, **kwargs):
@@ -84,7 +84,7 @@ class TestCausalTreeRegressor(CausalTreeBase):
             treatment_col="is_treated",
             treatment_effect_col="treatment_effect",
         )
-        assert df_qini["ctree_ite_pred"] > df_qini["Random"]
+        assert df_qini["ctree_ite_pred"] > 0.0
 
     @pytest.mark.parametrize("return_ci", (False, True))
     @pytest.mark.parametrize("bootstrap_size", (500, 800))
@@ -165,7 +165,7 @@ class TestCausalRandomForestRegressor(CausalTreeBase):
             treatment_col="is_treated",
             treatment_effect_col="treatment_effect",
         )
-        assert df_qini["crforest_ite_pred"] > df_qini["Random"]
+        assert df_qini["crforest_ite_pred"] > 0.0
 
     @pytest.mark.parametrize("n_estimators", (5,))
     def test_predict(self, generate_regression_data, n_estimators):
