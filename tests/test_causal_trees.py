@@ -74,6 +74,7 @@ class TestCausalTreeRegressor(CausalTreeBase):
         df_result = pd.DataFrame(
             {
                 "ctree_ite_pred": ctree.predict(X_test),
+                "outcome": y_test,
                 "is_treated": treatment_test,
                 "treatment_effect": self.df_test["treatment_effect"],
             }

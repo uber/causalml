@@ -1,5 +1,5 @@
 RANDOM_SEED = 42
-N_SAMPLE = 2000
+N_SAMPLE = 1000
 ERROR_THRESHOLD = 0.5
 NUM_FEATURES = 6
 
@@ -12,6 +12,6 @@ CONTROL_NAME = "control"
 TREATMENT_NAMES = [CONTROL_NAME, "treatment1", "treatment2", "treatment3"]
 CONVERSION = "conversion"
 DELTA_UPLIFT_INCREASE_DICT = {
-    "treatment1": 0.1,
+    "treatment1": 0.25,
 }
 N_UPLIFT_INCREASE_DICT = {"treatment1": 2}

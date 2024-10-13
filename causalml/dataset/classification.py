@@ -8,7 +8,6 @@ from scipy.special import expit, logit
 
 
 # ------ Define a list of functions for feature transformation
-# @staticmethod
 def _f_linear(x):
     """
     Linear transformation (actually identical transformation)
@@ -16,7 +15,6 @@ def _f_linear(x):
     return np.array(x)
 
 
-# @staticmethod
 def _f_quadratic(x):
     """
     Quadratic transformation
@@ -24,7 +22,6 @@ def _f_quadratic(x):
     return np.array(x) * np.array(x)
 
 
-# @staticmethod
 def _f_cubic(x):
     """
     Quadratic transformation
@@ -32,7 +29,6 @@ def _f_cubic(x):
     return np.array(x) * np.array(x) * np.array(x)
 
 
-# @staticmethod
 def _f_relu(x):
     """
     Relu transformation
@@ -41,7 +37,6 @@ def _f_relu(x):
     return np.maximum(x, 0)
 
 
-# @staticmethod
 def _f_sin(x):
     """
     Sine transformation
@@ -49,7 +44,6 @@ def _f_sin(x):
     return np.sin(np.array(x) * np.pi)
 
 
-# @staticmethod
 def _f_cos(x):
     """
     Cosine transformation
@@ -58,7 +52,6 @@ def _f_cos(x):
 
 
 # ------ Generating non-linear splines as feature transformation functions
-# @staticmethod
 def _generate_splines(
     n_functions=10,
     n_initial_points=10,
@@ -107,7 +100,6 @@ def _generate_splines(
     return spls
 
 
-# @staticmethod
 def _standardize(x):
     """
     Standardize a vector to be mean 0 and std 1.
@@ -115,7 +107,6 @@ def _standardize(x):
     return (np.array(x) - np.mean(x)) / np.std(x)
 
 
-# @staticmethod
 def _fixed_transformation(fs, x, f_index=0):
     """
     Transform and standardize a vector by a transformation function.
@@ -139,7 +130,6 @@ def _fixed_transformation(fs, x, f_index=0):
     return y
 
 
-# @staticmethod
 def _random_transformation(fs, x):
     """
     Transform and standardize a vector by a function randomly chosen from
@@ -158,7 +148,6 @@ def _random_transformation(fs, x):
     return y
 
 
-# @staticmethod
 def _softmax(z, p, xb):
     """
     Softmax function. This function is used to reversely solve the constant root value in the linear part to make the
