@@ -20,3 +20,7 @@ clean:
 	python setup.py clean --all
 	rm -rf ./build ./dist ./eggs ./causalml.egg-info
 	find ./causalml -type f \( -name "*.so" -o -name "*.c" -o -name "*.html" \) -delete
+
+.PHONY: setup_local
+setup_local:
+	pip install pre-commit

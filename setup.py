@@ -1,4 +1,4 @@
-import multiprocessing as mp
+.import multiprocessing as mp
 import os
 from setuptools import dist, setup, find_packages
 from setuptools.extension import Extension
