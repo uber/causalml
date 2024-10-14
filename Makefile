@@ -24,3 +24,4 @@ clean:
 .PHONY: setup_local
 setup_local:
 	pip install pre-commit
+	pre-commit install
