@@ -14,7 +14,18 @@ RANDOM_COL = "Random"
 logger = logging.getLogger("causalml")
 
 
-def plot(df, kind="gain", tmle=False, n=100, figsize=(8, 8), *args, **kwarg):
+def plot(
+    df,
+    kind="gain",
+    tmle=False,
+    n=100,
+    figsize=(8, 8),
+    ci=False,
+    plot_chance_level=True,
+    chance_level_kw=None,
+    *args,
+    **kwarg,
+):
     """Plot one of the lift/gain/Qini charts of model estimates.
 
     A factory method for `plot_lift()`, `plot_gain()`, `plot_qini()`, `plot_tmlegain()` and `plot_tmleqini()`.
@@ -24,31 +35,77 @@ def plot(df, kind="gain", tmle=False, n=100, figsize=(8, 8), *args, **kwarg):
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns.
         kind (str, optional): the kind of plot to draw. 'lift', 'gain', and 'qini' are supported.
         n (int, optional): the number of samples to be used for plotting.
+        figsize (set of float, optional): the size of the figure to plot.
+        ci (bool, optional): whether to plot confidence intervals or not. Only available for `tmle=True`.
+            Default is False.
+        plot_chance_level (bool, optional): whether to plot the chance level (i.e., random) line or not.
+            Default is True.
+        chance_level_line_kw (dict, optional): the keyword arguments for the chance level line. Default is None.
+        *args: Variable length argument list.
+        **kwargs: Arbitrary keyword arguments.
     """
-    catalog = {"lift": get_cumlift, "gain": get_cumgain, "qini": get_qini}
+
+    if tmle:
+        catalog = {"gain": get_tmlegain, "qini": get_tmleqini}
+    else:
+        catalog = {"lift": get_cumlift, "gain": get_cumgain, "qini": get_qini}
 
     assert (
         kind in catalog.keys()
     ), "{} plot is not implemented. Select one of {}".format(kind, catalog.keys())
 
+    _, ax = plt.subplots(figsize=figsize)
     if tmle:
-        ci_catalog = {"gain": plot_tmlegain, "qini": plot_tmleqini}
-        assert (
-            kind in ci_catalog.keys()
-        ), "{} plot is not implemented. Select one of {}".format(
-            kind, ci_catalog.keys()
-        )
+        df = catalog[kind](df, ci=ci, *args, **kwarg)
 
-        ci_catalog[kind](df, *args, **kwarg)
+        if ci:
+            model_names = [x.replace(" LB", "") for x in df.columns]
+            model_names = list(set([x.replace(" UB", "") for x in model_names]))
+
+            cmap = plt.get_cmap("tab10")
+            cindex = 0
+
+            for col in model_names:
+                lb_col = col + " LB"
+                up_col = col + " UB"
+
+                ax.plot(df.index, df[col], color=cmap(cindex))
+                ax.fill_between(
+                    df.index,
+                    df[lb_col],
+                    df[up_col],
+                    color=cmap(cindex),
+                    alpha=0.25,
+                )
+                cindex += 1
+
+            ax.legend()
+        else:
+            ax = df.plot(ax=ax)
+
     else:
         df = catalog[kind](df, *args, **kwarg)
 
         if (n is not None) and (n < df.shape[0]):
-            df = df.iloc[np.linspace(0, df.index[-1], n, endpoint=True)]
+            df = df.iloc[np.linspace(0, df.index[-1], n, endpoint=True).astype(int)]
 
-        df.plot(figsize=figsize)
-        plt.xlabel("Population")
-        plt.ylabel("{}".format(kind.title()))
+        ax = df.plot(ax=ax)
+
+    if plot_chance_level:
+        chance_level_line_kw = {
+            "label": RANDOM_COL,
+            "color": "k",
+            "linestyle": "--",
+        }
+
+        if chance_level_kw is not None:
+            chance_level_line_kw.update(**chance_level_kw)
+
+        ax.plot([0, df.index[-1]], [0, df.iloc[-1, 0]], **chance_level_line_kw)
+        ax.legend()
+
+    ax.set_xlabel("Population")
+    ax.set_ylabel("{}".format(kind.title()))
 
 
 def get_cumlift(
@@ -72,7 +129,7 @@ def get_cumlift(
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
-        random_seed (int, optional): random seed for numpy.random.rand()
+        random_seed (int, optional): deprecated
 
     Returns:
         (pandas.DataFrame): average uplifts of model estimates in cumulative population
@@ -84,15 +141,13 @@ def get_cumlift(
             treatment_effect_col in df.columns
             and df[treatment_effect_col].notnull().all()
         )
+    ), "{outcome_col} and {treatment_col}, or {treatment_effect_col} should be present without null.".format(
+        outcome_col=outcome_col,
+        treatment_col=treatment_col,
+        treatment_effect_col=treatment_effect_col,
     )
 
     df = df.copy()
-    np.random.seed(random_seed)
-    random_cols = []
-    for i in range(10):
-        random_col = "__random_{}__".format(i)
-        df[random_col] = np.random.rand(df.shape[0])
-        random_cols.append(random_col)
 
     model_names = [
         x
@@ -131,8 +186,6 @@ def get_cumlift(
     lift = lift.sort_index().interpolate()
 
     lift.columns = model_names
-    lift[RANDOM_COL] = lift[random_cols].mean(axis=1)
-    lift.drop(random_cols, axis=1, inplace=True)
 
     return lift
 
@@ -164,15 +217,13 @@ def get_cumgain(
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
         normalize (bool, optional): whether to normalize the y-axis to 1 or not
-        random_seed (int, optional): random seed for numpy.random.rand()
+        random_seed (int, optional): deprecated
 
     Returns:
         (pandas.DataFrame): cumulative gains of model estimates in population
     """
 
-    lift = get_cumlift(
-        df, outcome_col, treatment_col, treatment_effect_col, random_seed
-    )
+    lift = get_cumlift(df, outcome_col, treatment_col, treatment_effect_col)
 
     # cumulative gain = cumulative lift x (# of population)
     gain = lift.mul(lift.index.values, axis=0)
@@ -210,7 +261,7 @@ def get_qini(
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
         normalize (bool, optional): whether to normalize the y-axis to 1 or not
-        random_seed (int, optional): random seed for numpy.random.rand()
+        random_seed (int, optional): deprecated
 
     Returns:
         (pandas.DataFrame): cumulative gains of model estimates in population
@@ -222,15 +273,13 @@ def get_qini(
             treatment_effect_col in df.columns
             and df[treatment_effect_col].notnull().all()
         )
+    ), "{outcome_col} and {treatment_col}, or {treatment_effect_col} should be present without null.".format(
+        outcome_col=outcome_col,
+        treatment_col=treatment_col,
+        treatment_effect_col=treatment_effect_col,
     )
 
     df = df.copy()
-    np.random.seed(random_seed)
-    random_cols = []
-    for i in range(10):
-        random_col = "__random_{}__".format(i)
-        df[random_col] = np.random.rand(df.shape[0])
-        random_cols.append(random_col)
 
     model_names = [
         x
@@ -277,8 +326,6 @@ def get_qini(
     qini = qini.sort_index().interpolate()
 
     qini.columns = model_names
-    qini[RANDOM_COL] = qini[random_cols].mean(axis=1)
-    qini.drop(random_cols, axis=1, inplace=True)
 
     if normalize:
         qini = qini.div(np.abs(qini.iloc[-1, :]), axis=1)
@@ -318,6 +365,10 @@ def get_tmlegain(
         (outcome_col in df.columns and df[outcome_col].notnull().all())
         and (treatment_col in df.columns and df[treatment_col].notnull().all())
         or (p_col in df.columns and df[p_col].notnull().all())
+    ), "{outcome_col} and {treatment_col}, or {p_col} should be present without null.".format(
+        outcome_col=outcome_col,
+        treatment_col=treatment_col,
+        p_col=p_col,
     )
 
     inference_col = [x for x in inference_col if x in df.columns]
@@ -390,7 +441,6 @@ def get_tmlegain(
         lift = pd.concat([lift, lift_lb, lift_ub], axis=1)
 
     lift.index = lift.index / n_segment
-    lift[RANDOM_COL] = np.linspace(0, 1, n_segment + 1) * ate_all[0]
 
     return lift
 
@@ -428,6 +478,10 @@ def get_tmleqini(
         (outcome_col in df.columns and df[outcome_col].notnull().all())
         and (treatment_col in df.columns and df[treatment_col].notnull().all())
         or (p_col in df.columns and df[p_col].notnull().all())
+    ), "{outcome_col} and {treatment_col}, or {p_col} should be present without null.".format(
+        outcome_col=outcome_col,
+        treatment_col=treatment_col,
+        p_col=p_col,
     )
 
     inference_col = [x for x in inference_col if x in df.columns]
@@ -493,9 +547,6 @@ def get_tmleqini(
 
     qini = qini.cumsum()
     qini.loc[n_segment] = ate_all[0] * df[treatment_col].sum()
-    qini[RANDOM_COL] = (
-        np.linspace(0, 1, n_segment + 1) * ate_all[0] * df[treatment_col].sum()
-    )
     qini.index = np.linspace(0, 1, n_segment + 1) * df.shape[0]
 
     return qini
@@ -543,7 +594,6 @@ def plot_gain(
         treatment_col=treatment_col,
         treatment_effect_col=treatment_effect_col,
         normalize=normalize,
-        random_seed=random_seed,
     )
 
 
@@ -574,7 +624,7 @@ def plot_lift(
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
-        random_seed (int, optional): random seed for numpy.random.rand()
+        random_seed (int, optional): deprecated
         n (int, optional): the number of samples to be used for plotting
     """
 
@@ -586,7 +636,6 @@ def plot_lift(
         outcome_col=outcome_col,
         treatment_col=treatment_col,
         treatment_effect_col=treatment_effect_col,
-        random_seed=random_seed,
     )
 
 
@@ -619,7 +668,7 @@ def plot_qini(
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
         normalize (bool, optional): whether to normalize the y-axis to 1 or not
-        random_seed (int, optional): random seed for numpy.random.rand()
+        random_seed (int, optional): deprecated
         n (int, optional): the number of samples to be used for plotting
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
@@ -633,7 +682,6 @@ def plot_qini(
         treatment_col=treatment_col,
         treatment_effect_col=treatment_effect_col,
         normalize=normalize,
-        random_seed=random_seed,
     )
 
 
@@ -666,8 +714,13 @@ def plot_tmlegain(
         calibrate_propensity (bool, optional): whether calibrate propensity score or not
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
-    plot_df = get_tmlegain(
+
+    plot(
         df,
+        kind="gain",
+        tmle=True,
+        figsize=figsize,
+        ci=ci,
         learner=learner,
         inference_col=inference_col,
         outcome_col=outcome_col,
@@ -676,40 +729,7 @@ def plot_tmlegain(
         n_segment=n_segment,
         cv=cv,
         calibrate_propensity=calibrate_propensity,
-        ci=ci,
     )
-    if ci:
-        model_names = [x.replace(" LB", "") for x in plot_df.columns]
-        model_names = list(set([x.replace(" UB", "") for x in model_names]))
-
-        fig, ax = plt.subplots(figsize=figsize)
-        cmap = plt.get_cmap("tab10")
-        cindex = 0
-
-        for col in model_names:
-            lb_col = col + " LB"
-            up_col = col + " UB"
-
-            if col != "Random":
-                ax.plot(plot_df.index, plot_df[col], color=cmap(cindex))
-                ax.fill_between(
-                    plot_df.index,
-                    plot_df[lb_col],
-                    plot_df[up_col],
-                    color=cmap(cindex),
-                    alpha=0.25,
-                )
-            else:
-                ax.plot(plot_df.index, plot_df[col], color=cmap(cindex))
-            cindex += 1
-
-        ax.legend()
-    else:
-        plot_df.plot(figsize=figsize)
-
-    plt.xlabel("Population")
-    plt.ylabel("Gain")
-    plt.show()
 
 
 def plot_tmleqini(
@@ -739,8 +759,13 @@ def plot_tmleqini(
         calibrate_propensity (bool, optional): whether calibrate propensity score or not
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
-    plot_df = get_tmleqini(
+
+    plot(
         df,
+        kind="qini",
+        tmle=True,
+        figsize=figsize,
+        ci=ci,
         learner=learner,
         inference_col=inference_col,
         outcome_col=outcome_col,
@@ -749,40 +774,7 @@ def plot_tmleqini(
         n_segment=n_segment,
         cv=cv,
         calibrate_propensity=calibrate_propensity,
-        ci=ci,
     )
-    if ci:
-        model_names = [x.replace(" LB", "") for x in plot_df.columns]
-        model_names = list(set([x.replace(" UB", "") for x in model_names]))
-
-        fig, ax = plt.subplots(figsize=figsize)
-        cmap = plt.get_cmap("tab10")
-        cindex = 0
-
-        for col in model_names:
-            lb_col = col + " LB"
-            up_col = col + " UB"
-
-            if col != "Random":
-                ax.plot(plot_df.index, plot_df[col], color=cmap(cindex))
-                ax.fill_between(
-                    plot_df.index,
-                    plot_df[lb_col],
-                    plot_df[up_col],
-                    color=cmap(cindex),
-                    alpha=0.25,
-                )
-            else:
-                ax.plot(plot_df.index, plot_df[col], color=cmap(cindex))
-            cindex += 1
-
-        ax.legend()
-    else:
-        plot_df.plot(figsize=figsize)
-
-    plt.xlabel("Population")
-    plt.ylabel("Qini")
-    plt.show()
 
 
 def auuc_score(
@@ -851,7 +843,9 @@ def qini_score(
         qini = get_tmleqini(
             df, outcome_col=outcome_col, treatment_col=treatment_col, *args, **kwarg
         )
-    return (qini.sum(axis=0) - qini[RANDOM_COL].sum()) / qini.shape[0]
+
+    random_area = np.linspace(qini.iloc[0, 0], qini.iloc[-1, 0], qini.shape[0]).sum()
+    return (qini.sum(axis=0) - random_area) / qini.shape[0]
 
 
 def plot_ps_diagnostics(df, covariate_col, treatment_col="w", p_col="p", bal_tol=0.1):

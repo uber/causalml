@@ -31,7 +31,7 @@ from causalml.inference.meta import (
 )
 from causalml.inference.meta import TMLELearner
 from causalml.inference.meta import BaseDRLearner
-from causalml.metrics import ape, get_cumgain
+from causalml.metrics import ape, auuc_score
 
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
 
@@ -127,13 +127,15 @@ def test_BaseSRegressor(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_LRSRegressor(generate_regression_data):
@@ -183,13 +185,15 @@ def test_BaseTLearner(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
     # test of using control_learner and treatment_learner
     learner = BaseTLearner(
@@ -233,13 +237,15 @@ def test_BaseTRegressor(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_MLPTRegressor(generate_regression_data):
@@ -272,13 +278,15 @@ def test_MLPTRegressor(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_XGBTRegressor(generate_regression_data):
@@ -311,13 +319,15 @@ def test_XGBTRegressor(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_BaseXLearner(generate_regression_data):
@@ -350,13 +360,15 @@ def test_BaseXLearner(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
     # basic test of using outcome_learner and effect_learner
     learner = BaseXLearner(
@@ -402,13 +414,15 @@ def test_BaseXRegressor(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_BaseXLearner_without_p(generate_regression_data):
@@ -443,13 +457,15 @@ def test_BaseXLearner_without_p(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_BaseXRegressor_without_p(generate_regression_data):
@@ -482,13 +498,15 @@ def test_BaseXRegressor_without_p(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_BaseRLearner(generate_regression_data):
@@ -521,13 +539,15 @@ def test_BaseRLearner(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
     # basic test of using outcome_learner and effect_learner
     learner = BaseRLearner(
@@ -572,13 +592,15 @@ def test_BaseRRegressor(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_BaseRLearner_without_p(generate_regression_data):
@@ -611,13 +633,15 @@ def test_BaseRLearner_without_p(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_BaseRRegressor_without_p(generate_regression_data):
@@ -650,13 +674,15 @@ def test_BaseRRegressor_without_p(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
 
 
 def test_TMLELearner(generate_regression_data):
@@ -702,16 +728,15 @@ def test_BaseSClassifier(generate_classification_data):
         }
     )
 
-    cumgain = get_cumgain(
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
         treatment_effect_col="treatment_effect_col",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["tau_pred"].sum() > cumgain["Random"].sum()
+    assert auuc["tau_pred"] > 0.5
 
 
 def test_BaseTClassifier(generate_classification_data):
@@ -746,16 +771,15 @@ def test_BaseTClassifier(generate_classification_data):
         }
     )
 
-    cumgain = get_cumgain(
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
         treatment_effect_col="treatment_effect_col",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["tau_pred"].sum() > cumgain["Random"].sum()
+    assert auuc["tau_pred"] > 0.5
 
 
 def test_BaseXClassifier(generate_classification_data):
@@ -816,16 +840,15 @@ def test_BaseXClassifier(generate_classification_data):
         }
     )
 
-    cumgain = get_cumgain(
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
         treatment_effect_col="treatment_effect_col",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["tau_pred"].sum() > cumgain["Random"].sum()
+    assert auuc["tau_pred"] > 0.5
 
 
 def test_BaseRClassifier(generate_classification_data):
@@ -865,16 +888,15 @@ def test_BaseRClassifier(generate_classification_data):
         }
     )
 
-    cumgain = get_cumgain(
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
         treatment_effect_col="treatment_effect_col",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["tau_pred"].sum() > cumgain["Random"].sum()
+    assert auuc["tau_pred"] > 0.5
 
 
 def test_BaseRClassifier_with_sample_weights(generate_classification_data):
@@ -916,16 +938,15 @@ def test_BaseRClassifier_with_sample_weights(generate_classification_data):
         }
     )
 
-    cumgain = get_cumgain(
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
         auuc_metrics,
         outcome_col=CONVERSION,
         treatment_col="W",
         treatment_effect_col="treatment_effect_col",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["tau_pred"].sum() > cumgain["Random"].sum()
+    assert auuc["tau_pred"] > 0.5
 
 
 def test_XGBRegressor_with_sample_weights(generate_regression_data):
@@ -1009,10 +1030,12 @@ def test_BaseDRLearner(generate_regression_data):
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5

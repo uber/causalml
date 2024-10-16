@@ -1,15 +1,12 @@
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from sklearn.model_selection import train_test_split
-import statsmodels.api as sm
 from xgboost import XGBRegressor
-import warnings
 
 from causalml.inference.iv import BaseDRIVLearner
-from causalml.metrics import ape, get_cumgain
+from causalml.metrics import ape, auuc_score
 
-from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
+from .const import RANDOM_SEED, ERROR_THRESHOLD
 
 
 def test_drivlearner():
@@ -34,7 +31,6 @@ def test_drivlearner():
     e = e_raw.copy()
     e[assignment == 0] = 0
     tau = (X[:, 0] + X[:, 1]) / 2
-    X_obs = X[:, [i for i in range(8) if i != 1]]
 
     w = np.random.binomial(1, e, size=n)
     treatment = w
@@ -75,10 +71,12 @@ def test_drivlearner():
         }
     )
 
-    cumgain = get_cumgain(
-        auuc_metrics, outcome_col="y", treatment_col="W", treatment_effect_col="tau"
+    # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col="y",
+        treatment_col="W",
+        treatment_effect_col="tau",
+        normalize=True,
     )
-
-    # Check if the cumulative gain when using the model's prediction is
-    # higher than it would be under random targeting
-    assert cumgain["cate_p"].sum() > cumgain["Random"].sum()
+    assert auuc["cate_p"] > 0.5
