@@ -25,7 +25,7 @@ If you'd like to contribute to something else, open a new issue for discussion f
 
 1. Fork the `causalml` repo. This will create your own copy of the `causalml` repo. For more details about forks, please check [this guide](https://docs.github.com/en/github/collaborating-with-pull-requests/working-with-forks/about-forks) at GitHub.
 2. Clone the forked repo locally
-3. Complete local installation by running:
+3. (optional) Complete local installation by running:
 ```bash
 make setup_local
 ```
