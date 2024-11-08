@@ -8,9 +8,14 @@ The codebase is hosted on Github at https://github.com/uber/causalml.
 We use [`black`](https://black.readthedocs.io/en/stable/index.html) as a formatter to keep the coding style and format across all Python files consistent and compliant with [PEP8](https://www.python.org/dev/peps/pep-0008/). We recommend that you add `black` to your IDE as a formatter (see the [instruction](https://black.readthedocs.io/en/stable/integrations/editors.html)) or run `black` on the command line before submitting a PR as follows:
 ```bash
 # move to the top directory of the causalml repository
-$ cd causalml 
+$ cd causalml
 $ pip install -U black
 $ black .
+```
+
+Additionally, you can set up black and other tools we use to run before any commit is made via:
+```bash
+make setup_local
 ```
 
 As a start, please check out outstanding [issues](https://github.com/uber/causalml/issues).
@@ -20,22 +25,26 @@ If you'd like to contribute to something else, open a new issue for discussion f
 
 1. Fork the `causalml` repo. This will create your own copy of the `causalml` repo. For more details about forks, please check [this guide](https://docs.github.com/en/github/collaborating-with-pull-requests/working-with-forks/about-forks) at GitHub.
 2. Clone the forked repo locally
-3. Create a branch for the change:
+3. (optional) Complete local installation by running:
+```bash
+make setup_local
+```
+4. Create a branch for the change:
 ```bash
 $ git checkout -b branch_name
 ```
-4. Make a change
-5. Test your change as described below in the Test section
-6. Commit the change to your local branch
+5. Make a change
+6. Test your change as described below in the Test section
+7. Commit the change to your local branch
 ```bash
 $ git add file1_changed file2_changed
 $ git commit -m "Issue number: message to describe the change."
 ```
-7. Push your local branch to remote
+8. Push your local branch to remote
 ```bash
 $ git push origin branch_name
 ```
-8. Go to GitHub and create PR from your branch in your forked repo to the original `causalml` repo. An instruction to create a PR from a fork is available [here](https://docs.github.com/en/github/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)
+9. Go to GitHub and create PR from your branch in your forked repo to the original `causalml` repo. An instruction to create a PR from a fork is available [here](https://docs.github.com/en/github/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/creating-a-pull-request-from-a-fork)
 
 ## Documentation :books:
 
@@ -120,6 +129,6 @@ We are supporting to install the package through `conda`, in order to maintain t
     - Generate the new sha256 hash and update it [here](https://github.com/conda-forge/causalml-feedstock/blob/main/recipe/meta.yaml#L11):  the sha256 hash can get from PyPi; look for the SHA256 link next to the download link on PyPi package’s files page, e.g. https://pypi.org/project/causalml/#files
     - Reset the build number to 0
     - Update the dependencies if needed
-4. Submit the PR and the recipe will automatically be built; 
+4. Submit the PR and the recipe will automatically be built;
 
 Once the recipe is ready it will be merged. The recipe will then automatically be built and uploaded to the conda-forge channel.
