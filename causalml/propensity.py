@@ -191,7 +191,8 @@ def calibrate(ps, treatment):
         (numpy.array): a calibrated propensity score vector
     """
 
-    pm_ir = IsotonicRegression(out_of_bounds="clip")
+    two_eps = 2.0*np.finfo(float).eps
+    pm_ir = IsotonicRegression(out_of_bounds="clip", y_min=two_eps, y_max=1.0-two_eps)
     ps_ir = pm_ir.fit_transform(ps, treatment)
 
     return ps_ir
