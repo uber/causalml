@@ -14,7 +14,7 @@
 # cython: linetrace=True
 
 # See _criterion.pyx for implementation details.
-from sklearn.utils._typedefs cimport float64_t, int8_t, int32_t, intp_t
+from ._typedefs cimport float64_t, int8_t, int32_t, intp_t
 
 
 cdef class Criterion:

@@ -27,7 +27,7 @@ from ._utils cimport log
 from ._utils cimport rand_int
 from ._utils cimport rand_uniform
 from ._utils cimport RAND_R_MAX
-from sklearn.utils._typedefs cimport int8_t
+from ._typedefs cimport int8_t
 
 import numpy as np
 from scipy.sparse import issparse

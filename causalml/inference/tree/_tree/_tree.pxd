@@ -20,7 +20,7 @@
 import numpy as np
 cimport numpy as cnp
 
-from sklearn.utils._typedefs cimport float32_t, float64_t, intp_t, int32_t, uint32_t
+from ._typedefs cimport float32_t, float64_t, intp_t, int32_t, uint32_t
 
 from ._splitter cimport Splitter
 from ._splitter cimport SplitRecord

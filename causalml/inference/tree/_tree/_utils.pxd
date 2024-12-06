@@ -17,8 +17,7 @@
 
 cimport numpy as cnp
 from ._tree cimport Node
-from sklearn.neighbors._quad_tree cimport Cell
-from sklearn.utils._typedefs cimport float32_t, float64_t, intp_t, int32_t, uint32_t
+from ._typedefs cimport float32_t, float64_t, intp_t, int32_t, uint32_t
 
 cdef enum:
     # Max value for our rand_r replacement (near the bottom).
@@ -43,7 +42,6 @@ ctypedef fused realloc_ptr:
     (float64_t*)
     (float64_t**)
     (Node*)
-    (Cell*)
     (Node**)
 
 cdef int safe_realloc(realloc_ptr* p, intp_t nelems) except -1 nogil

@@ -18,7 +18,7 @@
 from ._criterion cimport Criterion
 from ._tree cimport ParentInfo
 
-from sklearn.utils._typedefs cimport float32_t, float64_t, intp_t, int8_t, int32_t, uint32_t
+from ._typedefs cimport float32_t, float64_t, intp_t, int8_t, int32_t, uint32_t
 
 
 cdef struct SplitRecord:
