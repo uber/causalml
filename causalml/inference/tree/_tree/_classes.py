@@ -183,7 +183,11 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         return self.tree_.n_leaves
 
     def _support_missing_values(self, X):
-        return not issparse(X) and self._get_tags()["allow_nan"] and self.monotonic_cst is None
+        return (
+            not issparse(X)
+            and self._get_tags()["allow_nan"]
+            and self.monotonic_cst is None
+        )
 
     def _compute_missing_values_in_feature_mask(self, X, estimator_name=None):
         """Return boolean mask denoting if there are missing values for each feature.
@@ -242,22 +246,36 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
 
             # _compute_missing_values_in_feature_mask will check for finite values and
             # compute the missing mask if the tree supports missing values
-            check_X_params = dict(dtype=DTYPE, accept_sparse="csc", force_all_finite=False)
+            check_X_params = dict(
+                dtype=DTYPE, accept_sparse="csc", force_all_finite=False
+            )
             check_y_params = dict(ensure_2d=False, dtype=None)
-            X, y = self._validate_data(X, y, validate_separately=(check_X_params, check_y_params))
+            X, y = self._validate_data(
+                X, y, validate_separately=(check_X_params, check_y_params)
+            )
 
-            missing_values_in_feature_mask = self._compute_missing_values_in_feature_mask(X)
+            missing_values_in_feature_mask = (
+                self._compute_missing_values_in_feature_mask(X)
+            )
             if issparse(X):
                 X.sort_indices()
 
                 if X.indices.dtype != np.intc or X.indptr.dtype != np.intc:
-                    raise ValueError("No support for np.int64 index based sparse matrices")
+                    raise ValueError(
+                        "No support for np.int64 index based sparse matrices"
+                    )
 
             if self.criterion == "poisson":
                 if np.any(y < 0):
-                    raise ValueError("Some value(s) of y are negative which is" " not allowed for Poisson regression.")
+                    raise ValueError(
+                        "Some value(s) of y are negative which is"
+                        " not allowed for Poisson regression."
+                    )
                 if np.sum(y) <= 0:
-                    raise ValueError("Sum of y is not positive which is " "necessary for Poisson regression.")
+                    raise ValueError(
+                        "Sum of y is not positive which is "
+                        "necessary for Poisson regression."
+                    )
 
         # Determine output settings
         n_samples, self.n_features_in_ = X.shape
@@ -291,7 +309,9 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
             y = y_encoded
 
             if self.class_weight is not None:
-                expanded_class_weight = compute_sample_weight(self.class_weight, y_original)
+                expanded_class_weight = compute_sample_weight(
+                    self.class_weight, y_original
+                )
 
             self.n_classes_ = np.array(self.n_classes_, dtype=np.intp)
 
@@ -333,7 +353,10 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         max_leaf_nodes = -1 if self.max_leaf_nodes is None else self.max_leaf_nodes
 
         if len(y) != n_samples:
-            raise ValueError("Number of labels=%d does not match number of samples=%d" % (len(y), n_samples))
+            raise ValueError(
+                "Number of labels=%d does not match number of samples=%d"
+                % (len(y), n_samples)
+            )
 
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X, DOUBLE)
@@ -354,7 +377,9 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
         criterion = self.criterion
         if not isinstance(criterion, Criterion):
             if is_classification:
-                criterion = CRITERIA_CLF[self.criterion](self.n_outputs_, self.n_classes_)
+                criterion = CRITERIA_CLF[self.criterion](
+                    self.n_outputs_, self.n_classes_
+                )
             else:
                 criterion = CRITERIA_REG[self.criterion](self.n_outputs_, n_samples)
         else:
@@ -369,7 +394,9 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
             monotonic_cst = None
         else:
             if self.n_outputs_ > 1:
-                raise ValueError("Monotonicity constraints are not supported with multiple outputs.")
+                raise ValueError(
+                    "Monotonicity constraints are not supported with multiple outputs."
+                )
             # Check to correct monotonicity constraint' specification,
             # by applying element-wise logical conjunction
             # Note: we do not cast `np.asarray(self.monotonic_cst, dtype=np.int8)`
@@ -385,12 +412,16 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
             if not np.all(valid_constraints):
                 unique_constaints_value = np.unique(monotonic_cst)
                 raise ValueError(
-                    "monotonic_cst must be None or an array-like of -1, 0 or 1, but" f" got {unique_constaints_value}"
+                    "monotonic_cst must be None or an array-like of -1, 0 or 1, but"
+                    f" got {unique_constaints_value}"
                 )
             monotonic_cst = np.asarray(monotonic_cst, dtype=np.int8)
             if is_classifier(self):
                 if self.n_classes_[0] > 2:
-                    raise ValueError("Monotonicity constraints are not supported with multiclass " "classification")
+                    raise ValueError(
+                        "Monotonicity constraints are not supported with multiclass "
+                        "classification"
+                    )
                 # Binary classification trees are built by constraining probabilities
                 # of the *negative class* in order to make the implementation similar
                 # to regression trees.
@@ -1370,10 +1401,14 @@ class DecisionTreeRegressor(RegressorMixin, BaseDecisionTree):
             The value of the partial dependence function on each grid point.
         """
         grid = np.asarray(grid, dtype=DTYPE, order="C")
-        averaged_predictions = np.zeros(shape=grid.shape[0], dtype=np.float64, order="C")
+        averaged_predictions = np.zeros(
+            shape=grid.shape[0], dtype=np.float64, order="C"
+        )
         target_features = np.asarray(target_features, dtype=np.intp, order="C")
 
-        self.tree_.compute_partial_dependence(grid, target_features, averaged_predictions)
+        self.tree_.compute_partial_dependence(
+            grid, target_features, averaged_predictions
+        )
         return averaged_predictions
 
     def _more_tags(self):
