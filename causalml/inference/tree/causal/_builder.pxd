@@ -6,4 +6,6 @@
 
 from .._tree._tree cimport Node, Tree, TreeBuilder
 from .._tree._splitter cimport Splitter, SplitRecord
-from .._tree._tree cimport SIZE_t, DOUBLE_t
+from .._tree._tree cimport intp_t, int32_t, float64_t
+from .._tree._tree cimport FrontierRecord, StackRecord
+from .._tree._tree cimport ParentInfo, _init_parent_record

@@ -8,7 +8,7 @@ from scipy.sparse import issparse
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import _check_sample_weight
 
-from .._tree._classes import DTYPE, DOUBLE
+from .._tree._classes import DTYPE, DOUBLE, INT
 from .._tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
 from .._tree._classes import Tree, BaseDecisionTree
 from .._tree._criterion import Criterion
@@ -93,6 +93,9 @@ class BaseCausalDecisionTree(BaseDecisionTree):
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
+
+        if getattr(treatment, "dtype", None) != INT or not treatment.flags.contiguous:
+            treatment = np.ascontiguousarray(treatment, dtype=INT)
 
         # Check parameters
         max_depth = np.iinfo(np.int32).max if self.max_depth is None else self.max_depth
@@ -226,6 +229,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 min_samples_leaf,
                 min_weight_leaf,
                 random_state,
+                monotonic_cst=None,
             )
             self.tree_ = Tree(
                 self.n_features_,
