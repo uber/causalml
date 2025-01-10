@@ -5,10 +5,10 @@ version: 2
 build:
   os: ubuntu-22.04
   tools:
-    python: "miniconda3-4.7"
+    python: "3.9"
 
 conda:
-  environment: docs/environment-py38-rtd.yml
+  environment: docs/environment-py39-rtd.yml
 
 python:
   install:
