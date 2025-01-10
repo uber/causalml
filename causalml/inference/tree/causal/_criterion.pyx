@@ -14,27 +14,27 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
     Base class for causal tree criterion
     """
     cdef public SplitState state
-    cdef public double groups_penalty
+    cdef public float64_t groups_penalty
 
     cdef int init(
         self,
-        const DOUBLE_t[:, ::1] y,
-        DOUBLE_t* treatment,
-        DOUBLE_t* sample_weight,
-        double weighted_n_samples,
-        SIZE_t* samples,
-        SIZE_t start,
-        SIZE_t end
+        const float64_t[:, ::1] y,
+        const int32_t[:] treatment,
+        const float64_t[:] sample_weight,
+        float64_t weighted_n_samples,
+        const intp_t[:] sample_indices,
+        intp_t start,
+        intp_t end,
     ) nogil except -1:
         """Initialize the criterion.
-        This initializes the criterion at node samples[start:end] and children
-        samples[start:start] and samples[start:end].
+        This initializes the criterion at node sample_indices[start:end] and children
+        sample_indices[start:start] and sample_indices[start:end].
         """
         # Initialize fields
         self.y = y
         self.treatment = treatment
         self.sample_weight = sample_weight
-        self.samples = samples
+        self.sample_indices = sample_indices
         self.start = start
         self.end = end
         self.n_node_samples = end - start
@@ -42,20 +42,20 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         self.weighted_n_samples = weighted_n_samples
         self.weighted_n_node_samples = 0.
 
-        cdef SIZE_t i
-        cdef SIZE_t p
-        cdef DOUBLE_t is_treated
-        cdef SIZE_t k = 0
-        cdef DOUBLE_t w = 1.0
+        cdef intp_t i
+        cdef intp_t p
+        cdef int32_t is_treated
+        cdef intp_t k = 0
+        cdef float64_t w = 1.0
 
-        memset(&self.sum_total[0], 0, self.n_outputs * sizeof(double))
+        memset(&self.sum_total[0], 0, self.n_outputs * sizeof(float64_t))
         self.sq_sum_total = 0.
         self.state.node = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
         self.state.left = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
         self.state.right = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
 
         for p in range(start, end):
-            i = samples[p]
+            i = sample_indices[p]
             is_treated = treatment[i]
 
             self.sum_total[k] += self.y[i, k]
@@ -76,7 +76,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
     cdef int reset(self) nogil except -1:
         """Reset the criterion at pos=start."""
-        cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
+        cdef intp_t n_bytes = self.n_outputs * sizeof(float64_t)
 
         memset(&self.sum_left[0], 0, n_bytes)
         memcpy(&self.sum_right[0], &self.sum_total[0], n_bytes)
@@ -111,7 +111,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
     cdef int reverse_reset(self) nogil except -1:
         """Reset the criterion at pos=end."""
-        cdef SIZE_t n_bytes = self.n_outputs * sizeof(double)
+        cdef intp_t n_bytes = self.n_outputs * sizeof(float64_t)
         memset(&self.sum_right[0], 0, n_bytes)
         memcpy(&self.sum_left[0], &self.sum_total[0], n_bytes)
 
@@ -142,18 +142,19 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
         return 0
 
-    cdef int update(self, SIZE_t new_pos) nogil except -1:
-        """Updated statistics by moving samples[pos:new_pos] to the left."""
-        cdef double * sample_weight = self.sample_weight
-        cdef double * treatment = self.treatment
-        cdef SIZE_t * samples = self.samples
+    cdef int update(self, intp_t new_pos) nogil except -1:
+        """Updated statistics by moving sample_indices[pos:new_pos] to the left."""
+        cdef const float64_t[:] sample_weight = self.sample_weight
+        cdef const int32_t[:] treatment = self.treatment
+        cdef const intp_t[:] sample_indices = self.sample_indices
 
-        cdef SIZE_t pos = self.pos
-        cdef SIZE_t end = self.end
-        cdef SIZE_t i
-        cdef SIZE_t p
-        cdef SIZE_t k = 0
-        cdef DOUBLE_t w = 1.0
+        cdef intp_t pos = self.pos
+        cdef intp_t end = self.end
+        cdef intp_t i
+        cdef int32_t is_treated
+        cdef intp_t p
+        cdef intp_t k = 0
+        cdef float64_t w = 1.0
 
         """
         Update statistics up to new_pos
@@ -165,7 +166,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         """
         if (new_pos - pos) <= (end - new_pos):
             for p in range(pos, new_pos):
-                i = samples[p]
+                i = sample_indices[p]
                 is_treated = treatment[i]
 
                 self.sum_left[k] += self.y[i, k]
@@ -181,7 +182,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
             self.reverse_reset()
 
             for p in range(end - 1, new_pos - 1, -1):
-                i = samples[p]
+                i = sample_indices[p]
                 is_treated = treatment[i]
 
                 self.sum_left[k] -= self.y[i, k]
@@ -211,12 +212,12 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
         return 0
 
-    cdef void node_value(self, double * dest) nogil:
-        """Compute the node values of samples[start:end] into dest."""
+    cdef void node_value(self, float64_t * dest) nogil:
+        """Compute the node values of sample_indices[start:end] into dest."""
         dest[0] = self.state.node.ct_y_sum / self.state.node.ct_count
         dest[1] = self.state.node.tr_y_sum / self.state.node.tr_count
 
-    cdef double get_groups_penalty(self, double tr_count, double ct_count) nogil:
+    cdef float64_t get_groups_penalty(self, float64_t tr_count, float64_t ct_count) nogil:
         """Compute penalty for the sample size difference between groups"""
         return self.groups_penalty * fabs(tr_count- ct_count)
 
@@ -227,14 +228,14 @@ cdef class StandardMSE(CausalRegressionCriterion):
     Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_criterion.pyx
     """
 
-    cdef double node_impurity(self) nogil:
+    cdef float64_t node_impurity(self) nogil:
         """Evaluate the impurity of the current node.
         Evaluate the MSE criterion as impurity of the current node,
-        i.e. the impurity of samples[start:end]. The smaller the impurity the
+        i.e. the impurity of sample_indices[start:end]. The smaller the impurity the
         better.
         """
-        cdef double impurity
-        cdef SIZE_t k
+        cdef float64_t impurity
+        cdef intp_t k
 
 
         impurity = self.sq_sum_total / self.n_node_samples
@@ -245,7 +246,7 @@ cdef class StandardMSE(CausalRegressionCriterion):
 
         return impurity / self.n_outputs
 
-    cdef double proxy_impurity_improvement(self) nogil:
+    cdef float64_t proxy_impurity_improvement(self) nogil:
         """Compute a proxy of the impurity reduction.
         This method is used to speed up the search for the best split.
         It is a proxy quantity such that the split that maximizes this value
@@ -259,10 +260,10 @@ cdef class StandardMSE(CausalRegressionCriterion):
         Neglecting constant terms, this gives:
             - 1/n_L * sum_{i left}(y_i)^2 - 1/n_R * sum_{i right}(y_i)^2
         """
-        cdef SIZE_t k
-        cdef double proxy_impurity_left = 0.0
-        cdef double proxy_impurity_right = 0.0
-        cdef double penalty_left, penalty_right
+        cdef intp_t k
+        cdef float64_t proxy_impurity_left = 0.0
+        cdef float64_t proxy_impurity_right = 0.0
+        cdef float64_t penalty_left, penalty_right
 
         penalty_left = self.get_groups_penalty(self.state.left.tr_count, self.state.left.ct_count)
         penalty_right = self.get_groups_penalty(self.state.right.tr_count, self.state.right.ct_count)
@@ -276,32 +277,35 @@ cdef class StandardMSE(CausalRegressionCriterion):
 
     cdef void children_impurity(
         self,
-        double * impurity_left,
-        double * impurity_right
+        float64_t * impurity_left,
+        float64_t * impurity_right
     ) nogil:
         """Evaluate the impurity in children nodes.
-        i.e. the impurity of the left child (samples[start:pos]) and the
-        impurity the right child (samples[pos:end]).
+        i.e. the impurity of the left child (sample_indices[start:pos]) and the
+        impurity the right child (sample_indices[pos:end]).
         """
-        cdef DOUBLE_t * sample_weight = self.sample_weight
-        cdef SIZE_t * samples = self.samples
-        cdef SIZE_t pos = self.pos
-        cdef SIZE_t start = self.start
+        cdef const float64_t[:] sample_weight = self.sample_weight
+        cdef const intp_t[:] sample_indices = self.sample_indices
+        cdef intp_t pos = self.pos
+        cdef intp_t start = self.start
 
-        cdef DOUBLE_t y_ik
+        cdef float64_t y_ik
 
-        cdef double sq_sum_left = 0.0
-        cdef double sq_sum_right
+        cdef float64_t sq_sum_left = 0.0
+        cdef float64_t sq_sum_right
 
-        cdef SIZE_t i
-        cdef SIZE_t p
-        cdef SIZE_t k
-        cdef DOUBLE_t w = 1.0
+        cdef intp_t i
+        cdef intp_t p
+        cdef intp_t k
+        cdef float64_t w = 1.0
 
-        cdef double penalty_left, penalty_right
+        cdef float64_t penalty_left, penalty_right
 
         for p in range(start, pos):
-            i = samples[p]
+            i = sample_indices[p]
+
+            if sample_weight is not None:
+                w = sample_weight[i]
 
             for k in range(self.n_outputs):
                 y_ik = self.y[i, k]
@@ -331,14 +335,14 @@ cdef class CausalMSE(CausalRegressionCriterion):
     effect = alpha * tau^2 - (1 - alpha) * (1 + train_to_est_ratio) * (VAR_tr / p + VAR_cont / (1 - p))
     """
 
-    cdef double node_impurity(self) nogil:
+    cdef float64_t node_impurity(self) nogil:
         """
-        Evaluate the impurity of the current node, i.e. the impurity of samples[start:end].
+        Evaluate the impurity of the current node, i.e. the impurity of sample_indices[start:end].
         """
-        cdef double impurity
-        cdef double node_tau
-        cdef double tr_var
-        cdef double ct_var
+        cdef float64_t impurity
+        cdef float64_t node_tau
+        cdef float64_t tr_var
+        cdef float64_t ct_var
 
         node_tau = self.get_tau(self.state.node)
         tr_var = self.get_variance(
@@ -355,23 +359,26 @@ cdef class CausalMSE(CausalRegressionCriterion):
 
         return impurity
 
-    cdef double get_tau(self, NodeInfo info) nogil:
+    cdef float64_t get_tau(self, NodeInfo info) nogil:
         return info.tr_y_sum / info.tr_count - info.ct_y_sum / info.ct_count
 
-    cdef double get_variance(self, double y_sum, double y_sq_sum, double count) nogil:
+    cdef float64_t get_variance(self, float64_t y_sum, float64_t y_sq_sum, float64_t count) nogil:
         return  y_sq_sum / count - (y_sum * y_sum) / (count * count)
 
-    cdef void children_impurity(self, double * impurity_left, double * impurity_right) nogil:
+    cdef void children_impurity(self, float64_t * impurity_left, float64_t * impurity_right) nogil:
         """
         Evaluate the impurity in children nodes, i.e. the impurity of the
-           left child (samples[start:pos]) and the impurity the right child
-           (samples[pos:end]).
+           left child (sample_indices[start:pos]) and the impurity the right child
+           (sample_indices[pos:end]).
         """
 
-        cdef double right_tr_var
-        cdef double right_ct_var
-        cdef double left_tr_var
-        cdef double left_ct_var
+        cdef float64_t right_tr_var
+        cdef float64_t right_ct_var
+        cdef float64_t left_tr_var
+        cdef float64_t left_ct_var
+
+        cdef float64_t right_tau
+        cdef float64_t left_tau
 
         right_tau = self.get_tau(self.state.right)
         right_tr_var = self.get_variance(
@@ -398,11 +405,11 @@ cdef class TTest(CausalRegressionCriterion):
     """
     TTest impurity criterion for Causal Tree based on "Su, Xiaogang, et al. (2009). Subgroup analysis via recursive partitioning."
     """
-    cdef double node_impurity(self) nogil:
-        cdef double impurity
-        cdef double node_tau
-        cdef double tr_var
-        cdef double ct_var
+    cdef float64_t node_impurity(self) nogil:
+        cdef float64_t impurity
+        cdef float64_t node_tau
+        cdef float64_t tr_var
+        cdef float64_t ct_var
 
         node_tau = self.get_tau(self.state.node)
         tr_var = self.get_variance(
@@ -419,27 +426,28 @@ cdef class TTest(CausalRegressionCriterion):
 
         return impurity
 
-    cdef double get_tau(self, NodeInfo info) nogil:
+    cdef float64_t get_tau(self, NodeInfo info) nogil:
         return info.tr_y_sum / info.tr_count - info.ct_y_sum / info.ct_count
 
-    cdef double get_variance(self, double y_sum, double y_sq_sum, double count) nogil:
+    cdef float64_t get_variance(self, float64_t y_sum, float64_t y_sq_sum, float64_t count) nogil:
         return y_sq_sum / count - (y_sum * y_sum) / (count * count)
 
-    cdef void children_impurity(self, double * impurity_left, double * impurity_right) nogil:
+    cdef void children_impurity(self, float64_t * impurity_left, float64_t * impurity_right) nogil:
         """
         Evaluate the impurity in children nodes, i.e. the impurity of the
-           left child (samples[start:pos]) and the impurity the right child
-           (samples[pos:end]).
+           left child (sample_indices[start:pos]) and the impurity the right child
+           (sample_indices[pos:end]).
         """
-        cdef double right_tr_var
-        cdef double right_ct_var
-        cdef double left_tr_var
-        cdef double left_ct_var
-        cdef double right_tau
-        cdef double left_tau
-        cdef double right_t_stat
-        cdef double left_t_stat
-        cdef double t_stat
+        cdef float64_t right_tr_var
+        cdef float64_t right_ct_var
+        cdef float64_t left_tr_var
+        cdef float64_t left_ct_var
+        cdef float64_t right_tau
+        cdef float64_t left_tau
+        cdef float64_t right_t_stat
+        cdef float64_t left_t_stat
+        cdef float64_t t_stat
+        cdef float64_t pooled_var
 
         right_tau = self.get_tau(self.state.right)
         right_tr_var = self.get_variance(
@@ -486,17 +494,17 @@ cdef class TTest(CausalRegressionCriterion):
         impurity_left[0] = left_t_stat
         impurity_right[0] = right_t_stat
 
-    cdef double impurity_improvement(self, double impurity_parent,
-                                     double impurity_left,
-                                     double impurity_right) nogil:
+    cdef float64_t impurity_improvement(self, float64_t impurity_parent,
+                                     float64_t impurity_left,
+                                     float64_t impurity_right) nogil:
         return self.state.left.split_metric
 
-    cdef double proxy_impurity_improvement(self) nogil:
-        """Compute a proxy of the impurity reduction. In case of t statistic - proxy_impurity_improvement 
+    cdef float64_t proxy_impurity_improvement(self) nogil:
+        """Compute a proxy of the impurity reduction. In case of t statistic - proxy_impurity_improvement
         is the same as impurity_improvement.
         """
-        cdef double impurity_left
-        cdef double impurity_right
+        cdef float64_t impurity_left
+        cdef float64_t impurity_right
         self.children_impurity(&impurity_left, &impurity_right)
 
         return self.state.left.split_metric
