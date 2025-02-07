@@ -1,10 +1,10 @@
 from abc import ABCMeta, abstractmethod
 import logging
 import numpy as np
-from pygam import LogisticGAM, s
 from sklearn.metrics import roc_auc_score as auc
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import StratifiedKFold, train_test_split
+from sklearn.isotonic import IsotonicRegression
 import xgboost as xgb
 
 
@@ -179,9 +179,9 @@ class GradientBoostedPropensityModel(PropensityModel):
 
 
 def calibrate(ps, treatment):
-    """Calibrate propensity scores with logistic GAM.
+    """Calibrate propensity scores with IsotonicRegression.
 
-    Ref: https://pygam.readthedocs.io/en/latest/api/logisticgam.html
+    Ref: https://scikit-learn.org/stable/modules/isotonic.html
 
     Args:
         ps (numpy.array): a propensity score vector
@@ -191,9 +191,11 @@ def calibrate(ps, treatment):
         (numpy.array): a calibrated propensity score vector
     """
 
-    gam = LogisticGAM(s(0)).fit(ps, treatment)
+    two_eps = 2.0 * np.finfo(float).eps
+    pm_ir = IsotonicRegression(out_of_bounds="clip", y_min=two_eps, y_max=1.0 - two_eps)
+    ps_ir = pm_ir.fit_transform(ps, treatment)
 
-    return gam.predict_proba(ps)
+    return ps_ir
 
 
 def compute_propensity_score(
