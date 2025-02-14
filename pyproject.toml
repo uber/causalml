@@ -21,7 +21,7 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
     "forestci==0.6",
     "pathos==0.2.9",
