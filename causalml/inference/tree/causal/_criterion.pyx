@@ -212,7 +212,7 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
         return 0
 
-    cdef void node_value(self, float64_t * dest) nogil:
+    cdef void node_value(self, float64_t * dest) noexcept nogil:
         """Compute the node values of sample_indices[start:end] into dest."""
         dest[0] = self.state.node.ct_y_sum / self.state.node.ct_count
         dest[1] = self.state.node.tr_y_sum / self.state.node.tr_count
@@ -228,7 +228,7 @@ cdef class StandardMSE(CausalRegressionCriterion):
     Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_criterion.pyx
     """
 
-    cdef float64_t node_impurity(self) nogil:
+    cdef float64_t node_impurity(self) noexcept nogil:
         """Evaluate the impurity of the current node.
         Evaluate the MSE criterion as impurity of the current node,
         i.e. the impurity of sample_indices[start:end]. The smaller the impurity the
@@ -246,7 +246,7 @@ cdef class StandardMSE(CausalRegressionCriterion):
 
         return impurity / self.n_outputs
 
-    cdef float64_t proxy_impurity_improvement(self) nogil:
+    cdef float64_t proxy_impurity_improvement(self) noexcept nogil:
         """Compute a proxy of the impurity reduction.
         This method is used to speed up the search for the best split.
         It is a proxy quantity such that the split that maximizes this value
@@ -279,7 +279,7 @@ cdef class StandardMSE(CausalRegressionCriterion):
         self,
         float64_t * impurity_left,
         float64_t * impurity_right
-    ) nogil:
+    ) noexcept nogil:
         """Evaluate the impurity in children nodes.
         i.e. the impurity of the left child (sample_indices[start:pos]) and the
         impurity the right child (sample_indices[pos:end]).
@@ -335,7 +335,7 @@ cdef class CausalMSE(CausalRegressionCriterion):
     effect = alpha * tau^2 - (1 - alpha) * (1 + train_to_est_ratio) * (VAR_tr / p + VAR_cont / (1 - p))
     """
 
-    cdef float64_t node_impurity(self) nogil:
+    cdef float64_t node_impurity(self) noexcept nogil:
         """
         Evaluate the impurity of the current node, i.e. the impurity of sample_indices[start:end].
         """
@@ -365,7 +365,7 @@ cdef class CausalMSE(CausalRegressionCriterion):
     cdef float64_t get_variance(self, float64_t y_sum, float64_t y_sq_sum, float64_t count) nogil:
         return  y_sq_sum / count - (y_sum * y_sum) / (count * count)
 
-    cdef void children_impurity(self, float64_t * impurity_left, float64_t * impurity_right) nogil:
+    cdef void children_impurity(self, float64_t * impurity_left, float64_t * impurity_right) noexcept nogil:
         """
         Evaluate the impurity in children nodes, i.e. the impurity of the
            left child (sample_indices[start:pos]) and the impurity the right child
@@ -405,7 +405,7 @@ cdef class TTest(CausalRegressionCriterion):
     """
     TTest impurity criterion for Causal Tree based on "Su, Xiaogang, et al. (2009). Subgroup analysis via recursive partitioning."
     """
-    cdef float64_t node_impurity(self) nogil:
+    cdef float64_t node_impurity(self) noexcept nogil:
         cdef float64_t impurity
         cdef float64_t node_tau
         cdef float64_t tr_var
@@ -432,7 +432,7 @@ cdef class TTest(CausalRegressionCriterion):
     cdef float64_t get_variance(self, float64_t y_sum, float64_t y_sq_sum, float64_t count) nogil:
         return y_sq_sum / count - (y_sum * y_sum) / (count * count)
 
-    cdef void children_impurity(self, float64_t * impurity_left, float64_t * impurity_right) nogil:
+    cdef void children_impurity(self, float64_t * impurity_left, float64_t * impurity_right) noexcept nogil:
         """
         Evaluate the impurity in children nodes, i.e. the impurity of the
            left child (sample_indices[start:pos]) and the impurity the right child
@@ -496,10 +496,10 @@ cdef class TTest(CausalRegressionCriterion):
 
     cdef float64_t impurity_improvement(self, float64_t impurity_parent,
                                      float64_t impurity_left,
-                                     float64_t impurity_right) nogil:
+                                     float64_t impurity_right) noexcept nogil:
         return self.state.left.split_metric
 
-    cdef float64_t proxy_impurity_improvement(self) nogil:
+    cdef float64_t proxy_impurity_improvement(self) noexcept nogil:
         """Compute a proxy of the impurity reduction. In case of t statistic - proxy_impurity_improvement
         is the same as impurity_improvement.
         """
