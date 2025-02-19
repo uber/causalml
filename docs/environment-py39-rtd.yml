@@ -21,7 +21,6 @@ dependencies:
     - numba==0.60.0
     - numpy==1.26.4
     - pandas==2.2.2
-    - pygam==0.9.1
     - pyro-api==0.1.2
     - pyro-ppl==1.9.1
     - scikit-learn==1.5.2

@@ -61,8 +61,8 @@ torch = [
 requires = [
     "setuptools>=18.0",
     "wheel",
-    "Cython<=0.29.34",
-    "numpy>=1.18.5, <2",
+    "Cython",
+    "numpy>=1.18.5",
     "scikit-learn>=0.22.0",
 ]
 
@@ -70,7 +70,7 @@ requires = [
 homepage = "https://github.com/uber/causalml"
 
 [tool.cibuildwheel]
-build = ["cp38-*", "cp39-*", "cp310-*", "cp311-*"]
+build = ["cp39-*", "cp310-*", "cp311-*", "cp312-*"]
 build-verbosity = 1
 # Skip 32-bit builds
 skip = ["*-win32", "*-manylinux_i686", "*-musllinux*"]
