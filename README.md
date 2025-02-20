@@ -36,14 +36,14 @@ https://causalml.readthedocs.io/en/latest/about.html
 
 # Installation
 
-Installation instructions are available at: 
+Installation instructions are available at:
 
 https://causalml.readthedocs.io/en/latest/installation.html
 
 
 # Quickstart
 
-Quickstarts with code-snippets are available at: 
+Quickstarts with code-snippets are available at:
 
 https://causalml.readthedocs.io/en/latest/quickstart.html
 
@@ -75,11 +75,13 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](https:
 ## Documentation
 * [Causal ML API documentation](https://causalml.readthedocs.io/en/latest/about.html)
 
-## Conference Talks and Publications by CausalML Team
+## Workshops, Talks, and Publications
+* (Workshop) [2nd Workshop on Causal Inference and Machine Learning in Practice](https://causal-machine-learning.github.io/kdd2024-workshop/) at KDD 2024
+* (Workshop) [Causal Inference and Machine Learning in Practice: Use cases for Product, Brand, Policy and Beyond](https://causal-machine-learning.github.io/kdd2023-workshop/) at KDD 2023
 * (Talk) Introduction to CausalML at [Causal Data Science Meeting 2021](https://www.causalscience.org/meeting/program/day-2/)
 * (Talk) Introduction to CausalML at [2021 Conference on Digital Experimentation @ MIT (CODE@MIT)](https://ide.mit.edu/events/2021-conference-on-digital-experimentation-mit-codemit/)
-* (Talk) Causal Inference and Machine Learning in Practice with EconML and CausalML: Industrial Use Cases at Microsoft, TripAdvisor, Uber at [KDD 2021 Tutorials](https://kdd.org/kdd2021/tutorials) ([website and slide links](https://causal-machine-learning.github.io/kdd2021-tutorial/))
-* (Publication) CausalML White Paper [Causalml: Python package for causal machine learning](https://arxiv.org/abs/2002.11631)
+* (Tutorial) [Causal Inference and Machine Learning in Practice with EconML and CausalML: Industrial Use Cases at Microsoft, TripAdvisor, Uber](https://causal-machine-learning.github.io/kdd2021-tutorial/) at KDD 2021
+* (Publication) [Causalml: Python package for causal machine learning](https://arxiv.org/abs/2002.11631)
 * (Publication) [Uplift Modeling for Multiple Treatments with Cost Optimization](https://ieeexplore.ieee.org/document/8964199) at [2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA)](http://203.170.84.89/~idawis33/dsaa2019/preliminary-program/)
 * (Publication) [Feature Selection Methods for Uplift Modeling](https://arxiv.org/abs/2005.03447)
 
@@ -119,7 +121,7 @@ Bibtex:
 15. Shi, Claudia, David M. Blei, and Victor Veitch. "Adapting neural networks for the estimation of treatment effects." 33rd Conference on Neural Information Processing Systems (NeurIPS 2019), 2019.
 16. Zhao, Zhenyu, Yumin Zhang, Totte Harinen, and Mike Yung. "Feature Selection Methods for Uplift Modeling." arXiv preprint arXiv:2005.03447 (2020).
 17. Zhao, Zhenyu, and Totte Harinen. "Uplift modeling for multiple treatments with cost optimization." In 2019 IEEE International Conference on Data Science and Advanced Analytics (DSAA), pp. 422-431. IEEE, 2019.
- 
+
 
 ## Related projects
 
