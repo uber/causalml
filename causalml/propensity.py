@@ -201,13 +201,12 @@ def calibrate(ps, treatment):
 def compute_propensity_score(
     X, treatment, p_model=None, X_pred=None, treatment_pred=None, calibrate_p=True
 ):
-    """Generate propensity score if user didn't provide
+    """Generate propensity score if user didn't provide and optionally calibrate.
 
     Args:
         X (np.matrix): features for training
         treatment (np.array or pd.Series): a treatment vector for training
-        p_model (propensity model object, optional):
-            ElasticNetPropensityModel (default) / GradientBoostedPropensityModel
+        p_model (model object, optional): a binary classifier with either a predict_proba or predict method
         X_pred (np.matrix, optional): features for prediction
         treatment_pred (np.array or pd.Series, optional): a treatment vector for prediciton
         calibrate_p (bool, optional): whether calibrate the propensity score
@@ -215,7 +214,7 @@ def compute_propensity_score(
     Returns:
         (tuple)
             - p (numpy.ndarray): propensity score
-            - p_model (PropensityModel): a trained PropensityModel object
+            - p_model (PropensityModel): either the original p_model, a trained ElasticNetPropensityModel, or None if calibrate_p=True
     """
     if treatment_pred is None:
         treatment_pred = treatment.copy()
@@ -224,14 +223,18 @@ def compute_propensity_score(
 
     p_model.fit(X, treatment)
 
-    if X_pred is None:
-        p = p_model.predict(X)
-    else:
+    X_pred = X if X_pred is None else X_pred
+
+    try:
+        p = p_model.predict_proba(X_pred)[:, 1]
+    except AttributeError:
+        logger.info("predict_proba not available, using predict instead")
         p = p_model.predict(X_pred)
 
     if calibrate_p:
-        logger.info("Calibrating propensity scores.")
+        logger.info("Calibrating propensity scores. Returning p_model=None.")
         p = calibrate(p, treatment_pred)
+        p_model = None
 
     # force the p values within the range
     eps = np.finfo(float).eps
