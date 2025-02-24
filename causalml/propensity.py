@@ -223,13 +223,13 @@ def compute_propensity_score(
 
     p_model.fit(X, treatment)
 
-    X = X if X_pred is None else X_pred
+    X_pred = X if X_pred is None else X_pred
 
     try:
-        p = p_model.predict_proba(X)[:, 1]
+        p = p_model.predict_proba(X_pred)[:, 1]
     except AttributeError:
         logger.info("predict_proba not available, using predict instead")
-        p = p_model.predict(X)
+        p = p_model.predict(X_pred)
 
     if calibrate_p:
         logger.info("Calibrating propensity scores. Returning p_model=None.")
