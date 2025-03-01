@@ -58,6 +58,8 @@ cdef extern from "math.h":
     double fabs(double x) nogil
     double sqrt(double x) nogil
 
+# KL散度不具有对称性，衡量的是离散变量分布的差异性
+# qk为0时（变量q中1出现的概率），散度视为0即没有差异性
 @cython.cfunc
 def kl_divergence(pk: cython.float, qk: cython.float) -> cython.float:
     '''
@@ -95,7 +97,8 @@ def kl_divergence(pk: cython.float, qk: cython.float) -> cython.float:
 
     return S
 
-
+# 单一概率的熵：即某个时间发生概率的熵，越不可能发生熵越大
+# 交叉熵：某一概率固定下，另外一个概率越接近0，熵越大
 @cython.cfunc
 def entropyH(p: cython.float, q: cython.float=-1.) -> cython.float:
     '''
@@ -329,6 +332,11 @@ def group_counts_by_divide(
     # done, modified out_arr
     return len_X_l
 
+
+"""
+1.根据处理效应的最大化来选择分裂点：max(左右子节点KL散度加权和（基于样本量）-父节点KL散度)。各处理组和对照组输出间的累积KL散度
+2.和train独立的验证集val用于早停，从train中分出的评估集用于更新叶子节点弹性分。其中评估集优先分组采样：y*treatment
+"""
 # Uplift Tree Classifier
 class UpliftTreeClassifier:
     """ Uplift Tree Classifier for Classification Task.
@@ -1862,6 +1870,24 @@ class UpliftTreeClassifier:
             res.append(p)
         return res
 
+
+        '''
+        1.根据t和c组的样本量以及正样本比例统计弹性分对应的显著性，影响显著性的有三个因素，2和3是对处理效应稳定性的判断,确保不是因为随机因素导致的，而是因为处理效应本身就大，所以每个处理组的样本量越大（min_samples_treatment），估计出的处理效应就越稳定
+        a.处理效应
+        处理效应越大，越显著
+        b.组内样本量
+        样本量越大，统计的处理效应越可靠
+        c.组内方差
+        组内标签越一致，说明组内的正样本比例稳定，从而统计出的处理效应才稳定
+
+        2.每个节点都会进行特征的随机选择，并且只评估所选特征的若干个具有代表性的分裂点，以减少计算量，提高效率
+
+        3.使用评估集确定是否停止分裂：对于任何组别中的任何子节点，如果训练样本和验证集样本的输出差异大于某个阈值，则不使用该分裂点
+        
+        4.子节点*组别下，任何一组样本量过少时也不使用该分裂点
+
+        5.最优分裂点：使用KL散度衡量各子节点干预和对照组的输出的差异，差异越大分数越高；同时会对gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)进行归一化，确保gain之间是可比较的，因为不同的分裂点
+        '''
     def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val,
                              early_stopping_eval_diff_scale=1, max_depth=10,
                              min_samples_leaf=100, depth=1,
@@ -2363,13 +2389,14 @@ class UpliftRandomForestClassifier:
     ----------
     n_estimators : integer, optional (default=10)
         The number of trees in the uplift random forest.
-
+    # KL散度只是衡量处理效益大小的其中一个指标
     evaluationFunction : string
         Choose from one of the models: 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', 'IDDP'.
 
     max_features: int, optional (default=10)
         The number of features to consider when looking for the best split.
 
+    # 随机1:bootstrap，随机2:参与分裂评估的特征候选集
     random_state: int, RandomState instance or None (default=None)
         A random seed or `np.random.RandomState` to control randomness in building the trees and forest.
 
@@ -2378,7 +2405,7 @@ class UpliftRandomForestClassifier:
 
     min_samples_leaf: int, optional (default=100)
         The minimum number of samples required to be split at a leaf node.
-
+    # 各个处理组的样本量都要大于一定阈值，否则无法计算处理效应
     min_samples_treatment: int, optional (default=10)
         The minimum number of samples required of the experiment group to be split at a leaf node.
 
@@ -2464,7 +2491,7 @@ class UpliftRandomForestClassifier:
 
         if self.n_jobs == -1:
             self.n_jobs = mp.cpu_count()
-
+    # 支持多个处理组，并行训练弹性树，每棵树的训练集和验证集使用bootstrap抽样
     def fit(self, X, treatment, y, X_val=None, treatment_val=None, y_val=None):
         """
         Fit the UpliftRandomForestClassifier.
@@ -2547,6 +2574,7 @@ class UpliftRandomForestClassifier:
             tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt, X_val=x_val_bt, treatment_val=treatment_val_bt, y_val=y_val_bt)
         return tree
 
+    # 将所有树的输出（p(y|t=ti)）取平均作为最后的潜结果，基于此再计算处理效应
     @ignore_warnings(category=FutureWarning)
     def predict(self, X, full_output=False):
         '''
