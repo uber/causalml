@@ -395,6 +395,7 @@ class UpliftTreeClassifier:
         assert evaluationFunction in ['KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', 'IDDP'], \
             f"evaluationFunction should be either 'KL', 'ED', 'Chi', 'CTS', 'DDP', 'IT', 'CIT', or 'IDDP' but {evaluationFunction} is passed"
 
+        # self.evaluate_KL is a static funtion
         if evaluationFunction == 'KL':
             self.evaluationFunction = self.evaluate_KL
             self.arr_eval_func = self.arr_evaluate_KL
@@ -433,7 +434,7 @@ class UpliftTreeClassifier:
         if evaluationFunction == 'IDDP' and self.honesty is False:
             self.honesty = True
 
-
+    # 训练的时候验证集可以不指定
     def fit(self, X, treatment, y, X_val=None, treatment_val=None, y_val=None):
         """ Fit the uplift model.
 
@@ -466,12 +467,14 @@ class UpliftTreeClassifier:
             assert len(y_val) == len(treatment_val), 'Data length must be equal for X_val, treatment_val, and y_val.'
         
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
+        # map different treament groups into sequential numbers starting from 1 according to sorted treatment values
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
         self.classes_ = [self.control_name]
         treatment_idx = np.zeros_like(treatment, dtype=TR_TYPE)
         treatment_val_idx = None
         if treatment_val is not None:
             treatment_val_idx = np.zeros_like(treatment_val, dtype=TR_TYPE)
+        # i starts from
         for i, tr in enumerate(treatment_groups, 1):
             self.classes_.append(tr)
             treatment_idx[treatment == tr] = i
@@ -485,7 +488,7 @@ class UpliftTreeClassifier:
             raise ValueError("The DDP, IDDP, IT, and CIT approach can only cope with two class problems, that is two different treatment "
                              "options (e.g., control vs treatment). Please select another approach or only use a "
                              "dataset which employs two treatment options.")
-
+        # stratified sampling via combination of treatment and outcome combinations better than total random sampling
         if self.honesty:
             try:
                 X, X_est, treatment_idx, treatment_idx_est, y, y_est = train_test_split(X, treatment_idx, y, stratify=np.stack([treatment_idx, y], axis=1), test_size=self.estimation_sample_size,
@@ -494,7 +497,7 @@ class UpliftTreeClassifier:
                 logger.warning(f"Stratified sampling failed. Falling back to random sampling.")
                 X, X_est, treatment_idx, treatment_idx_est, y, y_est = train_test_split(X, treatment_idx, y, test_size=self.estimation_sample_size, shuffle=True,
                                                                                         random_state=self.random_state)
-
+        # 构建树
         self.fitted_uplift_tree = self.growDecisionTreeFrom(
             X, treatment_idx, y, X_val, treatment_val_idx, y_val,
             max_depth=self.max_depth, early_stopping_eval_diff_scale=self.early_stopping_eval_diff_scale,
@@ -503,6 +506,7 @@ class UpliftTreeClassifier:
             n_reg=self.n_reg, parentNodeSummary_p=None
         )
 
+        # 验证集独立于训练集，如果使用诚实估计，从训练集中抽出部分用于评估叶子节点值
         if self.honesty:
             self.honestApproach(X_est, treatment_idx_est, y_est)
 
@@ -1601,6 +1605,7 @@ class UpliftTreeClassifier:
             sum_n_t_left += left_summary_n[i]
             sum_n_t += cur_summary_n[i]
 
+        # pt_a：左子节点干预组样本量占比(分母为父节点干预组样本量)，pc_a:左子节点对照组样本量占比(分母为父节点对照组样本量)
         pt_a = 1. * sum_n_t_left / (sum_n_t + 0.1)
         pc_a = 1. * n_c_left / (n_c + 0.1)
 
@@ -1909,6 +1914,7 @@ class UpliftTreeClassifier:
         # some temporary buffers for node summaries
         cdef int n_class = self.n_class
         # buffers for group counts, right can be derived from total and left
+        # each treatment class corresponds two kinds of
         cdef np.ndarray[N_TYPE_t, ndim=1] left_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
         cdef np.ndarray[N_TYPE_t, ndim=1] right_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
         cdef np.ndarray[N_TYPE_t, ndim=1] total_count_arr = np.zeros(2 * self.n_class, dtype = N_TYPE)
@@ -1969,8 +1975,8 @@ class UpliftTreeClassifier:
         currentNodeSummary = []
         for i in range(n_class):
             currentNodeSummary.append([cur_summary_p[i], cur_summary_n[i]])
-        #
 
+        # default to KL
         if self.evaluationFunction == self.evaluate_IT or self.evaluationFunction == self.evaluate_CIT:
             currentScore = 0
         else:
@@ -1990,6 +1996,7 @@ class UpliftTreeClassifier:
         cdef int i_tr = 0
         cdef P_TYPE_t p_t = 0.0, diff = 0.0
 
+        # treament effect and its significance-p_value
         for i_tr in range(1, n_class):
             p_t = cur_summary_p[i_tr]
             # P(Y=1|T=t) - P(Y=1|T=0)
@@ -2021,6 +2028,7 @@ class UpliftTreeClassifier:
         len_X = len(X)
         len_X_val = len(X_val) if X_val is not None else 0
 
+        # split candidates are representive, not all possible values
         c_num_percentiles = [3, 5, 10, 20, 30, 50, 70, 80, 90, 95, 97]
         c_cat_percentiles = [10, 50, 90]
 
@@ -2037,6 +2045,8 @@ class UpliftTreeClassifier:
             lsUnique = np.unique(columnValues)
 
             if np.issubdtype(lsUnique.dtype, np.number):
+
+                # '>=' as split condition
                 is_split_by_gt = True
                 if len(lsUnique) > 10:
                     lspercentile = np.percentile(columnValues, c_num_percentiles)
@@ -2045,8 +2055,10 @@ class UpliftTreeClassifier:
                 lsUnique = np.unique(lspercentile)
             else:
                 # to split by equality check.
+                # ‘=’ as split condition
                 is_split_by_gt = False
-
+            
+            # 并非取所有出现的值，而是使用具有代表性的分为点对应的值，连续型特征的分位点会多于离散型特征的分位点
             for value in lsUnique:
                 len_X_l = group_counts_by_divide(columnValues, value, is_split_by_gt, treatment_idx, y, left_count_arr)
                 len_X_r = len_X - len_X_l
@@ -2081,6 +2093,8 @@ class UpliftTreeClassifier:
                     n_reg
                     )
 
+                # 使用评估集确定是否停止分裂：对于任何组别中的任何子节点，如果训练样本和验证集样本的输出差异大于某个阈值，则不使用该分裂点
+                # 子节点*组别下，任何一组样本量过少时也不使用该分裂点
                 if X_val is not None:
                     len_X_val_l = group_counts_by_divide(X_val[:, col], value, is_split_by_gt, treatment_val_idx, y_val, val_left_count_arr)
 
@@ -2102,6 +2116,8 @@ class UpliftTreeClassifier:
                         1 # has_parent_summary
                     )
 
+
+                    # if the predicted outcome difference between train and valid samples is too big, then stop split
                     early_stopping_flag = False
                     for k in range(n_class):
                         if (abs(val_left_summary_p[k] - left_summary_p[k]) >
@@ -2119,6 +2135,7 @@ class UpliftTreeClassifier:
                 if node_mst < min_samples_treatment:
                     continue
 
+                # 使用KL散度衡量各子节点干预和对照组的输出的差异，差异越大分数越高（使用训练样本）
                 # evaluate the split
                 if self.arr_eval_func == self.arr_evaluate_CTS:
                     leftScore1 = self.arr_eval_func(left_summary_p, left_summary_n)
@@ -2151,8 +2168,11 @@ class UpliftTreeClassifier:
                         norm_factor = 1
                     gain = gain / norm_factor
                 else:
+                    # S = pk * log(pk / qk) + (1 - pk) * log((1 - pk) / (1 - qk))
                     leftScore1 = self.arr_eval_func(left_summary_p, left_summary_n)
                     rightScore2 = self.arr_eval_func(right_summary_p, right_summary_n)
+
+                    #左子节点样本量占其父节点样本量比例，使用KL散度衡量各子节点干预和对照组的输出的差异，差异越大分数越高
                     gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)
                     gain_for_imp = (len_X_l * leftScore1 + len_X_r * rightScore2 - len_X * currentScore)
                     if self.normalization:
@@ -2179,14 +2199,19 @@ class UpliftTreeClassifier:
                 best_set_left = [X_l, w_l, y_l, None, None, None]
                 best_set_right = [X_r, w_r, y_r, None, None, None]
 
+        # 当前节点的摘要信息
+        # 不纯度即KL散度，样本量
         dcY = {'impurity': '%.3f' % currentScore, 'samples': '%d' % len(X)}
-        # Add treatment size
+        # Add treatment size,各组别样本数
         dcY['group_size'] = ''
         for i, summary in enumerate(currentNodeSummary):
             dcY['group_size'] += ' ' + self.classes_[i] + ': ' + str(summary[1])
+        # 弹性分(组别间输出的差)及其显著性，显著性和组别样本量及其内正样本比例有关
         dcY['upliftScore'] = [round(upliftScore[0], 4), round(upliftScore[1], 4)]
         dcY['matchScore'] = round(upliftScore[0], 4)
-
+        
+        # 最大增益大于0并且没有达到最大深度，带着当前节点的摘要递归构建左右子树，最后返回当前节点对应的树，树的本质就是一个类，包含各种属性
+        # 验证集一同送往子树
         if bestGain > 0 and depth < max_depth:
             self.feature_imp_dict[bestAttribute[0]] += bestGainImp
             trueBranch = self.growDecisionTreeFrom(
@@ -2429,6 +2454,8 @@ class UpliftRandomForestClassifier:
         self.n_jobs = n_jobs
         self.joblib_prefer = joblib_prefer
 
+        
+        # Assert control_name is valid - program will terminate if this fails as a defensive programming measure
         assert control_name is not None and isinstance(control_name, str), \
             f"control_group should be string but {control_name} is passed"
         self.control_name = control_name
@@ -2464,7 +2491,7 @@ class UpliftRandomForestClassifier:
         """
         random_state = check_random_state(self.random_state)
 
-        # Create forest
+        # Create forest, all trees share the same configuration，but the random seed differs ensuring distinct personality
         self.uplift_forest = [
             UpliftTreeClassifier(
                 max_features=self.max_features, max_depth=self.max_depth,
@@ -2481,17 +2508,20 @@ class UpliftRandomForestClassifier:
         ]
 
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
+        # support multiple treatment groups
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
         self.classes_ = [self.control_name]
         for tr in treatment_groups:
             self.classes_.append(tr)
         self.n_class = len(self.classes_)
 
+        # parallel trainging up to min(n_estimators, n_jobs)
         self.uplift_forest = (
             Parallel(n_jobs=self.n_jobs, prefer=self.joblib_prefer)
             (delayed(self.bootstrap)(X, treatment, y, X_val, treatment_val, y_val, tree) for tree in self.uplift_forest)
         )
-
+        
+        # the shape of all_importances is [n_estimators,num_features]
         all_importances = [tree.feature_importances_ for tree in self.uplift_forest]
         self.feature_importances_ = np.mean(all_importances, axis=0)
         self.feature_importances_ /= self.feature_importances_.sum()  # normalize to add to 1
@@ -2502,6 +2532,8 @@ class UpliftRandomForestClassifier:
         bt_index = random_state.choice(len(X), len(X))
         x_train_bt = X[bt_index]
         y_train_bt = y[bt_index]
+
+        # bt_index can be repeated, about 63.2% of the whole samples be sampled with replacement but with the same size of whole samples
         treatment_train_bt = treatment[bt_index]
 
         if X_val is None:
@@ -2532,7 +2564,7 @@ class UpliftRandomForestClassifier:
 
         Returns
         -------
-        y_pred_list : ndarray, shape = (num_samples, num_treatments])
+        y_pred_list : ndarray, shape = (num_samples, num_treatments)
             An ndarray containing the predicted treatment effect of each treatment group for each sample
 
         df_res : DataFrame, shape = [num_samples, (num_treatments * 2 + 3)]
