@@ -1887,6 +1887,8 @@ class UpliftTreeClassifier:
         4.子节点*组别下，任何一组样本量过少时也不使用该分裂点
 
         5.最优分裂点：使用KL散度衡量各子节点干预和对照组的输出的差异，差异越大分数越高；同时会对gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)进行归一化，确保gain之间是可比较的，因为不同的分裂点
+
+        6.还会对gain进行归一化，当只有一个处理组时，缩放因子只和父节点中对照组和干预组被分配到子节点的比例有关
         '''
     def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val,
                              early_stopping_eval_diff_scale=1, max_depth=10,
