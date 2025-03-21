@@ -102,7 +102,7 @@ We can validate the estimation by evaluating and comparing the uplift gains with
     train_preds, valid_preds = get_synthetic_preds_holdout(simulate_nuisance_and_easy_treatment,
                                                            n=50000,
                                                            valid_size=0.2)
-    # Cumulative Gain AUUC values for a Single Simulation of Validaiton Data
+    # Cumulative Gain AUUC values for a Single Simulation of Validation Data
     get_synthetic_auuc(valid_preds)
 
 
@@ -116,7 +116,7 @@ For data with skewed treatment, it is sometimes advantageous to use :ref:`Target
 
 Validation with Sensitivity Analysis
 ------------------------------------
-Sensitivity analysis aim to check the robustness of the unconfoundeness assumption. If there is hidden bias (unobserved confounders), it detemineds how severe whould have to be to change conclusion by examine the average treatment effect estimation.
+Sensitivity analysis aim to check the robustness of the unconfoundeness assumption. If there is hidden bias (unobserved confounders), it determines how severe would have to be to change conclusion by examining the average treatment effect estimation.
 
 We implemented the following methods to conduct sensitivity analysis:
 
