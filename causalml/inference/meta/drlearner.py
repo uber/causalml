@@ -473,7 +473,6 @@ class BaseDRRegressor(BaseDRLearner):
                 groups
             control_outcome_learner (optional): a model to estimate outcomes in the control group
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
-            control_effect_learner (optional): a model to estimate treatment effects in the control group
             treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group

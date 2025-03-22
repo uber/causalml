@@ -856,7 +856,6 @@ class BaseDRIVRegressor(BaseDRIVLearner):
                 groups
             control_outcome_learner (optional): a model to estimate outcomes in the control group
             treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
-            control_effect_learner (optional): a model to estimate treatment effects in the control group
             treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group. It needs
                 to take `sample_weight` as an input argument in `fit()`.
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
