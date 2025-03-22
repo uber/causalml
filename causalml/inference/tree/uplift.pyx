@@ -334,7 +334,7 @@ def group_counts_by_divide(
 
 
 """
-1.根据处理效应的最大化来选择分裂点：max(左右子节点KL散度加权和（基于样本量）-父节点KL散度)。各处理组和对照组输出间的累积KL散度,预测是叶子节点的分数来自诚实估计
+1.根据处理效应的最大化来选择分裂点：max(左右子节点KL散度加权和（基于样本量）-父节点KL散度)。各处理组和对照组输出间的累积KL散度,预测时叶子节点的分数来自诚实估计
 2.和train独立的验证集val用于早停，从train中分出的评估集用于更新叶子节点弹性分。其中评估集优先分组采样：y*treatment
 """
 # Uplift Tree Classifier
@@ -482,7 +482,7 @@ class UpliftTreeClassifier:
         treatment_val_idx = None
         if treatment_val is not None:
             treatment_val_idx = np.zeros_like(treatment_val, dtype=TR_TYPE)
-        # i starts from
+
         for i, tr in enumerate(treatment_groups, 1):
             self.classes_.append(tr)
             treatment_idx[treatment == tr] = i
@@ -1886,9 +1886,9 @@ class UpliftTreeClassifier:
         
         4.子节点*组别下，任何一组样本量过少时也不使用该分裂点
 
-        5.最优分裂点：使用KL散度衡量各子节点干预和对照组的输出的差异，差异越大分数越高；同时会对gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)进行归一化，确保gain之间是可比较的，因为不同的分裂点
+        5.最优分裂点：使用KL散度衡量各子节点干预和对照组的输出的差异，差异越大分数越高；同时会对gain = (p * leftScore1 + (1 - p) * rightScore2 - currentScore)进行归一化
 
-        6.还会对gain进行归一化，当只有一个处理组时，缩放因子只和父节点中对照组和干预组被分配到子节点的比例有关
+        6.还会对gain进行归一化，确保gain之间是可比较的，当只有一个处理组时，缩放因子只和父节点中对照组和干预组被分配到子节点的比例有关
         '''
     def growDecisionTreeFrom(self, X, treatment_idx, y, X_val, treatment_val_idx, y_val,
                              early_stopping_eval_diff_scale=1, max_depth=10,
@@ -2044,6 +2044,8 @@ class UpliftTreeClassifier:
         else:
             p_t = cur_summary_p[suboptTreatment]
             n_t = cur_summary_n[suboptTreatment]
+
+        # 使用双尾Z检验计算弹性的p值以衡量显著性即两个值的差异是否显著：弹性绝对值越大、t/c样本量越大、组内y值越一致即
         p_value = (1. - stats.norm.cdf(fabs(p_c - p_t) / sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
         upliftScore = [maxDiff, p_value]
 
@@ -2407,7 +2409,7 @@ class UpliftRandomForestClassifier:
 
     min_samples_leaf: int, optional (default=100)
         The minimum number of samples required to be split at a leaf node.
-    # 各个处理组的样本量都要大于一定阈值，否则无法计算处理效应
+    # 各处理组的样本量都要大于一定阈值，否则无法计算处理效应
     min_samples_treatment: int, optional (default=10)
         The minimum number of samples required of the experiment group to be split at a leaf node.
 
