@@ -19,3 +19,4 @@ _build/
 *.html
 *.prof
 .venv/
+.python-version
