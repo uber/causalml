@@ -1,4 +1,4 @@
-from abc import ABCMeta, abstractclassmethod
+from abc import ABCMeta, abstractmethod
 import logging
 import numpy as np
 import pandas as pd
@@ -12,11 +12,13 @@ logger = logging.getLogger("causalml")
 
 
 class BaseLearner(metaclass=ABCMeta):
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def fit(self, X, treatment, y, p=None):
         pass
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
@@ -37,7 +39,8 @@ class BaseLearner(metaclass=ABCMeta):
         self.fit(X, treatment, y, p)
         return self.predict(X, treatment, y, p, return_components, verbose)
 
-    @abstractclassmethod
+    @classmethod
+    @abstractmethod
     def estimate_ate(
         self,
         X,

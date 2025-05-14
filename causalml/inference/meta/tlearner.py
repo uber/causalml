@@ -280,7 +280,7 @@ class BaseTLearner(BaseLearner):
 
             for n in tqdm(range(n_bootstraps)):
                 ate_b = self.bootstrap(X, treatment, y, size=bootstrap_size)
-                ate_bootstraps[:, n] = ate_b.mean()
+                ate_bootstraps[:, n] = ate_b.mean(axis=0)
 
             ate_lower = np.percentile(
                 ate_bootstraps, (self.ate_alpha / 2) * 100, axis=1
