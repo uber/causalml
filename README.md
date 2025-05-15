@@ -76,6 +76,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](https:
 * [Causal ML API documentation](https://causalml.readthedocs.io/en/latest/about.html)
 
 ## Workshops, Talks, and Publications
+* (Workshop) [3rd Workshop on Causal Inference and Machine Learning in Practice](https://causal-machine-learning.github.io/kdd2025-workshop/) at KDD 2025
 * (Workshop) [2nd Workshop on Causal Inference and Machine Learning in Practice](https://causal-machine-learning.github.io/kdd2024-workshop/) at KDD 2024
 * (Workshop) [Causal Inference and Machine Learning in Practice: Use cases for Product, Brand, Policy and Beyond](https://causal-machine-learning.github.io/kdd2023-workshop/) at KDD 2023
 * (Talk) Introduction to CausalML at [Causal Data Science Meeting 2021](https://www.causalscience.org/meeting/program/day-2/)
