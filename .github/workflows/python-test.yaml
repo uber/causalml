@@ -28,6 +28,5 @@ jobs:
             pip install --upgrade pip
             pip install --upgrade setuptools
             python -m pip install .[test]
-            python setup.py build_ext --inplace
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/
