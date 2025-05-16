@@ -3,12 +3,20 @@ import os
 from setuptools import dist, setup, find_packages
 from setuptools.extension import Extension
 
-from Cython.Build import cythonize
+try:
+    from Cython.Build import cythonize
+except ImportError:
+    dist.Distribution().fetch_build_eggs(["cython"])
+    from Cython.Build import cythonize
 import Cython.Compiler.Options
 
 Cython.Compiler.Options.annotate = True
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:
+    dist.Distribution().fetch_build_eggs(["numpy"])
+    import numpy as np
 
 # fmt: off
 cython_modules = [
@@ -45,4 +53,8 @@ setup(
     packages=packages,
     ext_modules=cythonize(extensions, annotate=True, nthreads=nthreads),
     include_dirs=[np.get_include()],
+    setup_requires=[
+        "cython",
+        "numpy",
+    ],
 )
