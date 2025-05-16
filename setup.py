@@ -6,16 +6,17 @@ from setuptools.extension import Extension
 try:
     from Cython.Build import cythonize
 except ImportError:
-    dist.Distribution().fetch_build_eggs(["cython<=0.29.34"])
+    dist.Distribution().fetch_build_eggs(["cython"])
     from Cython.Build import cythonize
 import Cython.Compiler.Options
 
 Cython.Compiler.Options.annotate = True
+
 try:
-    from numpy import get_include as np_get_include
+    import numpy as np
 except ImportError:
     dist.Distribution().fetch_build_eggs(["numpy"])
-    from numpy import get_include as np_get_include
+    import numpy as np
 
 # fmt: off
 cython_modules = [
@@ -34,7 +35,7 @@ extensions = [
         name,
         [source],
         libraries=[],
-        include_dirs=[np_get_include()],
+        include_dirs=[np.get_include()],
         extra_compile_args=["-O3"],
     )
     for name, source in cython_modules
@@ -51,5 +52,9 @@ else:
 setup(
     packages=packages,
     ext_modules=cythonize(extensions, annotate=True, nthreads=nthreads),
-    include_dirs=[np_get_include()],
+    include_dirs=[np.get_include()],
+    setup_requires=[
+        "cython",
+        "numpy",
+    ],
 )

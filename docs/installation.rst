@@ -73,7 +73,6 @@ Then:
     git clone https://github.com/uber/causalml.git
     cd causalml
     pip install .
-    python setup.py build_ext --inplace
 
 with ``tensorflow`` for ``DragonNet``:
 
