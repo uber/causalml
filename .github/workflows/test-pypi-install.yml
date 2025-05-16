@@ -12,14 +12,16 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
         include:
-          - python-version: 3.7
-            python-version-nd: 37
-          - python-version: 3.8
-            python-version-nd: 38
-          - python-version: 3.9
+          - python-version: "3.9"
             python-version-nd: 39
+          - python-version: "3.10"
+            python-version-nd: 310
+          - python-version: "3.11"
+            python-version-nd: 311
+          - python-version: "3.12"
+            python-version-nd: 312
 
     steps:
       - uses: actions/checkout@v2
