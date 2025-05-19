@@ -19,17 +19,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        python-version: [3.7, 3.8, 3.9]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
         tf-label: ['', '-tf']
         include:
-          - python-version: 3.7
-            python-version-nd: 37
-          - python-version: 3.8
-            python-version-nd: 38
-          - python-version: 3.9
+          - python-version: "3.9"
             python-version-nd: 39
+          - python-version: "3.10"
+            python-version-nd: 310
+          - python-version: "3.11"
+            python-version-nd: 311
+          - python-version: "3.12"
+            python-version-nd: 312
           - tf-label: '-tf'
-            tf-label-pip: '[tf]'
+            tf-label-pip: ',tf'
 
     steps:
       - name: checkout repository
@@ -68,9 +70,7 @@ jobs:
         run: |
             pip install -U pip
             pip install -U setuptools
-            python -m pip install .${{ matrix.tf-label-pip}}
-            python -m pip install .[test]
-            python setup.py build_ext --inplace
+            python -m pip install -e ".[test${{ matrix.tf-label-pip}}]"
 
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/
