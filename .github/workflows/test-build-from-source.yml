@@ -31,7 +31,7 @@ jobs:
           - python-version: "3.12"
             python-version-nd: 312
           - tf-label: '-tf'
-            tf-label-pip: '[tf]'
+            tf-label-pip: ',tf'
 
     steps:
       - name: checkout repository
@@ -70,8 +70,7 @@ jobs:
         run: |
             pip install -U pip
             pip install -U setuptools
-            python -m pip install .${{ matrix.tf-label-pip}}
-            python -m pip install ".[test]"
+            python -m pip install -e ".[test${{ matrix.tf-label-pip}}]"
 
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/

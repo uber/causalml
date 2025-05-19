@@ -27,6 +27,6 @@ jobs:
             sudo apt install graphviz
             pip install --upgrade pip
             pip install --upgrade setuptools
-            python -m pip install ".[test]"
+            python -m pip install -e ".[test]"
       - name: Test with pytest
         run: pytest -vs tests/ --cov causalml/
