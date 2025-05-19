@@ -54,7 +54,7 @@ Install ``causalml`` with ``torch`` for ``CEVAE`` from ``PyPI``
 Install from source
 -------------------
 
-If you don't have Graphviz installed, you can install it using ``conda``, ``brew`` (on MacOS), or ``apt`` (on Linux).
+[Optional] If you don't have Graphviz installed, you can install it using ``conda``, ``brew`` (on MacOS), or ``apt`` (on Linux).
 
 .. code-block:: bash
 
