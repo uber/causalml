@@ -80,30 +80,43 @@ def run_mab_experiment():
     
     # Generate data
     print("Generating data...")
-    n_samples = 1000
-    n_arms = 3
+    n_samples = 300
+    n_arms = 5
     n_features = 2
-    
-    # Generate data with features for contextual MAB
+    arm_effects = {f"arm_{i}": eff for i, eff in enumerate([0.1, 0.2, 0.3, 0.5, 0.9])}
     df = make_mab_data(
         n_samples=n_samples,
         n_arms=n_arms,
         n_features=n_features,
-        arm_effects=[0.1, 0.5, 0.9],  # Different true means for each arm
-        random_seed=42
+        arm_effects=arm_effects,
+        random_seed=42,
+        error_std=0.2
     )
     
+    # Dynamically select the first two feature columns for contextual MAB
+    feature_cols = [col for col in df.columns if col.startswith("feature_")][:2]
+
+    # Add cohort column
+    df["cohort"] = np.random.choice([0, 1, 2], size=len(df))
+
+    # --- Make reward contextual: reward_prob depends on features and arm ---
+    feature_weights = np.random.uniform(-1, 1, len(feature_cols))
+    df['feature_score'] = df[feature_cols].dot(feature_weights)
+    df['reward_prob'] = df['reward_prob'] + 0.5 * df['feature_score']
+    df['reward_prob'] = np.clip(df['reward_prob'], 0, 1)
+    df['reward'] = np.random.binomial(1, df['reward_prob'])
+
     # Initialize algorithms
     print("Initializing algorithms...")
     algorithms = {
         # Classical MAB
-        'EpsilonGreedy': EpsilonGreedy(df, reward='reward', arm='arm', epsilon=0.1),
+        'EpsilonGreedy': EpsilonGreedy(df, reward='reward', arm='arm', epsilon=0.3),
         'UCB': UCB(df, reward='reward', arm='arm', alpha=1.0),
         'ThompsonSampling': ThompsonSampling(df, reward='reward', arm='arm'),
         
         # Batch Classical MAB
         'BatchEpsilonGreedy': BatchBandit(
-            EpsilonGreedy(df, reward='reward', arm='arm', epsilon=0.1),
+            EpsilonGreedy(df, reward='reward', arm='arm', epsilon=0.3),
             batch_size=10
         ),
         'BatchUCB': BatchBandit(
@@ -118,7 +131,7 @@ def run_mab_experiment():
         # Contextual MAB
         'LinUCB': LinUCB(
             df,
-            features=['feature_0', 'feature_1'],
+            features=feature_cols,
             reward='reward',
             arm='arm',
             alpha=1.0
@@ -133,7 +146,7 @@ def run_mab_experiment():
         # Batch Contextual MAB
         'BatchLinUCB': BatchLinUCB(
             df,
-            features=['feature_0', 'feature_1'],
+            features=feature_cols,
             reward='reward',
             arm='arm',
             alpha=1.0,
@@ -165,47 +178,83 @@ def run_mab_experiment():
                 batch_df = df.iloc[i:i + algo.batch_size]
                 if len(batch_df) == 0:
                     break
-                    
                 if 'LinUCB' in name:
-                    # For LinUCB, we need to pass features
                     contexts = batch_df[algo.features].values
                     arms = algo.batch_select(contexts)
-                    rewards.extend(batch_df['reward'].values)
+                    # Sample rewards for chosen arms
+                    rewards_batch = []
+                    for arm, context in zip(arms, contexts):
+                        possible_rows = batch_df[batch_df['arm'] == arm]
+                        if not possible_rows.empty:
+                            row = possible_rows.sample(1).iloc[0]
+                            rewards_batch.append(row['reward'])
+                        else:
+                            rewards_batch.append(0.0)
+                    rewards.extend(rewards_batch)
+                    algo.batch_update(arms, contexts, rewards_batch)
                 elif 'Cohort' in name:
-                    # For Cohort Thompson Sampling, we need to pass cohort
-                    contexts = batch_df[algo.feature].values
+                    contexts = batch_df[algo.feature].values.reshape(-1, 1)
                     arms = algo.batch_select(contexts)
-                    rewards.extend(batch_df['reward'].values)
+                    rewards_batch = []
+                    for arm, context in zip(arms, contexts):
+                        possible_rows = batch_df[(batch_df['arm'] == arm) & (batch_df[algo.feature] == context[0])]
+                        if not possible_rows.empty:
+                            row = possible_rows.sample(1).iloc[0]
+                            rewards_batch.append(row['reward'])
+                        else:
+                            rewards_batch.append(0.0)
+                    rewards.extend(rewards_batch)
+                    algo.batch_update(arms, contexts, rewards_batch)
                 else:
-                    # For classical MAB
                     arms = algo.select_batch()
-                    rewards.extend(batch_df['reward'].values)
-                
+                    rewards_batch = []
+                    for arm in arms:
+                        possible_rows = batch_df[batch_df['arm'] == arm]
+                        if not possible_rows.empty:
+                            row = possible_rows.sample(1).iloc[0]
+                            rewards_batch.append(row['reward'])
+                        else:
+                            rewards_batch.append(0.0)
+                    rewards.extend(rewards_batch)
+                    algo.update_batch(arms, rewards_batch)
                 selected_arms.extend(arms)
-                
-                # Update model
-                if 'LinUCB' in name:
-                    algo.batch_update(arms, contexts, batch_df['reward'].values)
-                elif 'Cohort' in name:
-                    algo.batch_update(arms, contexts, batch_df['reward'].values)
-                else:
-                    algo.update_batch(arms, batch_df['reward'].values)
         else:
             # For non-batch algorithms
-            for _, row in df.iterrows():
+            for _ in range(len(df)):
                 if 'LinUCB' in name:
+                    # Randomly sample a context row
+                    row = df.sample(1).iloc[0]
                     context = row[algo.features].values
                     arm = algo.select_arm(context)
-                    algo.update(arm, context, row['reward'])
+                    # Sample a reward for the chosen arm and context
+                    possible_rows = df[(df['arm'] == arm)]
+                    if not possible_rows.empty:
+                        reward_row = possible_rows.sample(1).iloc[0]
+                        reward = reward_row['reward']
+                    else:
+                        reward = 0.0
+                    algo.update(arm, context, reward)
                 elif 'Cohort' in name:
-                    context = row[algo.feature]
+                    row = df.sample(1).iloc[0]
+                    context = np.array([row[algo.feature]])
                     arm = algo.select_arm(context)
-                    algo.update(arm, context, row['reward'])
+                    possible_rows = df[(df['arm'] == arm) & (df[algo.feature] == context[0])]
+                    if not possible_rows.empty:
+                        reward_row = possible_rows.sample(1).iloc[0]
+                        reward = reward_row['reward']
+                    else:
+                        reward = 0.0
+                    algo.update(arm, context, reward)
                 else:
                     arm = algo.select_arm()
-                    algo.update(arm, row['reward'])
-                
-                rewards.append(row['reward'])
+                    possible_rows = df[df['arm'] == arm]
+                    if not possible_rows.empty:
+                        reward_row = possible_rows.sample(1).iloc[0]
+                        reward = reward_row['reward']
+                    else:
+                        reward = 0.0
+                    algo.update(arm, reward)
+                rewards.append(reward)
                 selected_arms.append(arm)
         
         # Store results
@@ -216,7 +265,16 @@ def run_mab_experiment():
     
     # Evaluate and visualize results
     print("Evaluating results...")
-    
+
+    # Print summary table of results
+    print("\nSummary Table:")
+    print(f"{'Algorithm':<30} {'Avg Reward':>12} {'Cum Reward':>12} {'Regret':>12}")
+    for name, result in results.items():
+        avg_reward = np.mean(result['rewards'])
+        cum_reward = np.sum(result['rewards'])
+        regret = (0.9 * n_samples) - cum_reward  # 0.9 is the best arm mean
+        print(f"{name:<30} {avg_reward:12.4f} {cum_reward:12.1f} {regret:12.1f}")
+
     # Plot cumulative rewards
     plt.figure(figsize=(12, 6))
     for name, result in results.items():
