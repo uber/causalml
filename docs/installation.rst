@@ -51,8 +51,7 @@ Install ``causalml`` with ``torch`` for ``CEVAE`` from ``PyPI``
     pip install causalml[torch]
 
 
-
-Install from ``PyPI`` using [`uv`](https://github.com/astral-sh/uv/blob/main/README.md)
+Install from ``PyPI`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
 ---------------------
 
 .. code-block:: bash
@@ -62,19 +61,20 @@ Install from ``PyPI`` using [`uv`](https://github.com/astral-sh/uv/blob/main/REA
     source .venv/bin/activate
     uv pip install causalml
 
-Install ``causalml`` with ``tensorflow`` for ``DragonNet`` from ``PyPI`` using [`uv`](https://github.com/astral-sh/uv/blob/main/README.md)  
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Install ``causalml`` with ``tensorflow`` for ``DragonNet`` from ``PyPI`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
     uv pip install causalml[tf]
 
-Install ``causalml`` with ``torch`` for ``CEVAE`` from ``PyPI`` using [`uv`](https://github.com/astral-sh/uv/blob/main/README.md)  
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Install ``causalml`` with ``torch`` for ``CEVAE`` from ``PyPI`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
     uv pip install causalml[torch]
+    
 
 
 
