@@ -64,14 +64,14 @@ Install ``causalml`` with ``tensorflow`` for ``DragonNet`` using `uv <https://gi
 
 .. code-block:: bash
 
-    uv add causalml[tf]
+    uv add "causalml[tf]"
 
 Install ``causalml`` with ``torch`` for ``CEVAE`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
-    uv add causalml[torch]
+    uv add "causalml[torch]"
     
 
 
