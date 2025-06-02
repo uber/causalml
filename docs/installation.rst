@@ -51,7 +51,7 @@ Install ``causalml`` with ``torch`` for ``CEVAE`` from ``PyPI``
     pip install causalml[torch]
 
 
-Install from ``PyPI`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
+Install using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
 ---------------------
 
 .. code-block:: bash
