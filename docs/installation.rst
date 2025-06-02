@@ -56,10 +56,8 @@ Install using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
 
 .. code-block:: bash
 
-    uv init myproject
-    uv venv
-    source .venv/bin/activate
-    uv pip install causalml
+    uv init
+    uv add causalml
 
 Install ``causalml`` with ``tensorflow`` for ``DragonNet`` from ``PyPI`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
