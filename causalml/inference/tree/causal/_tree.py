@@ -184,7 +184,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             )
 
         if sample_weight is not None:
-            sample_weight = _check_sample_weight(sample_weight, X, DOUBLE)
+            sample_weight = _check_sample_weight(sample_weight, X, dtype=DOUBLE)
 
         if expanded_class_weight is not None:
             if sample_weight is not None:
