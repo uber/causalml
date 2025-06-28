@@ -6,7 +6,11 @@ from joblib import Parallel, delayed
 from warnings import catch_warnings, simplefilter, warn
 
 from sklearn.exceptions import DataConversionWarning
-from sklearn.utils.validation import check_random_state, _check_sample_weight
+from sklearn.utils.validation import (
+    check_random_state,
+    _check_sample_weight,
+    validate_data,
+)
 from sklearn.utils.multiclass import type_of_target
 from sklearn import __version__ as sklearn_version
 from sklearn.ensemble._forest import DOUBLE, DTYPE, MAX_INT
@@ -246,8 +250,8 @@ class CausalRandomForestRegressor(ForestRegressor):
         # Validate or convert input data
         if issparse(y):
             raise ValueError("sparse multilabel-indicator for y is not supported.")
-        X, y = self._validate_data(
-            X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE
+        X, y = validate_data(
+            self, X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE
         )
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X)
