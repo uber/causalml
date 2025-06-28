@@ -214,7 +214,9 @@ def compute_propensity_score(
     if treatment_pred is None:
         treatment_pred = treatment.copy()
     if p_model is None:
-        p_model = ElasticNetPropensityModel(calibrate=calibrate_p)
+        p_model = ElasticNetPropensityModel(
+            clip_bounds=clip_bounds, calibrate=calibrate_p
+        )
 
     p_model.fit(X, treatment)
 
@@ -225,8 +227,5 @@ def compute_propensity_score(
     except AttributeError:
         logger.info("predict_proba not available, using predict instead")
         p = p_model.predict(X_pred)
-
-    # force the p values within the range
-    p = np.clip(p, clip_bounds[0], clip_bounds[1])
 
     return p, p_model
