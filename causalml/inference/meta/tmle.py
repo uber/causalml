@@ -11,7 +11,6 @@ from causalml.inference.meta.utils import (
     check_p_conditions,
     convert_pd_to_np,
 )
-from causalml.propensity import calibrate
 
 
 logger = logging.getLogger("causalml")
@@ -105,7 +104,6 @@ class TMLELearner:
         ate_alpha=0.05,
         control_name=0,
         cv=None,
-        calibrate_propensity=True,
     ):
         """Initialize a TMLE learner.
 
@@ -119,7 +117,6 @@ class TMLELearner:
         self.ate_alpha = ate_alpha
         self.control_name = control_name
         self.cv = cv
-        self.calibrate_propensity = calibrate_propensity
 
     def __repr__(self):
         return "{}(model={}, cv={})".format(
@@ -164,10 +161,6 @@ class TMLELearner:
             logger.info("Estimating ATE for group {}.".format(group))
             w_group = (treatment == group).astype(int)
             p_group = p[group]
-
-            if self.calibrate_propensity:
-                logger.info("Calibrating propensity scores.")
-                p_group = calibrate(p_group, w_group)
 
             yhat_c = np.zeros_like(y, dtype=float)
             yhat_t = np.zeros_like(y, dtype=float)

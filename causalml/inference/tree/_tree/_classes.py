@@ -40,6 +40,7 @@ from sklearn.utils.validation import (
     _check_sample_weight,
     assert_all_finite,
     check_is_fitted,
+    validate_data,
 )
 from . import _criterion, _splitter, _tree
 from ._criterion import Criterion
@@ -242,8 +243,8 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                 dtype=DTYPE, accept_sparse="csc", force_all_finite=False
             )
             check_y_params = dict(ensure_2d=False, dtype=None)
-            X, y = self._validate_data(
-                X, y, validate_separately=(check_X_params, check_y_params)
+            X, y = validate_data(
+                self, X, y, validate_separately=(check_X_params, check_y_params)
             )
 
             missing_values_in_feature_mask = (
@@ -479,7 +480,8 @@ class BaseDecisionTree(MultiOutputMixin, BaseEstimator, metaclass=ABCMeta):
                 force_all_finite = "allow-nan"
             else:
                 force_all_finite = True
-            X = self._validate_data(
+            X = validate_data(
+                self,
                 X,
                 dtype=DTYPE,
                 accept_sparse="csr",

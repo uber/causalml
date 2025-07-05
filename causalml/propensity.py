@@ -12,16 +12,19 @@ logger = logging.getLogger("causalml")
 
 
 class PropensityModel(metaclass=ABCMeta):
-    def __init__(self, clip_bounds=(1e-3, 1 - 1e-3), **model_kwargs):
+    def __init__(self, clip_bounds=(1e-3, 1 - 1e-3), calibrate=True, **model_kwargs):
         """
         Args:
             clip_bounds (tuple): lower and upper bounds for clipping propensity scores. Bounds should be implemented
                     such that: 0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
+            calibrate (bool): whether calibrate the propensity score
             model_kwargs: Keyword arguments to be passed to the underlying classification model.
         """
         self.clip_bounds = clip_bounds
+        self.calibrate = calibrate
         self.model_kwargs = model_kwargs
         self.model = self._model
+        self.calibrator = None
 
     @property
     @abstractmethod
@@ -40,6 +43,15 @@ class PropensityModel(metaclass=ABCMeta):
             y (numpy.ndarray): a binary target vector
         """
         self.model.fit(X, y)
+        if self.calibrate:
+            # Fit a calibrator to the propensity scores with IsotonicRegression.
+            # Ref: https://scikit-learn.org/stable/modules/isotonic.html
+            self.calibrator = IsotonicRegression(
+                out_of_bounds="clip",
+                y_min=self.clip_bounds[0],
+                y_max=self.clip_bounds[1],
+            )
+            self.calibrator.fit(self.model.predict_proba(X)[:, 1], y)
 
     def predict(self, X):
         """
@@ -51,7 +63,11 @@ class PropensityModel(metaclass=ABCMeta):
         Returns:
             (numpy.ndarray): Propensity scores between 0 and 1.
         """
-        return np.clip(self.model.predict_proba(X)[:, 1], *self.clip_bounds)
+        p = self.model.predict_proba(X)[:, 1]
+        if self.calibrate:
+            p = self.calibrator.transform(p)
+
+        return np.clip(p, *self.clip_bounds)
 
     def fit_predict(self, X, y):
         """
@@ -66,7 +82,6 @@ class PropensityModel(metaclass=ABCMeta):
         """
         self.fit(X, y)
         propensity_scores = self.predict(X)
-        logger.info("AUC score: {:.6f}".format(auc(y, propensity_scores)))
         return propensity_scores
 
 
@@ -112,12 +127,15 @@ class GradientBoostedPropensityModel(PropensityModel):
     https://xgboost.readthedocs.io/en/latest/python/python_api.html
     """
 
-    def __init__(self, early_stop=False, clip_bounds=(1e-3, 1 - 1e-3), **model_kwargs):
+    def __init__(
+        self,
+        early_stop=False,
+        clip_bounds=(1e-3, 1 - 1e-3),
+        calibrate=True,
+        **model_kwargs,
+    ):
         self.early_stop = early_stop
-
-        super(GradientBoostedPropensityModel, self).__init__(
-            clip_bounds, **model_kwargs
-        )
+        super().__init__(clip_bounds, calibrate, **model_kwargs)
 
     @property
     def _model(self):
@@ -156,50 +174,25 @@ class GradientBoostedPropensityModel(PropensityModel):
                 y_train,
                 eval_set=[(X_val, y_val)],
             )
+            if self.calibrate:
+                self.calibrator = IsotonicRegression(
+                    out_of_bounds="clip",
+                    y_min=self.clip_bounds[0],
+                    y_max=self.clip_bounds[1],
+                )
+                self.calibrator.fit(self.model.predict_proba(X)[:, 1], y)
         else:
-            super(GradientBoostedPropensityModel, self).fit(X, y)
-
-    def predict(self, X):
-        """
-        Predict propensity scores.
-
-        Args:
-            X (numpy.ndarray): a feature matrix
-
-        Returns:
-            (numpy.ndarray): Propensity scores between 0 and 1.
-        """
-        if self.early_stop:
-            return np.clip(
-                self.model.predict_proba(X)[:, 1],
-                *self.clip_bounds,
-            )
-        else:
-            return super(GradientBoostedPropensityModel, self).predict(X)
-
-
-def calibrate(ps, treatment):
-    """Calibrate propensity scores with IsotonicRegression.
-
-    Ref: https://scikit-learn.org/stable/modules/isotonic.html
-
-    Args:
-        ps (numpy.array): a propensity score vector
-        treatment (numpy.array): a binary treatment vector (0: control, 1: treated)
-
-    Returns:
-        (numpy.array): a calibrated propensity score vector
-    """
-
-    two_eps = 2.0 * np.finfo(float).eps
-    pm_ir = IsotonicRegression(out_of_bounds="clip", y_min=two_eps, y_max=1.0 - two_eps)
-    ps_ir = pm_ir.fit_transform(ps, treatment)
-
-    return ps_ir
+            super().fit(X, y)
 
 
 def compute_propensity_score(
-    X, treatment, p_model=None, X_pred=None, treatment_pred=None, calibrate_p=True
+    X,
+    treatment,
+    p_model=None,
+    X_pred=None,
+    treatment_pred=None,
+    calibrate_p=True,
+    clip_bounds=(1e-3, 1 - 1e-3),
 ):
     """Generate propensity score if user didn't provide and optionally calibrate.
 
@@ -210,16 +203,20 @@ def compute_propensity_score(
         X_pred (np.matrix, optional): features for prediction
         treatment_pred (np.array or pd.Series, optional): a treatment vector for prediciton
         calibrate_p (bool, optional): whether calibrate the propensity score
+        clip_bounds (tuple, optional): lower and upper bounds for clipping propensity scores. Bounds should be implemented
+                    such that: 0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
 
     Returns:
         (tuple)
             - p (numpy.ndarray): propensity score
-            - p_model (PropensityModel): either the original p_model, a trained ElasticNetPropensityModel, or None if calibrate_p=True
+            - p_model (PropensityModel): either the original p_model or a trained ElasticNetPropensityModel
     """
     if treatment_pred is None:
         treatment_pred = treatment.copy()
     if p_model is None:
-        p_model = ElasticNetPropensityModel()
+        p_model = ElasticNetPropensityModel(
+            clip_bounds=clip_bounds, calibrate=calibrate_p
+        )
 
     p_model.fit(X, treatment)
 
@@ -230,15 +227,5 @@ def compute_propensity_score(
     except AttributeError:
         logger.info("predict_proba not available, using predict instead")
         p = p_model.predict(X_pred)
-
-    if calibrate_p:
-        logger.info("Calibrating propensity scores. Returning p_model=None.")
-        p = calibrate(p, treatment_pred)
-        p_model = None
-
-    # force the p values within the range
-    eps = np.finfo(float).eps
-    p = np.where(p < 0 + eps, 0 + eps * 1.001, p)
-    p = np.where(p > 1 - eps, 1 - eps * 1.001, p)
 
     return p, p_model

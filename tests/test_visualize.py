@@ -69,6 +69,5 @@ def test_plot_tmlegain(generate_regression_data, monkeypatch):
         p_col="p",
         n_segment=5,
         cv=kf,
-        calibrate_propensity=True,
         ci=False,
     )

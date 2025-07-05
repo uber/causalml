@@ -342,7 +342,6 @@ def get_tmlegain(
     p_col="p",
     n_segment=5,
     cv=None,
-    calibrate_propensity=True,
     ci=False,
 ):
     """Get TMLE based average uplifts of model estimates of segments.
@@ -356,7 +355,6 @@ def get_tmlegain(
         p_col (str, optional): the column name for propensity score
         n_segment (int, optional): number of segment that TMLE will estimated for each
         cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
-        calibrate_propensity (bool, optional): whether calibrate propensity score or not
         ci (bool, optional): whether return confidence intervals for ATE or not
     Returns:
         (pandas.DataFrame): cumulative gains of model estimates based of TMLE
@@ -374,7 +372,7 @@ def get_tmlegain(
     inference_col = [x for x in inference_col if x in df.columns]
 
     # Initialize TMLE
-    tmle = TMLELearner(learner, cv=cv, calibrate_propensity=calibrate_propensity)
+    tmle = TMLELearner(learner, cv=cv)
     ate_all, ate_all_lb, ate_all_ub = tmle.estimate_ate(
         X=df[inference_col], p=df[p_col], treatment=df[treatment_col], y=df[outcome_col]
     )
@@ -454,7 +452,6 @@ def get_tmleqini(
     p_col="p",
     n_segment=5,
     cv=None,
-    calibrate_propensity=True,
     ci=False,
     normalize=False,
 ):
@@ -469,7 +466,6 @@ def get_tmleqini(
         p_col (str, optional): the column name for propensity score
         n_segment (int, optional): number of segment that TMLE will estimated for each
         cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
-        calibrate_propensity (bool, optional): whether calibrate propensity score or not
         ci (bool, optional): whether return confidence intervals for ATE or not
     Returns:
         (pandas.DataFrame): cumulative gains of model estimates based of TMLE
@@ -487,7 +483,7 @@ def get_tmleqini(
     inference_col = [x for x in inference_col if x in df.columns]
 
     # Initialize TMLE
-    tmle = TMLELearner(learner, cv=cv, calibrate_propensity=calibrate_propensity)
+    tmle = TMLELearner(learner, cv=cv)
     ate_all, ate_all_lb, ate_all_ub = tmle.estimate_ate(
         X=df[inference_col], p=df[p_col], treatment=df[treatment_col], y=df[outcome_col]
     )
@@ -696,7 +692,6 @@ def plot_tmlegain(
     p_col="tau",
     n_segment=5,
     cv=None,
-    calibrate_propensity=True,
     ci=False,
     figsize=(8, 8),
 ):
@@ -711,7 +706,6 @@ def plot_tmlegain(
         p_col (str, optional): the column name for propensity score
         n_segment (int, optional): number of segment that TMLE will estimated for each
         cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
-        calibrate_propensity (bool, optional): whether calibrate propensity score or not
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
 
@@ -728,7 +722,6 @@ def plot_tmlegain(
         p_col=p_col,
         n_segment=n_segment,
         cv=cv,
-        calibrate_propensity=calibrate_propensity,
     )
 
 
@@ -741,7 +734,6 @@ def plot_tmleqini(
     p_col="tau",
     n_segment=5,
     cv=None,
-    calibrate_propensity=True,
     ci=False,
     figsize=(8, 8),
 ):
@@ -756,7 +748,6 @@ def plot_tmleqini(
         p_col (str, optional): the column name for propensity score
         n_segment (int, optional): number of segment that TMLE will estimated for each
         cv (sklearn.model_selection._BaseKFold, optional): sklearn CV object
-        calibrate_propensity (bool, optional): whether calibrate propensity score or not
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
 
@@ -773,7 +764,6 @@ def plot_tmleqini(
         p_col=p_col,
         n_segment=n_segment,
         cv=cv,
-        calibrate_propensity=calibrate_propensity,
     )
 
 

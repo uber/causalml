@@ -6,7 +6,7 @@ from math import ceil
 import numpy as np
 from scipy.sparse import issparse
 from sklearn.utils import check_random_state
-from sklearn.utils.validation import _check_sample_weight
+from sklearn.utils.validation import _check_sample_weight, validate_data
 
 from .._tree._classes import DTYPE, DOUBLE, INT
 from .._tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
@@ -61,8 +61,8 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             # csr.
             check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
             check_y_params = dict(ensure_2d=False, dtype=None)
-            X, y = self._validate_data(
-                X, y, validate_separately=(check_X_params, check_y_params)
+            X, y = validate_data(
+                self, X, y, validate_separately=(check_X_params, check_y_params)
             )
             if issparse(X):
                 X.sort_indices()
@@ -184,7 +184,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             )
 
         if sample_weight is not None:
-            sample_weight = _check_sample_weight(sample_weight, X, DOUBLE)
+            sample_weight = _check_sample_weight(sample_weight, X, dtype=DOUBLE)
 
         if expanded_class_weight is not None:
             if sample_weight is not None:
