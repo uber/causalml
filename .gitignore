@@ -20,3 +20,4 @@ _build/
 *.prof
 .venv/
 .python-version
+uv.lock
