@@ -9,4 +9,4 @@ from .tlearner import (
 from .xlearner import BaseXLearner, BaseXRegressor, BaseXClassifier
 from .rlearner import BaseRLearner, BaseRRegressor, BaseRClassifier, XGBRRegressor
 from .tmle import TMLELearner
-from .drlearner import BaseDRLearner, BaseDRRegressor, XGBDRRegressor
+from .drlearner import BaseDRLearner, BaseDRRegressor, BaseDRClassifier, XGBDRRegressor
