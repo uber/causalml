@@ -30,7 +30,9 @@ from causalml.inference.meta import (
     XGBRRegressor,
 )
 from causalml.inference.meta import TMLELearner
-from causalml.inference.meta import BaseDRLearner, BaseDRRegressor, BaseDRClassifier
+from causalml.inference.meta import BaseDRLearner
+from causalml.inference.meta import BaseDRRegressor
+from causalml.inference.meta import BaseDRClassifier
 from causalml.metrics import ape, auuc_score
 
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION

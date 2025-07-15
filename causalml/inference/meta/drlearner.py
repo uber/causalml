@@ -531,11 +531,21 @@ class BaseDRClassifier(BaseDRLearner):
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series, optional): a treatment vector
-            y (np.array or pd.Series, optional): an outcome vector
-            verbose (bool, optional): whether to output progress logs
+            treatment (np.array or pd.Series, optional): a treatment vector. Used for computing
+                classification metrics when y is also provided.
+            y (np.array or pd.Series, optional): an outcome vector. Used for computing
+                classification metrics when treatment is also provided.
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1). Currently not used in prediction but kept for API consistency.
+            return_components (bool, optional): whether to return outcome probabilities for treatment and control
+                groups separately. Defaults to False.
+            verbose (bool, optional): whether to output progress logs. Defaults to True.
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
+            If return_components is True, also returns:
+                - dict: Predicted probabilities for the control group (yhat_cs).
+                - dict: Predicted probabilities for the treatment group (yhat_ts).
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
