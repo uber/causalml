@@ -1041,7 +1041,6 @@ def test_BaseDRLearner(generate_regression_data):
     assert auuc["cate_p"] > 0.5
 
 
-
 def test_BaseDRClassifier(generate_classification_data):
     np.random.seed(RANDOM_SEED)
 
@@ -1050,40 +1049,39 @@ def test_BaseDRClassifier(generate_classification_data):
     df["treatment_group_key"] = np.where(
         df["treatment_group_key"] == CONTROL_NAME, 0, 1
     )
-    
+
     # Extract features and outcome
     y = df[CONVERSION].values
     X = df[X_names].values
     treatment = df["treatment_group_key"].values
 
     learner = BaseDRClassifier(
-        learner=LogisticRegression(),
-        treatment_effect_learner=LinearRegression()
+        learner=LogisticRegression(), treatment_effect_learner=LinearRegression()
     )
 
     # Test fit and predict
     te = learner.fit_predict(X=X, treatment=treatment, y=y)
-    
+
     # Check that treatment effects are returned
     assert te.shape[0] == X.shape[0]
     assert te.shape[1] == len(np.unique(treatment[treatment != 0]))
-    
+
     # Test with return_components
     te, yhat_cs, yhat_ts = learner.fit_predict(
         X=X, treatment=treatment, y=y, return_components=True
     )
-    
+
     # Check that components are returned as probabilities
     for group in learner.t_groups:
         assert np.all((yhat_cs[group] >= 0) & (yhat_cs[group] <= 1))
         assert np.all((yhat_ts[group] >= 0) & (yhat_ts[group] <= 1))
-    
+
     # Test separate outcome and effect learners
     learner_separate = BaseDRClassifier(
         control_outcome_learner=LogisticRegression(),
         treatment_outcome_learner=LogisticRegression(),
-        treatment_effect_learner=LinearRegression()
+        treatment_effect_learner=LinearRegression(),
     )
-    
+
     te_separate = learner_separate.fit_predict(X=X, treatment=treatment, y=y)
     assert te_separate.shape == te.shape
