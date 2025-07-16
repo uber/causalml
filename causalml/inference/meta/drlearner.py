@@ -13,7 +13,7 @@ from causalml.inference.meta.utils import (
     check_p_conditions,
     convert_pd_to_np,
 )
-from causalml.metrics import regression_metrics
+from causalml.metrics import regression_metrics, classification_metrics
 from causalml.propensity import compute_propensity_score
 
 
@@ -485,6 +485,102 @@ class BaseDRRegressor(BaseDRLearner):
             ate_alpha=ate_alpha,
             control_name=control_name,
         )
+
+
+class BaseDRClassifier(BaseDRLearner):
+    """
+    A parent class for DR-learner classifier classes.
+    """
+
+    def __init__(
+        self,
+        learner=None,
+        control_outcome_learner=None,
+        treatment_outcome_learner=None,
+        treatment_effect_learner=None,
+        ate_alpha=0.05,
+        control_name=0,
+    ):
+        """Initialize a DR-learner classifier.
+
+        Args:
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
+                groups. Should have a predict_proba() method for outcome models.
+            control_outcome_learner (optional): a model to estimate outcomes in the control group.
+                Should have a predict_proba() method.
+            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group.
+                Should have a predict_proba() method.
+            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group.
+                Should be a regressor.
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
+        super().__init__(
+            learner=learner,
+            control_outcome_learner=control_outcome_learner,
+            treatment_outcome_learner=treatment_outcome_learner,
+            treatment_effect_learner=treatment_effect_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+        )
+
+    def predict(
+        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+    ):
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series, optional): a treatment vector. Used for computing
+                classification metrics when y is also provided.
+            y (np.array or pd.Series, optional): an outcome vector. Used for computing
+                classification metrics when treatment is also provided.
+            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1). Currently not used in prediction but kept for API consistency.
+            return_components (bool, optional): whether to return outcome probabilities for treatment and control
+                groups separately. Defaults to False.
+            verbose (bool, optional): whether to output progress logs. Defaults to True.
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+            If return_components is True, also returns:
+                - dict: Predicted probabilities for the control group (yhat_cs).
+                - dict: Predicted probabilities for the treatment group (yhat_ts).
+        """
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
+
+        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        yhat_cs = {}
+        yhat_ts = {}
+
+        for i, group in enumerate(self.t_groups):
+            models_tau = self.models_tau[group]
+            _te = np.r_[[model.predict(X) for model in models_tau]].mean(axis=0)
+            te[:, i] = np.ravel(_te)
+            yhat_cs[group] = np.r_[
+                [model.predict_proba(X)[:, 1] for model in self.models_mu_c]
+            ].mean(axis=0)
+            yhat_ts[group] = np.r_[
+                [model.predict_proba(X)[:, 1] for model in self.models_mu_t[group]]
+            ].mean(axis=0)
+
+            if (y is not None) and (treatment is not None) and verbose:
+                mask = (treatment == group) | (treatment == self.control_name)
+                treatment_filt = treatment[mask]
+                y_filt = y[mask]
+                w = (treatment_filt == group).astype(int)
+
+                yhat = np.zeros_like(y_filt, dtype=float)
+                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 1] = yhat_ts[group][mask][w == 1]
+
+                logger.info("Error metrics for group {}".format(group))
+                classification_metrics(y_filt, yhat, w)
+
+        if not return_components:
+            return te
+        else:
+            return te, yhat_cs, yhat_ts
 
 
 class XGBDRRegressor(BaseDRRegressor):

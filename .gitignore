@@ -21,3 +21,7 @@ _build/
 .venv/
 .python-version
 uv.lock
+
+# Claude Code artifacts
+CLAUDE.md
+.claude/
