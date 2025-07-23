@@ -2264,7 +2264,7 @@ class UpliftTreeClassifier:
             else:
                 v = observations[tree.col]
                 branch = None
-                if isinstance(v, int) or isinstance(v, float):
+                if isinstance(v, (int, float, np.number)):
                     if v >= tree.value:
                         branch = tree.trueBranch
                     else:
@@ -2311,7 +2311,7 @@ class UpliftTreeClassifier:
                     return dict(result)
                 else:
                     branch = None
-                    if isinstance(v, int) or isinstance(v, float):
+                    if isinstance(v, (int, float, np.number)):
                         if v >= tree.value:
                             branch = tree.trueBranch
                         else:
