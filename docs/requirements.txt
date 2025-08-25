@@ -4,5 +4,7 @@ scikit-learn
 matplotlib
 sphinx
 sphinx_rtd_theme
-sphinxcontrib-bibtex<2.0.0
+sphinxcontrib-bibtex>=2.6.1
+pybtex>=0.24.0
+pybtex-docutils>=1.0.3
 nbsphinx
