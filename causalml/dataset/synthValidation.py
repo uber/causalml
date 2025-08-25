@@ -12,6 +12,7 @@ import multiprocessing as mp
 from functools import partial
 from sklearn.linear_model import LinearRegression
 from causalml.inference.meta import BaseXRegressor, BaseTRegressor
+from scipy.special import expit
 
 class SynthDataGenerator:
     def __init__(self, Q: int = 5, gamma: float = 2.0, train_frac: float = 0.8, val_frac: float = 0.1, B: int = 5, 
@@ -75,13 +76,17 @@ class SynthDataGenerator:
             ))
         
 
-    def generate(self, K: int = 10) -> List[List[pd.DataFrame]]:
+    def generate(self, K: int = 10, n = None) -> List[List[pd.DataFrame]]:
+        if n is None:
+            n = len(self.X)
         if all((self.y == 0) | (self.y == 1)):
             binary_y = True
         else:
             binary_y = False
         ctrl_idx = np.where(self.w == 0)[0]
-        treat_idx = np.where(self.w == 1)[0]
+        trt_idx = np.where(self.w == 1)[0]
+        ctrl_n = int(n * (len(ctrl_idx)/len(self.X)))
+        trt_n = int(n * (len(trt_idx)/len(self.X)))
         ans = []
         for q in range(len(self.dgps)):
             datasets = []
@@ -98,9 +103,9 @@ class SynthDataGenerator:
             resid = self.y - data_tau['y_w']
             for k in range(K):
                 rng = np.random.default_rng(seed=k)
-                ctrl_idx_qk = rng.choice(ctrl_idx, size=len(ctrl_idx), replace=True)
-                treat_idx_qk = rng.choice(treat_idx, size=len(treat_idx), replace=True)
-                idx = np.concatenate([ctrl_idx_qk, treat_idx_qk])
+                ctrl_idx_qk = rng.choice(ctrl_idx, size=ctrl_n, replace=True)
+                trt_idx_qk = rng.choice(trt_idx, size=trt_n, replace=True)
+                idx = np.concatenate([ctrl_idx_qk, trt_idx_qk])
                 data_qk = data_tau.iloc[idx].copy()
                 if not binary_y:
                     data_qk['y'] = data_qk['y_w'] + rng.choice(resid, size=len(data_qk), replace=True) # aka observed y
@@ -133,7 +138,6 @@ def continuous_objective(x, Q, a, d):
     """
     return np.dot(x, Q @ x) + np.dot(a, x) + d
 
-from scipy.special import expit
 def deviance(y, pred):
     """
     Compute the binomial deviance loss function.
