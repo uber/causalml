@@ -50,9 +50,6 @@ extensions = [
     "nbsphinx",
 ]
 
-# Configure sphinxcontrib-bibtex bibliography files
-bibtex_bibfiles = ["refs.bib"]
-
 autodoc_mock_imports = ["_tkinter"]
 
 
