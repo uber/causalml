@@ -156,8 +156,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
     def fit(
         self,
         X: np.ndarray,
-        treatment: np.ndarray,
         y: np.ndarray,
+        treatment: np.ndarray,
         sample_weight: np.ndarray = None,
         check_input=False,
     ):
@@ -165,8 +165,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         Fit CausalTreeRegressor
         Args:
             X (np.ndarray): feature matrix
-            treatment (np.ndarray): treatment vector
             y (np.ndarray): outcome vector
+            treatment (np.ndarray): treatment vector, includes control group
             sample_weight (np.ndarray): sample_weight, optional
             check_input (bool, optional): default=False
         Returns:
@@ -181,14 +181,11 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             )
 
         X, y = self._prepare_data(X=X, y=y, treatment=treatment)
-        self.treatment_groups = np.unique(w)
 
-        super().fit(
-            X=X, treatment=w, y=y, sample_weight=sample_weight, check_input=check_input
-        )
+        super().fit(X=X, y=y, sample_weight=sample_weight, check_input=check_input)
 
         if self.groups_cnt:
-            self._groups_cnt = self._count_groups_distribution(X=X, treatment=w)
+            self._groups_cnt = self._count_groups_distribution(X=X, treatment=treatment)
         return self
 
     def predict(
@@ -382,10 +379,11 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 f"The number of `treatment` and `y` rows are not equal: {y.shape[0]} {treatment.shape[0]}"
             )
         check_treatment_vector(treatment, self.control_name)
-        self.unique_treatments = sorted([x for x in list(set(treatment)) if x != self.control_name])
+        self.unique_groups = list(set(treatment))
+        self.unique_treatments = sorted([x for x in self.unique_groups if x != self.control_name])
         self._group2index= \
             {self.control_name: 0, 
-            **{treatment[0]: i+1 for i, treatment in enumerate(self.unique_treatments)}}
+            **{treatment: i+1 for i, treatment in enumerate(self.unique_treatments)}}
 
         X = check_array(X, dtype=DTYPE, accept_sparse="csc")
         y = check_array(y, ensure_2d=False, dtype=None)
@@ -409,8 +407,9 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         check_is_fitted(self)
 
         self.is_leaves = get_tree_leaves_mask(self)
+        groups = np.unique(treatment)
         groups_cnt = {
-            idx: {group: 0 for group in self.treatment_groups}
+            idx: {group: 0 for group in groups}
             for idx in np.array(range(self.tree_.node_count))
         }
         node_indicators = self.tree_.decision_path(X.astype(np.float32))
