@@ -40,6 +40,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         min_impurity_decrease: float = float("-inf"),
         ccp_alpha: float = 0.0,
         groups_penalty: float = 0.5,
+        min_group_size: int = 50,
         min_samples_leaf: int = 100,
         random_state: int = None,
         groups_cnt: bool = False,
@@ -55,7 +56,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 strategies are "best" to choose the best split and "random" to choose
                 the best random split.
             alpha: (float): the confidence level alpha of the ATE estimate and ITE bootstrap estimates
-            control_name: (str or int): name of control group
+            control_name: (str or int): name or index of control group
             max_depth: (int, default=None)
                 The maximum depth of the tree. If None, then nodes are expanded until
                 all leaves are pure or until all leaves contain less than
@@ -96,6 +97,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             groups_penalty: (float, default=0.5)
                 This penalty coefficient manages the node impurity increase in case of the difference between
                 treatment and control samples sizes.
+            min_group_size: (int, default=50)
+                The minimum number of samples per each group: k treatment groups and control group.
             min_samples_leaf: (int or float), default=100
                 The minimum number of samples required to be at a leaf node.
                 A split point at any depth will only be considered if it leaves at
@@ -122,6 +125,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         self.min_samples_split = min_samples_split
         self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
+        self.min_group_size = min_group_size
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
         self.ccp_alpha = ccp_alpha
@@ -163,7 +167,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             X (np.ndarray): feature matrix
             treatment (np.ndarray): treatment vector
             y (np.ndarray): outcome vector
-            sample_weight (np.ndarray): sample_weight
+            sample_weight (np.ndarray): sample_weight, optional
             check_input (bool, optional): default=False
         Returns:
             self
@@ -176,7 +180,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 "min_impurity_decrease must be set to -inf for causal_mse criterion"
             )
 
-        X, y, w = self._prepare_data(X=X, y=y, treatment=treatment)
+        X, y = self._prepare_data(X=X, y=y, treatment=treatment)
         self.treatment_groups = np.unique(w)
 
         super().fit(
@@ -360,31 +364,38 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         return te_b
 
     def _prepare_data(
-        self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray
-    ) -> tuple:
+        self, X: np.ndarray, y: np.ndarray, treatment: np.ndarray, 
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Prepare input data with treatment info for DecisionTreeRegressor
+        Prepare input data with treatment info for DecisionTreeRegressor.
+        Outcome vector y transforms into y_2dim with (samples x groups) dimensions.
+        Outcomes for the control group are always placed in the first column with index 0.
+        Attribute _group2index stores mapping for y_2dim columns: ({control: 0, treatmentA: 1, treatmentB: 2, ...})
         Args:
             X: : (np.ndarray), feature matrix
-            treatment: : (np.ndarray), treatment vector
             y: : (np.ndarray), outcome vector
-        Returns: X, y, w
+            treatment: : (np.ndarray), treatment vector, includes control group
+        Returns: X, y (samples x groups)
         """
         if y.shape[0] != treatment.shape[0]:
             raise ValueError(
                 f"The number of `treatment` and `y` rows are not equal: {y.shape[0]} {treatment.shape[0]}"
             )
         check_treatment_vector(treatment, self.control_name)
-
-        self.is_treatment = treatment != self.control_name
-        w = self.is_treatment.astype(int)
+        self.unique_treatments = sorted([x for x in list(set(treatment)) if x != self.control_name])
+        self._group2index= \
+            {self.control_name: 0, 
+            **{treatment[0]: i+1 for i, treatment in enumerate(self.unique_treatments)}}
 
         X = check_array(X, dtype=DTYPE, accept_sparse="csc")
         y = check_array(y, ensure_2d=False, dtype=None)
-
         self.n_samples, self.n_features = X.shape
 
-        return X, y, w
+        y_2dim = np.zeros((self.n_samples, len(self.unique_treatments) + 1))
+        for group, group_index in self._group2index.items():
+            y_2dim[:, group_index] = np.where(treatment==group, y, np.nan)
+
+        return X, y_2dim
 
     def _count_groups_distribution(self, X: np.ndarray, treatment: np.ndarray) -> dict:
         """
