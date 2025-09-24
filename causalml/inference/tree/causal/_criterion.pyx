@@ -4,35 +4,151 @@
 # cython: language_level=3
 # cython: linetrace=True
 
-from libc.math cimport fabs
-from libc.string cimport memset
-from libc.string cimport memcpy
+
+cdef int32_t CONTROL_GROUP_IDX = 0
+
+
+
+cdef class NodeState:
+
+    def __cinit__(self):
+        self.split_metric = 1.
+        self.control_idx = CONTROL_GROUP_IDX
+        self.control_total = 0
+        self.treatment_total = 0
+        self.groups_total = 0
+
+    cdef int32_t reset(self, intp_t n_outputs) except -1 nogil:
+
+        if self.count_1d.size() == 0:
+            self.count_1d.resize(n_outputs, 0.)
+            self.y_sum_1d.resize(n_outputs, 0.)
+            self.y_sq_sum_1d.resize(n_outputs, 0.)
+        else:
+            self.count_1d.assign(n_outputs, 0.)
+            self.y_sum_1d.assign(n_outputs, 0.)
+            self.y_sq_sum_1d.assign(n_outputs, 0.)
+
+        self.update_counters()
+        return 0
+
+    cdef int32_t update_counters(self) except -1 nogil:
+
+        cdef int n_outputs = self.count_1d.size()
+
+        if n_outputs == 0:
+            return -1
+
+        self.groups_total = n_outputs
+        self.control_total = <int32_t> self.count_1d[self.control_idx]
+        self.treatment_total = 0
+        for k in range(n_outputs):
+            if k != self.control_idx:
+                self.treatment_total += <int32_t> self.count_1d[k]
+        return 0
+
+    cdef int32_t copy_from_state(self, NodeState state) except -1 nogil:
+
+        if self.count_1d.size() == 0:
+            return -1
+
+        for k in range(self.count_1d.size()):
+            self.count_1d[k] = state.count_1d[k]
+            self.y_sum_1d[k] = state.y_sum_1d[k]
+            self.y_sq_sum_1d[k] = state.y_sq_sum_1d[k]
+        self.update_counters()
+        return 0
+
+    cdef int32_t increment_count(self, int32_t group_idx, float64_t value) except -1 nogil:
+        self.count_1d[group_idx] += value
+        self.update_counters()
+        return 0
+
+    cdef int32_t increment_y_sum(self, int32_t group_idx, float64_t value) except -1 nogil:
+        self.y_sum_1d[group_idx] += value
+        return 0
+
+    cdef int32_t increment_y_sq_sum(self, int32_t group_idx, float64_t value) except -1 nogil:
+        self.y_sq_sum_1d[group_idx] += value
+        return 0
+
+    cdef float64_t outcome_mean(self, int32_t group_idx) noexcept nogil:
+        return self.y_sum_1d[group_idx] / self.count_1d[group_idx]
+
+    cdef float64_t outcome_var(self, int32_t group_idx) noexcept nogil:
+        cdef float64_t var
+        var = (self.y_sq_sum_1d[group_idx] / self.count_1d[group_idx] -
+                (self.y_sum_1d[group_idx] * self.y_sum_1d[group_idx]) / (
+                            self.count_1d[group_idx] * self.count_1d[group_idx]))
+        # Clamp tiny negative variance to 0 instead of returning -1
+        var = max(var, 0.0)
+        return var
+
+    cdef float64_t effect(self, int32_t treatment_idx) noexcept nogil:
+        return (self.y_sum_1d[treatment_idx] / self.count_1d[treatment_idx] -
+                self.y_sum_1d[self.control_idx] / self.count_1d[self.control_idx])
+
+
+cdef class NodeSplitState:
+
+    def __cinit__(self, intp_t n_outputs):
+        self.node = NodeState(n_outputs)
+        self.right = NodeState(n_outputs)
+        self.left = NodeState(n_outputs)
+        self.reset_nodes(n_outputs)
+
+    cdef int32_t reset_nodes(self, intp_t n_outputs) except -1 nogil:
+        self.node.reset(n_outputs)
+        self.right.reset(n_outputs)
+        self.left.reset(n_outputs)
+        return 0
 
 
 cdef class CausalRegressionCriterion(RegressionCriterion):
     """
     Base class for causal tree criterion
     """
-    cdef public SplitState state
-    cdef public float64_t groups_penalty
+
+    def __cinit__(self, intp_t n_outputs, intp_t n_samples):
+        # Parent __cinit__ is automatically called
+        self.state = NodeSplitState(n_outputs)
+
+    cdef int get_group_stats(
+        self,
+        int32_t* groups_count,
+        int64_t* tr_count_mean,
+        int32_t* ct_count
+        ) except -1 nogil:
+
+        cdef int32_t g = <int32_t> self.state.node.groups_total
+        groups_count[0] = g
+        ct_count[0] = <int32_t> self.state.node.count_1d[self.state.node.control_idx]
+        tr_count_mean[0] = <int64_t> (
+            (<int64_t> self.state.node.treatment_total) / (<int64_t> (g - 1))
+            )
+        return 0
 
     cdef int init(
         self,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         float64_t weighted_n_samples,
         const intp_t[:] sample_indices,
         intp_t start,
         intp_t end,
-    ) nogil except -1:
+    ) except -1 nogil:
         """Initialize the criterion.
         This initializes the criterion at node sample_indices[start:end] and children
         sample_indices[start:start] and sample_indices[start:end].
+
+        Notes:
+        1) self.y[i, k] is nan if a particular observation is not in a group k, k is in range(0, n_outputs - 1).
+        2) Control group index is fixed to 0 value.
+        3) Impurity is averaged across the impurity vector calculated for all pairs of 
+           control & treatment_i, i is in range(1, n_outputs - 1)
         """
         # Initialize fields
         self.y = y
-        self.treatment = treatment
         self.sample_weight = sample_weight
         self.sample_indices = sample_indices
         self.start = start
@@ -44,62 +160,49 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
         cdef intp_t i
         cdef intp_t p
-        cdef int32_t is_treated
-        cdef intp_t k = 0
+        cdef intp_t k
         cdef float64_t w = 1.0
+        cdef float64_t y_ik
+        cdef float64_t w_y_ik
 
         memset(&self.sum_total[0], 0, self.n_outputs * sizeof(float64_t))
         self.sq_sum_total = 0.
-        self.state.node = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
-        self.state.left = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
-        self.state.right = [0., 0., 0., 0., 0., 0., 0., 0., 1.]
+        self.state.reset_nodes(self.n_outputs)
+
+        if sample_weight is not None:
+            w = sample_weight[i]
 
         for p in range(start, end):
             i = sample_indices[p]
-            is_treated = treatment[i]
 
-            self.sum_total[k] += self.y[i, k]
-            self.sq_sum_total += self.y[i, k] * self.y[i, k]
-            self.weighted_n_node_samples += w
+            # k is the number of groups
+            for k in range(self.n_outputs):
+                y_ik = self.y[i, k]
 
-            self.state.node.tr_count += is_treated
-            self.state.node.tr_y_sum += is_treated * self.y[i, k]
-            self.state.node.tr_y_sq_sum += is_treated * self.y[i, k] * self.y[i, k]
+                if not isnan(y_ik):
+                    w_y_ik = w * y_ik
+                    self.sum_total[k] += w_y_ik
+                    self.sq_sum_total += w_y_ik * y_ik
+                    self.weighted_n_node_samples += w
 
-        self.state.node.ct_count = self.weighted_n_node_samples - self.state.node.tr_count
-        self.state.node.ct_y_sum = self.sum_total[k] - self.state.node.tr_y_sum
-        self.state.node.ct_y_sq_sum = self.sq_sum_total - self.state.node.tr_y_sq_sum
+                    # Add groups statistics into node state
+                    self.state.node.increment_count(k, 1.)
+                    self.state.node.increment_y_sum(k, w_y_ik)
+                    self.state.node.increment_y_sq_sum(k, w_y_ik * y_ik)
 
         # Reset to pos=start
         self.reset()
         return 0
 
-    cdef int reset(self) nogil except -1:
+    cdef int reset(self) except -1 nogil:
         """Reset the criterion at pos=start."""
         cdef intp_t n_bytes = self.n_outputs * sizeof(float64_t)
 
         memset(&self.sum_left[0], 0, n_bytes)
         memcpy(&self.sum_right[0], &self.sum_total[0], n_bytes)
 
-        self.state.left.y_sq_sum = 0.
-        self.state.left.tr_y_sq_sum = 0.
-        self.state.left.tr_y_sum = 0.
-        self.state.left.ct_y_sq_sum = 0.
-        self.state.left.ct_y_sum = 0.
-
-        self.state.right.y_sq_sum = self.sq_sum_total
-        self.state.right.tr_y_sq_sum = self.state.node.tr_y_sq_sum
-        self.state.right.tr_y_sum = self.state.node.tr_y_sum
-        self.state.right.ct_y_sq_sum = self.state.node.ct_y_sq_sum
-        self.state.right.ct_y_sum = self.state.node.ct_y_sum
-
-        self.state.left.count = 0.
-        self.state.left.tr_count = 0.
-        self.state.left.ct_count = 0.
-
-        self.state.right.count = self.state.node.tr_count + self.state.node.ct_count
-        self.state.right.tr_count = self.state.node.tr_count
-        self.state.right.ct_count = self.state.node.ct_count
+        self.state.left.reset(self.n_outputs)
+        self.state.right.copy_from_state(self.state.node)
 
         # For compatibility with sklearn functions
         self.weighted_n_left = 0.
@@ -109,32 +212,16 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
         return 0
 
-    cdef int reverse_reset(self) nogil except -1:
+    cdef int reverse_reset(self) except -1 nogil:
         """Reset the criterion at pos=end."""
         cdef intp_t n_bytes = self.n_outputs * sizeof(float64_t)
         memset(&self.sum_right[0], 0, n_bytes)
         memcpy(&self.sum_left[0], &self.sum_total[0], n_bytes)
 
-        self.state.right.y_sq_sum = 0.
-        self.state.right.tr_y_sq_sum = 0.
-        self.state.right.tr_y_sum = 0.
-        self.state.right.ct_y_sq_sum = 0.
-        self.state.right.ct_y_sum = 0.
+        self.state.right.reset(self.n_outputs)
+        self.state.left.copy_from_state(self.state.node)
 
-        self.state.left.y_sq_sum = self.sq_sum_total
-        self.state.left.tr_y_sq_sum = self.state.node.tr_y_sq_sum
-        self.state.left.tr_y_sum = self.state.node.tr_y_sum
-        self.state.left.ct_y_sq_sum = self.state.node.ct_y_sq_sum
-        self.state.left.ct_y_sum = self.state.node.ct_y_sum
-
-        self.state.right.count = 0.
-        self.state.right.tr_count = 0.
-        self.state.right.ct_count = 0.
-
-        self.state.left.count = self.state.node.tr_count + self.state.node.ct_count
-        self.state.left.tr_count = self.state.node.tr_count
-        self.state.left.ct_count = self.state.node.ct_count
-
+        # For compatibility with sklearn functions
         self.weighted_n_right = 0.0
         self.weighted_n_left = self.weighted_n_node_samples
 
@@ -142,18 +229,18 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
         return 0
 
-    cdef int update(self, intp_t new_pos) nogil except -1:
+    cdef int update(self, intp_t new_pos) except -1 nogil:
         """Updated statistics by moving sample_indices[pos:new_pos] to the left."""
         cdef const float64_t[:] sample_weight = self.sample_weight
-        cdef const int32_t[:] treatment = self.treatment
         cdef const intp_t[:] sample_indices = self.sample_indices
 
         cdef intp_t pos = self.pos
         cdef intp_t end = self.end
         cdef intp_t i
-        cdef int32_t is_treated
         cdef intp_t p
         cdef intp_t k = 0
+        cdef float64_t y_ik
+        cdef float64_t w_y_ik
         cdef float64_t w = 1.0
 
         """
@@ -167,15 +254,18 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         if (new_pos - pos) <= (end - new_pos):
             for p in range(pos, new_pos):
                 i = sample_indices[p]
-                is_treated = treatment[i]
 
-                self.sum_left[k] += self.y[i, k]
-                self.state.left.tr_y_sum += is_treated * self.y[i, k]
-                self.state.left.tr_y_sq_sum += is_treated * self.y[i, k] * self.y[i, k]
-                self.state.left.ct_y_sum += (1. - is_treated) * self.y[i, k]
-                self.state.left.ct_y_sq_sum += (1. - is_treated) * self.y[i, k] * self.y[i, k]
-                self.state.left.tr_count += is_treated
-                self.state.left.ct_count += (1. - is_treated)
+                if sample_weight is not None:
+                    w = sample_weight[i]
+
+                for k in range(self.n_outputs):
+                    y_ik = self.y[i, k]
+                    if not isnan(y_ik):
+                        w_y_ik = w * y_ik
+                        self.sum_left[k] += w_y_ik
+                        self.state.left.increment_count(k, 1.)
+                        self.state.left.increment_y_sum(k, w_y_ik)
+                        self.state.left.increment_y_sq_sum(k, w_y_ik * y_ik)
 
                 self.weighted_n_left += w
         else:
@@ -183,43 +273,58 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
             for p in range(end - 1, new_pos - 1, -1):
                 i = sample_indices[p]
-                is_treated = treatment[i]
 
-                self.sum_left[k] -= self.y[i, k]
-                self.state.left.tr_y_sum -= is_treated * self.y[i, k]
-                self.state.left.tr_y_sq_sum -= is_treated * self.y[i, k] * self.y[i, k]
-                self.state.left.ct_y_sum -= (1. - is_treated) * self.y[i, k]
-                self.state.left.ct_y_sq_sum -= (1. - is_treated) * self.y[i, k] * self.y[i, k]
-                self.state.left.tr_count -= is_treated
-                self.state.left.ct_count -= (1. - is_treated)
+                if sample_weight is not None:
+                    w = sample_weight[i]
+
+                for k in range(self.n_outputs):
+                    y_ik = self.y[i, k]
+                    if not isnan(y_ik):
+                        w_y_ik = w * y_ik
+                        self.sum_left[k] -= w_y_ik
+                        self.state.left.increment_count(k, -1.)
+                        self.state.left.increment_y_sum(k, -w_y_ik)
+                        self.state.left.increment_y_sq_sum(k, -w_y_ik * y_ik)
 
                 self.weighted_n_left -= w
 
-        self.state.left.count = self.state.left.tr_count + self.state.left.ct_count
-        self.state.right.tr_count = self.state.node.tr_count - self.state.left.tr_count
-        self.state.right.ct_count = self.state.node.ct_count - self.state.left.ct_count
-        self.state.right.count = self.state.right.tr_count + self.state.right.ct_count
+        for k in range(self.n_outputs):
+            self.state.right.count_1d[k] = self.state.node.count_1d[k] - self.state.left.count_1d[k]
+            self.state.right.y_sum_1d[k] = self.state.node.y_sum_1d[k] - self.state.left.y_sum_1d[k]
+            self.state.right.y_sq_sum_1d[k] = self.state.node.y_sq_sum_1d[k] - self.state.left.y_sq_sum_1d[k]
 
-        self.state.right.tr_y_sum = self.state.node.tr_y_sum - self.state.left.tr_y_sum
-        self.state.right.ct_y_sum = self.state.node.ct_y_sum - self.state.left.ct_y_sum
-
-        self.state.right.tr_y_sq_sum = self.state.node.tr_y_sq_sum - self.state.left.tr_y_sq_sum
-        self.state.right.ct_y_sq_sum = self.state.node.ct_y_sq_sum - self.state.left.ct_y_sq_sum
+            self.sum_right[k] = self.sum_total[k] - self.sum_left[k]
 
         self.weighted_n_right = self.weighted_n_node_samples - self.weighted_n_left
-        self.sum_right[k] = self.sum_total[k] - self.sum_left[k]
         self.pos = new_pos
 
         return 0
 
     cdef void node_value(self, float64_t * dest) noexcept nogil:
         """Compute the node values of sample_indices[start:end] into dest."""
-        dest[0] = self.state.node.ct_y_sum / self.state.node.ct_count
-        dest[1] = self.state.node.tr_y_sum / self.state.node.tr_count
+        cdef intp_t k
+        for k in range(self.n_outputs):
+            dest[k] = self.state.node.outcome_mean(k)
 
-    cdef float64_t get_groups_penalty(self, float64_t tr_count, float64_t ct_count) nogil:
-        """Compute penalty for the sample size difference between groups"""
-        return self.groups_penalty * fabs(tr_count- ct_count)
+    cdef float64_t get_groups_penalty(self, NodeState node) noexcept nogil:
+        """Compute penalty for sample size differences across multiple treatment groups.
+        Penalizes imbalance of average absolute difference.
+        """
+        cdef intp_t k
+        cdef int32_t groups_total = self.n_outputs
+        cdef int32_t num_treatments = groups_total - 1
+        cdef float64_t fabs_diff_sum = 0.0
+
+        if num_treatments <= 0:
+            return 0.0
+
+        for k in range(groups_total):
+            if k == node.control_idx:
+                continue
+            fabs_diff_sum += fabs(node.count_1d[k] - node.count_1d[CONTROL_GROUP_IDX])
+
+        return self.groups_penalty * (fabs_diff_sum / <float64_t> num_treatments)
+
 
 
 cdef class StandardMSE(CausalRegressionCriterion):
@@ -242,7 +347,7 @@ cdef class StandardMSE(CausalRegressionCriterion):
         for k in range(self.n_outputs):
             impurity -= (self.sum_total[k] / self.n_node_samples) ** 2.0
 
-        impurity += self.get_groups_penalty(self.state.node.tr_count, self.state.node.ct_count)
+        impurity += self.get_groups_penalty(self.state.node)
 
         return impurity / self.n_outputs
 
@@ -265,8 +370,8 @@ cdef class StandardMSE(CausalRegressionCriterion):
         cdef float64_t proxy_impurity_right = 0.0
         cdef float64_t penalty_left, penalty_right
 
-        penalty_left = self.get_groups_penalty(self.state.left.tr_count, self.state.left.ct_count)
-        penalty_right = self.get_groups_penalty(self.state.right.tr_count, self.state.right.ct_count)
+        penalty_left = self.get_groups_penalty(self.state.left)
+        penalty_right = self.get_groups_penalty(self.state.right)
 
         for k in range(self.n_outputs):
             proxy_impurity_left += self.sum_left[k] * self.sum_left[k] - penalty_left
@@ -309,7 +414,8 @@ cdef class StandardMSE(CausalRegressionCriterion):
 
             for k in range(self.n_outputs):
                 y_ik = self.y[i, k]
-                sq_sum_left += w * y_ik * y_ik
+                if not isnan(y_ik):
+                    sq_sum_left += w * y_ik * y_ik
 
         sq_sum_right = self.sq_sum_total - sq_sum_left
 
@@ -320,8 +426,8 @@ cdef class StandardMSE(CausalRegressionCriterion):
             impurity_left[0] -= (self.sum_left[k] / self.weighted_n_left) ** 2.0
             impurity_right[0] -= (self.sum_right[k] / self.weighted_n_right) ** 2.0
 
-        impurity_left[0] += self.get_groups_penalty(self.state.left.tr_count, self.state.left.ct_count)
-        impurity_right[0] += self.get_groups_penalty(self.state.right.tr_count, self.state.right.ct_count)
+        impurity_left[0] += self.get_groups_penalty(self.state.left)
+        impurity_right[0] += self.get_groups_penalty(self.state.right)
 
         impurity_left[0] /= self.n_outputs
         impurity_right[0] /= self.n_outputs
@@ -339,31 +445,26 @@ cdef class CausalMSE(CausalRegressionCriterion):
         """
         Evaluate the impurity of the current node, i.e. the impurity of sample_indices[start:end].
         """
-        cdef float64_t impurity
+
+        cdef float64_t impurity = 0.
+        cdef int32_t tr_group_idx
         cdef float64_t node_tau
         cdef float64_t tr_var
-        cdef float64_t ct_var
+        cdef float64_t ct_var = self.state.node.outcome_var(CONTROL_GROUP_IDX)
+        cdef float64_t tr_count
+        cdef float64_t ct_count = self.state.node.count_1d[CONTROL_GROUP_IDX]
 
-        node_tau = self.get_tau(self.state.node)
-        tr_var = self.get_variance(
-            self.state.node.tr_y_sum,
-            self.state.node.tr_y_sq_sum,
-            self.state.node.tr_count
-        )
-        ct_var = self.get_variance(
-            self.state.node.ct_y_sum,
-            self.state.node.ct_y_sq_sum,
-            self.state.node.ct_count)
-        impurity = (tr_var / self.state.node.tr_count + ct_var / self.state.node.ct_count) - node_tau * node_tau
-        impurity += self.get_groups_penalty(self.state.node.tr_count, self.state.node.ct_count)
+        for tr_group_idx in range(1, self.n_outputs):
+            node_tau = self.state.node.effect(tr_group_idx)
+            tr_var = self.state.node.outcome_var(tr_group_idx)
+            tr_count = self.state.node.count_1d[tr_group_idx]
+
+            impurity += (tr_var / tr_count + ct_var / ct_count) - node_tau * node_tau
+
+        impurity /= (self.n_outputs - 1)
+        impurity += self.get_groups_penalty(self.state.node)
 
         return impurity
-
-    cdef float64_t get_tau(self, NodeInfo info) nogil:
-        return info.tr_y_sum / info.tr_count - info.ct_y_sum / info.ct_count
-
-    cdef float64_t get_variance(self, float64_t y_sum, float64_t y_sq_sum, float64_t count) nogil:
-        return  y_sq_sum / count - (y_sum * y_sum) / (count * count)
 
     cdef void children_impurity(self, float64_t * impurity_left, float64_t * impurity_right) noexcept nogil:
         """
@@ -373,32 +474,35 @@ cdef class CausalMSE(CausalRegressionCriterion):
         """
 
         cdef float64_t right_tr_var
-        cdef float64_t right_ct_var
+        cdef float64_t right_ct_var = self.state.right.outcome_var(CONTROL_GROUP_IDX)
+        cdef float64_t right_tr_count
+        cdef float64_t right_ct_count = self.state.right.count_1d[CONTROL_GROUP_IDX]
         cdef float64_t left_tr_var
-        cdef float64_t left_ct_var
-
+        cdef float64_t left_ct_var = self.state.left.outcome_var(CONTROL_GROUP_IDX)
+        cdef float64_t left_tr_count
+        cdef float64_t left_ct_count = self.state.left.count_1d[CONTROL_GROUP_IDX]
         cdef float64_t right_tau
         cdef float64_t left_tau
 
-        right_tau = self.get_tau(self.state.right)
-        right_tr_var = self.get_variance(
-            self.state.right.tr_y_sum , self.state.right.tr_y_sq_sum, self.state.right.tr_count)
-        right_ct_var = self.get_variance(
-            self.state.right.ct_y_sum, self.state.right.ct_y_sq_sum, self.state.right.ct_count)
+        impurity_right[0] = 0.
+        impurity_left[0] = 0.
 
-        left_tau = self.get_tau(self.state.left)
-        left_tr_var = self.get_variance(
-            self.state.left.tr_y_sum , self.state.left.tr_y_sq_sum, self.state.left.tr_count)
-        left_ct_var = self.get_variance(
-            self.state.left.ct_y_sum, self.state.left.ct_y_sq_sum, self.state.left.ct_count)
+        for tr_group_idx in range(1, self.n_outputs):
+            right_tau = self.state.right.effect(tr_group_idx)
+            right_tr_var = self.state.right.outcome_var(tr_group_idx)
+            right_tr_count = self.state.right.count_1d[tr_group_idx]
 
-        impurity_left[0] = (left_tr_var / self.state.left.tr_count + left_ct_var / self.state.left.ct_count) - \
-                           left_tau * left_tau
-        impurity_right[0] = (right_tr_var / self.state.right.tr_count + right_ct_var / self.state.right.ct_count) - \
-                            right_tau * right_tau
+            left_tau = self.state.left.effect(tr_group_idx)
+            left_tr_var = self.state.left.outcome_var(tr_group_idx)
+            left_tr_count = self.state.left.count_1d[tr_group_idx]
 
-        impurity_left[0]  += self.get_groups_penalty(self.state.left.tr_count, self.state.left.ct_count)
-        impurity_right[0] += self.get_groups_penalty(self.state.right.tr_count, self.state.right.ct_count)
+            impurity_right[0] += (right_tr_var / right_tr_count + right_ct_var / right_ct_count) - right_tau * right_tau
+            impurity_left[0] += (left_tr_var / left_tr_count + left_ct_var / left_ct_count) - left_tau * left_tau
+
+        impurity_right[0] /= (self.n_outputs - 1)
+        impurity_left[0] /= (self.n_outputs - 1)
+        impurity_right[0] += self.get_groups_penalty(self.state.right)
+        impurity_left[0] += self.get_groups_penalty(self.state.left)
 
 
 cdef class TTest(CausalRegressionCriterion):
@@ -406,31 +510,27 @@ cdef class TTest(CausalRegressionCriterion):
     TTest impurity criterion for Causal Tree based on "Su, Xiaogang, et al. (2009). Subgroup analysis via recursive partitioning."
     """
     cdef float64_t node_impurity(self) noexcept nogil:
-        cdef float64_t impurity
+        
+
+        cdef float64_t impurity = 0.
+        cdef int32_t tr_group_idx
         cdef float64_t node_tau
         cdef float64_t tr_var
-        cdef float64_t ct_var
+        cdef float64_t ct_var = self.state.node.outcome_var(CONTROL_GROUP_IDX)
+        cdef float64_t tr_count
+        cdef float64_t ct_count = self.state.node.count_1d[CONTROL_GROUP_IDX]
+        cdef float64_t denom
 
-        node_tau = self.get_tau(self.state.node)
-        tr_var = self.get_variance(
-            self.state.node.tr_y_sum,
-            self.state.node.tr_y_sq_sum,
-            self.state.node.tr_count
-        )
-        ct_var = self.get_variance(
-            self.state.node.ct_y_sum,
-            self.state.node.ct_y_sq_sum,
-            self.state.node.ct_count)
-        # T statistic of difference between treatment and control means
-        impurity = node_tau / (((tr_var / self.state.node.tr_count) + (ct_var / self.state.node.ct_count)) ** 0.5)
+        for tr_group_idx in range(1, self.n_outputs):
+            node_tau = self.state.node.effect(tr_group_idx)
+            tr_var = self.state.node.outcome_var(tr_group_idx)
+            tr_count = self.state.node.count_1d[tr_group_idx]
+            # T statistic of difference between treatment and control means
+            denom = sqrt(( (tr_var / tr_count) + (ct_var / ct_count)))
+            if denom > 0:
+                impurity += node_tau / denom
 
         return impurity
-
-    cdef float64_t get_tau(self, NodeInfo info) nogil:
-        return info.tr_y_sum / info.tr_count - info.ct_y_sum / info.ct_count
-
-    cdef float64_t get_variance(self, float64_t y_sum, float64_t y_sq_sum, float64_t count) nogil:
-        return y_sq_sum / count - (y_sum * y_sum) / (count * count)
 
     cdef void children_impurity(self, float64_t * impurity_left, float64_t * impurity_right) noexcept nogil:
         """
@@ -438,61 +538,72 @@ cdef class TTest(CausalRegressionCriterion):
            left child (sample_indices[start:pos]) and the impurity the right child
            (sample_indices[pos:end]).
         """
-        cdef float64_t right_tr_var
-        cdef float64_t right_ct_var
-        cdef float64_t left_tr_var
-        cdef float64_t left_ct_var
-        cdef float64_t right_tau
-        cdef float64_t left_tau
-        cdef float64_t right_t_stat
-        cdef float64_t left_t_stat
-        cdef float64_t t_stat
-        cdef float64_t pooled_var
 
-        right_tau = self.get_tau(self.state.right)
-        right_tr_var = self.get_variance(
-            self.state.right.tr_y_sum,
-            self.state.right.tr_y_sq_sum,
-            self.state.right.tr_count)
-        right_ct_var = self.get_variance(
-            self.state.right.ct_y_sum,
-            self.state.right.ct_y_sq_sum,
-            self.state.right.ct_count)
+        cdef int32_t tr_group_idx
+        cdef int32_t num_treatments = self.n_outputs - 1
 
-        left_tau = self.get_tau(self.state.left)
-        left_tr_var = self.get_variance(
-            self.state.left.tr_y_sum,
-            self.state.left.tr_y_sq_sum,
-            self.state.left.tr_count)
-        left_ct_var = self.get_variance(
-            self.state.left.ct_y_sum,
-            self.state.left.ct_y_sq_sum,
-            self.state.left.ct_count)
-        pooled_var = ((self.state.right.tr_count - 1) / (
-                    self.state.node.tr_count + self.state.node.ct_count - 4)) * right_tr_var + \
-                     (self.state.right.ct_count - 1) / (
-                                 self.state.node.tr_count + self.state.node.ct_count - 4) * right_ct_var + \
-                     (self.state.left.tr_count - 1) / (
-                                 self.state.node.tr_count + self.state.node.ct_count - 4) * left_tr_var + \
-                     (self.state.left.ct_count - 1) / (
-                                 self.state.node.tr_count + self.state.node.ct_count - 4) * left_ct_var
+        cdef float64_t t_left_sum = 0.0
+        cdef float64_t t_right_sum = 0.0
+        cdef float64_t tdiff = 0.0
+        cdef float64_t tdiff_sq_sum = 0.0
 
-        # T statistic of difference between treatment and control means in left and right nodes
-        left_t_stat = left_tau / (
-                    ((left_ct_var / self.state.left.ct_count) + (left_tr_var / self.state.left.tr_count)) ** 0.5)
-        right_t_stat = right_tau / (
-                    ((right_ct_var / self.state.right.ct_count) + (right_tr_var / self.state.right.tr_count)) ** 0.5)
+        cdef float64_t left_tau, right_tau
+        cdef float64_t left_tr_var, right_tr_var
+        cdef float64_t left_ct_var = self.state.left.outcome_var(CONTROL_GROUP_IDX)
+        cdef float64_t right_ct_var = self.state.right.outcome_var(CONTROL_GROUP_IDX)
 
-        # Squared T statistic of difference between tau from left and right nodes.
-        t_stat = ((left_tau - right_tau) / ((pooled_var ** 0.5) * (
-                    (1 / self.state.right.tr_count) + (1 / self.state.right.ct_count) + (
-                        1 / self.state.left.tr_count) + (1 / self.state.left.ct_count)) ** 0.5)) ** 2
+        cdef float64_t left_tr_count, right_tr_count
+        cdef float64_t left_ct_count = self.state.left.count_1d[CONTROL_GROUP_IDX]
+        cdef float64_t right_ct_count = self.state.right.count_1d[CONTROL_GROUP_IDX]
 
-        self.state.left.split_metric = t_stat+self.get_groups_penalty(self.state.node.tr_count,
-                                                                      self.state.node.ct_count)
+        cdef float64_t denom_left, denom_right
+        cdef float64_t pooled_var_t
+        cdef float64_t inv_n_sum
+        cdef float64_t dof
 
-        impurity_left[0] = left_t_stat
-        impurity_right[0] = right_t_stat
+        impurity_left[0] = 0.0
+        impurity_right[0] = 0.0
+
+        for tr_group_idx in range(1, self.n_outputs):
+            right_tau = self.state.right.effect(tr_group_idx)
+            right_tr_var = self.state.right.outcome_var(tr_group_idx)
+            right_tr_count = self.state.right.count_1d[tr_group_idx]
+
+            left_tau = self.state.left.effect(tr_group_idx)
+            left_tr_var = self.state.left.outcome_var(tr_group_idx)
+            left_tr_count = self.state.left.count_1d[tr_group_idx]
+
+            denom_left = sqrt(left_tr_var / left_tr_count + left_ct_var / left_ct_count)
+            denom_right = sqrt(right_tr_var / right_tr_count + right_ct_var / right_ct_count)
+            if denom_left > 0.:
+                t_left_sum += left_tau / denom_left
+            if denom_right > 0.:
+                t_right_sum += right_tau / denom_right
+    
+            # Per-treatment squared difference in taus between sides
+            inv_n_sum = (1.0 / right_tr_count + 1.0 / right_ct_count +
+                        1.0 / left_tr_count + 1.0 / left_ct_count)
+
+            # Pooled variance across four cells (left/right × tr/ct)
+            pooled_var_t = 0.0
+            pooled_var_t += ((right_tr_count - 1.0) * right_tr_var)
+            pooled_var_t += ((right_ct_count - 1.0) * right_ct_var)
+            pooled_var_t += ((left_tr_count - 1.0) * left_tr_var)
+            pooled_var_t += ((left_ct_count - 1.0) * left_ct_var)
+
+            # Normalize by total degrees of freedom if it is positive
+            dof = (right_tr_count - 1.0) + (right_ct_count - 1.0) + (left_tr_count - 1.0) + (left_ct_count - 1.0)
+            if dof > 0.0:
+                pooled_var_t /= dof
+
+            if pooled_var_t > 0.0 and inv_n_sum > 0.0:
+                tdiff = ((left_tau - right_tau) / (( sqrt(pooled_var_t) ) * ( sqrt(inv_n_sum) )))
+                tdiff_sq_sum += (tdiff * tdiff)
+
+        self.state.left.split_metric = (tdiff_sq_sum / <float64_t> num_treatments) + self.get_groups_penalty(self.state.node)
+        
+        impurity_left[0] = t_left_sum / <float64_t> num_treatments
+        impurity_right[0] = t_right_sum / <float64_t> num_treatments
 
     cdef float64_t impurity_improvement(self, float64_t impurity_parent,
                                      float64_t impurity_left,
