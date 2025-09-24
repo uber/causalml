@@ -78,8 +78,10 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
     cdef public NodeSplitState state
     cdef public float64_t groups_penalty
 
-    cdef int get_group_stats(self,
-                              int32_t* groups_count,
-                              int64_t* tr_count_mean,
-                              int32_t* ct_count) except -1 nogil
+    cdef int get_group_stats(
+        self,
+        int32_t* groups_count,
+        int64_t* tr_count_mean,
+        int32_t* ct_count,
+        int32_t* min_size_among_groups) except -1 nogil
     cdef float64_t get_groups_penalty(self, NodeState node) noexcept nogil

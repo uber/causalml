@@ -70,7 +70,6 @@ cdef class Splitter:
     #   +1: monotonic increase
     cdef const int8_t[:] monotonic_cst
     cdef bint with_monotonic_cst
-    cdef const int32_t[:] treatment
     cdef const float64_t[:] sample_weight
 
     # The samples vector `samples` is maintained by the Splitter object such
@@ -94,7 +93,6 @@ cdef class Splitter:
         self,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         const unsigned char[::1] missing_values_in_feature_mask,
     ) except -1

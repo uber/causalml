@@ -117,15 +117,20 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         self,
         int32_t* groups_count,
         int64_t* tr_count_mean,
-        int32_t* ct_count
+        int32_t* ct_count,
+        int32_t* min_size_among_groups,
         ) except -1 nogil:
 
-        cdef int32_t g = <int32_t> self.state.node.groups_total
-        groups_count[0] = g
+        cdef int32_t min_size = <int32_t> self.state.node.count_1d[0]
+        for k in range(1, self.n_outputs):
+            min_size = <int32_t>  self.state.node.count_1d[k] if <int32_t> self.state.node.count_1d[k]  < min_size else min_size
+        cdef int32_t groups = <int32_t> self.state.node.groups_total
+
+        min_size_among_groups[0] = min_size
+        groups_count[0] = groups
         ct_count[0] = <int32_t> self.state.node.count_1d[self.state.node.control_idx]
-        tr_count_mean[0] = <int64_t> (
-            (<int64_t> self.state.node.treatment_total) / (<int64_t> (g - 1))
-            )
+        tr_count_mean[0] = <int64_t> ( (<int64_t> self.state.node.treatment_total) / (<int64_t> (groups - 1)) )
+
         return 0
 
     cdef int init(
@@ -169,11 +174,11 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
         self.sq_sum_total = 0.
         self.state.reset_nodes(self.n_outputs)
 
-        if sample_weight is not None:
-            w = sample_weight[i]
-
         for p in range(start, end):
             i = sample_indices[p]
+
+            if sample_weight is not None:
+                w = sample_weight[i]
 
             # k is the number of groups
             for k in range(self.n_outputs):

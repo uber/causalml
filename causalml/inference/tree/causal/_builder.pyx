@@ -101,6 +101,7 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef int64_t tr_count_mean
         cdef int32_t ct_count
         cdef int32_t groups_count
+        cdef int32_t min_size
 
         cdef float64_t middle_value
         cdef float64_t left_child_min
@@ -150,7 +151,7 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
                 n_node_samples = end - start
                 splitter.node_reset(start, end, &weighted_n_node_samples)
 
-                (<CausalRegressionCriterion> splitter.criterion).get_group_stats(&groups_count, &tr_count_mean, &ct_count)
+                (<CausalRegressionCriterion> splitter.criterion).get_group_stats(&groups_count, &tr_count_mean, &ct_count, &min_size)
 
                 is_leaf = (depth >= max_depth or
                            n_node_samples < min_samples_split or
@@ -159,6 +160,7 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
                            ct_count < min_samples_split // groups_count or
                            tr_count_mean < min_samples_leaf or
                            ct_count < min_samples_leaf or
+                           min_size < min_group_size or
                            weighted_n_node_samples < 2 * min_weight_leaf)
 
                 if first:
@@ -497,6 +499,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         cdef int64_t tr_count_mean
         cdef int32_t ct_count
         cdef int32_t groups_count
+        cdef int32_t min_size
 
         # reset n_constant_features for this specific split before beginning split search
         parent_record.n_constant_features = 0
@@ -504,7 +507,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         if is_first:
             parent_record.impurity = splitter.node_impurity()
 
-        (<CausalRegressionCriterion> splitter.criterion).get_group_stats(&groups_count, &tr_count_mean, &ct_count)
+        (<CausalRegressionCriterion> splitter.criterion).get_group_stats(&groups_count, &tr_count_mean, &ct_count, &min_size)
 
         n_node_samples = end - start
         is_leaf = (depth >= self.max_depth or
@@ -514,6 +517,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
                    ct_count < self.min_samples_split // groups_count or
                    tr_count_mean < self.min_samples_leaf or
                    ct_count < self.min_samples_leaf or
+                   min_size < self.min_group_size or
                    weighted_n_node_samples < 2 * self.min_weight_leaf or parent_record.impurity <= EPSILON
                    )
 
