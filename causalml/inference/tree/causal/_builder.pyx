@@ -40,19 +40,19 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
        Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_tree.pyx
     """
 
-    cdef intp_t min_group_size
+    cdef intp_t min_group_samples
 
     def __cinit__(self, Splitter splitter, intp_t min_samples_split,
                   intp_t min_samples_leaf, float64_t min_weight_leaf,
                   intp_t max_depth, float64_t min_impurity_decrease,
-                  intp_t min_group_size):
+                  intp_t min_group_samples):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
         self.min_weight_leaf = min_weight_leaf
         self.max_depth = max_depth
         self.min_impurity_decrease = min_impurity_decrease
-        self.min_group_size = min_group_size
+        self.min_group_samples = min_group_samples
 
     cpdef build(self, Tree tree, object X,
                 const float64_t[:, ::1] y,
@@ -81,7 +81,7 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef float64_t min_weight_leaf = self.min_weight_leaf
         cdef intp_t min_samples_split = self.min_samples_split
         cdef float64_t min_impurity_decrease = self.min_impurity_decrease
-        cdef intp_t min_group_size = self.min_group_size
+        cdef intp_t min_group_samples = self.min_group_samples
 
         # Recursive partition (without actual recursion)
         splitter.init(X, y, sample_weight, missing_values_in_feature_mask)
@@ -160,7 +160,7 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
                            ct_count < min_samples_split // groups_count or
                            tr_count_mean < min_samples_leaf or
                            ct_count < min_samples_leaf or
-                           min_size < min_group_size or
+                           min_size < min_group_samples or
                            weighted_n_node_samples < 2 * min_weight_leaf)
 
                 if first:
@@ -282,12 +282,12 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
     Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_tree.pyx
     """
     cdef intp_t max_leaf_nodes
-    cdef intp_t min_group_size
+    cdef intp_t min_group_samples
 
     def __cinit__(self, Splitter splitter, intp_t min_samples_split,
                   intp_t min_samples_leaf,  min_weight_leaf,
                   intp_t max_depth, intp_t max_leaf_nodes,
-                  float64_t min_impurity_decrease, intp_t min_group_size):
+                  float64_t min_impurity_decrease, intp_t min_group_samples):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -295,7 +295,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         self.max_depth = max_depth
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
-        self.min_group_size = min_group_size
+        self.min_group_samples = min_group_samples
 
     cpdef build(
         self,
@@ -517,7 +517,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
                    ct_count < self.min_samples_split // groups_count or
                    tr_count_mean < self.min_samples_leaf or
                    ct_count < self.min_samples_leaf or
-                   min_size < self.min_group_size or
+                   min_size < self.min_group_samples or
                    weighted_n_node_samples < 2 * self.min_weight_leaf or parent_record.impurity <= EPSILON
                    )
 

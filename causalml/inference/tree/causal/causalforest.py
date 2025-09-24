@@ -5,6 +5,7 @@ import forestci as fci
 from joblib import Parallel, delayed
 from warnings import catch_warnings, simplefilter, warn
 
+from numba import UnsupportedError
 from sklearn.exceptions import DataConversionWarning
 from sklearn.utils.validation import (
     check_random_state,
@@ -71,9 +72,9 @@ def _parallel_build_trees(
         elif class_weight == "balanced_subsample":
             curr_sample_weight *= compute_sample_weight("balanced", y, indices=indices)
 
-        tree.fit(X, treatment, y, sample_weight=curr_sample_weight, check_input=False)
+        tree.fit(X, treatment, y, sample_weight=curr_sample_weight, check_input=True, prepare_data=False)
     else:
-        tree.fit(X, treatment, y, sample_weight=sample_weight, check_input=False)
+        tree.fit(X, treatment, y, sample_weight=sample_weight, check_input=True, prepare_data=False)
 
     return tree
 
@@ -89,6 +90,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         max_depth: int = None,
         min_samples_split: int = 60,
         min_samples_leaf: int = 100,
+        min_group_samples: int = 50,
         min_weight_fraction_leaf: float = 0.0,
         max_features: Union[int, float, str] = 1.0,
         max_leaf_nodes: int = None,
@@ -103,6 +105,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         groups_penalty: float = 0.5,
         max_samples: int = None,
         groups_cnt: bool = True,
+        groups_cnt_mode: str = "nodes",
     ):
         """
         Initialize Random Forest of CausalTreeRegressors
@@ -158,10 +161,15 @@ class CausalRandomForestRegressor(ForestRegressor):
                     If bootstrap is True, the number of samples to draw from X
                     to train each base estimator.
             groups_cnt: (bool), count treatment and control groups for each node/leaf
+            groups_cnt_mode: (str, 'nodes', 'leaves'), mode for samples counting
         """
         self._estimator = CausalTreeRegressor(
-            control_name=control_name, criterion=criterion, groups_cnt=groups_cnt
+            control_name=control_name,
+            criterion=criterion,
+            groups_cnt=groups_cnt,
+            groups_cnt_mode=groups_cnt_mode,
         )
+
         _estimator_key = (
             "estimator"
             if Version(sklearn_version) >= Version("1.2.0")
@@ -182,6 +190,7 @@ class CausalRandomForestRegressor(ForestRegressor):
                 "ccp_alpha",
                 "groups_penalty",
                 "min_samples_leaf",
+                "min_group_samples",
                 "random_state",
             ),
             "bootstrap": bootstrap,
@@ -200,6 +209,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         self.max_depth = max_depth
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
+        self.min_group_samples = min_group_samples
         self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
         self.max_leaf_nodes = max_leaf_nodes
@@ -208,6 +218,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         self.groups_penalty = groups_penalty
         self.alpha = alpha
         self.groups_cnt = groups_cnt
+        self.groups_cnt_mode = groups_cnt_mode
 
     def _fit(
         self,
@@ -223,19 +234,18 @@ class CausalRandomForestRegressor(ForestRegressor):
 
         Parameters
         ----------
-        X : {array-like, sparse matrix} of shape (n_samples, n_features)
+        X (np.ndarray): {array-like, sparse matrix} of shape (n_samples, n_features)
             The training input samples. Internally, its dtype will be converted
             to ``dtype=np.float32``. If a sparse matrix is provided, it will be
             converted into a sparse ``csc_matrix``.
 
-        treatment : array-like of shape (n_samples,)
-            The treatment assignments.
+        treatment (np.ndarray): treatment vector, includes control group
 
-        y : array-like of shape (n_samples,) or (n_samples, n_outputs)
+        y (np.ndarray): array-like of shape (n_samples,) or (n_samples, n_outputs)
             The target values (class labels in classification, real numbers in
             regression).
 
-        sample_weight : array-like of shape (n_samples,), default=None
+        sample_weight (np.ndarray): array-like of shape (n_samples,), default=None
             Sample weights. If None, then samples are equally weighted. Splits
             that would create child nodes with net zero or negative weight are
             ignored while searching for a split in each node. In the case of
@@ -250,8 +260,10 @@ class CausalRandomForestRegressor(ForestRegressor):
         # Validate or convert input data
         if issparse(y):
             raise ValueError("sparse multilabel-indicator for y is not supported.")
+        check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
+        check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
         X, y = validate_data(
-            self, X, y, multi_output=True, accept_sparse="csc", dtype=DTYPE
+            self, X, y, multi_output=True, accept_sparse="csc", validate_separately=(check_X_params, check_y_params)
         )
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X)
@@ -285,8 +297,9 @@ class CausalRandomForestRegressor(ForestRegressor):
                     "Sum of y is not strictly positive which "
                     "is necessary for Poisson regression."
                 )
-
-        self.max_outputs_ = np.unique(treatment).astype(int).size + 1
+        groups = np.unique(treatment).astype(int).size
+        self.n_outputs_ = groups - 1
+        self.max_outputs_ = self.n_outputs_ + groups
         y, expanded_class_weight = self._validate_y_class_weight(y)
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
@@ -345,7 +358,7 @@ class CausalRandomForestRegressor(ForestRegressor):
 
             trees = [
                 self._make_estimator(append=False, random_state=random_state)
-                for i in range(n_more_estimators)
+                for _ in range(n_more_estimators)
             ]
             trees = Parallel(
                 n_jobs=self.n_jobs,
@@ -404,26 +417,25 @@ class CausalRandomForestRegressor(ForestRegressor):
         Returns:
              self
         """
-        X, y, w = self._estimator._prepare_data(X=X, treatment=treatment, y=y)
-        return self._fit(X=X, treatment=w, y=y, sample_weight=sample_weight)
+        X, y = self._estimator._prepare_data(X=X, treatment=treatment, y=y)
+        return self._fit(X=X, treatment=treatment, y=y, sample_weight=sample_weight)
 
     def predict(self, X: np.ndarray, with_outcomes: bool = False) -> np.ndarray:
         """Predict individual treatment effects
 
         Args:
-            X (np.matrix): a feature matrix
+            X (np.ndarray): a feature matrix
             with_outcomes (bool), default=False,
                                   include outcomes Y_hat(X|T=0), Y_hat(X|T=1) along with individual treatment effect
         Returns:
-           (np.matrix): individual treatment effect (ITE), dim=nx1
-                        or ITE with outcomes [Y_hat(X|T=0), Y_hat(X|T=1), ITE], dim=nx3
+           (np.ndarray): individual treatment effect (ITE), dim=(samples, groups-1)
+                        or ITE with outcomes:
+                        [Y_hat(X|T=0), Y_hat(X|T=1),...,Y_hat(X|T=n), ITE_1, ITE_2,...,ITE_n], dim=(samples, 2*groups-1)
         """
         if with_outcomes:
             self.n_outputs_ = self.max_outputs_
             for estimator in self.estimators_:
                 estimator._with_outcomes = True
-        else:
-            self.n_outputs_ = 1
         y_pred = super().predict(X)
         return y_pred
 
@@ -467,6 +479,8 @@ class CausalRandomForestRegressor(ForestRegressor):
         Returns:
             (np.ndarray), An array with the unbiased sampling variance for a RandomForest object.
         """
+        if self.n_outputs_ != 1:
+            raise NotImplementedError(f"forestci supports n_outputs=1. n_outputs={self.n_outputs_}")
 
         var = fci.random_forest_error(
             self,
@@ -478,3 +492,4 @@ class CausalRandomForestRegressor(ForestRegressor):
             memory_limit=memory_limit,
         )
         return var
+

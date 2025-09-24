@@ -2,6 +2,7 @@ import copy
 import numbers
 import warnings
 from math import ceil
+from typing import Union
 
 import numpy as np
 from scipy.sparse import issparse
@@ -30,8 +31,9 @@ class BaseCausalDecisionTree(BaseDecisionTree):
     Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_classes.py
     """
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, min_group_samples: int, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.min_group_samples = min_group_samples
 
     def _support_missing_values(self, X) -> bool:
         """
@@ -43,11 +45,10 @@ class BaseCausalDecisionTree(BaseDecisionTree):
 
     def fit(
         self,
-        X,
-        treatment,
-        y,
-        sample_weight=None,
-        check_input=True,
+        X: np.ndarray,
+        y: np.ndarray,
+        sample_weight: Union[np.ndarray, None] = None,
+        check_input: bool = True,
         X_idx_sorted="deprecated",
     ):
         random_state = check_random_state(self.random_state)
@@ -57,10 +58,9 @@ class BaseCausalDecisionTree(BaseDecisionTree):
 
         if check_input:
             # Need to validate separately here.
-            # We can't pass multi_ouput=True because that would allow y to be
-            # csr.
+            # We can't pass multi_ouput=True because that would allow y to be csr.
             check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
-            check_y_params = dict(ensure_2d=False, dtype=None)
+            check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
             X, y = validate_data(
                 self, X, y, validate_separately=(check_X_params, check_y_params)
             )
@@ -83,19 +83,11 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         y = np.atleast_1d(y)
         expanded_class_weight = None
 
-        if y.ndim == 1:
-            # reshape is necessary to preserve the data contiguity against vs
-            # [:, np.newaxis] that does not.
-            y = np.reshape(y, (-1, 1))
-
-        # For memory allocation to store control, treatment outcomes
-        self.n_outputs_ = np.unique(treatment).astype(int).size
+        # n_outputs_ is the length of [y|control, y|treatment_1,..., y|treatment_{n-1}]
+        self.n_outputs_ = y.shape[1]
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
-
-        if getattr(treatment, "dtype", None) != INT or not treatment.flags.contiguous:
-            treatment = np.ascontiguousarray(treatment, dtype=INT)
 
         # Check parameters
         max_depth = np.iinfo(np.int32).max if self.max_depth is None else self.max_depth
@@ -209,10 +201,8 @@ class BaseCausalDecisionTree(BaseDecisionTree):
 
         # Build tree
         criterion = self.criterion
-        if not isinstance(criterion, Criterion):
-            criterion = CAUSAL_TREES_CRITERIA[self.criterion](
-                self.n_outputs_, n_samples
-            )
+        if isinstance(criterion, str):
+            criterion = CAUSAL_TREES_CRITERIA[criterion](self.n_outputs_, n_samples)
             criterion.groups_penalty = self.groups_penalty
         else:
             # Make a deepcopy in case the criterion has mutable attributes that
@@ -246,6 +236,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 min_weight_leaf,
                 max_depth,
                 self.min_impurity_decrease,
+                self.min_group_samples
             )
         else:
             builder = BestFirstCausalTreeBuilder(
@@ -256,9 +247,10 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 max_depth,
                 max_leaf_nodes,
                 self.min_impurity_decrease,
+                self.min_group_samples
             )
-
-        builder.build(self.tree_, X, y, treatment, sample_weight)
+        # Treatment column is described via y cols. The first column is always a control group.
+        builder.build(self.tree_, X, y, sample_weight)
 
         self._prune_tree()
 
