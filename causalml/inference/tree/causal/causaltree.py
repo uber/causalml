@@ -369,7 +369,10 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         return te_b
 
     def _prepare_data(
-        self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray,
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray]:
         """
         Prepare input data with treatment info for DecisionTreeRegressor.
@@ -388,10 +391,13 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             )
         check_treatment_vector(treatment, self.control_name)
         self.unique_groups = list(set(treatment))
-        self.unique_treatments = sorted([x for x in self.unique_groups if x != self.control_name])
-        self._group2index= \
-            {self.control_name: 0, 
-            **{treatment: i+1 for i, treatment in enumerate(self.unique_treatments)}}
+        self.unique_treatments = sorted(
+            [x for x in self.unique_groups if x != self.control_name]
+        )
+        self._group2index = {
+            self.control_name: 0,
+            **{treatment: i + 1 for i, treatment in enumerate(self.unique_treatments)},
+        }
 
         X = check_array(X, dtype=DTYPE, accept_sparse="csc")
         y = check_array(y, ensure_2d=False, dtype=None)
@@ -399,7 +405,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
 
         y_2dim = np.zeros((self.n_samples, len(self.unique_treatments) + 1))
         for group, group_index in self._group2index.items():
-            y_2dim[:, group_index] = np.where(treatment==group, y, np.nan)
+            y_2dim[:, group_index] = np.where(treatment == group, y, np.nan)
 
         return X, y_2dim
 

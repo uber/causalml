@@ -685,7 +685,7 @@ def plot_qini(
         treatment_col=treatment_col,
         treatment_effect_col=treatment_effect_col,
         normalize=normalize,
-        ax=ax
+        ax=ax,
     )
     return ax
 

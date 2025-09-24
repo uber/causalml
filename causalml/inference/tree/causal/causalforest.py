@@ -72,9 +72,23 @@ def _parallel_build_trees(
         elif class_weight == "balanced_subsample":
             curr_sample_weight *= compute_sample_weight("balanced", y, indices=indices)
 
-        tree.fit(X, treatment, y, sample_weight=curr_sample_weight, check_input=True, prepare_data=False)
+        tree.fit(
+            X,
+            treatment,
+            y,
+            sample_weight=curr_sample_weight,
+            check_input=True,
+            prepare_data=False,
+        )
     else:
-        tree.fit(X, treatment, y, sample_weight=sample_weight, check_input=True, prepare_data=False)
+        tree.fit(
+            X,
+            treatment,
+            y,
+            sample_weight=sample_weight,
+            check_input=True,
+            prepare_data=False,
+        )
 
     return tree
 
@@ -263,7 +277,12 @@ class CausalRandomForestRegressor(ForestRegressor):
         check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
         check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
         X, y = validate_data(
-            self, X, y, multi_output=True, accept_sparse="csc", validate_separately=(check_X_params, check_y_params)
+            self,
+            X,
+            y,
+            multi_output=True,
+            accept_sparse="csc",
+            validate_separately=(check_X_params, check_y_params),
         )
         if sample_weight is not None:
             sample_weight = _check_sample_weight(sample_weight, X)
@@ -480,7 +499,9 @@ class CausalRandomForestRegressor(ForestRegressor):
             (np.ndarray), An array with the unbiased sampling variance for a RandomForest object.
         """
         if self.n_outputs_ != 1:
-            raise NotImplementedError(f"forestci supports n_outputs=1. n_outputs={self.n_outputs_}")
+            raise NotImplementedError(
+                f"forestci supports n_outputs=1. n_outputs={self.n_outputs_}"
+            )
 
         var = fci.random_forest_error(
             self,
@@ -492,4 +513,3 @@ class CausalRandomForestRegressor(ForestRegressor):
             memory_limit=memory_limit,
         )
         return var
-

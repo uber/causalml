@@ -236,7 +236,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 min_weight_leaf,
                 max_depth,
                 self.min_impurity_decrease,
-                self.min_group_samples
+                self.min_group_samples,
             )
         else:
             builder = BestFirstCausalTreeBuilder(
@@ -247,7 +247,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 max_depth,
                 max_leaf_nodes,
                 self.min_impurity_decrease,
-                self.min_group_samples
+                self.min_group_samples,
             )
         # Treatment column is described via y cols. The first column is always a control group.
         builder.build(self.tree_, X, y, sample_weight)

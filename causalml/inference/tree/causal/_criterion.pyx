@@ -8,7 +8,6 @@
 cdef int32_t CONTROL_GROUP_IDX = 0
 
 
-
 cdef class NodeState:
 
     def __cinit__(self):
