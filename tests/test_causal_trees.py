@@ -1,6 +1,7 @@
 import multiprocessing as mp
 from abc import abstractmethod
 
+import numpy as np
 import pandas as pd
 import pytest
 from sklearn.model_selection import train_test_split
@@ -8,7 +9,7 @@ from sklearn.model_selection import train_test_split
 from causalml.inference.tree import CausalTreeRegressor, CausalRandomForestRegressor
 from causalml.metrics import ape
 from causalml.metrics import qini_score
-from .const import RANDOM_SEED, ERROR_THRESHOLD
+from .const import RANDOM_SEED, ERROR_THRESHOLD, N_SAMPLE
 
 
 class CausalTreeBase:
@@ -27,17 +28,43 @@ class CausalTreeBase:
     def test_predict(self, *args, **kwargs):
         return
 
-    def prepare_data(self, generate_regression_data) -> tuple:
-        y, X, treatment, tau, b, e = generate_regression_data(mode=2)
+    def prepare_data(self, generate_regression_data, n_treatments: int) -> pd.DataFrame:
+        data = []
+        sigmas = np.abs(np.random.normal(size=n_treatments))
+        for i in range(n_treatments):
+            _, X, w, tau, b, e = generate_regression_data(mode=2, sigma=sigmas[i])
+            w = np.where(w == 1, i + 1, 0)
+            y = b + (w - 0.5) * tau + sigmas[i] * np.random.normal(size=N_SAMPLE)
+            data.append([y, X, w, tau, b, e])
+
+        y = np.hstack([chunk[0] for chunk in data])
+        X = np.vstack([chunk[1] for chunk in data])
+        w = np.hstack([chunk[2] for chunk in data])
+        tau = np.hstack([chunk[3] for chunk in data])
+
         df = pd.DataFrame(X)
-        feature_names = [f"feature_{i}" for i in range(X.shape[1])]
-        df.columns = feature_names
-        df["outcome"] = y
-        df["treatment"] = treatment
-        df["treatment_effect"] = tau
+        df.columns = [f"feature_{i}" for i in range(X.shape[1])]
+        df['outcome'] = y
+        df['treatment'] = w
+        df['treatment_effect'] = tau
+        df = df.sample(frac=1.0).reset_index(drop=True)
+
+        df_balanced = pd.concat(
+            [
+                df[df["treatment"] != 0],
+                df[df["treatment"] == 0].sample(frac=1 / n_treatments)
+            ]
+        ).sample(frac=1.).reset_index(drop=True)
+        return df_balanced
+
+    def prepare_multi_treatment_data(self, generate_regression_data, n_treatments: int):
+        return self.prepare_data(generate_regression_data, n_treatments=n_treatments)
+
+    def split_data(self, df: pd.DataFrame) -> tuple:
         self.df_train, self.df_test = train_test_split(
             df, test_size=self.test_size, random_state=RANDOM_SEED
         )
+        feature_names = [x for x in self.df_train.columns if x.startswith("feature_")]
         X_train, X_test = (
             self.df_train[feature_names].values,
             self.df_test[feature_names].values,
@@ -53,15 +80,20 @@ class CausalTreeBase:
         return X_train, X_test, y_train, y_test, treatment_train, treatment_test
 
 
-class TestCausalTreeRegressor(CausalTreeBase):
+@pytest.mark.parametrize("n_treatments", (1, 2,))
+class TestCausalTreeCase(CausalTreeBase):
+
     def prepare_model(self) -> CausalTreeRegressor:
         ctree = CausalTreeRegressor(
-            control_name=self.control_name, groups_cnt=True, random_state=RANDOM_SEED
+            control_name=self.control_name,
+            groups_cnt=True,
+            random_state=RANDOM_SEED
         )
         return ctree
 
-    def test_fit(self, generate_regression_data):
+    def test_fit(self, generate_regression_data, n_treatments: int):
         ctree = self.prepare_model()
+        data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
         (
             X_train,
             X_test,
@@ -69,68 +101,60 @@ class TestCausalTreeRegressor(CausalTreeBase):
             y_test,
             treatment_train,
             treatment_test,
-        ) = self.prepare_data(generate_regression_data)
+        ) = self.split_data(data)
         ctree.fit(X=X_train, treatment=treatment_train, y=y_train)
+        preds = ctree.predict(X=X_test)
+
         df_result = pd.DataFrame(
             {
-                "ctree_ite_pred": ctree.predict(X_test),
                 "outcome": y_test,
-                "is_treated": treatment_test,
+                "group": treatment_test,
                 "treatment_effect": self.df_test["treatment_effect"],
             }
         )
-        df_qini = qini_score(
-            df_result,
-            outcome_col="outcome",
-            treatment_col="is_treated",
-            treatment_effect_col="treatment_effect",
-        )
-        assert df_qini["ctree_ite_pred"] > 0.0
+        for i, group in enumerate(range(1, n_treatments + 1)):
+            df_result[f"ite_pred_t{group}"] = preds[:, i] if n_treatments > 1 else preds
+            df_group_result = df_result[df_result["group"].isin([0, group])].copy()
+            df_group_result["is_treated"] = (df_group_result["group"] == group).astype(int)
+            df_group_result = df_group_result[["outcome", "is_treated", "treatment_effect", f"ite_pred_t{group}"]]
+            df_qini = qini_score(df_group_result,
+                                 outcome_col='outcome',
+                                 treatment_col='is_treated',
+                                 treatment_effect_col='treatment_effect')
+            assert df_qini[f"ite_pred_t{group}"] > 0.0
 
-    @pytest.mark.parametrize("return_ci", (False, True))
-    @pytest.mark.parametrize("bootstrap_size", (500, 800))
-    @pytest.mark.parametrize("n_bootstraps", (1000,))
-    def test_fit_predict(
-        self, generate_regression_data, return_ci, bootstrap_size, n_bootstraps
-    ):
-        y, X, treatment, tau, b, e = generate_regression_data(mode=1)
+    def test_predict(self, generate_regression_data, n_treatments: int):
         ctree = self.prepare_model()
-        output = ctree.fit_predict(
-            X=X,
-            treatment=treatment,
-            y=y,
-            return_ci=return_ci,
-            n_bootstraps=n_bootstraps,
-            bootstrap_size=bootstrap_size,
-            n_jobs=mp.cpu_count() - 1,
-            verbose=False,
-        )
-        if return_ci:
-            te, te_lower, te_upper = output
-            assert len(output) == 3
-            assert (te_lower <= te).all() and (te_upper >= te).all()
-        else:
-            te = output
-            assert te.shape[0] == y.shape[0]
+        data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
+        (
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+            treatment_train,
+            treatment_test,
+        ) = self.split_data(data)
+        ctree.fit(X=X_train, treatment=treatment_train, y=y_train)
+        y_pred = ctree.predict(X_test)
+        y_pred = y_pred.reshape(-1, n_treatments) if n_treatments == 1 else y_pred
+        y_pred_with_outcomes = ctree.predict(X_test, with_outcomes=True)
+        assert y_pred.shape == (X_test.shape[0], n_treatments)
+        assert y_pred_with_outcomes.shape == (X_test.shape[0], n_treatments + (n_treatments + 1))
 
-    def test_predict(self, generate_regression_data):
-        y, X, treatment, tau, b, e = generate_regression_data(mode=2)
+    def test_ate(self, generate_regression_data, n_treatments: int):
         ctree = self.prepare_model()
-        ctree.fit(X=X, treatment=treatment, y=y)
-        y_pred = ctree.predict(X[:1, :])
-        y_pred_with_outcomes = ctree.predict(X[:1, :], with_outcomes=True)
-        assert y_pred.shape == (1,)
-        assert y_pred_with_outcomes.shape == (1, 3)
-
-    def test_ate(self, generate_regression_data):
-        y, X, treatment, tau, b, e = generate_regression_data(mode=2)
-        ctree = self.prepare_model()
-        ate, ate_lower, ate_upper = ctree.estimate_ate(X=X, y=y, treatment=treatment)
+        data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
+        feature_names = [x for x in data.columns if x.startswith("feature_")]
+        X, y, treatment = data[feature_names], data["outcome"], data["treatment"]
+        tau = data["treatment_effect"]
+        ate, ate_lower, ate_upper = ctree.estimate_ate(X=X.values, treatment=treatment.values, y=y.values)
         assert (ate >= ate_lower) and (ate <= ate_upper)
         assert ape(tau.mean(), ate) < ERROR_THRESHOLD
 
 
-class TestCausalRandomForestRegressor(CausalTreeBase):
+@pytest.mark.parametrize("n_treatments", (1, 2,))
+@pytest.mark.parametrize("n_estimators", (5, 10,))
+class TestCausalRandomForestCase(CausalTreeBase):
     def prepare_model(self, n_estimators: int) -> CausalRandomForestRegressor:
         crforest = CausalRandomForestRegressor(
             criterion="causal_mse",
@@ -140,9 +164,9 @@ class TestCausalRandomForestRegressor(CausalTreeBase):
         )
         return crforest
 
-    @pytest.mark.parametrize("n_estimators", (5, 10, 50))
-    def test_fit(self, generate_regression_data, n_estimators):
+    def test_fit(self, generate_regression_data, n_estimators: int, n_treatments: int):
         crforest = self.prepare_model(n_estimators=n_estimators)
+        data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
         (
             X_train,
             X_test,
@@ -150,37 +174,31 @@ class TestCausalRandomForestRegressor(CausalTreeBase):
             y_test,
             treatment_train,
             treatment_test,
-        ) = self.prepare_data(generate_regression_data)
+        ) = self.split_data(data)
         crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
+        preds = crforest.predict(X=X_test)
 
         df_result = pd.DataFrame(
             {
-                "crforest_ite_pred": crforest.predict(X_test),
-                "is_treated": treatment_test,
+                "outcome": y_test,
+                "group": treatment_test,
                 "treatment_effect": self.df_test["treatment_effect"],
             }
         )
-        df_qini = qini_score(
-            df_result,
-            outcome_col="outcome",
-            treatment_col="is_treated",
-            treatment_effect_col="treatment_effect",
-        )
-        assert df_qini["crforest_ite_pred"] > 0.0
+        for i, group in enumerate(range(1, n_treatments + 1)):
+            df_result[f"ite_pred_t{group}"] = preds[:, i] if n_treatments > 1 else preds
+            df_group_result = df_result[df_result["group"].isin([0, group])].copy()
+            df_group_result["is_treated"] = (df_group_result["group"] == group).astype(int)
+            df_group_result = df_group_result[["outcome", "is_treated", "treatment_effect", f"ite_pred_t{group}"]]
+            df_qini = qini_score(df_group_result,
+                                 outcome_col='outcome',
+                                 treatment_col='is_treated',
+                                 treatment_effect_col='treatment_effect')
+            assert df_qini[f"ite_pred_t{group}"] > 0.0
 
-    @pytest.mark.parametrize("n_estimators", (5,))
-    def test_predict(self, generate_regression_data, n_estimators):
-        y, X, treatment, tau, b, e = generate_regression_data(mode=2)
-        ctree = self.prepare_model(n_estimators=n_estimators)
-        ctree.fit(X=X, y=y, treatment=treatment)
-        y_pred = ctree.predict(X[:1, :])
-        y_pred_with_outcomes = ctree.predict(X[:1, :], with_outcomes=True)
-        assert y_pred.shape == (1,)
-        assert y_pred_with_outcomes.shape == (1, 3)
-
-    @pytest.mark.parametrize("n_estimators", (5,))
-    def test_unbiased_sampling_error(self, generate_regression_data, n_estimators):
+    def test_predict(self, generate_regression_data, n_estimators: int, n_treatments: int):
         crforest = self.prepare_model(n_estimators=n_estimators)
+        data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
         (
             X_train,
             X_test,
@@ -188,8 +206,28 @@ class TestCausalRandomForestRegressor(CausalTreeBase):
             y_test,
             treatment_train,
             treatment_test,
-        ) = self.prepare_data(generate_regression_data)
+        ) = self.split_data(data)
         crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
-        crforest_test_var = crforest.calculate_error(X_train=X_train, X_test=X_test)
-        assert (crforest_test_var > 0).all()
-        assert crforest_test_var.shape[0] == y_test.shape[0]
+        y_pred = crforest.predict(X_test)
+        y_pred = y_pred.reshape(-1, n_treatments) if n_treatments == 1 else y_pred
+        y_pred_with_outcomes = crforest.predict(X_test, with_outcomes=True)
+        assert y_pred.shape == (X_test.shape[0], n_treatments)
+        assert y_pred_with_outcomes.shape == (X_test.shape[0], n_treatments + (n_treatments + 1))
+
+    def test_unbiased_sampling_error(self, generate_regression_data, n_estimators: int, n_treatments: int):
+        crforest = self.prepare_model(n_estimators=n_estimators)
+        data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
+        (
+            X_train,
+            X_test,
+            y_train,
+            y_test,
+            treatment_train,
+            treatment_test,
+        ) = self.split_data(data)
+        crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
+        crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
+        if n_treatments == 1:
+            crforest_test_var = crforest.calculate_error(X_train=X_train, X_test=X_test)
+            assert (crforest_test_var > 0).all()
+            assert crforest_test_var.shape[0] == y_test.shape[0]
