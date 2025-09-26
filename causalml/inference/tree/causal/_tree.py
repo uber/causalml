@@ -4,12 +4,18 @@ import warnings
 from math import ceil
 from typing import Union
 
+try:
+    from packaging.version import parse as Version
+except ModuleNotFoundError:
+    from distutils.version import LooseVersion as Version
+
 import numpy as np
 from scipy.sparse import issparse
+from sklearn import __version__ as sklearn_version
 from sklearn.utils import check_random_state
 from sklearn.utils.validation import _check_sample_weight, validate_data
 
-from .._tree._classes import DTYPE, DOUBLE, INT
+from .._tree._classes import DTYPE, DOUBLE
 from .._tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
 from .._tree._classes import Tree, BaseDecisionTree
 from .._tree._criterion import Criterion
@@ -60,7 +66,10 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             # Need to validate separately here.
             # We can't pass multi_ouput=True because that would allow y to be csr.
             check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
-            check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
+            if Version(sklearn_version) >= Version("1.6"):
+                check_y_params = dict(ensure_2d=False, dtype=None, ensure_all_finite=False)
+            else:
+                check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
             X, y = validate_data(
                 self, X, y, validate_separately=(check_X_params, check_y_params)
             )
@@ -74,7 +83,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
 
             if self.criterion not in CAUSAL_TREES_CRITERIA.keys():
                 raise ValueError(
-                    "Only {CAUSAL_TREES_CRITERIA.keys()} criteria are supported"
+                    f"Only {CAUSAL_TREES_CRITERIA.keys()} criteria are supported"
                 )
 
         n_samples, self.n_features_ = X.shape

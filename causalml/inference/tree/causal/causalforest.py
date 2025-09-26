@@ -5,7 +5,6 @@ import forestci as fci
 from joblib import Parallel, delayed
 from warnings import catch_warnings, simplefilter, warn
 
-from numba import UnsupportedError
 from sklearn.exceptions import DataConversionWarning
 from sklearn.utils.validation import (
     check_random_state,
@@ -275,7 +274,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         if issparse(y):
             raise ValueError("sparse multilabel-indicator for y is not supported.")
         check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
-        check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
+        check_y_params = dict(ensure_2d=False, dtype=None, ensure_all_finite=False)
         X, y = validate_data(
             self,
             X,
