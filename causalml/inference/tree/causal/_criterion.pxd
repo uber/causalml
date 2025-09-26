@@ -38,7 +38,6 @@ cdef class NodeState:
     control_idx:    int32_t,              control group index
     control_total   int32_t,              total number of observations for a control group
     treatment_total int32_t,              total number of observations for treatment groups
-    treatment_min   int32_t,    
     groups_total    int32_t,              total number of groups
     split_metric:   float64_t,            split metric for TTest criterion
     """
