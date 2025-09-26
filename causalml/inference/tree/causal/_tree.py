@@ -67,9 +67,13 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             # We can't pass multi_ouput=True because that would allow y to be csr.
             check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
             if Version(sklearn_version) >= Version("1.6"):
-                check_y_params = dict(ensure_2d=False, dtype=None, ensure_all_finite=False)
+                check_y_params = dict(
+                    ensure_2d=False, dtype=None, ensure_all_finite=False
+                )
             else:
-                check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
+                check_y_params = dict(
+                    ensure_2d=False, dtype=None, force_all_finite=False
+                )
             X, y = validate_data(
                 self, X, y, validate_separately=(check_X_params, check_y_params)
             )
