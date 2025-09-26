@@ -44,17 +44,21 @@ class CausalTreeBase:
 
         df = pd.DataFrame(X)
         df.columns = [f"feature_{i}" for i in range(X.shape[1])]
-        df['outcome'] = y
-        df['treatment'] = w
-        df['treatment_effect'] = tau
+        df["outcome"] = y
+        df["treatment"] = w
+        df["treatment_effect"] = tau
         df = df.sample(frac=1.0).reset_index(drop=True)
 
-        df_balanced = pd.concat(
-            [
-                df[df["treatment"] != 0],
-                df[df["treatment"] == 0].sample(frac=1 / n_treatments)
-            ]
-        ).sample(frac=1.).reset_index(drop=True)
+        df_balanced = (
+            pd.concat(
+                [
+                    df[df["treatment"] != 0],
+                    df[df["treatment"] == 0].sample(frac=1 / n_treatments),
+                ]
+            )
+            .sample(frac=1.0)
+            .reset_index(drop=True)
+        )
         return df_balanced
 
     def prepare_multi_treatment_data(self, generate_regression_data, n_treatments: int):
@@ -80,14 +84,18 @@ class CausalTreeBase:
         return X_train, X_test, y_train, y_test, treatment_train, treatment_test
 
 
-@pytest.mark.parametrize("n_treatments", (1, 2,))
+@pytest.mark.parametrize(
+    "n_treatments",
+    (
+        1,
+        2,
+    ),
+)
 class TestCausalTreeCase(CausalTreeBase):
 
     def prepare_model(self) -> CausalTreeRegressor:
         ctree = CausalTreeRegressor(
-            control_name=self.control_name,
-            groups_cnt=True,
-            random_state=RANDOM_SEED
+            control_name=self.control_name, groups_cnt=True, random_state=RANDOM_SEED
         )
         return ctree
 
@@ -115,12 +123,18 @@ class TestCausalTreeCase(CausalTreeBase):
         for i, group in enumerate(range(1, n_treatments + 1)):
             df_result[f"ite_pred_t{group}"] = preds[:, i] if n_treatments > 1 else preds
             df_group_result = df_result[df_result["group"].isin([0, group])].copy()
-            df_group_result["is_treated"] = (df_group_result["group"] == group).astype(int)
-            df_group_result = df_group_result[["outcome", "is_treated", "treatment_effect", f"ite_pred_t{group}"]]
-            df_qini = qini_score(df_group_result,
-                                 outcome_col='outcome',
-                                 treatment_col='is_treated',
-                                 treatment_effect_col='treatment_effect')
+            df_group_result["is_treated"] = (df_group_result["group"] == group).astype(
+                int
+            )
+            df_group_result = df_group_result[
+                ["outcome", "is_treated", "treatment_effect", f"ite_pred_t{group}"]
+            ]
+            df_qini = qini_score(
+                df_group_result,
+                outcome_col="outcome",
+                treatment_col="is_treated",
+                treatment_effect_col="treatment_effect",
+            )
             assert df_qini[f"ite_pred_t{group}"] > 0.0
 
     def test_predict(self, generate_regression_data, n_treatments: int):
@@ -139,7 +153,10 @@ class TestCausalTreeCase(CausalTreeBase):
         y_pred = y_pred.reshape(-1, n_treatments) if n_treatments == 1 else y_pred
         y_pred_with_outcomes = ctree.predict(X_test, with_outcomes=True)
         assert y_pred.shape == (X_test.shape[0], n_treatments)
-        assert y_pred_with_outcomes.shape == (X_test.shape[0], n_treatments + (n_treatments + 1))
+        assert y_pred_with_outcomes.shape == (
+            X_test.shape[0],
+            n_treatments + (n_treatments + 1),
+        )
 
     def test_ate(self, generate_regression_data, n_treatments: int):
         ctree = self.prepare_model()
@@ -147,13 +164,27 @@ class TestCausalTreeCase(CausalTreeBase):
         feature_names = [x for x in data.columns if x.startswith("feature_")]
         X, y, treatment = data[feature_names], data["outcome"], data["treatment"]
         tau = data["treatment_effect"]
-        ate, ate_lower, ate_upper = ctree.estimate_ate(X=X.values, treatment=treatment.values, y=y.values)
+        ate, ate_lower, ate_upper = ctree.estimate_ate(
+            X=X.values, treatment=treatment.values, y=y.values
+        )
         assert (ate >= ate_lower) and (ate <= ate_upper)
         assert ape(tau.mean(), ate) < ERROR_THRESHOLD
 
 
-@pytest.mark.parametrize("n_treatments", (1, 2,))
-@pytest.mark.parametrize("n_estimators", (5, 10,))
+@pytest.mark.parametrize(
+    "n_treatments",
+    (
+        1,
+        2,
+    ),
+)
+@pytest.mark.parametrize(
+    "n_estimators",
+    (
+        5,
+        10,
+    ),
+)
 class TestCausalRandomForestCase(CausalTreeBase):
     def prepare_model(self, n_estimators: int) -> CausalRandomForestRegressor:
         crforest = CausalRandomForestRegressor(
@@ -188,15 +219,23 @@ class TestCausalRandomForestCase(CausalTreeBase):
         for i, group in enumerate(range(1, n_treatments + 1)):
             df_result[f"ite_pred_t{group}"] = preds[:, i] if n_treatments > 1 else preds
             df_group_result = df_result[df_result["group"].isin([0, group])].copy()
-            df_group_result["is_treated"] = (df_group_result["group"] == group).astype(int)
-            df_group_result = df_group_result[["outcome", "is_treated", "treatment_effect", f"ite_pred_t{group}"]]
-            df_qini = qini_score(df_group_result,
-                                 outcome_col='outcome',
-                                 treatment_col='is_treated',
-                                 treatment_effect_col='treatment_effect')
+            df_group_result["is_treated"] = (df_group_result["group"] == group).astype(
+                int
+            )
+            df_group_result = df_group_result[
+                ["outcome", "is_treated", "treatment_effect", f"ite_pred_t{group}"]
+            ]
+            df_qini = qini_score(
+                df_group_result,
+                outcome_col="outcome",
+                treatment_col="is_treated",
+                treatment_effect_col="treatment_effect",
+            )
             assert df_qini[f"ite_pred_t{group}"] > 0.0
 
-    def test_predict(self, generate_regression_data, n_estimators: int, n_treatments: int):
+    def test_predict(
+        self, generate_regression_data, n_estimators: int, n_treatments: int
+    ):
         crforest = self.prepare_model(n_estimators=n_estimators)
         data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
         (
@@ -212,9 +251,14 @@ class TestCausalRandomForestCase(CausalTreeBase):
         y_pred = y_pred.reshape(-1, n_treatments) if n_treatments == 1 else y_pred
         y_pred_with_outcomes = crforest.predict(X_test, with_outcomes=True)
         assert y_pred.shape == (X_test.shape[0], n_treatments)
-        assert y_pred_with_outcomes.shape == (X_test.shape[0], n_treatments + (n_treatments + 1))
+        assert y_pred_with_outcomes.shape == (
+            X_test.shape[0],
+            n_treatments + (n_treatments + 1),
+        )
 
-    def test_unbiased_sampling_error(self, generate_regression_data, n_estimators: int, n_treatments: int):
+    def test_unbiased_sampling_error(
+        self, generate_regression_data, n_estimators: int, n_treatments: int
+    ):
         crforest = self.prepare_model(n_estimators=n_estimators)
         data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
         (
