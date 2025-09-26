@@ -31,6 +31,19 @@ CAUSAL_TREES_CRITERIA = {
 }
 
 
+def get_check_y_params() -> dict:
+    """
+    Prepares flags depending on the scikit-learn version.
+
+    Returns: check_y_params
+    """
+    if Version(sklearn_version) >= Version("1.6"):
+        check_y_params = dict(ensure_2d=False, dtype=None, ensure_all_finite=False)
+    else:
+        check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
+    return check_y_params
+
+
 class BaseCausalDecisionTree(BaseDecisionTree):
     """
     Modified base class BaseDecisionTree for causal trees
@@ -66,14 +79,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
             # Need to validate separately here.
             # We can't pass multi_ouput=True because that would allow y to be csr.
             check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
-            if Version(sklearn_version) >= Version("1.6"):
-                check_y_params = dict(
-                    ensure_2d=False, dtype=None, ensure_all_finite=False
-                )
-            else:
-                check_y_params = dict(
-                    ensure_2d=False, dtype=None, force_all_finite=False
-                )
+            check_y_params = get_check_y_params()
             X, y = validate_data(
                 self, X, y, validate_separately=(check_X_params, check_y_params)
             )

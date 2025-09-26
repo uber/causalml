@@ -19,6 +19,7 @@ from sklearn.ensemble._forest import compute_sample_weight, issparse
 from sklearn.ensemble._forest import _generate_sample_indices, _get_n_samples_bootstrap
 
 from .causaltree import CausalTreeRegressor
+from ._tree import get_check_y_params
 
 try:
     from packaging.version import parse as Version
@@ -274,7 +275,7 @@ class CausalRandomForestRegressor(ForestRegressor):
         if issparse(y):
             raise ValueError("sparse multilabel-indicator for y is not supported.")
         check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
-        check_y_params = dict(ensure_2d=False, dtype=None, ensure_all_finite=False)
+        check_y_params = get_check_y_params()
         X, y = validate_data(
             self,
             X,
