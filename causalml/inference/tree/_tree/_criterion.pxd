@@ -24,7 +24,6 @@ cdef class Criterion:
 
     # Internal structures
     cdef const float64_t[:, ::1] y         # Values of y
-    cdef const int32_t[:] treatment         # Treatment assignment: 1 for treatment, 0 for control
     cdef const float64_t[:] sample_weight  # Sample weights
 
     cdef const intp_t[:] sample_indices    # Sample indices in X, y
@@ -50,7 +49,6 @@ cdef class Criterion:
     cdef int init(
         self,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         float64_t weighted_n_samples,
         const intp_t[:] sample_indices,

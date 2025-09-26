@@ -106,7 +106,6 @@ cdef class TreeBuilder:
         Tree tree,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight=None,
         const unsigned char[::1] missing_values_in_feature_mask=None,
     ):
@@ -117,7 +116,6 @@ cdef class TreeBuilder:
         self,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
     ):
         """Check input dtype, layout and format"""
@@ -142,9 +140,6 @@ cdef class TreeBuilder:
         if y.base.dtype != DOUBLE or not y.base.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
 
-        if treatment.base.dtype != INT or not treatment.base.flags.contiguous:
-            treatment = np.ascontiguousarray(treatment, dtype=INT)
-
         if (
             sample_weight is not None and
             (
@@ -154,7 +149,7 @@ cdef class TreeBuilder:
         ):
             sample_weight = np.asarray(sample_weight, dtype=DOUBLE, order="C")
 
-        return X, y, treatment, sample_weight
+        return X, y, sample_weight
 
 # Depth first builder ---------------------------------------------------------
 cdef class DepthFirstTreeBuilder(TreeBuilder):
@@ -162,7 +157,8 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
 
     def __cinit__(self, Splitter splitter, intp_t min_samples_split,
                   intp_t min_samples_leaf, float64_t min_weight_leaf,
-                  intp_t max_depth, float64_t min_impurity_decrease):
+                  intp_t max_depth, float64_t min_impurity_decrease,
+                  *args, **kwargs):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -175,14 +171,13 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
         Tree tree,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight=None,
         const unsigned char[::1] missing_values_in_feature_mask=None,
     ):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
-        X, y, treatment, sample_weight = self._check_input(X, y, treatment, sample_weight)
+        X, y, sample_weight = self._check_input(X, y, sample_weight)
 
         # Initial capacity
         cdef intp_t init_capacity
@@ -203,7 +198,7 @@ cdef class DepthFirstTreeBuilder(TreeBuilder):
         cdef float64_t min_impurity_decrease = self.min_impurity_decrease
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, treatment, sample_weight, missing_values_in_feature_mask)
+        splitter.init(X, y, sample_weight, missing_values_in_feature_mask)
 
         cdef intp_t start
         cdef intp_t end
@@ -399,7 +394,8 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
     def __cinit__(self, Splitter splitter, intp_t min_samples_split,
                   intp_t min_samples_leaf,  min_weight_leaf,
                   intp_t max_depth, intp_t max_leaf_nodes,
-                  float64_t min_impurity_decrease):
+                  float64_t min_impurity_decrease,
+                  *args, **kwargs):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -413,21 +409,20 @@ cdef class BestFirstTreeBuilder(TreeBuilder):
         Tree tree,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight=None,
         const unsigned char[::1] missing_values_in_feature_mask=None,
     ):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
-        X, y, treatment, sample_weight = self._check_input(X, y, treatment, sample_weight)
+        X, y, sample_weight = self._check_input(X, y, sample_weight)
 
         # Parameters
         cdef Splitter splitter = self.splitter
         cdef intp_t max_leaf_nodes = self.max_leaf_nodes
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, treatment, sample_weight, missing_values_in_feature_mask)
+        splitter.init(X, y, sample_weight, missing_values_in_feature_mask)
 
         cdef vector[FrontierRecord] frontier
         cdef FrontierRecord record

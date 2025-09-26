@@ -49,7 +49,6 @@ cdef class Criterion:
     cdef int init(
         self,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         float64_t weighted_n_samples,
         const intp_t[:] sample_indices,
@@ -357,7 +356,6 @@ cdef class ClassificationCriterion(Criterion):
     cdef int init(
         self,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         float64_t weighted_n_samples,
         const intp_t[:] sample_indices,
@@ -871,7 +869,6 @@ cdef class RegressionCriterion(Criterion):
     cdef int init(
         self,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         float64_t weighted_n_samples,
         const intp_t[:] sample_indices,
@@ -1250,7 +1247,6 @@ cdef class MAE(RegressionCriterion):
     cdef int init(
         self,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         float64_t weighted_n_samples,
         const intp_t[:] sample_indices,

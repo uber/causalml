@@ -106,12 +106,12 @@ cdef class TreeBuilder:
     # This class controls the various stopping criteria and the node splitting
     # evaluation order, e.g. depth-first or best-first.
 
-    cdef Splitter splitter              # Splitting algorithm
+    cdef Splitter splitter                 # Splitting algorithm
 
-    cdef intp_t min_samples_split       # Minimum number of samples in an internal node
-    cdef intp_t min_samples_leaf        # Minimum number of samples in a leaf
+    cdef intp_t min_samples_split          # Minimum number of samples in an internal node
+    cdef intp_t min_samples_leaf           # Minimum number of samples in a leaf
     cdef float64_t min_weight_leaf         # Minimum weight in a leaf
-    cdef intp_t max_depth               # Maximal tree depth
+    cdef intp_t max_depth                  # Maximal tree depth
     cdef float64_t min_impurity_decrease   # Impurity threshold for early stopping
 
     cpdef build(
@@ -119,7 +119,6 @@ cdef class TreeBuilder:
         Tree tree,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight=*,
         const unsigned char[::1] missing_values_in_feature_mask=*,
     )
@@ -128,7 +127,6 @@ cdef class TreeBuilder:
         self,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
     )
 
