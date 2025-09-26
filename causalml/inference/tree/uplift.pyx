@@ -33,6 +33,7 @@ from joblib import Parallel, delayed
 from packaging import version
 from sklearn.model_selection import train_test_split
 from sklearn.utils import check_X_y, check_array, check_random_state
+import numbers
 
 if version.parse(sklearn.__version__) >= version.parse('0.22.0'):
     from sklearn.utils._testing import ignore_warnings
@@ -242,7 +243,7 @@ def group_uniqueCounts_to_arr(np.ndarray[TR_TYPE_t, ndim=1] treatment_idx,
         tv = treatment_idx[i]
         # assume treatment index is in range
         out_arr[2*tv] += 1
-        # assume y should be either 0 or 1, so this is summing 
+        # assume y should be either 0 or 1, so this is summing
         out_arr[2*tv + 1] += y[i]
     # adjust the entry at index 2*i to be N(Y = 0, T = i) = N(T = i) - N(Y = 1, T = i)
     for i in range(n_class):
@@ -321,7 +322,7 @@ def group_counts_by_divide(
             tv = treatment_idx[i]
             # assume treatment index is in range
             out_arr[2*tv] += 1
-            # assume y should be either 0 or 1, so this is summing 
+            # assume y should be either 0 or 1, so this is summing
             out_arr[2*tv + 1] += y[i]
     # adjust the entry at index 2*i to be N(Y = 0, T = i) = N(T = i) - N(Y = 1, T = i)
     for i in range(n_class):
@@ -359,9 +360,9 @@ class UpliftTreeClassifier:
     n_reg: int, optional (default=100)
         The regularization parameter defined in Rzepakowski et al. 2012, the weight (in terms of sample size) of the
         parent node influence on the child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
-    
+
     early_stopping_eval_diff_scale: float, optional (default=1)
-        If train and valid uplift score diff bigger than 
+        If train and valid uplift score diff bigger than
         min(train_uplift_score,valid_uplift_score)/early_stopping_eval_diff_scale, stop.
 
     control_name: string
@@ -403,7 +404,7 @@ class UpliftTreeClassifier:
             self.arr_eval_func = self.arr_evaluate_ED
         elif evaluationFunction == 'Chi':
             self.evaluationFunction = self.evaluate_Chi
-            self.arr_eval_func = self.arr_evaluate_Chi     
+            self.arr_eval_func = self.arr_evaluate_Chi
         elif evaluationFunction == 'DDP':
             self.evaluationFunction = self.evaluate_DDP
             self.arr_eval_func = self.arr_evaluate_DDP
@@ -464,7 +465,7 @@ class UpliftTreeClassifier:
             y_val = (y_val > 0).astype(Y_TYPE) # make sure it is 0 or 1, and is int8
             treatment_val = np.asarray(treatment_val)
             assert len(y_val) == len(treatment_val), 'Data length must be equal for X_val, treatment_val, and y_val.'
-        
+
         # Get treatment group keys. self.classes_[0] is reserved for the control group.
         treatment_groups = sorted([x for x in list(set(treatment)) if x != self.control_name])
         self.classes_ = [self.control_name]
@@ -1335,7 +1336,7 @@ class UpliftTreeClassifier:
                          np.ndarray[N_TYPE_t, ndim=1] right_node_summary_n):
         '''
         Calculate likelihood ratio test statistic as split evaluation criterion for a given node
-        
+
         NOTE: n_class should be 2.
 
         Args
@@ -1364,7 +1365,7 @@ class UpliftTreeClassifier:
             Has type numpy.int32.
             The counts of each of the control
             and treament groups of the right node, i.e. [N(T=i)...]
-                
+
         Returns
         -------
         lrt : Likelihood ratio test statistic
@@ -1421,7 +1422,7 @@ class UpliftTreeClassifier:
     def evaluate_IDDP(nodeSummary):
         '''
         Calculate Delta P as split evaluation criterion for a given node.
-        
+
         Args
         ----
         nodeSummary : dictionary
@@ -1443,7 +1444,7 @@ class UpliftTreeClassifier:
                           np.ndarray[N_TYPE_t, ndim=1] node_summary_n):
         '''
         Calculate Delta P as split evaluation criterion for a given node.
-        
+
         Args
         ----
         node_summary_p : array of shape [n_class]
@@ -1588,7 +1589,7 @@ class UpliftTreeClassifier:
             Normalization factor.
         '''
         cdef N_TYPE_t[::1] cur_summary_n = cur_node_summary_n
-        cdef N_TYPE_t[::1] left_summary_n = left_node_summary_n        
+        cdef N_TYPE_t[::1] left_summary_n = left_node_summary_n
         cdef int n_class = cur_summary_n.shape[0]
         cdef int i = 0
 
@@ -1928,7 +1929,7 @@ class UpliftTreeClassifier:
         cdef np.ndarray[N_TYPE_t, ndim=1] val_left_summary_n = np.zeros(self.n_class, dtype = N_TYPE)
         cdef np.ndarray[P_TYPE_t, ndim=1] val_right_summary_p = np.zeros(self.n_class, dtype = P_TYPE)
         cdef np.ndarray[N_TYPE_t, ndim=1] val_right_summary_n = np.zeros(self.n_class, dtype = N_TYPE)
-        
+
         # dummy
         cdef int has_parent_summary = 0
         if parentNodeSummary_p is None:
@@ -2106,7 +2107,7 @@ class UpliftTreeClassifier:
                     for k in range(n_class):
                         if (abs(val_left_summary_p[k] - left_summary_p[k]) >
                                 min(val_left_summary_p[k], left_summary_p[k])/early_stopping_eval_diff_scale or
-                            abs(val_right_summary_p[k] - right_summary_p[k]) > 
+                            abs(val_right_summary_p[k] - right_summary_p[k]) >
                                 min(val_right_summary_p[k], right_summary_p[k])/early_stopping_eval_diff_scale):
                             early_stopping_flag = True
                             break
@@ -2159,13 +2160,13 @@ class UpliftTreeClassifier:
                         norm_factor = self.arr_normI(cur_summary_n, left_summary_n, alpha=0.9)
                     else:
                         norm_factor = 1
-                    gain = gain / norm_factor 
+                    gain = gain / norm_factor
                 if (gain > bestGain and len_X_l > min_samples_leaf and len_X_r > min_samples_leaf):
                     bestGain = gain
                     bestGainImp = gain_for_imp
                     best_col = col
                     best_value = value
-        
+
         # after finding the best split col and value
         if best_col is not None:
             bestAttribute = (best_col, best_value)
@@ -2264,7 +2265,7 @@ class UpliftTreeClassifier:
             else:
                 v = observations[tree.col]
                 branch = None
-                if isinstance(v, int) or isinstance(v, float):
+                if isinstance(v, numbers.Number):
                     if v >= tree.value:
                         branch = tree.trueBranch
                     else:
@@ -2311,7 +2312,7 @@ class UpliftTreeClassifier:
                     return dict(result)
                 else:
                     branch = None
-                    if isinstance(v, int) or isinstance(v, float):
+                    if isinstance(v, numbers.Number):
                         if v >= tree.value:
                             branch = tree.trueBranch
                         else:
@@ -2363,7 +2364,7 @@ class UpliftRandomForestClassifier:
         child node, only effective for 'KL', 'ED', 'Chi', 'CTS' methods.
 
     early_stopping_eval_diff_scale: float, optional (default=1)
-        If train and valid uplift score diff bigger than 
+        If train and valid uplift score diff bigger than
         min(train_uplift_score,valid_uplift_score)/early_stopping_eval_diff_scale, stop.
 
     control_name: string
@@ -2426,6 +2427,7 @@ class UpliftRandomForestClassifier:
         self.control_name = control_name
         self.normalization = normalization
         self.honesty = honesty
+        self.estimation_sample_size = estimation_sample_size
         self.n_jobs = n_jobs
         self.joblib_prefer = joblib_prefer
 
@@ -2476,6 +2478,7 @@ class UpliftRandomForestClassifier:
                 control_name=self.control_name,
                 normalization=self.normalization,
                 honesty=self.honesty,
+                estimation_sample_size=self.estimation_sample_size,
                 random_state=random_state.randint(MAX_INT))
             for _ in range(self.n_estimators)
         ]
@@ -2511,7 +2514,7 @@ class UpliftRandomForestClassifier:
             x_val_bt = X_val[bt_val_index]
             y_val_bt = y_val[bt_val_index]
             treatment_val_bt = treatment_val[bt_val_index]
-    
+
             tree.fit(X=x_train_bt, treatment=treatment_train_bt, y=y_train_bt, X_val=x_val_bt, treatment_val=treatment_val_bt, y_val=y_val_bt)
         return tree
 
