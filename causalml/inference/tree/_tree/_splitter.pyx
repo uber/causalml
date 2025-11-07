@@ -125,7 +125,6 @@ cdef class Splitter:
         self,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         const unsigned char[::1] missing_values_in_feature_mask,
     ) except -1:
@@ -144,9 +143,6 @@ cdef class Splitter:
         y : ndarray, dtype=float64_t
             This is the vector of targets, or true labels, for the samples represented
             as a Cython memoryview.
-
-        treatment : ndarray, dtype=int32_t
-            The treatment labels for each sample, represented as a Cython memoryview.
 
         sample_weight : ndarray, dtype=float64_t
             The weights of the samples, where higher weighted samples are fit
@@ -194,7 +190,6 @@ cdef class Splitter:
 
         self.y = y
 
-        self.treatment = treatment
         self.sample_weight = sample_weight
         if missing_values_in_feature_mask is not None:
             self.criterion.init_sum_missing()
@@ -226,7 +221,6 @@ cdef class Splitter:
 
         self.criterion.init(
             self.y,
-            self.treatment,
             self.sample_weight,
             self.weighted_n_samples,
             self.samples,
@@ -1515,11 +1509,10 @@ cdef class BestSplitter(Splitter):
         self,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         const unsigned char[::1] missing_values_in_feature_mask,
     ) except -1:
-        Splitter.init(self, X, y, treatment, sample_weight, missing_values_in_feature_mask)
+        Splitter.init(self, X, y, sample_weight, missing_values_in_feature_mask)
         self.partitioner = DensePartitioner(
             X, self.samples, self.feature_values, missing_values_in_feature_mask
         )
@@ -1546,11 +1539,10 @@ cdef class BestSparseSplitter(Splitter):
         self,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         const unsigned char[::1] missing_values_in_feature_mask,
     ) except -1:
-        Splitter.init(self, X, y, treatment, sample_weight, missing_values_in_feature_mask)
+        Splitter.init(self, X, y, sample_weight, missing_values_in_feature_mask)
         self.partitioner = SparsePartitioner(
             X, self.samples, self.n_samples, self.feature_values, missing_values_in_feature_mask
         )
@@ -1577,11 +1569,10 @@ cdef class RandomSplitter(Splitter):
         self,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         const unsigned char[::1] missing_values_in_feature_mask,
     ) except -1:
-        Splitter.init(self, X, y, treatment, sample_weight, missing_values_in_feature_mask)
+        Splitter.init(self, X, y, sample_weight, missing_values_in_feature_mask)
         self.partitioner = DensePartitioner(
             X, self.samples, self.feature_values, missing_values_in_feature_mask
         )
@@ -1608,11 +1599,10 @@ cdef class RandomSparseSplitter(Splitter):
         self,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight,
         const unsigned char[::1] missing_values_in_feature_mask,
     ) except -1:
-        Splitter.init(self, X, y, treatment, sample_weight, missing_values_in_feature_mask)
+        Splitter.init(self, X, y, sample_weight, missing_values_in_feature_mask)
         self.partitioner = SparsePartitioner(
             X, self.samples, self.n_samples, self.feature_values, missing_values_in_feature_mask
         )

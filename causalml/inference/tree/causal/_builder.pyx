@@ -13,6 +13,8 @@ from libcpp.vector cimport vector
 from libcpp.algorithm cimport pop_heap
 from libcpp.algorithm cimport push_heap
 
+from ._criterion cimport CausalRegressionCriterion
+
 import numpy as np
 cimport numpy as np
 np.import_array()
@@ -38,26 +40,29 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
        Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_tree.pyx
     """
 
+    cdef intp_t min_group_samples
+
     def __cinit__(self, Splitter splitter, intp_t min_samples_split,
                   intp_t min_samples_leaf, float64_t min_weight_leaf,
-                  intp_t max_depth, float64_t min_impurity_decrease):
+                  intp_t max_depth, float64_t min_impurity_decrease,
+                  intp_t min_group_samples):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
         self.min_weight_leaf = min_weight_leaf
         self.max_depth = max_depth
         self.min_impurity_decrease = min_impurity_decrease
+        self.min_group_samples = min_group_samples
 
     cpdef build(self, Tree tree, object X,
                 const float64_t[:, ::1] y,
-                const int32_t[:] treatment,
                 const float64_t[:] sample_weight=None,
                 const unsigned char[::1] missing_values_in_feature_mask=None,
                 ):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
-        X, y, treatment, sample_weight = self._check_input(X, y, treatment, sample_weight)
+        X, y, sample_weight = self._check_input(X, y, sample_weight)
 
         # Initial capacity
         cdef intp_t init_capacity
@@ -76,9 +81,10 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef float64_t min_weight_leaf = self.min_weight_leaf
         cdef intp_t min_samples_split = self.min_samples_split
         cdef float64_t min_impurity_decrease = self.min_impurity_decrease
+        cdef intp_t min_group_samples = self.min_group_samples
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, treatment, sample_weight, missing_values_in_feature_mask)
+        splitter.init(X, y, sample_weight, missing_values_in_feature_mask)
 
         cdef intp_t start
         cdef intp_t end
@@ -86,12 +92,16 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
         cdef intp_t parent
         cdef bint is_left
         cdef intp_t n_node_samples = splitter.n_samples
-        cdef long tr_count
-        cdef long ct_count
         cdef float64_t weighted_n_samples = splitter.weighted_n_samples
         cdef float64_t weighted_n_node_samples
         cdef SplitRecord split
         cdef intp_t node_id
+
+        # Groups statistic
+        cdef int64_t tr_count_mean
+        cdef int32_t ct_count
+        cdef int32_t groups_count
+        cdef int32_t min_size
 
         cdef float64_t middle_value
         cdef float64_t left_child_min
@@ -141,18 +151,16 @@ cdef class DepthFirstCausalTreeBuilder(TreeBuilder):
                 n_node_samples = end - start
                 splitter.node_reset(start, end, &weighted_n_node_samples)
 
-                with gil:
-                    # TODO: Get tr_count and ct_count without gil
-                    tr_count = <long> splitter.criterion.state["node"]["tr_count"]
-                    ct_count = <long> splitter.criterion.state["node"]["ct_count"]
+                (<CausalRegressionCriterion> splitter.criterion).get_group_stats(&groups_count, &tr_count_mean, &ct_count, &min_size)
 
                 is_leaf = (depth >= max_depth or
                            n_node_samples < min_samples_split or
                            n_node_samples < 2 * min_samples_leaf or
-                           tr_count < min_samples_split // 2 or
-                           ct_count < min_samples_split // 2 or
-                           tr_count < min_samples_leaf or
+                           tr_count_mean < min_samples_split // groups_count or
+                           ct_count < min_samples_split // groups_count or
+                           tr_count_mean < min_samples_leaf or
                            ct_count < min_samples_leaf or
+                           min_size < min_group_samples or
                            weighted_n_node_samples < 2 * min_weight_leaf)
 
                 if first:
@@ -274,11 +282,12 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
     Source: https://github.com/scikit-learn/scikit-learn/blob/main/sklearn/tree/_tree.pyx
     """
     cdef intp_t max_leaf_nodes
+    cdef intp_t min_group_samples
 
     def __cinit__(self, Splitter splitter, intp_t min_samples_split,
                   intp_t min_samples_leaf,  min_weight_leaf,
                   intp_t max_depth, intp_t max_leaf_nodes,
-                  float64_t min_impurity_decrease):
+                  float64_t min_impurity_decrease, intp_t min_group_samples):
         self.splitter = splitter
         self.min_samples_split = min_samples_split
         self.min_samples_leaf = min_samples_leaf
@@ -286,20 +295,20 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         self.max_depth = max_depth
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
+        self.min_group_samples = min_group_samples
 
     cpdef build(
         self,
         Tree tree,
         object X,
         const float64_t[:, ::1] y,
-        const int32_t[:] treatment,
         const float64_t[:] sample_weight=None,
         const unsigned char[::1] missing_values_in_feature_mask=None,
     ):
         """Build a decision tree from the training set (X, y)."""
 
         # check input
-        X, y, treatment, sample_weight = self._check_input(X, y, treatment, sample_weight)
+        X, y, sample_weight = self._check_input(X, y, sample_weight)
 
 
         # Parameters
@@ -310,7 +319,7 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         cdef intp_t min_samples_split = self.min_samples_split
 
         # Recursive partition (without actual recursion)
-        splitter.init(X, y, treatment, sample_weight, missing_values_in_feature_mask)
+        splitter.init(X, y, sample_weight, missing_values_in_feature_mask)
 
         cdef vector[FrontierRecord] frontier
         cdef FrontierRecord record
@@ -477,8 +486,6 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
         cdef SplitRecord split
         cdef intp_t node_id
         cdef intp_t n_node_samples
-        cdef long tr_count
-        cdef long ct_count
         cdef float64_t weighted_n_samples = splitter.weighted_n_samples
         cdef float64_t min_impurity_decrease = self.min_impurity_decrease
         cdef float64_t weighted_n_node_samples
@@ -488,25 +495,29 @@ cdef class BestFirstCausalTreeBuilder(TreeBuilder):
 
         splitter.node_reset(start, end, &weighted_n_node_samples)
 
+        # Groups statistic
+        cdef int64_t tr_count_mean
+        cdef int32_t ct_count
+        cdef int32_t groups_count
+        cdef int32_t min_size
+
         # reset n_constant_features for this specific split before beginning split search
         parent_record.n_constant_features = 0
 
-        with gil:
-            # TODO: Get tr_count and ct_count without gil
-            tr_count = <long> splitter.criterion.state["node"]["tr_count"]
-            ct_count = <long> splitter.criterion.state["node"]["ct_count"]
-
         if is_first:
             parent_record.impurity = splitter.node_impurity()
+
+        (<CausalRegressionCriterion> splitter.criterion).get_group_stats(&groups_count, &tr_count_mean, &ct_count, &min_size)
 
         n_node_samples = end - start
         is_leaf = (depth >= self.max_depth or
                    n_node_samples < self.min_samples_split or
                    n_node_samples < 2 * self.min_samples_leaf or
-                   tr_count < self.min_samples_split // 2 or
-                   ct_count < self.min_samples_split // 2 or
-                   tr_count < self.min_samples_leaf or
+                   tr_count_mean < self.min_samples_split // groups_count or
+                   ct_count < self.min_samples_split // groups_count or
+                   tr_count_mean < self.min_samples_leaf or
                    ct_count < self.min_samples_leaf or
+                   min_size < self.min_group_samples or
                    weighted_n_node_samples < 2 * self.min_weight_leaf or parent_record.impurity <= EPSILON
                    )
 

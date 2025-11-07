@@ -40,6 +40,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         min_impurity_decrease: float = float("-inf"),
         ccp_alpha: float = 0.0,
         groups_penalty: float = 0.5,
+        min_group_samples: int = 50,
         min_samples_leaf: int = 100,
         random_state: int = None,
         groups_cnt: bool = False,
@@ -55,7 +56,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 strategies are "best" to choose the best split and "random" to choose
                 the best random split.
             alpha: (float): the confidence level alpha of the ATE estimate and ITE bootstrap estimates
-            control_name: (str or int): name of control group
+            control_name: (str or int): name or index of control group
             max_depth: (int, default=None)
                 The maximum depth of the tree. If None, then nodes are expanded until
                 all leaves are pure or until all leaves contain less than
@@ -96,6 +97,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             groups_penalty: (float, default=0.5)
                 This penalty coefficient manages the node impurity increase in case of the difference between
                 treatment and control samples sizes.
+            min_group_samples: (int, default=50)
+                The minimum number of samples per each group: k treatment groups and control group.
             min_samples_leaf: (int or float), default=100
                 The minimum number of samples required to be at a leaf node.
                 A split point at any depth will only be considered if it leaves at
@@ -122,6 +125,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         self.min_samples_split = min_samples_split
         self.min_weight_fraction_leaf = min_weight_fraction_leaf
         self.max_features = max_features
+        self.min_group_samples = min_group_samples
         self.max_leaf_nodes = max_leaf_nodes
         self.min_impurity_decrease = min_impurity_decrease
         self.ccp_alpha = ccp_alpha
@@ -142,6 +146,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             min_samples_split=min_samples_split,
             min_weight_fraction_leaf=min_weight_fraction_leaf,
             max_features=max_features,
+            min_group_samples=min_group_samples,
             max_leaf_nodes=max_leaf_nodes,
             min_impurity_decrease=min_impurity_decrease,
             ccp_alpha=ccp_alpha,
@@ -154,17 +159,19 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         X: np.ndarray,
         treatment: np.ndarray,
         y: np.ndarray,
-        sample_weight: np.ndarray = None,
-        check_input=False,
+        sample_weight: Union[np.ndarray, None] = None,
+        check_input: bool = True,
+        prepare_data: bool = True,
     ):
         """
         Fit CausalTreeRegressor
         Args:
             X (np.ndarray): feature matrix
-            treatment (np.ndarray): treatment vector
+            treatment (np.ndarray): treatment vector, includes control group
             y (np.ndarray): outcome vector
-            sample_weight (np.ndarray): sample_weight
+            sample_weight (np.ndarray): sample_weight, optional
             check_input (bool, optional): default=False
+            prepare_data (bool): default=True
         Returns:
             self
         """
@@ -176,15 +183,13 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
                 "min_impurity_decrease must be set to -inf for causal_mse criterion"
             )
 
-        X, y, w = self._prepare_data(X=X, y=y, treatment=treatment)
-        self.treatment_groups = np.unique(w)
+        if prepare_data:
+            X, y = self._prepare_data(X=X, y=y, treatment=treatment)
 
-        super().fit(
-            X=X, treatment=w, y=y, sample_weight=sample_weight, check_input=check_input
-        )
+        super().fit(X=X, y=y, sample_weight=sample_weight, check_input=check_input)
 
         if self.groups_cnt:
-            self._groups_cnt = self._count_groups_distribution(X=X, treatment=w)
+            self._groups_cnt = self._count_groups_distribution(X=X, treatment=treatment)
         return self
 
     def predict(
@@ -193,23 +198,27 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         """Predict individual treatment effects
 
         Args:
-            X (np.matrix): a feature matrix
+            X (np.ndarray): a feature matrix
             with_outcomes (bool), default=False,
-                                  include outcomes Y_hat(X|T=0), Y_hat(X|T=1) along with individual treatment effect
+                                  include outcomes Y_hat(X|T=0), Y_hat(X|T=1),...,Y_hat(X|T=n)
+                                  along with individual treatment effects
             check_input (bool), default=True,
                                 Allow to bypass several input checking.
         Returns:
-           (np.matrix): individual treatment effect (ITE), dim=nx1
-                        or ITE with outcomes [Y_hat(X|T=0), Y_hat(X|T=1), ITE], dim=nx3
+           (np.ndarray): individual treatment effect (ITE), dim=(samples, groups)
+                        or ITE with outcomes:
+                        [Y_hat(X|T=0), Y_hat(X|T=1),...,Y_hat(X|T=n), ITE_1, ITE_2,...,ITE_n], dim=(samples, 2*groups-1)
         """
         if check_input:
             X = self._validate_X_predict(X, check_input)
         y_outcomes = super().predict(X)
-        y_pred = y_outcomes[:, 1] - y_outcomes[:, 0]
+        y_pred = y_outcomes[:, 1:] - y_outcomes[:, [0]]
         need_outcomes = with_outcomes or self._with_outcomes
-        return (
-            np.hstack([y_outcomes, y_pred.reshape(-1, 1)]) if need_outcomes else y_pred
-        )
+        out = np.hstack([y_outcomes, y_pred]) if need_outcomes else y_pred
+        # Provides scikit-learn support for _accumulate_prediction() required for causal forests
+        if out.shape[1] == 1:
+            out = out.ravel()
+        return out
 
     def fit_predict(
         self,
@@ -225,8 +234,8 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         """Fit the Causal Tree model and predict treatment effects.
 
         Args:
-            X (np.matrix): a feature matrix
-            treatment (np.array): a treatment vector
+            X (np.ndarray): a feature matrix
+            treatment (np.ndarray): a treatment vector
             y (np.array): an outcome vector
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
@@ -241,14 +250,14 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
              - te_lower (numpy.ndarray, optional): lower bounds of treatment effects
              - te_upper (numpy.ndarray, optional): upper bounds of treatment effects
         """
-        self.fit(X=X, treatment=treatment, y=y)
+        self.fit(X=X, y=y, treatment=treatment)
         te = self.predict(X=X)
 
         if return_ci:
             te_bootstraps = self.bootstrap_pool(
                 X=X,
-                treatment=treatment,
                 y=y,
+                treatment=treatment,
                 n_bootstraps=n_bootstraps,
                 bootstrap_size=bootstrap_size,
                 n_jobs=n_jobs,
@@ -265,9 +274,9 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
     ) -> tuple:
         """Estimate the Average Treatment Effect (ATE).
         Args:
-            X (np.matrix): a feature matrix
+            X (np.ndarray): a feature matrix
             treatment (np.array): a treatment vector
-            y (np.array): an outcome vector
+            y (np.ndarray): an outcome vector
         Returns:
             tuple, The mean and confidence interval (LB, UB) of the ATE estimate.
         """
@@ -312,7 +321,7 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
             if verbose:
                 logger.info(f"Boostrap iteration: {i}")
             return self.bootstrap(
-                X=X, treatment=treatment, y=y, sample_size=bootstrap_size, seed=i
+                X=X, y=y, treatment=treatment, sample_size=bootstrap_size, seed=i
             )
 
         pool = PPool(nodes=n_jobs)
@@ -360,31 +369,45 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         return te_b
 
     def _prepare_data(
-        self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray
-    ) -> tuple:
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
-        Prepare input data with treatment info for DecisionTreeRegressor
+        Prepare input data with treatment info for DecisionTreeRegressor.
+        Outcome vector y transforms into y_2dim with (samples x groups) dimensions.
+        Outcomes for the control group are always placed in the first column with index 0.
+        Attribute _group2index stores mapping for y_2dim columns: ({control: 0, treatmentA: 1, treatmentB: 2, ...})
         Args:
             X: : (np.ndarray), feature matrix
-            treatment: : (np.ndarray), treatment vector
+            treatment: : (np.ndarray), treatment vector, includes control group
             y: : (np.ndarray), outcome vector
-        Returns: X, y, w
+        Returns: X, y (samples x groups)
         """
         if y.shape[0] != treatment.shape[0]:
             raise ValueError(
                 f"The number of `treatment` and `y` rows are not equal: {y.shape[0]} {treatment.shape[0]}"
             )
         check_treatment_vector(treatment, self.control_name)
-
-        self.is_treatment = treatment != self.control_name
-        w = self.is_treatment.astype(int)
+        self.unique_groups = list(set(treatment))
+        self.unique_treatments = sorted(
+            [x for x in self.unique_groups if x != self.control_name]
+        )
+        self._group2index = {
+            self.control_name: 0,
+            **{treatment: i + 1 for i, treatment in enumerate(self.unique_treatments)},
+        }
 
         X = check_array(X, dtype=DTYPE, accept_sparse="csc")
         y = check_array(y, ensure_2d=False, dtype=None)
-
         self.n_samples, self.n_features = X.shape
 
-        return X, y, w
+        y_2dim = np.zeros((self.n_samples, len(self.unique_treatments) + 1))
+        for group, group_index in self._group2index.items():
+            y_2dim[:, group_index] = np.where(treatment == group, y, np.nan)
+
+        return X, y_2dim
 
     def _count_groups_distribution(self, X: np.ndarray, treatment: np.ndarray) -> dict:
         """
@@ -398,8 +421,9 @@ class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
         check_is_fitted(self)
 
         self.is_leaves = get_tree_leaves_mask(self)
+        groups = np.unique(treatment)
         groups_cnt = {
-            idx: {group: 0 for group in self.treatment_groups}
+            idx: {group: 0 for group in groups}
             for idx in np.array(range(self.tree_.node_count))
         }
         node_indicators = self.tree_.decision_path(X.astype(np.float32))

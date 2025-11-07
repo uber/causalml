@@ -1,3 +1,4 @@
+from typing import Optional
 from matplotlib import pyplot as plt
 import logging
 import numpy as np
@@ -23,9 +24,10 @@ def plot(
     ci=False,
     plot_chance_level=True,
     chance_level_kw=None,
+    ax: Optional[plt.Axes] = None,
     *args,
     **kwarg,
-):
+) -> plt.Axes:
     """Plot one of the lift/gain/Qini charts of model estimates.
 
     A factory method for `plot_lift()`, `plot_gain()`, `plot_qini()`, `plot_tmlegain()` and `plot_tmleqini()`.
@@ -54,7 +56,8 @@ def plot(
         kind in catalog.keys()
     ), "{} plot is not implemented. Select one of {}".format(kind, catalog.keys())
 
-    _, ax = plt.subplots(figsize=figsize)
+    if ax is None:
+        _, ax = plt.subplots(figsize=figsize)
     if tmle:
         df = catalog[kind](df, ci=ci, *args, **kwarg)
 
@@ -106,6 +109,7 @@ def plot(
 
     ax.set_xlabel("Population")
     ax.set_ylabel("{}".format(kind.title()))
+    return ax
 
 
 def get_cumlift(
@@ -557,6 +561,7 @@ def plot_gain(
     random_seed=42,
     n=100,
     figsize=(8, 8),
+    ax: Optional[plt.Axes] = None,
 ):
     """Plot the cumulative gain chart (or uplift curve) of model estimates.
 
@@ -590,6 +595,7 @@ def plot_gain(
         treatment_col=treatment_col,
         treatment_effect_col=treatment_effect_col,
         normalize=normalize,
+        ax=ax,
     )
 
 
@@ -644,7 +650,8 @@ def plot_qini(
     random_seed=42,
     n=100,
     figsize=(8, 8),
-):
+    ax: Optional[plt.Axes] = None,
+) -> plt.Axes:
     """Plot the Qini chart (or uplift curve) of model estimates.
 
     If the true treatment effect is provided (e.g. in synthetic data), it's calculated
@@ -669,7 +676,7 @@ def plot_qini(
         ci (bool, optional): whether return confidence intervals for ATE or not
     """
 
-    plot(
+    ax = plot(
         df,
         kind="qini",
         n=n,
@@ -678,7 +685,9 @@ def plot_qini(
         treatment_col=treatment_col,
         treatment_effect_col=treatment_effect_col,
         normalize=normalize,
+        ax=ax,
     )
+    return ax
 
 
 def plot_tmlegain(
