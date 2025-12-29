@@ -2117,11 +2117,6 @@ class UpliftTreeClassifier:
                     # min samples treatment check
                     if min(np.min(left_summary_n), np.min(right_summary_n)) < min_samples_treatment:
                         continue
-
-                    # ---- GAIN CALCULATION (KEEP YOUR EXISTING CODE EXACTLY) ----
-                    # (do NOT change anything here)
-                    # ------------------------------------------------------------
-
                     if (gain > bestGain):
                         bestGain = gain
                         bestGainImp = gain_for_imp
