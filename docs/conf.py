@@ -67,7 +67,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "causalml"
-copyright = "2024 Uber Technologies, Inc."
+copyright = "2026 Uber Technologies, Inc."
 author = "CausalML"
 
 # The version info for the project you're documenting, acts as replacement
@@ -223,7 +223,7 @@ latex_elements = {
 # (source start file, target name, title, author, documentclass
 # [howto/manual]).
 latex_documents = [
-    ("index", "causalml.tex", "causalml Documentation", "Someone at Uber", "manual")
+    ("index", "causalml.tex", "causalml Documentation", "CausalML Team", "manual")
 ]
 
 # The name of an image file (relative to this directory) to place at
@@ -269,7 +269,7 @@ texinfo_documents = [
         "causalml Documentation",
         author,
         "causalml",
-        "One line description of project.",
+        "Python Package for Uplift Modeling and Causal Inference with Machine Learning Algorithms",
         "Miscellaneous",
     )
 ]

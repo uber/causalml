@@ -26,12 +26,6 @@ from ._typedefs cimport uint32_t
 
 cdef const uint32_t DEFAULT_SEED = 1
 
-cdef enum:
-    # Max value for our rand_r replacement.
-    # Corresponds to the maximum representable value for
-    # 32-bit signed integers (i.e. 2^31 - 1).
-    RAND_R_MAX = 2147483647
-
 # rand_r replacement using a 32bit XorShift generator
 # See http://www.jstatsoft.org/v08/i14/paper for details
 cdef inline uint32_t our_rand_r(uint32_t* seed) nogil:
