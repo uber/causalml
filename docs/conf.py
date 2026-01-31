@@ -288,3 +288,6 @@ texinfo_documents = [
 
 numpydoc_show_class_members = True
 class_members_toctree = False
+
+# In conf.py
+bibtex_bibfiles = ['refs.bib']  # Add path(s) to your .bib file(s)
