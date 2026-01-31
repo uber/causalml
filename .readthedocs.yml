@@ -3,9 +3,9 @@ version: 2
 
 # Set the OS, Python version and other tools you might need
 build:
-  os: ubuntu-22.04
+  os: ubuntu-24.04
   tools:
-    python: "miniconda3-4.7"
+    python: "miniforge-latest"
 
 conda:
   environment: docs/environment-py311-rtd.yml
