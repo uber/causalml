@@ -249,7 +249,7 @@ def load_data(data, features, transformations={}):
         logger.info("Applying {} to {}".format(transformation.__name__, col))
         df[col] = df[col].apply(transformation)
 
-    cat_cols = [col for col in features if df[col].dtype == object]
+    cat_cols = [col for col in features if not pd.api.types.is_numeric_dtype(df[col])]
     num_cols = [col for col in features if col not in cat_cols]
 
     logger.info("Applying one-hot-encoding to {}".format(cat_cols))

@@ -32,7 +32,7 @@ def test_load_data(generate_categorical_data):
 
 def test_LabelEncoder(generate_categorical_data):
     df = generate_categorical_data()
-    cat_cols = [col for col in df.columns if df[col].dtype == "object"]
+    cat_cols = [col for col in df.columns if not pd.api.types.is_numeric_dtype(df[col])]
     n_category = 0
     for col in cat_cols:
         n_category += df[col].nunique()
@@ -48,7 +48,7 @@ def test_LabelEncoder(generate_categorical_data):
 
 def test_OneHotEncoder(generate_categorical_data):
     df = generate_categorical_data()
-    cat_cols = [col for col in df.columns if df[col].dtype == "object"]
+    cat_cols = [col for col in df.columns if not pd.api.types.is_numeric_dtype(df[col])]
     n_category = 0
     for col in cat_cols:
         n_category += df[col].nunique()
