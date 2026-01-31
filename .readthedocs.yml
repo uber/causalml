@@ -8,7 +8,7 @@ build:
     python: "miniconda3-4.7"
 
 conda:
-  environment: docs/environment-py39-rtd.yml
+  environment: docs/environment-py311-rtd.yml
 
 python:
   install:
