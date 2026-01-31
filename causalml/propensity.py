@@ -7,7 +7,6 @@ from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.isotonic import IsotonicRegression
 import xgboost as xgb
 
-
 logger = logging.getLogger("causalml")
 
 

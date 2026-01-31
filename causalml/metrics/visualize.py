@@ -7,7 +7,6 @@ import seaborn as sns
 from lightgbm import LGBMRegressor
 from ..inference.meta.tmle import TMLELearner
 
-
 plt.style.use("fivethirtyeight")
 sns.set_palette("Paired")
 RANDOM_COL = "Random"

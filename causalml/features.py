@@ -4,7 +4,6 @@ import pandas as pd
 from scipy import sparse
 from sklearn import base
 
-
 logger = logging.getLogger("causalml")
 
 

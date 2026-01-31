@@ -6,7 +6,6 @@ from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifi
 from sklearn.model_selection import KFold
 from sklearn.tree import DecisionTreeClassifier
 
-
 logger = logging.getLogger("causalml")
 
 

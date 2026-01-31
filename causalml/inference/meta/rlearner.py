@@ -15,7 +15,6 @@ from causalml.inference.meta.utils import (
 )
 from causalml.propensity import ElasticNetPropensityModel
 
-
 logger = logging.getLogger("causalml")
 
 

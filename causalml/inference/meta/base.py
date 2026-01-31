@@ -7,7 +7,6 @@ from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import check_p_conditions, convert_pd_to_np
 from causalml.propensity import compute_propensity_score
 
-
 logger = logging.getLogger("causalml")
 
 

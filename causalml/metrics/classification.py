@@ -4,7 +4,6 @@ from sklearn.metrics import log_loss, roc_auc_score
 from .const import EPS
 from .regression import regression_metrics
 
-
 logger = logging.getLogger("causalml")
 
 
