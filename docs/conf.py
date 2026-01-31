@@ -67,7 +67,7 @@ master_doc = "index"
 
 # General information about the project.
 project = "causalml"
-copyright = "2026 Uber Technologies, Inc."
+copyright = "2019-2026 Uber Technologies, Inc."
 author = "CausalML"
 
 # The version info for the project you're documenting, acts as replacement
