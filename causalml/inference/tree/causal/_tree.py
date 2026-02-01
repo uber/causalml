@@ -33,14 +33,11 @@ CAUSAL_TREES_CRITERIA = {
 
 def get_check_y_params() -> dict:
     """
-    Prepares flags depending on the scikit-learn version.
+    Prepares flags for sklearn 1.6+.
 
     Returns: check_y_params
     """
-    if Version(sklearn_version) >= Version("1.6"):
-        check_y_params = dict(ensure_2d=False, dtype=None, ensure_all_finite=False)
-    else:
-        check_y_params = dict(ensure_2d=False, dtype=None, force_all_finite=False)
+    check_y_params = dict(ensure_2d=False, dtype=None, ensure_all_finite=False)
     return check_y_params
 
 

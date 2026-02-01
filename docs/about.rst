@@ -2,7 +2,7 @@ About CausalML
 ===========================
 
 ``CausalML`` is a Python package that provides a suite of uplift modeling and causal inference methods using machine learning algorithms based on recent research.
-It provides a standard interface that allows user to estimate the **Conditional Average Treatment Effect** (CATE), also known as **Individual Treatment Effect** (ITE), from experimental or observational data.
+It provides a standard interface that allows user to estimate the **Conditional Average Treatment Effect** (CATE) from experimental or observational data.
 Essentially, it estimates the causal impact of intervention **W** on outcome **Y** for users with observed features **X**, without strong assumptions on the model form.
 
 GitHub Repo

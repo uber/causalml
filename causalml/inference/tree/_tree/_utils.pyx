@@ -16,7 +16,31 @@ import numpy as np
 cimport numpy as cnp
 cnp.import_array()
 
-from sklearn.utils._random cimport our_rand_r
+# Random number generation utilities
+# Copied from sklearn.utils._random to avoid DEFAULT_SEED signature mismatch
+# Original authors: The scikit-learn developers
+# License: BSD-3-Clause
+# Copied from sklearn 1.6+ _random.pxd to avoid signature mismatch issues
+
+from ._typedefs cimport uint32_t
+
+cdef const uint32_t DEFAULT_SEED = 1
+
+# rand_r replacement using a 32bit XorShift generator
+# See http://www.jstatsoft.org/v08/i14/paper for details
+cdef inline uint32_t our_rand_r(uint32_t* seed) nogil:
+    """Generate a pseudo-random np.uint32 from a np.uint32 seed"""
+    # seed shouldn't ever be 0.
+    if (seed[0] == 0):
+        seed[0] = DEFAULT_SEED
+
+    seed[0] ^= <uint32_t>(seed[0] << 13)
+    seed[0] ^= <uint32_t>(seed[0] >> 17)
+    seed[0] ^= <uint32_t>(seed[0] << 5)
+
+    # Use the modulo to ensure we don't return values greater than
+    # the maximum representable value for signed 32bit integers.
+    return seed[0] % ((<uint32_t>RAND_R_MAX) + 1)
 
 # =============================================================================
 # Helper functions

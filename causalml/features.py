@@ -4,7 +4,6 @@ import pandas as pd
 from scipy import sparse
 from sklearn import base
 
-
 logger = logging.getLogger("causalml")
 
 
@@ -98,9 +97,9 @@ class LabelEncoder(base.BaseEstimator):
         Returns:
             X (pandas.DataFrame): label encoded columns
         """
-
+        X = X.copy()
         for i, col in enumerate(X.columns):
-            X.loc[:, col] = self._transform_col(X[col], i)
+            X[col] = self._transform_col(X[col], i).astype(float)
 
         return X
 
@@ -113,7 +112,7 @@ class LabelEncoder(base.BaseEstimator):
         Returns:
             X (pandas.DataFrame): label encoded columns
         """
-
+        X = X.copy()
         self.label_encoders = [None] * X.shape[1]
         self.label_maxes = [None] * X.shape[1]
 
@@ -123,7 +122,13 @@ class LabelEncoder(base.BaseEstimator):
                 self.label_maxes[i],
             ) = self._get_label_encoder_and_max(X[col])
 
-            X.loc[:, col] = X[col].fillna(NAN_INT).map(self.label_encoders[i]).fillna(0)
+            X[col] = (
+                X[col]
+                .fillna(NAN_INT)
+                .map(self.label_encoders[i])
+                .fillna(0)
+                .astype(float)
+            )
 
         return X
 
@@ -250,7 +255,7 @@ def load_data(data, features, transformations={}):
         logger.info("Applying {} to {}".format(transformation.__name__, col))
         df[col] = df[col].apply(transformation)
 
-    cat_cols = [col for col in features if df[col].dtype == object]
+    cat_cols = [col for col in features if not pd.api.types.is_numeric_dtype(df[col])]
     num_cols = [col for col in features if col not in cat_cols]
 
     logger.info("Applying one-hot-encoding to {}".format(cat_cols))

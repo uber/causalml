@@ -6,7 +6,6 @@ from sklearn.metrics import r2_score  # noqa
 
 from .const import EPS
 
-
 logger = logging.getLogger("causalml")
 
 

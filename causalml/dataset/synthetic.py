@@ -19,7 +19,6 @@ from causalml.inference.tree.causal.causaltree import CausalTreeRegressor
 from causalml.propensity import ElasticNetPropensityModel
 from causalml.metrics import plot_gain, get_cumgain
 
-
 plt.style.use("fivethirtyeight")
 warnings.filterwarnings("ignore")
 
