@@ -7,7 +7,7 @@ dependencies:
   - python=3.11
   - pandoc
   - sphinx
-  - sphinx_rtd_theme
+  - sphinx-rtd-theme
   - sphinxcontrib-bibtex
   - nbsphinx
   - pip:
