@@ -69,7 +69,7 @@ requires = [
 homepage = "https://github.com/uber/causalml"
 
 [tool.cibuildwheel]
-build = ["cp39-*", "cp310-*", "cp311-*", "cp312-*"]
+build = ["cp311-*", "cp312-*"]
 build-verbosity = 1
 # Skip 32-bit builds
 skip = ["*-win32", "*-manylinux_i686", "*-musllinux*"]
