@@ -2006,6 +2006,8 @@ class UpliftTreeClassifier:
         # Prune Stats:
         cdef P_TYPE_t maxAbsDiff = 0.0
         cdef P_TYPE_t maxDiff = -1.
+        cdef P_TYPE_t gain = 0.0
+        cdef P_TYPE_t gain_for_imp = 0.0
         cdef int bestTreatment = 0       # treatment index for the control group, also used in returning the tree for this node
         cdef int suboptTreatment = 0     # treatment index for the control group
         cdef int maxDiffTreatment = 0    # treatment index for the control group, also used in returning the tree for this node
@@ -2039,6 +2041,7 @@ class UpliftTreeClassifier:
         p_value = (1. - stats.norm.cdf(fabs(p_c - p_t) / sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
         upliftScore = [maxDiff, p_value]
 
+        
         bestGain = 0.0
         bestGainImp = 0.0
         bestAttribute = None
@@ -2067,10 +2070,19 @@ class UpliftTreeClassifier:
 
             if np.issubdtype(lsUnique.dtype, np.number):
                 is_split_by_gt = True
-                if len(lsUnique) > 10:
-                    lspercentile = np.percentile(columnValues, c_num_percentiles)
+
+                # Exclude NaNs from percentile calculation
+                valid_vals = columnValues[~np.isnan(columnValues)]
+
+                # If all values are NaN, skip this feature
+                if len(valid_vals) == 0:
+                    continue
+
+                if len(np.unique(valid_vals)) > 10:
+                    lspercentile = np.percentile(valid_vals, c_num_percentiles)
                 else:
-                    lspercentile = np.percentile(lsUnique, c_cat_percentiles)
+                    lspercentile = np.percentile(np.unique(valid_vals), c_cat_percentiles)
+
                 lsUnique = np.unique(lspercentile)
             else:
                 # to split by equality check.
@@ -2082,48 +2094,139 @@ class UpliftTreeClassifier:
                 for missing_go_to_left in (0, 1):
 
                     len_X_l = group_counts_by_divide(
-                        columnValues, value, is_split_by_gt,
-                        treatment_idx, y, left_count_arr,
+                        columnValues,
+                        value,
+                        is_split_by_gt,
+                        treatment_idx,
+                        y,
+                        left_count_arr,
                         missing_go_to_left
                     )
+
                     len_X_r = len_X - len_X_l
 
-                    if (len_X_l < min_samples_leaf or len_X_r < min_samples_leaf):
+                    # min leaf check
+                    if len_X_l < min_samples_leaf or len_X_r < min_samples_leaf:
                         continue
 
-                    # probability
                     p = float(len_X_l) / len_X
 
-                    # right branch counts
+                    # compute right counts
                     for i in range(2 * n_class):
                         right_count_arr[i] = total_count_arr[i] - left_count_arr[i]
 
-                    # summaries (UNCHANGED)
+                    # compute summaries
                     self.tree_node_summary_from_counts(
                         left_count_arr,
                         left_summary_p, left_summary_n,
-                        cur_summary_p, 1,
+                        cur_summary_p,
+                        1,
                         min_samples_treatment,
                         n_reg
                     )
+
                     self.tree_node_summary_from_counts(
                         right_count_arr,
                         right_summary_p, right_summary_n,
-                        cur_summary_p, 1,
+                        cur_summary_p,
+                        1,
                         min_samples_treatment,
                         n_reg
                     )
+
+                    # EARLY STOPPING (restore exactly as upstream)
+                    if X_val is not None:
+
+                        len_X_val_l = group_counts_by_divide(
+                            X_val[:, col],
+                            value,
+                            is_split_by_gt,
+                            treatment_val_idx,
+                            y_val,
+                            val_left_count_arr,
+                            missing_go_to_left
+                        )
+
+                        for i in range(2 * n_class):
+                            val_right_count_arr[i] = (
+                                val_total_count_arr[i] - val_left_count_arr[i]
+                            )
+
+                        self.tree_node_summary_from_counts(
+                            val_left_count_arr,
+                            val_left_summary_p, val_left_summary_n,
+                            cur_summary_p,
+                            1,
+                            min_samples_treatment,
+                            n_reg
+                        )
+
+                        self.tree_node_summary_from_counts(
+                            val_right_count_arr,
+                            val_right_summary_p, val_right_summary_n,
+                            cur_summary_p,
+                            1,
+                            min_samples_treatment,
+                            n_reg
+                        )
+
+                        early_stopping_flag = False
+
+                        for k in range(n_class):
+                            if (
+                                abs(val_left_summary_p[k] - left_summary_p[k]) >
+                                min(val_left_summary_p[k], left_summary_p[k]) / early_stopping_eval_diff_scale
+                                or
+                                abs(val_right_summary_p[k] - right_summary_p[k]) >
+                                min(val_right_summary_p[k], right_summary_p[k]) / early_stopping_eval_diff_scale
+                            ):
+                                early_stopping_flag = True
+                                break
+
+                        if early_stopping_flag:
+                            continue
 
                     # min samples treatment check
                     if min(np.min(left_summary_n), np.min(right_summary_n)) < min_samples_treatment:
                         continue
-                    if (gain > bestGain):
+
+                    # compute gain
+                    if self.evaluationFunction == self.evaluate_IT:
+                        gain = self.arr_evaluate_IT(
+                            left_summary_p, left_summary_n,
+                            right_summary_p, right_summary_n
+                        )
+                        gain_for_imp = gain
+
+                    elif self.evaluationFunction == self.evaluate_CIT:
+                        gain = self.arr_evaluate_CIT(
+                            cur_summary_p, cur_summary_n,
+                            left_summary_p, left_summary_n,
+                            right_summary_p, right_summary_n
+                        )
+                        gain_for_imp = gain
+
+                    else:
+                        leftScore = self.arr_eval_func(left_summary_p, left_summary_n)
+                        rightScore = self.arr_eval_func(right_summary_p, right_summary_n)
+
+                        gain = p * leftScore + (1 - p) * rightScore - currentScore
+                        gain_for_imp = gain
+
+                        if self.normalization:
+                            norm_res = self.arr_normI(
+                                cur_summary_n,
+                                left_summary_n,
+                                currentDivergence=currentScore
+                            )
+                            gain = gain / norm_res
+
+                    if gain > bestGain:
                         bestGain = gain
                         bestGainImp = gain_for_imp
                         best_col = col
                         best_value = value
                         best_missing_go_to_left = missing_go_to_left
-
 
         # after finding the best split col and value
         if best_col is not None:
