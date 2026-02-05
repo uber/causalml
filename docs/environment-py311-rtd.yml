@@ -24,7 +24,7 @@ dependencies:
     - pyro-api>=0.1.2
     - pyro-ppl>=1.9.1
     - scikit-learn>=1.6.0
-    - scipy>=1.16.0
+    - scipy>=1.16.0,<1.17.0  # Pin to versions with manylinux2014 wheels
     - seaborn>=0.13.2
     - shap>=0.46.0
     - statsmodels>=0.14.5
