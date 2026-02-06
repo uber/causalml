@@ -1,6 +1,6 @@
 [project]
 name = "causalml"
-version = "0.15.6"
+version = "0.16.0"
 description = "Python Package for Uplift Modeling and Causal Inference with Machine Learning Algorithms"
 readme = { file = "README.md", content-type = "text/markdown" }
 
@@ -26,7 +26,7 @@ dependencies = [
     "forestci==0.6",
     "pathos==0.2.9",
     "numpy>=1.25.2",
-    "scipy>=1.16.0,<1.17.0",  # Pin to versions with manylinux2014 wheels (1.17.0+ requires manylinux_2_27)
+    "scipy>=1.16.0",
     "matplotlib",
     "pandas>=0.24.1",
     "scikit-learn>=1.6.0",
@@ -71,7 +71,7 @@ homepage = "https://github.com/uber/causalml"
 [tool.cibuildwheel]
 build = ["cp311-*", "cp312-*"]
 build-verbosity = 1
-manylinux-x86_64-image = "manylinux2014"
-manylinux-aarch64-image = "manylinux2014"
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-aarch64-image = "manylinux_2_28"
 # Skip 32-bit builds
 skip = ["*-win32", "*-manylinux_i686", "*-musllinux*"]
