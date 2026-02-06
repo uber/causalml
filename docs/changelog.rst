@@ -5,6 +5,44 @@ Changelog
 
 You can find the latest changes in the `GitHub releases <https://github.com/uber/causalml/releases>`_
 
+0.16.0 (Feb 2026)
+-----------------
+* **BREAKING CHANGE:** This release upgrades from manylinux2014 to manylinux_2_28 for Linux wheel distribution.
+* Pre-built wheels now require glibc 2.28 or later (Ubuntu 20.04+, RHEL 8+, Debian 10+).
+* Users on older Linux distributions (Ubuntu 18.04, RHEL 7, etc.) must build from source.
+* Removes scipy version pin, enabling compatibility with both scipy 1.16.x and 1.17.x.
+
+Updates
+~~~~~~~
+* Upgrade to manylinux_2_28 and remove scipy version constraints by @jeongyoonlee in https://github.com/uber/causalml/pull/869
+* Upgrade cibuildwheel to v3.3.1 and remove deprecated macos-13 runner by @jeongyoonlee in https://github.com/uber/causalml/pull/867
+* Fix Ubuntu packaging failure - scipy manylinux compatibility by @jeongyoonlee in https://github.com/uber/causalml/pull/865
+* Fix Ubuntu packaging failure by aligning cibuildwheel config with Python version requirement by @jeongyoonlee in https://github.com/uber/causalml/pull/864
+
+Breaking Changes
+~~~~~~~~~~~~~~~~
+* **Linux wheel compatibility:** Pre-built wheels require glibc 2.28+ (manylinux_2_28)
+
+  * ✅ **Supported:** Ubuntu 20.04+, RHEL/CentOS 8+, Debian 10+, Fedora 32+
+  * ⚠️ **Requires source build:** Ubuntu 18.04, RHEL 7, Ubuntu 16.04, Debian 9
+
+* **Python version:** Minimum Python version is 3.11 (updated from 3.9)
+
+Migration Notes
+~~~~~~~~~~~~~~~
+If you are on an older Linux distribution:
+
+1. **Check your glibc version:** ``ldd --version``
+2. **If glibc < 2.28:** Install from source instead of using pip wheels:
+
+   .. code-block:: bash
+
+       git clone https://github.com/uber/causalml.git
+       cd causalml
+       pip install -e .
+
+3. **Recommended:** Upgrade to a modern Linux distribution (Ubuntu 20.04+, RHEL 8+)
+
 0.15.1 (Apr 2024)
 -----------------
 * This release fixes the build failure on macOS and a few bugs in ``UpliftTreeClassifier``.
