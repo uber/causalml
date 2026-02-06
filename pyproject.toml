@@ -62,6 +62,7 @@ requires = [
     "wheel",
     "Cython",
     "numpy>=1.18.5",
+    "scipy>=1.16.0,<1.17.0",  # Pin to versions with manylinux2014 wheels
     "scikit-learn>=1.6.0",
 ]
 
