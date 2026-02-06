@@ -11,15 +11,15 @@ System Requirements
 
 **Python Version:** Python 3.11 or later is required.
 
-**Linux Distributions:** Pre-built binary wheels require a Linux distribution with glibc 2.27 or later:
+**Linux Distributions:** Pre-built binary wheels require a Linux distribution with glibc 2.28 or later:
 
-* **Ubuntu:** 18.04 LTS or later
+* **Ubuntu:** 20.04 LTS or later
 * **RHEL/CentOS:** 8 or later
 * **Debian:** 10 (Buster) or later
 * **Fedora:** 32 or later
 
 .. note::
-   For older Linux distributions (e.g., RHEL 7, Ubuntu 16.04), you will need to build CausalML from source. See **Install from source** below.
+   For older Linux distributions (e.g., RHEL 7, Ubuntu 16.04, Ubuntu 18.04), you will need to build CausalML from source. See **Install from source** below.
 
 **macOS and Windows:** All recent versions are supported.
 
