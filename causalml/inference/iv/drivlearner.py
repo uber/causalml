@@ -352,7 +352,7 @@ class BaseDRIVLearner:
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_components (bool, optional): whether to return outcome for treatment and control separately
             verbose (str): whether to output progress logs
             seed (int): random seed for cross-fitting
         Returns:
