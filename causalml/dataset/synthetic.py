@@ -5,7 +5,10 @@ from sklearn.metrics import mean_squared_error as mse
 from sklearn.metrics import auc
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-from xgboost import XGBRegressor
+try:
+    from xgboost import XGBRegressor
+except ImportError:  # pragma: no cover
+    XGBRegressor = None
 from scipy.stats import entropy
 import warnings
 
@@ -69,7 +72,12 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
             [BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
             ["S", "T", "X", "R"],
         ):
-            for model, label_m in zip([LinearRegression, XGBRegressor], ["LR", "XGB"]):
+            models = [(LinearRegression, "LR")]
+	    if XGBRegressor is not None:
+    		models.append((XGBRegressor, "XGB"))
+
+	    for model, label_m in models:
+
                 learner = base_learner(model())
                 model_name = "{} Learner ({})".format(label_l, label_m)
                 try:
@@ -372,7 +380,10 @@ def get_synthetic_preds_holdout(
         [BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
         ["S", "T", "X", "R"],
     ):
-        for model, label_m in zip([LinearRegression, XGBRegressor], ["LR", "XGB"]):
+        models = [(LinearRegression, "LR")]
+        if XGBRegressor is not None:
+		models.append((XGBRegressor, "XGB"))
+	for model, label_m in models:
             # RLearner will need to fit on the p_hat
             if label_l != "R":
                 learner = base_learner(model())
