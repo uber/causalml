@@ -42,7 +42,7 @@ jobs:
         run: python -c "import sys; print(sys.version)"
 
       - name: create environment
-        uses: conda-incubator/setup-miniconda@v2
+        uses: conda-incubator/setup-miniconda@v3
         with:
           activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version-nd }} 
           python-version: ${{ matrix.python-version }}
