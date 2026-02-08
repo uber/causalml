@@ -73,10 +73,10 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
             ["S", "T", "X", "R"],
         ):
             models = [(LinearRegression, "LR")]
-	    if XGBRegressor is not None:
-    		models.append((XGBRegressor, "XGB"))
+        if XGBRegressor is not None:
+            models.append((XGBRegressor, "XGB"))
 
-	    for model, label_m in models:
+        for model, label_m in models:
 
                 learner = base_learner(model())
                 model_name = "{} Learner ({})".format(label_l, label_m)
@@ -382,8 +382,8 @@ def get_synthetic_preds_holdout(
     ):
         models = [(LinearRegression, "LR")]
         if XGBRegressor is not None:
-		models.append((XGBRegressor, "XGB"))
-	for model, label_m in models:
+            models.append((XGBRegressor, "XGB"))
+        for model, label_m in models:
             # RLearner will need to fit on the p_hat
             if label_l != "R":
                 learner = base_learner(model())
