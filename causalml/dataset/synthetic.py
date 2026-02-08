@@ -5,6 +5,7 @@ from sklearn.metrics import mean_squared_error as mse
 from sklearn.metrics import auc
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
+
 try:
     from xgboost import XGBRegressor
 except ImportError:  # pragma: no cover
@@ -78,16 +79,16 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
 
         for model, label_m in models:
 
-                learner = base_learner(model())
-                model_name = "{} Learner ({})".format(label_l, label_m)
-                try:
-                    preds_dict[model_name] = learner.fit_predict(
-                        X=X, treatment=w, y=y, p=p_hat
-                    ).flatten()
-                except TypeError:
-                    preds_dict[model_name] = learner.fit_predict(
-                        X=X, treatment=w, y=y
-                    ).flatten()
+            learner = base_learner(model())
+            model_name = "{} Learner ({})".format(label_l, label_m)
+            try:
+                preds_dict[model_name] = learner.fit_predict(
+                    X=X, treatment=w, y=y, p=p_hat
+                ).flatten()
+            except TypeError:
+                preds_dict[model_name] = learner.fit_predict(
+                    X=X, treatment=w, y=y
+                ).flatten()
 
         learner = CausalTreeRegressor(random_state=RANDOM_SEED)
         preds_dict["Causal Tree"] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
