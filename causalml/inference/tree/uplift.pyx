@@ -467,12 +467,26 @@ class UpliftTreeClassifier:
 
         self.random_state_ = check_random_state(self.random_state)
 
-        X, y = check_X_y(X, y, force_all_finite=False)
+        try:
+            X, y = check_X_y(
+                X,
+                y,
+                ensure_all_finite=False,
+            )
+        except TypeError:
+            X, y = check_X_y(
+                X,
+                y,
+                force_all_finite=False,
+            )
         y = (y > 0).astype(Y_TYPE) # make sure it is 0 or 1, and is int8
         treatment = np.asarray(treatment)
         assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
         if X_val is not None:
-            X_val, y_val = check_X_y(X_val, y_val, force_all_finite=False)
+            try:
+                X_val, y_val = check_X_y(X_val, y_val, ensure_all_finite=False)
+            except TypeError:
+                X_val, y_val = check_X_y(X_val, y_val, force_all_finite=False)
             y_val = (y_val > 0).astype(Y_TYPE) # make sure it is 0 or 1, and is int8
             treatment_val = np.asarray(treatment_val)
             assert len(y_val) == len(treatment_val), 'Data length must be equal for X_val, treatment_val, and y_val.'
@@ -547,7 +561,18 @@ class UpliftTreeClassifier:
         self : object
         """
 
-        X, y = check_X_y(X, y, force_all_finite=False)
+        try:
+            X, y = check_X_y(
+                X,
+                y,
+                ensure_all_finite=False,
+            )
+        except TypeError:
+            X, y = check_X_y(
+                X,
+                y,
+                force_all_finite=False,
+            )
         treatment = np.asarray(treatment)
         assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
@@ -754,7 +779,18 @@ class UpliftTreeClassifier:
         self : object
         """
 
-        X, y = check_X_y(X, y, force_all_finite=False)
+        try:
+            X, y = check_X_y(
+                X,
+                y,
+                ensure_all_finite=False,
+            )
+        except TypeError:
+            X, y = check_X_y(
+                X,
+                y,
+                force_all_finite=False,
+            )
         treatment = np.asarray(treatment)
         assert len(y) == len(treatment), 'Data length must be equal for X, treatment, and y.'
 
@@ -839,7 +875,10 @@ class UpliftTreeClassifier:
             An ndarray of predicted treatment effects across treatments.
         '''
 
-        X = check_array(X, force_all_finite=False)
+        try:
+            X = check_array(X, ensure_all_finite=False)
+        except TypeError:
+            X = check_array(X, force_all_finite=False)
 
         pred_nodes = []
         for i_row in range(len(X)):
