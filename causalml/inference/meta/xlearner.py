@@ -164,7 +164,7 @@ class BaseXLearner(BaseLearner):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_components (bool, optional): whether to return outcome for treatment and control separately
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -238,7 +238,7 @@ class BaseXLearner(BaseLearner):
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_components (bool, optional): whether to return outcome for treatment and control separately
             verbose (str): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
@@ -586,7 +586,7 @@ class BaseXClassifier(BaseXLearner):
             p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_components (bool, optional): whether to return outcome for treatment and control separately
             return_p_score (bool, optional): whether to return propensity score
             verbose (bool, optional): whether to output progress logs
         Returns:
