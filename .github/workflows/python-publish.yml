@@ -20,7 +20,7 @@ jobs:
     name: Make SDist
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0 # Optional, use if you use setuptools_scm
           submodules: false # Optional, use if you have submodules
@@ -28,7 +28,7 @@ jobs:
       - name: Build SDist
         run: pipx run build --sdist
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: cibw-sdist
           path: dist/*.tar.gz
@@ -42,7 +42,7 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-14]  # macos-13 removed (deprecated)
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           submodules: true
@@ -50,7 +50,7 @@ jobs:
       - uses: pypa/cibuildwheel@v3.3.1
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cibw-wheels-${{ matrix.os }}
           path: wheelhouse/*.whl
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           pattern: cibw-*
           path: dist
