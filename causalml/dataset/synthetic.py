@@ -74,21 +74,21 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
             ["S", "T", "X", "R"],
         ):
             models = [(LinearRegression, "LR")]
-        if XGBRegressor is not None:
-            models.append((XGBRegressor, "XGB"))
+            if XGBRegressor is not None:
+                models.append((XGBRegressor, "XGB"))
 
-        for model, label_m in models:
+            for model, label_m in models:
 
-            learner = base_learner(model())
-            model_name = "{} Learner ({})".format(label_l, label_m)
-            try:
-                preds_dict[model_name] = learner.fit_predict(
-                    X=X, treatment=w, y=y, p=p_hat
-                ).flatten()
-            except TypeError:
-                preds_dict[model_name] = learner.fit_predict(
-                    X=X, treatment=w, y=y
-                ).flatten()
+                learner = base_learner(model())
+                model_name = "{} Learner ({})".format(label_l, label_m)
+                try:
+                    preds_dict[model_name] = learner.fit_predict(
+                        X=X, treatment=w, y=y, p=p_hat
+                    ).flatten()
+                except TypeError:
+                    preds_dict[model_name] = learner.fit_predict(
+                        X=X, treatment=w, y=y
+                    ).flatten()
 
         learner = CausalTreeRegressor(random_state=RANDOM_SEED)
         preds_dict["Causal Tree"] = learner.fit_predict(X=X, treatment=w, y=y).flatten()
