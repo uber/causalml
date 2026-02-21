@@ -1043,6 +1043,107 @@ def test_BaseDRLearner(generate_regression_data):
     assert auuc["cate_p"] > 0.5
 
 
+def test_BaseDRLearner_estimate_ate_bootstrap(generate_regression_data):
+    """Regression test for issue #857: estimate_ate with bootstrap_ci=True
+    raised TypeError due to stray seed argument passed to bootstrap()."""
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseDRRegressor(learner=LinearRegression(), control_name=0)
+
+    # This call raised TypeError before the fix
+    ate, lb, ub = learner.estimate_ate(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        bootstrap_ci=True,
+        n_bootstraps=10,
+        bootstrap_size=200,
+        seed=42,
+    )
+
+    # Verify results are valid
+    assert np.all(np.isfinite(ate))
+    assert np.all(np.isfinite(lb))
+    assert np.all(np.isfinite(ub))
+
+    # Verify same seed produces identical bootstrap CI bounds
+    learner2 = BaseDRRegressor(learner=LinearRegression(), control_name=0)
+    ate2, lb2, ub2 = learner2.estimate_ate(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        bootstrap_ci=True,
+        n_bootstraps=10,
+        bootstrap_size=200,
+        seed=42,
+    )
+    np.testing.assert_array_equal(lb, lb2)
+    np.testing.assert_array_equal(ub, ub2)
+
+    # fit_predict() should also honor seed for bootstrap reproducibility.
+    learner_fp1 = BaseDRRegressor(learner=LinearRegression(), control_name=0)
+    _, te_lb1, te_ub1 = learner_fp1.fit_predict(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        return_ci=True,
+        n_bootstraps=10,
+        bootstrap_size=200,
+        seed=42,
+    )
+    learner_fp2 = BaseDRRegressor(learner=LinearRegression(), control_name=0)
+    _, te_lb2, te_ub2 = learner_fp2.fit_predict(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        return_ci=True,
+        n_bootstraps=10,
+        bootstrap_size=200,
+        seed=42,
+    )
+    np.testing.assert_array_equal(te_lb1, te_lb2)
+    np.testing.assert_array_equal(te_ub1, te_ub2)
+
+    # Verify seed=None still returns valid results
+    learner3 = BaseDRRegressor(learner=LinearRegression(), control_name=0)
+    ate3, lb3, ub3 = learner3.estimate_ate(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        bootstrap_ci=True,
+        n_bootstraps=10,
+        bootstrap_size=200,
+    )
+    assert np.all(np.isfinite(ate3))
+    assert np.all(np.isfinite(lb3))
+    assert np.all(np.isfinite(ub3))
+
+    # Verify global RNG state is not leaked by seeded bootstrap
+    np.random.seed(99)
+    _ = np.random.random()
+    state_before = np.random.get_state()
+    learner4 = BaseDRRegressor(learner=LinearRegression(), control_name=0)
+    learner4.estimate_ate(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        bootstrap_ci=True,
+        n_bootstraps=10,
+        bootstrap_size=200,
+        seed=42,
+    )
+    state_after = np.random.get_state()
+    assert state_before[0] == state_after[0]
+    np.testing.assert_array_equal(state_before[1], state_after[1])
+    assert state_before[2:] == state_after[2:]
+
+
 def test_BaseDRClassifier(generate_classification_data):
     np.random.seed(RANDOM_SEED)
 
