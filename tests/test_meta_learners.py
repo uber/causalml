@@ -38,6 +38,23 @@ from causalml.metrics import ape, auuc_score
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
 
 
+class ReadOnlyLinearRegression:
+    """Minimal regressor that marks input arrays read-only like CatBoost."""
+
+    def __init__(self):
+        self.model = LinearRegression()
+
+    def fit(self, X, y):
+        self.model.fit(X, y)
+        X.flags.writeable = False
+        return self
+
+    def predict(self, X):
+        result = self.model.predict(X)
+        X.flags.writeable = False
+        return result
+
+
 def test_synthetic_data():
     y, X, treatment, tau, b, e = synthetic_data(mode=1, n=N_SAMPLE, p=8, sigma=0.1)
 
@@ -95,6 +112,21 @@ def test_BaseSLearner(generate_regression_data):
         X=X, treatment=treatment, y=y, return_ci=True, pretrain=True
     )
     assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
+
+def test_BaseSLearner_predict_with_readonly_arrays(generate_regression_data):
+    y, X, treatment, _, _, _ = generate_regression_data()
+    X_readonly = np.array(X, copy=True)
+    X_readonly.flags.writeable = False
+
+    learner = BaseSLearner(learner=ReadOnlyLinearRegression())
+
+    # Exercise both fit() and predict() with read-only array behavior.
+    learner.fit(X=X_readonly, treatment=treatment, y=y)
+    cate = learner.predict(X=X_readonly)
+
+    assert cate.shape == (X.shape[0], 1)
+    assert not X_readonly.flags.writeable
 
 
 def test_BaseSRegressor(generate_regression_data):
