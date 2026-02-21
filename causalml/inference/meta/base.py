@@ -52,9 +52,12 @@ class BaseLearner(metaclass=ABCMeta):
     ):
         pass
 
-    def bootstrap(self, X, treatment, y, p=None, size=10000):
+    def bootstrap(self, X, treatment, y, p=None, size=10000, rng=None):
         """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
-        idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
+        if rng is not None:
+            idxs = rng.choice(np.arange(0, X.shape[0]), size=size)
+        else:
+            idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
         X_b = X[idxs]
 
         if p is not None:
