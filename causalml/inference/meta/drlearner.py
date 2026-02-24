@@ -201,6 +201,24 @@ class BaseDRLearner(BaseLearner):
                 )
                 self.models_tau[group][ifold].fit(X_filt, dr)
 
+    def bootstrap(self, X, treatment, y, p=None, size=10000, rng=None, seed=None):
+        """Runs a single bootstrap with optional deterministic cross-fit seed."""
+        if rng is not None:
+            idxs = rng.choice(np.arange(0, X.shape[0]), size=size)
+        else:
+            idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
+        X_b = X[idxs]
+
+        if p is not None:
+            p_b = {group: _p[idxs] for group, _p in p.items()}
+        else:
+            p_b = None
+
+        treatment_b = treatment[idxs]
+        y_b = y[idxs]
+        self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b, seed=seed)
+        return self.predict(X=X, p=p)
+
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
@@ -312,10 +330,25 @@ class BaseDRLearner(BaseLearner):
             te_bootstraps = np.zeros(
                 shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps)
             )
+            # seed controls both bootstrap resampling and cross-fit randomness.
+            rng = np.random.default_rng(seed) if seed is not None else None
 
             logger.info("Bootstrap Confidence Intervals")
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X, treatment, y, p, size=bootstrap_size)
+                bootstrap_seed = (
+                    int(rng.integers(np.iinfo(np.int32).max))
+                    if rng is not None
+                    else None
+                )
+                te_b = self.bootstrap(
+                    X,
+                    treatment,
+                    y,
+                    p,
+                    size=bootstrap_size,
+                    rng=rng,
+                    seed=bootstrap_seed,
+                )
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -428,10 +461,23 @@ class BaseDRLearner(BaseLearner):
 
             logger.info("Bootstrap Confidence Intervals for ATE")
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
+            # seed controls both bootstrap resampling and cross-fit randomness.
+            rng = np.random.default_rng(seed) if seed is not None else None
 
             for n in tqdm(range(n_bootstraps)):
+                bootstrap_seed = (
+                    int(rng.integers(np.iinfo(np.int32).max))
+                    if rng is not None
+                    else None
+                )
                 cate_b = self.bootstrap(
-                    X, treatment, y, p, size=bootstrap_size, seed=seed
+                    X,
+                    treatment,
+                    y,
+                    p,
+                    size=bootstrap_size,
+                    rng=rng,
+                    seed=bootstrap_seed,
                 )
                 ate_bootstraps[:, n] = cate_b.mean(axis=0)
 
