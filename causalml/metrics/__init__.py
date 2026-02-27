@@ -32,3 +32,15 @@ from .sensitivity import (
     SensitivitySubsetData,
     SensitivitySelectionBias,
 )  # noqa
+from .mab_evaluation import (
+    MABMetrics,
+    evaluate_mab,
+    compare_mab_algorithms,
+    plot_mab_comparison,
+    plot_learning_curve,
+    cumulative_reward,
+    cumulative_regret,
+    plot_cumulative_reward,
+    plot_cumulative_regret,
+    plot_arm_selection_frequency
+)
