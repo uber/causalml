@@ -1059,7 +1059,7 @@ def test_BaseDRLearner_estimate_ate_bootstrap(generate_regression_data):
         bootstrap_ci=True,
         n_bootstraps=10,
         bootstrap_size=200,
-        seed=42,
+        seed=RANDOM_SEED,
     )
 
     # Verify results are valid
@@ -1077,7 +1077,7 @@ def test_BaseDRLearner_estimate_ate_bootstrap(generate_regression_data):
         bootstrap_ci=True,
         n_bootstraps=10,
         bootstrap_size=200,
-        seed=42,
+        seed=RANDOM_SEED,
     )
     np.testing.assert_array_equal(lb, lb2)
     np.testing.assert_array_equal(ub, ub2)
@@ -1092,7 +1092,7 @@ def test_BaseDRLearner_estimate_ate_bootstrap(generate_regression_data):
         return_ci=True,
         n_bootstraps=10,
         bootstrap_size=200,
-        seed=42,
+        seed=RANDOM_SEED,
     )
     learner_fp2 = BaseDRRegressor(learner=LinearRegression(), control_name=0)
     _, te_lb2, te_ub2 = learner_fp2.fit_predict(
@@ -1103,7 +1103,7 @@ def test_BaseDRLearner_estimate_ate_bootstrap(generate_regression_data):
         return_ci=True,
         n_bootstraps=10,
         bootstrap_size=200,
-        seed=42,
+        seed=RANDOM_SEED,
     )
     np.testing.assert_array_equal(te_lb1, te_lb2)
     np.testing.assert_array_equal(te_ub1, te_ub2)
@@ -1136,7 +1136,7 @@ def test_BaseDRLearner_estimate_ate_bootstrap(generate_regression_data):
         bootstrap_ci=True,
         n_bootstraps=10,
         bootstrap_size=200,
-        seed=42,
+        seed=RANDOM_SEED,
     )
     state_after = np.random.get_state()
     assert state_before[0] == state_after[0]
