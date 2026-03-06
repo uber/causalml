@@ -328,3 +328,45 @@ def test_UpliftTreeClassifier_with_nan_values():
 
     # Ensure tree has valid split structure
     assert uplift_model.fitted_uplift_tree is not None
+
+
+def test_UpliftTreeClassifier_with_nan_in_categorical_features():
+    """NaNs in string/categorical columns should not raise TypeError."""
+    df, x_names = make_uplift_classification()
+    df = df[df["treatment_group_key"].isin(["control", "treatment1"])]
+
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
+
+    # Build object array with first column as string categories containing NaNs
+    X_train = df_train[x_names].values.astype(object)
+    X_test = df_test[x_names].values.astype(object)
+
+    n_train = X_train.shape[0]
+    n_test = X_test.shape[0]
+
+    X_train[:, 0] = np.where(
+        np.arange(n_train) % 5 == 0, None,
+        np.where(np.arange(n_train) % 2 == 0, "cat", "dog")
+    )
+    X_test[:, 0] = np.where(
+        np.arange(n_test) % 5 == 0, None,
+        np.where(np.arange(n_test) % 2 == 0, "cat", "dog")
+    )
+
+    uplift_model = UpliftTreeClassifier(
+        control_name="control",
+        random_state=42,
+        max_depth=3,
+        min_samples_leaf=50,
+    )
+
+    # Should not raise TypeError for string columns with NaNs
+    uplift_model.fit(
+        X_train,
+        treatment=df_train["treatment_group_key"].values,
+        y=df_train["conversion"].values,
+    )
+
+    preds = uplift_model.predict(X_test)
+    assert preds is not None
+    assert uplift_model.fitted_uplift_tree is not None
