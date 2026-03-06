@@ -314,13 +314,14 @@ def group_counts_by_divide(
     else:
         filt = col_vals == threshold_val
 
-    # Handle NaNs
-    cdef np.ndarray[np.uint8_t, ndim=1, cast=True] nan_mask = np.isnan(col_vals)
+    # Handle NaNs only for numeric columns
+    if np.issubdtype(np.asarray(col_vals).dtype, np.number):
+        nan_mask = np.isnan(col_vals)
 
-    if missing_go_to_left:
-        filt = filt | nan_mask
-    else:
-        filt = filt & ~nan_mask
+        if missing_go_to_left:
+            filt = filt | nan_mask
+        else:
+            filt = filt & ~nan_mask
 
     # then loop through treatment_idx and y, sum the counts where filt
     # is True, and it is the count for the left branch.
@@ -915,13 +916,14 @@ class UpliftTreeClassifier:
         else:
             filt = X[:, column] == value
 
-        # Handle NaNs
-        nan_mask = np.isnan(X[:, column])
+        # Handle NaNs only for numeric columns
+        if np.issubdtype(X[:, column].dtype, np.number):
+            nan_mask = np.isnan(X[:, column])
 
-        if missing_go_to_left:
-            filt = filt | nan_mask
-        else:
-            filt = filt & ~nan_mask
+            if missing_go_to_left:
+                filt = filt | nan_mask
+            else:
+                filt = filt & ~nan_mask
 
         return X[filt], X[~filt], treatment_idx[filt], treatment_idx[~filt], y[filt], y[~filt]
 
