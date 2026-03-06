@@ -5,7 +5,11 @@ from sklearn.metrics import mean_squared_error as mse
 from sklearn.metrics import auc
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression
-from xgboost import XGBRegressor
+
+try:
+    from xgboost import XGBRegressor
+except ImportError:  # pragma: no cover
+    XGBRegressor = None
 from scipy.stats import entropy
 import warnings
 
@@ -69,7 +73,12 @@ def get_synthetic_preds(synthetic_data_func, n=1000, estimators={}):
             [BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
             ["S", "T", "X", "R"],
         ):
-            for model, label_m in zip([LinearRegression, XGBRegressor], ["LR", "XGB"]):
+            models = [(LinearRegression, "LR")]
+            if XGBRegressor is not None:
+                models.append((XGBRegressor, "XGB"))
+
+            for model, label_m in models:
+
                 learner = base_learner(model())
                 model_name = "{} Learner ({})".format(label_l, label_m)
                 try:
@@ -372,7 +381,10 @@ def get_synthetic_preds_holdout(
         [BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
         ["S", "T", "X", "R"],
     ):
-        for model, label_m in zip([LinearRegression, XGBRegressor], ["LR", "XGB"]):
+        models = [(LinearRegression, "LR")]
+        if XGBRegressor is not None:
+            models.append((XGBRegressor, "XGB"))
+        for model, label_m in models:
             # RLearner will need to fit on the p_hat
             if label_l != "R":
                 learner = base_learner(model())
@@ -544,10 +556,10 @@ def scatter_plot_summary_holdout(
 
     for g in np.unique(group):
         ix = np.where(group == g)[0].tolist()
-        ax.scatter(xs[ix], ys[ix], c=cdict[g], label=g, s=100)
+        ax.scatter(xs.iloc[ix], ys.iloc[ix], c=cdict[g], label=g, s=100)
 
     for i, txt in enumerate(plot_data.label[:10]):
-        ax.annotate(txt, (xs[i] + 0.005, ys[i]))
+        ax.annotate(txt, (xs.iloc[i] + 0.005, ys.iloc[i]))
 
     ax.set_xlabel("Abs % Error of ATE")
     ax.set_ylabel("MSE")

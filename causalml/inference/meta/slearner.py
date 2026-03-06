@@ -109,13 +109,14 @@ class BaseSLearner(BaseLearner):
         for group in self.t_groups:
             model = self.models[group]
 
-            # set the treatment column to zero (the control group)
-            X_new = np.hstack((np.zeros((X.shape[0], 1)), X))
-            yhat_cs[group] = model.predict(X_new)
+            # Build separate arrays for control and treatment to avoid in-place
+            # mutation, which fails when learners like CatBoost set the
+            # writeable flag to False on arrays passed to predict().
+            X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
+            yhat_cs[group] = model.predict(X_new_c)
 
-            # set the treatment column to one (the treatment group)
-            X_new[:, 0] = 1
-            yhat_ts[group] = model.predict(X_new)
+            X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
+            yhat_ts[group] = model.predict(X_new_t)
 
             if (y is not None) and (treatment is not None) and verbose:
                 mask = (treatment == group) | (treatment == self.control_name)
@@ -346,13 +347,14 @@ class BaseSClassifier(BaseSLearner):
         for group in self.t_groups:
             model = self.models[group]
 
-            # set the treatment column to zero (the control group)
-            X_new = np.hstack((np.zeros((X.shape[0], 1)), X))
-            yhat_cs[group] = model.predict_proba(X_new)[:, 1]
+            # Build separate arrays for control and treatment to avoid in-place
+            # mutation, which fails when learners like CatBoost set the
+            # writeable flag to False on arrays passed to predict().
+            X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
+            yhat_cs[group] = model.predict_proba(X_new_c)[:, 1]
 
-            # set the treatment column to one (the treatment group)
-            X_new[:, 0] = 1
-            yhat_ts[group] = model.predict_proba(X_new)[:, 1]
+            X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
+            yhat_ts[group] = model.predict_proba(X_new_t)[:, 1]
 
             if y is not None and (treatment is not None) and verbose:
                 mask = (treatment == group) | (treatment == self.control_name)
