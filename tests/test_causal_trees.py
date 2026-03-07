@@ -275,3 +275,27 @@ class TestCausalRandomForestCase(CausalTreeBase):
             crforest_test_var = crforest.calculate_error(X_train=X_train, X_test=X_test)
             assert (crforest_test_var > 0).all()
             assert crforest_test_var.shape[0] == y_test.shape[0]
+
+
+def test_CausalRandomForestRegressor_no_inf_predictions():
+    """Test that CausalRandomForestRegressor does not predict inf values
+    when some tree splits have zero-count treatment/control groups (#589)."""
+    np.random.seed(RANDOM_SEED)
+    n = 100
+    X = np.random.randn(n, 5)
+    # Heavily imbalanced: very few treated samples so tree splits
+    # can produce nodes with zero treatment count
+    treatment = np.array([0] * 90 + [1] * 10)
+    y = np.random.randn(n)
+
+    model = CausalRandomForestRegressor(
+        criterion="causal_mse",
+        control_name=0,
+        n_estimators=10,
+        min_samples_leaf=1,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+    preds = model.predict(X=X)
+
+    assert np.all(np.isfinite(preds)), "Predictions contain inf or NaN values"
