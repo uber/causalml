@@ -312,7 +312,7 @@ def test_CausalRandomForestRegressor_no_inf_predictions_ttest():
     y = np.random.randn(n)
 
     model = CausalRandomForestRegressor(
-        criterion="ttest",
+        criterion="t_test",
         control_name=0,
         n_estimators=10,
         min_samples_leaf=1,
