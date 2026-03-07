@@ -299,3 +299,26 @@ def test_CausalRandomForestRegressor_no_inf_predictions():
     preds = model.predict(X=X)
 
     assert np.all(np.isfinite(preds)), "Predictions contain inf or NaN values"
+
+
+def test_CausalRandomForestRegressor_no_inf_predictions_ttest():
+    """Test that CausalRandomForestRegressor with criterion='ttest' does not
+    predict inf values when some tree splits have zero-count
+    treatment/control groups (#589)."""
+    np.random.seed(RANDOM_SEED)
+    n = 100
+    X = np.random.randn(n, 5)
+    treatment = np.array([0] * 90 + [1] * 10)
+    y = np.random.randn(n)
+
+    model = CausalRandomForestRegressor(
+        criterion="ttest",
+        control_name=0,
+        n_estimators=10,
+        min_samples_leaf=1,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+    preds = model.predict(X=X)
+
+    assert np.all(np.isfinite(preds)), "Predictions contain inf or NaN values"
