@@ -60,6 +60,25 @@ cdef extern from "math.h":
     double fabs(double x) nogil
     double sqrt(double x) nogil
 
+
+def _align_tree_predict(tree, X, forest_classes):
+    """Predict with a single tree and align output to the forest's classes.
+
+    When a bootstrap sample excludes some treatment groups, the tree's
+    classes_ will be a subset of the forest's classes_. This function
+    maps the tree's predictions to the forest-level class ordering.
+    """
+    raw = tree.predict(X=X)
+    if len(tree.classes_) == len(forest_classes):
+        return raw
+    aligned = np.zeros((raw.shape[0], len(forest_classes)))
+    for tree_idx, cls in enumerate(tree.classes_):
+        if cls in forest_classes:
+            forest_idx = forest_classes.index(cls)
+            aligned[:, forest_idx] = raw[:, tree_idx]
+    return aligned
+
+
 @cython.cfunc
 def kl_divergence(pk: cython.float, qk: cython.float) -> cython.float:
     '''
@@ -2696,10 +2715,10 @@ class UpliftRandomForestClassifier:
         if self.n_jobs != 1:
             y_pred_ensemble = sum(
                 Parallel(n_jobs=self.n_jobs, prefer=self.joblib_prefer)
-                (delayed(tree.predict)(X=X) for tree in self.uplift_forest)
+                (delayed(_align_tree_predict)(tree, X, self.classes_) for tree in self.uplift_forest)
             ) / len(self.uplift_forest)
         else:
-            y_pred_ensemble = sum([tree.predict(X=X) for tree in self.uplift_forest]) / len(self.uplift_forest)
+            y_pred_ensemble = sum([_align_tree_predict(tree, X, self.classes_) for tree in self.uplift_forest]) / len(self.uplift_forest)
 
         # Summarize results into dataframe
         df_res = pd.DataFrame(y_pred_ensemble, columns=self.classes_)
