@@ -282,7 +282,8 @@ class SensitivityPlaceboTreatment(Sensitivity):
 
         X = self.df[self.inference_features].values
         p = self.df[self.p_col].values
-        treatment_new = np.random.randint(2, size=num_rows)
+        treatment = self.df[self.treatment_col].values
+        treatment_new = np.random.permutation(treatment)
         y = self.df[self.outcome_col].values
 
         ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(X, p, treatment_new, y)
