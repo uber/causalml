@@ -2010,7 +2010,14 @@ class UpliftTreeClassifier:
         else:
             p_t = cur_summary_p[suboptTreatment]
             n_t = cur_summary_n[suboptTreatment]
-        p_value = (1. - stats.norm.cdf(fabs(p_c - p_t) / sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
+        if n_t > 0 and n_c > 0:
+            variance = p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c
+            if variance > 0:
+                p_value = (1. - stats.norm.cdf(fabs(p_c - p_t) / sqrt(variance))) * 2
+            else:
+                p_value = 1.0
+        else:
+            p_value = 1.0
         upliftScore = [maxDiff, p_value]
 
         bestGain = 0.0
