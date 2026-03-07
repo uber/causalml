@@ -1220,3 +1220,31 @@ def test_BaseDRClassifier(generate_classification_data):
 
     te_separate = learner_separate.fit_predict(X=X, treatment=treatment, y=y)
     assert te_separate.shape == te.shape
+
+
+def test_BaseTLearner_predict_return_ci(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseTRegressor(learner=LinearRegression(), control_name=0)
+
+    # Test 1: store_bootstraps=True then predict with return_ci=True
+    learner.fit(X, treatment, y, store_bootstraps=True, n_bootstraps=50, bootstrap_size=500)
+    tau_pred, lb, ub = learner.predict(X, return_ci=True, ci_quantile=0.05)
+
+    assert tau_pred.shape == (X.shape[0], len(learner.t_groups))
+    assert lb.shape == tau_pred.shape
+    assert ub.shape == tau_pred.shape
+    assert (lb <= tau_pred).all() and (tau_pred <= ub).all()
+
+    # Test 2: without store_bootstraps, return_ci=True should raise ValueError
+    learner2 = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    learner2.fit(X, treatment, y)
+    try:
+        learner2.predict(X, return_ci=True)
+        assert False, "Expected ValueError was not raised"
+    except ValueError:
+        pass
+
+    # Test 3: old API unchanged, no return_ci should return plain array
+    tau_plain = learner.predict(X)
+    assert tau_plain.shape == (X.shape[0], len(learner.t_groups))
