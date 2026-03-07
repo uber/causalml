@@ -310,13 +310,23 @@ def test_UpliftRandomForestClassifier_predict_shape_with_sparse_groups():
     model = UpliftRandomForestClassifier(
         control_name=CONTROL_NAME,
         n_estimators=10,
+        n_jobs=2,
         min_samples_leaf=1,
         min_samples_treatment=0,
         random_state=RANDOM_SEED,
     )
     model.fit(X, treatment=treatment, y=y)
 
+    # Verify that at least one tree was fit without some treatment groups
+    assert any(
+        len(tree.classes_) < len(model.classes_) for tree in model.uplift_forest
+    ), (
+        "Test setup failed to produce any trees missing treatment groups; "
+        "adjust seed or sampling parameters to exercise sparse-group behavior."
+    )
+
     # Single-threaded
+    model.n_jobs = 1
     preds = model.predict(X)
     assert preds.shape == (
         n,
@@ -325,7 +335,7 @@ def test_UpliftRandomForestClassifier_predict_shape_with_sparse_groups():
     assert not np.any(np.isnan(preds)), "Predictions contain NaN"
 
     # Parallel
-    with parallel_backend("threading", n_jobs=2):
-        preds_par = model.predict(X)
+    model.n_jobs = 2
+    preds_par = model.predict(X)
     assert preds_par.shape == preds.shape
     assert np.allclose(preds, preds_par)
