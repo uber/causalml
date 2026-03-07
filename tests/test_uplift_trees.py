@@ -395,11 +395,14 @@ def test_UpliftRandomForestClassifier_predict_shape_with_sparse_groups():
     """Test that UpliftRandomForestClassifier.predict() returns correct shape
     when bootstrap sampling causes some trees to miss treatment groups (#569)."""
     np.random.seed(RANDOM_SEED)
-    n = 60
+    n = 102
     X = np.random.randn(n, 3)
-    # Very few samples in treatment groups so bootstraps are likely to miss some
+    # Only 1 sample per minority treatment group guarantees that bootstrap
+    # sampling (with replacement, n draws from n) will miss them in some trees.
+    # P(group included) = 1 - (1 - 1/n)^n ≈ 1 - 1/e ≈ 0.63 per tree,
+    # so with 10 trees the chance ALL include both groups is ~0.63^20 ≈ 0.01%.
     treatment = np.array(
-        [CONTROL_NAME] * 50 + [TREATMENT_NAMES[1]] * 5 + [TREATMENT_NAMES[2]] * 5
+        [CONTROL_NAME] * 100 + [TREATMENT_NAMES[1]] * 1 + [TREATMENT_NAMES[2]] * 1
     )
     y = np.random.randint(0, 2, n)
 
