@@ -104,6 +104,34 @@ def test_SensitivityPlaceboTreatment():
     print(sens_summary)
 
 
+def test_SensitivityPlaceboTreatment_string_labels():
+    y, X, treatment, tau, b, e = synthetic_data(
+        mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
+    )
+
+    # Convert binary treatment to string labels
+    treatment_str = np.where(treatment == 1, "treatment1", "control")
+
+    INFERENCE_FEATURES = ["feature_" + str(i) for i in range(NUM_FEATURES)]
+    df = pd.DataFrame(X, columns=INFERENCE_FEATURES)
+    df[TREATMENT_COL] = treatment_str
+    df[OUTCOME_COL] = y
+    df[SCORE_COL] = e
+
+    learner = BaseXLearner(LinearRegression(), control_name="control")
+    sens = SensitivityPlaceboTreatment(
+        df=df,
+        inference_features=INFERENCE_FEATURES,
+        p_col=SCORE_COL,
+        treatment_col=TREATMENT_COL,
+        outcome_col=OUTCOME_COL,
+        learner=learner,
+    )
+
+    sens_summary = sens.summary(method="Placebo Treatment")
+    print(sens_summary)
+
+
 def test_SensitivityRandomCause():
     y, X, treatment, tau, b, e = synthetic_data(
         mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
