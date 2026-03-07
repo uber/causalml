@@ -293,3 +293,39 @@ def test_uplift_tree_visualization():
     # Plot uplift tree
     graph = uplift_tree_plot(uplift_model.fitted_uplift_tree, x_names)
     graph.create_png()
+
+
+def test_UpliftRandomForestClassifier_predict_shape_with_sparse_groups():
+    """Test that UpliftRandomForestClassifier.predict() returns correct shape
+    when bootstrap sampling causes some trees to miss treatment groups (#569)."""
+    np.random.seed(RANDOM_SEED)
+    n = 60
+    X = np.random.randn(n, 3)
+    # Very few samples in treatment groups so bootstraps are likely to miss some
+    treatment = np.array(
+        [CONTROL_NAME] * 50 + [TREATMENT_NAMES[1]] * 5 + [TREATMENT_NAMES[2]] * 5
+    )
+    y = np.random.randint(0, 2, n)
+
+    model = UpliftRandomForestClassifier(
+        control_name=CONTROL_NAME,
+        n_estimators=10,
+        min_samples_leaf=1,
+        min_samples_treatment=0,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X, treatment=treatment, y=y)
+
+    # Single-threaded
+    preds = model.predict(X)
+    assert preds.shape == (
+        n,
+        len(model.classes_) - 1,
+    ), f"Expected shape ({n}, {len(model.classes_) - 1}), got {preds.shape}"
+    assert not np.any(np.isnan(preds)), "Predictions contain NaN"
+
+    # Parallel
+    with parallel_backend("threading", n_jobs=2):
+        preds_par = model.predict(X)
+    assert preds_par.shape == preds.shape
+    assert np.allclose(preds, preds_par)
