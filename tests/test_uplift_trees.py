@@ -365,3 +365,27 @@ def test_UpliftTreeClassifier_with_nan_in_categorical_features():
     preds = uplift_model.predict(X_test)
     assert preds is not None
     assert uplift_model.fitted_uplift_tree is not None
+
+
+def test_uplift_tree_pvalue_no_nan_with_sparse_groups():
+    """Test that p-values don't become NaN when tree nodes have zero
+    treatment or control observations (issue #585)."""
+    np.random.seed(RANDOM_SEED)
+    n = 50
+    X = np.random.randn(n, 3)
+    # Heavily imbalanced: only 2 samples in treatment1
+    treatment = np.array([CONTROL_NAME] * 45 + ["treatment1"] * 2 + ["treatment2"] * 3)
+    y = np.random.randint(0, 2, n)
+
+    model = UpliftTreeClassifier(
+        control_name=CONTROL_NAME,
+        min_samples_leaf=1,
+        min_samples_treatment=0,
+        max_depth=5,
+    )
+    model.fit(X, treatment, y)
+    preds = model.predict(X)
+
+    assert not np.any(
+        np.isnan(preds)
+    ), "Predictions contain NaN (likely from NaN p-values)"
