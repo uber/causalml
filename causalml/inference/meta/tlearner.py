@@ -69,7 +69,7 @@ class BaseTLearner(BaseLearner):
         )
 
     @ignore_warnings(category=ConvergenceWarning)
-    def fit(self, X, treatment, y, p=None):
+    def fit(self, X, treatment, y, p=None, store_bootstraps=False, n_bootstraps=1000, bootstrap_size=10000):
         """Fit the inference model
 
         Args:
@@ -94,9 +94,33 @@ class BaseTLearner(BaseLearner):
 
             self.models_c[group].fit(X_filt[w == 0], y_filt[w == 0])
             self.models_t[group].fit(X_filt[w == 1], y_filt[w == 1])
-
+        if store_bootstraps:
+            logger.info("Storing bootstrap ensemble ({} iterations)".format(n_bootstraps))
+            self.bootstrap_models_ = []
+            for i in tqdm(range(n_bootstraps)):
+                idxs = np.random.choice(np.arange(X.shape[0]), size=bootstrap_size)
+                X_b, treatment_b, y_b = X[idxs], treatment[idxs], y[idxs]
+                models_c_b = {group: deepcopy(self.model_c) for group in self.t_groups}
+                models_t_b = {group: deepcopy(self.model_t) for group in self.t_groups}
+                for group in self.t_groups:
+                    mask = (treatment_b == group) | (treatment_b == self.control_name)
+                    treatment_filt = treatment_b[mask]
+                    X_filt = X_b[mask]
+                    y_filt = y_b[mask]
+                    w = (treatment_filt == group).astype(int)
+                    if w.sum() == 0 or (w == 0).sum() == 0:
+                        models_c_b[group] = self.models_c[group]
+                        models_t_b[group] = self.models_t[group]
+                        continue
+                    models_c_b[group].fit(X_filt[w == 0], y_filt[w == 0])
+                    models_t_b[group].fit(X_filt[w == 1], y_filt[w == 1])
+                self.bootstrap_models_.append((models_c_b, models_t_b))
+        else:
+            self.bootstrap_models_ = None
+        
     def predict(
-        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True,
+        return_ci=False, ci_quantile=0.05,
     ):
         """Predict treatment effects.
 
@@ -135,6 +159,21 @@ class BaseTLearner(BaseLearner):
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = yhat_ts[group] - yhat_cs[group]
+
+        if return_ci:
+            if not self.bootstrap_models_:
+                raise ValueError(
+                    "No bootstrap ensemble found. Call fit(..., store_bootstraps=True) first."
+                )
+            te_bootstraps = np.zeros((X.shape[0], self.t_groups.shape[0], len(self.bootstrap_models_)))
+            for b, (models_c_b, models_t_b) in enumerate(self.bootstrap_models_):
+                for i, group in enumerate(self.t_groups):
+                    te_bootstraps[:, i, b] = (
+                        models_t_b[group].predict(X) - models_c_b[group].predict(X)
+                    )
+            te_lower = np.percentile(te_bootstraps, ci_quantile / 2 * 100, axis=2)
+            te_upper = np.percentile(te_bootstraps, (1 - ci_quantile / 2) * 100, axis=2)
+            return te, te_lower, te_upper
 
         if not return_components:
             return te
