@@ -345,12 +345,14 @@ def test_UpliftTreeClassifier_with_nan_in_categorical_features():
     n_test = X_test.shape[0]
 
     X_train[:, 0] = np.where(
-        np.arange(n_train) % 5 == 0, None,
-        np.where(np.arange(n_train) % 2 == 0, "cat", "dog")
+        np.arange(n_train) % 5 == 0,
+        None,
+        np.where(np.arange(n_train) % 2 == 0, "cat", "dog"),
     )
     X_test[:, 0] = np.where(
-        np.arange(n_test) % 5 == 0, None,
-        np.where(np.arange(n_test) % 2 == 0, "cat", "dog")
+        np.arange(n_test) % 5 == 0,
+        None,
+        np.where(np.arange(n_test) % 2 == 0, "cat", "dog"),
     )
 
     uplift_model = UpliftTreeClassifier(
