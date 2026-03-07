@@ -104,7 +104,7 @@ class BaseTLearner(BaseLearner):
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_components (bool, optional): whether to return outcome for treatment and control separately
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
@@ -162,7 +162,7 @@ class BaseTLearner(BaseLearner):
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_components (bool, optional): whether to return outcome for treatment and control separately
             verbose (str): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
