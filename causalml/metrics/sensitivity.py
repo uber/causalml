@@ -278,8 +278,6 @@ class SensitivityPlaceboTreatment(Sensitivity):
         Returns:
             (pd.DataFrame): a summary dataframe
         """
-        num_rows = self.df.shape[0]
-
         X = self.df[self.inference_features].values
         p = self.df[self.p_col].values
         treatment = self.df[self.treatment_col].values
