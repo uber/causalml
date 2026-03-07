@@ -293,3 +293,75 @@ def test_uplift_tree_visualization():
     # Plot uplift tree
     graph = uplift_tree_plot(uplift_model.fitted_uplift_tree, x_names)
     graph.create_png()
+
+
+def test_UpliftTreeClassifier_with_nan_values():
+    # Create synthetic uplift dataset
+    df, x_names = make_uplift_classification()
+
+    # Keep binary treatment for simplicity
+    df = df[df["treatment_group_key"].isin(["control", "treatment1"])]
+
+    # Introduce NaNs in first feature
+    df.loc[df.sample(frac=0.1, random_state=42).index, x_names[0]] = np.nan
+
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
+
+    uplift_model = UpliftTreeClassifier(
+        control_name="control",
+        random_state=42,
+        max_depth=3,
+        min_samples_leaf=50,
+    )
+
+    # Should not raise any exception
+    uplift_model.fit(
+        df_train[x_names].values,
+        treatment=df_train["treatment_group_key"].values,
+        y=df_train["conversion"].values,
+    )
+
+    preds = uplift_model.predict(df_test[x_names].values)
+
+    # Ensure predictions are finite
+    assert not np.isnan(preds).any()
+
+    # Ensure tree has valid split structure
+    assert uplift_model.fitted_uplift_tree is not None
+
+
+def test_UpliftTreeClassifier_with_nan_in_categorical_features():
+    """NaNs in object-dtype columns should not raise TypeError."""
+    df, x_names = make_uplift_classification()
+    df = df[df["treatment_group_key"].isin(["control", "treatment1"])]
+
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
+
+    # Use numeric data but as object dtype to simulate mixed-type arrays
+    X_train = df_train[x_names].values.astype(object)
+    X_test = df_test[x_names].values.astype(object)
+
+    # Inject None into first column (object dtype, numeric values + None)
+    n_train = X_train.shape[0]
+    n_test = X_test.shape[0]
+
+    X_train[np.arange(n_train) % 5 == 0, 0] = None
+    X_test[np.arange(n_test) % 5 == 0, 0] = None
+
+    uplift_model = UpliftTreeClassifier(
+        control_name="control",
+        random_state=42,
+        max_depth=3,
+        min_samples_leaf=50,
+    )
+
+    # Should not raise TypeError
+    uplift_model.fit(
+        X_train,
+        treatment=df_train["treatment_group_key"].values,
+        y=df_train["conversion"].values,
+    )
+
+    preds = uplift_model.predict(X_test)
+    assert preds is not None
+    assert uplift_model.fitted_uplift_tree is not None
