@@ -788,7 +788,9 @@ def auuc_score(
     """Calculate the AUUC (Area Under the Uplift Curve) score.
 
      Args:
-        df (pandas.DataFrame): a data frame with model estimates and actual data as columns
+        df (pandas.DataFrame): a data frame with model estimates and actual data as columns.
+            Columns not matching outcome_col, treatment_col, or treatment_effect_col are
+            treated as model prediction columns whose AUUC will be computed.
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
@@ -797,6 +799,15 @@ def auuc_score(
     Returns:
         (float): the AUUC score
     """
+    required_cols = {outcome_col, treatment_col, treatment_effect_col}
+    model_names = [x for x in df.columns if x not in required_cols]
+    if len(model_names) == 0:
+        raise ValueError(
+            "No model prediction columns found in the DataFrame. "
+            "The DataFrame should contain at least one column besides "
+            f"'{outcome_col}', '{treatment_col}', and '{treatment_effect_col}' "
+            "representing model uplift predictions to score."
+        )
 
     if not tmle:
         cumgain = get_cumgain(
