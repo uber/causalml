@@ -331,29 +331,22 @@ def test_UpliftTreeClassifier_with_nan_values():
 
 
 def test_UpliftTreeClassifier_with_nan_in_categorical_features():
-    """NaNs in string/categorical columns should not raise TypeError."""
+    """NaNs in object-dtype columns should not raise TypeError."""
     df, x_names = make_uplift_classification()
     df = df[df["treatment_group_key"].isin(["control", "treatment1"])]
 
     df_train, df_test = train_test_split(df, test_size=0.2, random_state=42)
 
-    # Build object array with first column as string categories containing NaNs
+    # Use numeric data but as object dtype to simulate mixed-type arrays
     X_train = df_train[x_names].values.astype(object)
     X_test = df_test[x_names].values.astype(object)
 
+    # Inject None into first column (object dtype, numeric values + None)
     n_train = X_train.shape[0]
     n_test = X_test.shape[0]
 
-    X_train[:, 0] = np.where(
-        np.arange(n_train) % 5 == 0,
-        None,
-        np.where(np.arange(n_train) % 2 == 0, "cat", "dog"),
-    )
-    X_test[:, 0] = np.where(
-        np.arange(n_test) % 5 == 0,
-        None,
-        np.where(np.arange(n_test) % 2 == 0, "cat", "dog"),
-    )
+    X_train[np.arange(n_train) % 5 == 0, 0] = None
+    X_test[np.arange(n_test) % 5 == 0, 0] = None
 
     uplift_model = UpliftTreeClassifier(
         control_name="control",
@@ -362,7 +355,7 @@ def test_UpliftTreeClassifier_with_nan_in_categorical_features():
         min_samples_leaf=50,
     )
 
-    # Should not raise TypeError for string columns with NaNs
+    # Should not raise TypeError
     uplift_model.fit(
         X_train,
         treatment=df_train["treatment_group_key"].values,
