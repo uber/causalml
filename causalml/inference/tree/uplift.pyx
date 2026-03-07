@@ -71,10 +71,11 @@ def _align_tree_predict(tree, X, forest_classes):
     raw = tree.predict(X=X)
     if len(tree.classes_) == len(forest_classes):
         return raw
-    aligned = np.zeros((raw.shape[0], len(forest_classes)))
+    aligned = np.zeros((raw.shape[0], len(forest_classes)), dtype=raw.dtype)
+    class_to_forest_idx = {cls: idx for idx, cls in enumerate(forest_classes)}
     for tree_idx, cls in enumerate(tree.classes_):
-        if cls in forest_classes:
-            forest_idx = forest_classes.index(cls)
+        forest_idx = class_to_forest_idx.get(cls)
+        if forest_idx is not None:
             aligned[:, forest_idx] = raw[:, tree_idx]
     return aligned
 
