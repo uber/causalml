@@ -24,4 +24,6 @@ uv.lock
 
 # Claude Code artifacts
 CLAUDE.md
-.claude/
+.claude/.worktrees/
+.worktrees/
+.worktrees/
