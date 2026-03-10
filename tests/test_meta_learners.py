@@ -1228,7 +1228,9 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
     learner = BaseTRegressor(learner=LinearRegression(), control_name=0)
 
     # Test 1: store_bootstraps=True then predict with return_ci=True
-    learner.fit(X, treatment, y, store_bootstraps=True, n_bootstraps=50, bootstrap_size=500)
+    learner.fit(
+        X, treatment, y, store_bootstraps=True, n_bootstraps=50, bootstrap_size=500
+    )
     tau_pred, lb, ub = learner.predict(X, return_ci=True, ci_quantile=0.05)
 
     assert tau_pred.shape == (X.shape[0], len(learner.t_groups))
