@@ -389,3 +389,52 @@ def test_uplift_tree_pvalue_no_nan_with_sparse_groups():
     assert not np.any(
         np.isnan(preds)
     ), "Predictions contain NaN (likely from NaN p-values)"
+
+
+def test_UpliftRandomForestClassifier_predict_shape_with_sparse_groups():
+    """Test that UpliftRandomForestClassifier.predict() returns correct shape
+    when bootstrap sampling causes some trees to miss treatment groups (#569)."""
+    np.random.seed(RANDOM_SEED)
+    n = 102
+    X = np.random.randn(n, 3)
+    # Only 1 sample per minority treatment group guarantees that bootstrap
+    # sampling (with replacement, n draws from n) will miss them in some trees.
+    # P(group included) = 1 - (1 - 1/n)^n ≈ 1 - 1/e ≈ 0.63 per tree,
+    # so with 10 trees the chance ALL include both groups is ~0.63^20 ≈ 0.01%.
+    treatment = np.array(
+        [CONTROL_NAME] * 100 + [TREATMENT_NAMES[1]] * 1 + [TREATMENT_NAMES[2]] * 1
+    )
+    y = np.random.randint(0, 2, n)
+
+    model = UpliftRandomForestClassifier(
+        control_name=CONTROL_NAME,
+        n_estimators=10,
+        n_jobs=2,
+        min_samples_leaf=1,
+        min_samples_treatment=0,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X, treatment=treatment, y=y)
+
+    # Verify that at least one tree was fit without some treatment groups
+    assert any(
+        len(tree.classes_) < len(model.classes_) for tree in model.uplift_forest
+    ), (
+        "Test setup failed to produce any trees missing treatment groups; "
+        "adjust seed or sampling parameters to exercise sparse-group behavior."
+    )
+
+    # Single-threaded
+    model.n_jobs = 1
+    preds = model.predict(X)
+    assert preds.shape == (
+        n,
+        len(model.classes_) - 1,
+    ), f"Expected shape ({n}, {len(model.classes_) - 1}), got {preds.shape}"
+    assert not np.any(np.isnan(preds)), "Predictions contain NaN"
+
+    # Parallel
+    model.n_jobs = 2
+    preds_par = model.predict(X)
+    assert preds_par.shape == preds.shape
+    assert np.allclose(preds, preds_par)
