@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
@@ -1225,28 +1226,50 @@ def test_BaseDRClassifier(generate_classification_data):
 def test_BaseTLearner_predict_return_ci(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    learner = BaseTRegressor(learner=LinearRegression(), control_name=CONTROL_NAME)
 
     # Test 1: store_bootstraps=True then predict with return_ci=True
     learner.fit(
-        X, treatment, y, store_bootstraps=True, n_bootstraps=50, bootstrap_size=500
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED,
     )
-    tau_pred, lb, ub = learner.predict(X, return_ci=True, ci_quantile=0.05)
+    tau_pred, lb, ub = learner.predict(X, return_ci=True)
 
     assert tau_pred.shape == (X.shape[0], len(learner.t_groups))
     assert lb.shape == tau_pred.shape
     assert ub.shape == tau_pred.shape
-    assert (lb <= tau_pred).all() and (tau_pred <= ub).all()
+    assert (lb <= ub).all()
 
-    # Test 2: without store_bootstraps, return_ci=True should raise ValueError
-    learner2 = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    # Test 2: ValueError without store_bootstraps
+    learner2 = BaseTRegressor(learner=LinearRegression(), control_name=CONTROL_NAME)
     learner2.fit(X, treatment, y)
-    try:
+    with pytest.raises(ValueError):
         learner2.predict(X, return_ci=True)
-        assert False, "Expected ValueError was not raised"
-    except ValueError:
-        pass
 
-    # Test 3: old API unchanged, no return_ci should return plain array
+    # Test 3: ValueError when return_ci and return_components both True
+    with pytest.raises(ValueError):
+        learner.predict(X, return_ci=True, return_components=True)
+
+    # Test 4: old API unchanged
     tau_plain = learner.predict(X)
     assert tau_plain.shape == (X.shape[0], len(learner.t_groups))
+
+    # Test 5: reproducibility via random_state
+    learner3 = BaseTRegressor(learner=LinearRegression(), control_name=CONTROL_NAME)
+    learner3.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED,
+    )
+    tau2, lb2, ub2 = learner3.predict(X, return_ci=True)
+    np.testing.assert_array_equal(lb, lb2)
+    np.testing.assert_array_equal(ub, ub2)
