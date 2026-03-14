@@ -17,7 +17,6 @@ def get_toc(
     treatment_col="w",
     treatment_effect_col="tau",
     normalize=False,
-    random_seed=42,
 ):
     """Get the Targeting Operator Characteristic (TOC) of model estimates in population.
 
@@ -25,12 +24,19 @@ def get_toc(
     by the prioritization score and the overall ATE. A positive TOC at low q indicates
     the model successfully identifies units with above-average treatment benefit.
 
+    By definition, TOC(0) = 0 and TOC(1) = 0 (the subset ATE equals the overall ATE
+    when the entire population is selected).
+
     If the true treatment effect is provided (e.g. in synthetic data), it's used directly
     to calculate TOC. Otherwise, it's estimated as the difference between the mean outcomes
     of the treatment and control groups in each quantile band.
 
+    Note: when using observed outcomes, if a quantile band contains only treated or only
+    control units, the code falls back to TOC(q) = 0 for that band (i.e., subset ATE is
+    set to the overall ATE). This is a conservative approximation and is logged as a warning.
+
     For details, see Yadlowsky et al. (2021), `Evaluating Treatment Prioritization Rules
-    via Rank-Weighted Average Treatment Effects`.
+    via Rank-Weighted Average Treatment Effects`. https://arxiv.org/abs/2111.07966
 
     For the former, `treatment_effect_col` should be provided. For the latter, both
     `outcome_col` and `treatment_col` should be provided.
@@ -40,8 +46,9 @@ def get_toc(
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
-        normalize (bool, optional): whether to normalize the y-axis to 1 or not
-        random_seed (int, optional): deprecated
+        normalize (bool, optional): whether to normalize the TOC curve by its maximum
+            absolute value. Uses max(|TOC|) as the reference to avoid division by zero
+            at q=1 where TOC is always zero by definition.
 
     Returns:
         (pandas.DataFrame): TOC values of model estimates in population, indexed by quantile q
@@ -80,33 +87,46 @@ def get_toc(
         )
 
     n_total = len(df)
-    quantiles = np.linspace(0, 1, n_total + 1)[1:]
 
     toc = []
     for col in model_names:
         sorted_df = df.sort_values(col, ascending=False).reset_index(drop=True)
-        toc_values = []
 
-        for q in quantiles:
-            top_k = max(1, int(np.ceil(q * n_total)))
-            top_subset = sorted_df.iloc[:top_k]
+        if use_oracle:
+            # O(n) via cumulative sum
+            cumsum_tau = sorted_df[treatment_effect_col].cumsum().values
+            counts = np.arange(1, n_total + 1)
+            subset_ates = cumsum_tau / counts
+        else:
+            cumsum_tr = sorted_df[treatment_col].cumsum().values
+            cumsum_ct = np.arange(1, n_total + 1) - cumsum_tr
+            cumsum_y_tr = (
+                (sorted_df[outcome_col] * sorted_df[treatment_col]).cumsum().values
+            )
+            cumsum_y_ct = (
+                (sorted_df[outcome_col] * (1 - sorted_df[treatment_col]))
+                .cumsum()
+                .values
+            )
 
-            if use_oracle:
-                subset_ate = top_subset[treatment_effect_col].mean()
-            else:
-                t_mask = top_subset[treatment_col] == 1
-                c_mask = top_subset[treatment_col] == 0
-                if t_mask.sum() == 0 or c_mask.sum() == 0:
-                    subset_ate = overall_ate
-                else:
-                    subset_ate = (
-                        top_subset.loc[t_mask, outcome_col].mean()
-                        - top_subset.loc[c_mask, outcome_col].mean()
-                    )
+            # Guard against division by zero when a band is all-treated or all-control;
+            # fall back to overall_ate (TOC = 0) for those positions.
+            with np.errstate(invalid="ignore", divide="ignore"):
+                subset_ates = np.where(
+                    (cumsum_tr == 0) | (cumsum_ct == 0),
+                    overall_ate,
+                    cumsum_y_tr / cumsum_tr - cumsum_y_ct / cumsum_ct,
+                )
 
-            toc_values.append(subset_ate - overall_ate)
+            if np.any((cumsum_tr == 0) | (cumsum_ct == 0)):
+                logger.warning(
+                    "Some quantile bands contain only treated or only control units "
+                    "for column '%s'. TOC is set to 0 for those positions.",
+                    col,
+                )
 
-        toc.append(pd.Series(toc_values, index=quantiles))
+        toc_values = subset_ates - overall_ate
+        toc.append(pd.Series(toc_values, index=np.linspace(0, 1, n_total + 1)[1:]))
 
     toc = pd.concat(toc, join="inner", axis=1)
     toc.loc[0] = np.zeros((toc.shape[1],))
@@ -115,7 +135,11 @@ def get_toc(
     toc.index.name = "q"
 
     if normalize:
-        toc = toc.div(np.abs(toc.iloc[-1, :]), axis=1)
+        # Normalize by max absolute value rather than the value at q=1, which is
+        # always zero by definition and would cause division by zero.
+        max_abs = toc.abs().max()
+        max_abs = max_abs.replace(0, 1)  # guard for flat TOC curves
+        toc = toc.div(max_abs, axis=1)
 
     return toc
 
@@ -127,7 +151,6 @@ def rate_score(
     treatment_effect_col="tau",
     weighting="autoc",
     normalize=False,
-    random_seed=42,
 ):
     """Calculate the Rank-weighted Average Treatment Effect (RATE) score.
 
@@ -147,6 +170,11 @@ def rate_score(
     above-average treatment benefit. A RATE near zero suggests little heterogeneity or
     a poor prioritization rule.
 
+    Note: the integral is approximated via a weighted mean over the discrete quantile grid
+    using midpoint values. Weights are normalized to sum to 1 (i.e. ``weights / weights.sum()``),
+    so the absolute scale matches the TOC values but may differ slightly from the paper's
+    continuous integral definition. Model rankings are preserved.
+
     For details, see Yadlowsky et al. (2021), `Evaluating Treatment Prioritization Rules
     via Rank-Weighted Average Treatment Effects`. https://arxiv.org/abs/2111.07966
 
@@ -161,7 +189,6 @@ def rate_score(
         weighting (str, optional): the weighting scheme for the RATE integral.
             One of ``"autoc"`` (default) or ``"qini"``.
         normalize (bool, optional): whether to normalize the TOC curve before scoring
-        random_seed (int, optional): deprecated
 
     Returns:
         (pandas.Series): RATE scores of model estimates
@@ -181,7 +208,7 @@ def rate_score(
         normalize=normalize,
     )
 
-    quantiles = toc.index.values  # shape (n,), 0 included
+    quantiles = toc.index.values  # includes 0 and 1
 
     # Use midpoints to avoid division by zero for autoc at q=0
     q_mid = (quantiles[:-1] + quantiles[1:]) / 2
@@ -209,7 +236,6 @@ def plot_toc(
     treatment_col="w",
     treatment_effect_col="tau",
     normalize=False,
-    random_seed=42,
     n=100,
     figsize=(8, 8),
     ax: Optional[plt.Axes] = None,
@@ -234,8 +260,8 @@ def plot_toc(
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
-        normalize (bool, optional): whether to normalize the y-axis to 1 or not
-        random_seed (int, optional): deprecated
+        normalize (bool, optional): whether to normalize the TOC curve by its maximum
+            absolute value before plotting
         n (int, optional): the number of samples to be used for plotting
         figsize (tuple, optional): the size of the figure to plot
         ax (plt.Axes, optional): an existing axes object to draw on
