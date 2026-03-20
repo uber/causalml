@@ -1226,7 +1226,7 @@ def test_BaseDRClassifier(generate_classification_data):
 def test_BaseTLearner_predict_return_ci(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
-    learner = BaseTRegressor(learner=LinearRegression(), control_name=CONTROL_NAME)
+    learner = BaseTRegressor(learner=LinearRegression(), control_name=0)
 
     # Test 1: store_bootstraps=True then predict with return_ci=True
     learner.fit(
@@ -1246,7 +1246,7 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
     assert (lb <= ub).all()
 
     # Test 2: ValueError without store_bootstraps
-    learner2 = BaseTRegressor(learner=LinearRegression(), control_name=CONTROL_NAME)
+    learner2 = BaseTRegressor(learner=LinearRegression(), control_name=0)
     learner2.fit(X, treatment, y)
     with pytest.raises(ValueError):
         learner2.predict(X, return_ci=True)
@@ -1260,7 +1260,7 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
     assert tau_plain.shape == (X.shape[0], len(learner.t_groups))
 
     # Test 5: reproducibility via random_state
-    learner3 = BaseTRegressor(learner=LinearRegression(), control_name=CONTROL_NAME)
+    learner3 = BaseTRegressor(learner=LinearRegression(), control_name=0)
     learner3.fit(
         X,
         treatment,
