@@ -77,13 +77,15 @@ def test_plot_tmlegain(generate_regression_data, monkeypatch):
 def test_rate_score_basic():
     np.random.seed(42)
     n = 500
-    df = pd.DataFrame({
-        "y": np.random.binomial(1, 0.5, n),
-        "w": np.random.binomial(1, 0.5, n),
-        "tau": np.zeros(n),
-        "model_good": np.random.normal(1, 1, n),
-        "model_random": np.random.normal(0, 1, n),
-    })
+    df = pd.DataFrame(
+        {
+            "y": np.random.binomial(1, 0.5, n),
+            "w": np.random.binomial(1, 0.5, n),
+            "tau": np.zeros(n),
+            "model_good": np.random.normal(1, 1, n),
+            "model_random": np.random.normal(0, 1, n),
+        }
+    )
 
     result = rate_score(df)
     assert isinstance(result, pd.Series)
@@ -94,13 +96,15 @@ def test_rate_score_basic():
 def test_rate_score_with_ci():
     np.random.seed(42)
     n = 500
-    df = pd.DataFrame({
-        "y": np.random.binomial(1, 0.5, n),
-        "w": np.random.binomial(1, 0.5, n),
-        "tau": np.zeros(n),
-        "model_good": np.random.normal(1, 1, n),
-        "model_random": np.random.normal(0, 1, n),
-    })
+    df = pd.DataFrame(
+        {
+            "y": np.random.binomial(1, 0.5, n),
+            "w": np.random.binomial(1, 0.5, n),
+            "tau": np.zeros(n),
+            "model_good": np.random.normal(1, 1, n),
+            "model_random": np.random.normal(0, 1, n),
+        }
+    )
 
     result = rate_score(df, return_ci=True, n_bootstrap=50)
     assert isinstance(result, pd.DataFrame)
@@ -111,9 +115,14 @@ def test_rate_score_with_ci():
 
 
 def test_rate_score_invalid_weighting():
-    df = pd.DataFrame({
-        "y": [1, 0, 1], "w": [1, 0, 1], "tau": [0.1, 0.2, 0.3], "model": [0.5, 0.3, 0.8]
-    })
+    df = pd.DataFrame(
+        {
+            "y": [1, 0, 1],
+            "w": [1, 0, 1],
+            "tau": [0.1, 0.2, 0.3],
+            "model": [0.5, 0.3, 0.8],
+        }
+    )
     with pytest.raises(ValueError, match="weighting must be"):
         rate_score(df, weighting="invalid")
 
