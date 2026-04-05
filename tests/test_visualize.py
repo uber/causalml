@@ -71,4 +71,3 @@ def test_plot_tmlegain(generate_regression_data, monkeypatch):
         cv=kf,
         ci=False,
     )
-
