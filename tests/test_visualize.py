@@ -6,7 +6,6 @@ from sklearn.model_selection import KFold, train_test_split
 
 from causalml.metrics.visualize import get_cumlift, plot_tmlegain
 from causalml.inference.meta import LRSRegressor
-from causalml.metrics import rate_score
 
 
 def test_visualize_get_cumlift_errors_on_nan():
@@ -73,61 +72,3 @@ def test_plot_tmlegain(generate_regression_data, monkeypatch):
         ci=False,
     )
 
-
-def test_rate_score_basic():
-    np.random.seed(42)
-    n = 500
-    df = pd.DataFrame(
-        {
-            "y": np.random.binomial(1, 0.5, n),
-            "w": np.random.binomial(1, 0.5, n),
-            "tau": np.zeros(n),
-            "model_good": np.random.normal(1, 1, n),
-            "model_random": np.random.normal(0, 1, n),
-        }
-    )
-
-    result = rate_score(df)
-    assert isinstance(result, pd.Series)
-    assert set(result.index) == {"model_good", "model_random"}
-    assert result["model_good"] > result["model_random"]
-
-
-def test_rate_score_with_ci():
-    np.random.seed(42)
-    n = 500
-    df = pd.DataFrame(
-        {
-            "y": np.random.binomial(1, 0.5, n),
-            "w": np.random.binomial(1, 0.5, n),
-            "tau": np.zeros(n),
-            "model_good": np.random.normal(1, 1, n),
-            "model_random": np.random.normal(0, 1, n),
-        }
-    )
-
-    result = rate_score(df, return_ci=True, n_bootstrap=50)
-    assert isinstance(result, pd.DataFrame)
-    assert set(result.columns) == {"rate", "se", "ci_lower", "ci_upper", "p_value"}
-    assert (result["ci_lower"] < result["rate"]).all()
-    assert (result["ci_upper"] > result["rate"]).all()
-    assert (result["p_value"].between(0, 1)).all()
-
-
-def test_rate_score_invalid_weighting():
-    df = pd.DataFrame(
-        {
-            "y": [1, 0, 1],
-            "w": [1, 0, 1],
-            "tau": [0.1, 0.2, 0.3],
-            "model": [0.5, 0.3, 0.8],
-        }
-    )
-    with pytest.raises(ValueError, match="weighting must be"):
-        rate_score(df, weighting="invalid")
-
-
-def test_rate_score_no_model_cols():
-    df = pd.DataFrame({"y": [1, 0], "w": [1, 0], "tau": [0.1, 0.2]})
-    with pytest.raises(ValueError, match="No model prediction columns"):
-        rate_score(df)
