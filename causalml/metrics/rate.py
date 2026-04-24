@@ -3,12 +3,37 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from scipy import stats
 import logging
 
 plt.style.use("fivethirtyeight")
 RANDOM_COL = "Random"
 
 logger = logging.getLogger("causalml")
+
+
+def _compute_rate_from_toc(toc, weighting):
+    """Compute the RATE scalar from a TOC DataFrame.
+
+    Args:
+        toc (pandas.DataFrame): TOC curve indexed by quantile q
+        weighting (str): one of ``"autoc"`` or ``"qini"``
+
+    Returns:
+        (pandas.Series): RATE score for each model column
+    """
+    quantiles = toc.index.values
+    q_mid = (quantiles[:-1] + quantiles[1:]) / 2
+    toc_mid = (toc.iloc[:-1].values + toc.iloc[1:].values) / 2
+    if weighting == "autoc":
+        weights = 1.0 / q_mid
+    else:
+        weights = q_mid
+    weights = weights / weights.sum()
+    return pd.Series(
+        np.average(toc_mid, axis=0, weights=weights),
+        index=toc.columns,
+    )
 
 
 def get_toc(
@@ -154,6 +179,7 @@ def rate_score(
     return_ci=False,
     n_bootstrap=200,
     alpha=0.05,
+    random_state=None,
 ):
     """Calculate the Rank-weighted Average Treatment Effect (RATE) score.
 
@@ -204,6 +230,8 @@ def rate_score(
             Only used when return_ci=True. Default 200.
         alpha (float, optional): significance level for confidence intervals.
             Only used when return_ci=True. Default 0.05.
+        random_state (int or None, optional): random seed for the bootstrap sampler.
+            Pass an integer for reproducible results. Default None.
 
     Returns:
         If return_ci=False:
@@ -212,28 +240,12 @@ def rate_score(
             (pandas.DataFrame): RATE score, standard error, CI lower bound, CI upper bound,
                 and p-value for each model estimate column
     """
-    from scipy import stats
-
     assert weighting in (
         "autoc",
         "qini",
     ), "{} weighting is not implemented. Select one of {}".format(
         weighting, ("autoc", "qini")
     )
-
-    def _compute_rate_from_toc(toc, weighting):
-        quantiles = toc.index.values
-        q_mid = (quantiles[:-1] + quantiles[1:]) / 2
-        toc_mid = (toc.iloc[:-1].values + toc.iloc[1:].values) / 2
-        if weighting == "autoc":
-            weights = 1.0 / q_mid
-        else:
-            weights = q_mid
-        weights = weights / weights.sum()
-        return pd.Series(
-            np.average(toc_mid, axis=0, weights=weights),
-            index=toc.columns,
-        )
 
     toc = get_toc(
         df,
@@ -255,7 +267,7 @@ def rate_score(
     model_names = toc.columns.tolist()
     boot_scores = {model: [] for model in model_names}
 
-    rng = np.random.default_rng(seed=42)
+    rng = np.random.default_rng(random_state)
     for _ in range(n_bootstrap):
         idx = rng.choice(n, size=m, replace=False)
         df_boot = df.iloc[idx].reset_index(drop=True)
