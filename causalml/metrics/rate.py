@@ -56,9 +56,16 @@ def get_toc(
     to calculate TOC. Otherwise, it's estimated as the difference between the mean outcomes
     of the treatment and control groups in each quantile band.
 
-    Note: when using observed outcomes, if a quantile band contains only treated or only
-    control units, the code falls back to TOC(q) = 0 for that band (i.e., subset ATE is
-    set to the overall ATE). This is a conservative approximation and is logged as a warning.
+    Note: when using observed outcomes (i.e. without ``treatment_effect_col``), the subset
+    ATE is estimated via a naive difference-in-means. This is valid for randomized
+    experiments (RCTs) but may be biased for observational data due to confounding within
+    quantile bands. For observational settings, compute doubly-robust (AIPW) pseudo-outcomes
+    externally and pass them as ``treatment_effect_col``. See Yadlowsky et al. (2021),
+    Section 4 for details.
+
+    If a quantile band contains only treated or only control units, the code falls back to
+    TOC(q) = 0 for that band (i.e., subset ATE is set to the overall ATE). This is a
+    conservative approximation and is logged as a warning.
 
     For details, see Yadlowsky et al. (2021), `Evaluating Treatment Prioritization Rules
     via Rank-Weighted Average Treatment Effects`. https://arxiv.org/abs/2111.07966
@@ -209,6 +216,10 @@ def rate_score(
     coverage for the RATE functional per the Yadlowsky et al. (2021) functional CLT.
     The p-value tests H0: RATE = 0 (i.e. the model's prioritization is no better than
     random) using a two-sided z-test.
+    When using observed outcomes (without ``treatment_effect_col``), the underlying TOC
+    estimates the subset ATE via naive difference-in-means, which is valid for RCTs but
+    biased for observational data. For observational settings, pass AIPW pseudo-outcomes
+    as ``treatment_effect_col``. See the ``get_toc()`` docstring for details.
 
     For details, see Yadlowsky et al. (2021), `Evaluating Treatment Prioritization Rules
     via Rank-Weighted Average Treatment Effects`. https://arxiv.org/abs/2111.07966
