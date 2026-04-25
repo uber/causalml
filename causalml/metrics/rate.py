@@ -3,12 +3,37 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
+from scipy import stats
 import logging
 
 plt.style.use("fivethirtyeight")
 RANDOM_COL = "Random"
 
 logger = logging.getLogger("causalml")
+
+
+def _compute_rate_from_toc(toc, weighting):
+    """Compute the RATE scalar from a TOC DataFrame.
+
+    Args:
+        toc (pandas.DataFrame): TOC curve indexed by quantile q
+        weighting (str): one of ``"autoc"`` or ``"qini"``
+
+    Returns:
+        (pandas.Series): RATE score for each model column
+    """
+    quantiles = toc.index.values
+    q_mid = (quantiles[:-1] + quantiles[1:]) / 2
+    toc_mid = (toc.iloc[:-1].values + toc.iloc[1:].values) / 2
+    if weighting == "autoc":
+        weights = 1.0 / q_mid
+    else:
+        weights = q_mid
+    weights = weights / weights.sum()
+    return pd.Series(
+        np.average(toc_mid, axis=0, weights=weights),
+        index=toc.columns,
+    )
 
 
 def get_toc(
@@ -158,6 +183,10 @@ def rate_score(
     treatment_effect_col="tau",
     weighting="autoc",
     normalize=False,
+    return_ci=False,
+    n_bootstrap=200,
+    alpha=0.05,
+    random_state=None,
 ):
     """Calculate the Rank-weighted Average Treatment Effect (RATE) score.
 
@@ -182,6 +211,11 @@ def rate_score(
     so the absolute scale matches the TOC values but may differ slightly from the paper's
     continuous integral definition. Model rankings are preserved.
 
+    When return_ci=True, standard errors and confidence intervals are estimated via the
+    half-sample bootstrap (m = n // 2 draws without replacement), which gives valid
+    coverage for the RATE functional per the Yadlowsky et al. (2021) functional CLT.
+    The p-value tests H0: RATE = 0 (i.e. the model's prioritization is no better than
+    random) using a two-sided z-test.
     When using observed outcomes (without ``treatment_effect_col``), the underlying TOC
     estimates the subset ATE via naive difference-in-means, which is valid for RCTs but
     biased for observational data. For observational settings, pass AIPW pseudo-outcomes
@@ -201,9 +235,21 @@ def rate_score(
         weighting (str, optional): the weighting scheme for the RATE integral.
             One of ``"autoc"`` (default) or ``"qini"``.
         normalize (bool, optional): whether to normalize the TOC curve before scoring
+        return_ci (bool, optional): whether to return bootstrap confidence intervals and
+            p-values. Default False.
+        n_bootstrap (int, optional): number of half-sample bootstrap iterations.
+            Only used when return_ci=True. Default 200.
+        alpha (float, optional): significance level for confidence intervals.
+            Only used when return_ci=True. Default 0.05.
+        random_state (int or None, optional): random seed for the bootstrap sampler.
+            Pass an integer for reproducible results. Default None.
 
     Returns:
-        (pandas.Series): RATE scores of model estimates
+        If return_ci=False:
+            (pandas.Series): RATE scores of model estimates
+        If return_ci=True:
+            (pandas.DataFrame): RATE score, standard error, CI lower bound, CI upper bound,
+                and p-value for each model estimate column
     """
     assert weighting in (
         "autoc",
@@ -220,26 +266,55 @@ def rate_score(
         normalize=normalize,
     )
 
-    quantiles = toc.index.values  # includes 0 and 1
-
-    # Use midpoints to avoid division by zero for autoc at q=0
-    q_mid = (quantiles[:-1] + quantiles[1:]) / 2
-    toc_mid = (toc.iloc[:-1].values + toc.iloc[1:].values) / 2
-
-    if weighting == "autoc":
-        weights = 1.0 / q_mid
-    else:
-        weights = q_mid
-
-    # Normalize weights so they sum to 1 over the integration domain
-    weights = weights / weights.sum()
-
-    rate = pd.Series(
-        np.average(toc_mid, axis=0, weights=weights),
-        index=toc.columns,
-    )
+    rate = _compute_rate_from_toc(toc, weighting)
     rate.name = "RATE ({})".format(weighting)
-    return rate
+
+    if not return_ci:
+        return rate
+
+    # Half-sample bootstrap for SE and p-value
+    n = len(df)
+    m = n // 2
+    model_names = toc.columns.tolist()
+    boot_scores = {model: [] for model in model_names}
+
+    rng = np.random.default_rng(random_state)
+    for _ in range(n_bootstrap):
+        idx = rng.choice(n, size=m, replace=False)
+        df_boot = df.iloc[idx].reset_index(drop=True)
+        toc_boot = get_toc(
+            df_boot,
+            outcome_col=outcome_col,
+            treatment_col=treatment_col,
+            treatment_effect_col=treatment_effect_col,
+            normalize=normalize,
+        )
+        rate_boot = _compute_rate_from_toc(toc_boot, weighting)
+        for model in model_names:
+            boot_scores[model].append(rate_boot[model])
+
+    z_crit = stats.norm.ppf(1 - alpha / 2)
+    results = []
+    for model in model_names:
+        point = rate[model]
+        boot = np.array(boot_scores[model])
+        se = np.std(boot, ddof=1)
+        ci_lower = point - z_crit * se
+        ci_upper = point + z_crit * se
+        z_stat = point / se if se > 0 else np.inf
+        p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+        results.append(
+            {
+                "model": model,
+                "rate": point,
+                "se": se,
+                "ci_lower": ci_lower,
+                "ci_upper": ci_upper,
+                "p_value": p_value,
+            }
+        )
+
+    return pd.DataFrame(results).set_index("model")
 
 
 def plot_toc(
