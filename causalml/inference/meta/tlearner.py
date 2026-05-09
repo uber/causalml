@@ -82,8 +82,14 @@ class BaseTLearner(BaseLearner):
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-        self.models_c = {group: deepcopy(self.model_c) for group in self.t_groups}
         self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
+
+        # model_c is trained on the control group, which is the same data for every
+        # treatment group, so we fit it once and share the reference across groups.
+        control_mask = treatment == self.control_name
+        fitted_model_c = deepcopy(self.model_c)
+        fitted_model_c.fit(X[control_mask], y[control_mask])
+        self.models_c = {group: fitted_model_c for group in self.t_groups}
 
         for group in self.t_groups:
             mask = (treatment == group) | (treatment == self.control_name)
@@ -92,7 +98,6 @@ class BaseTLearner(BaseLearner):
             y_filt = y[mask]
             w = (treatment_filt == group).astype(int)
 
-            self.models_c[group].fit(X_filt[w == 0], y_filt[w == 0])
             self.models_t[group].fit(X_filt[w == 1], y_filt[w == 1])
 
     def predict(
@@ -113,10 +118,12 @@ class BaseTLearner(BaseLearner):
         yhat_cs = {}
         yhat_ts = {}
 
+        # All groups share the same fitted model_c, so predict control outcomes once.
+        yhat_c = self.models_c[self.t_groups[0]].predict(X)
+
         for group in self.t_groups:
-            model_c = self.models_c[group]
             model_t = self.models_t[group]
-            yhat_cs[group] = model_c.predict(X)
+            yhat_cs[group] = yhat_c
             yhat_ts[group] = model_t.predict(X)
 
             if (y is not None) and (treatment is not None) and verbose:
@@ -374,10 +381,12 @@ class BaseTClassifier(BaseTLearner):
         yhat_cs = {}
         yhat_ts = {}
 
+        # All groups share the same fitted model_c, so predict control outcomes once.
+        yhat_c = self.models_c[self.t_groups[0]].predict_proba(X)[:, 1]
+
         for group in self.t_groups:
-            model_c = self.models_c[group]
             model_t = self.models_t[group]
-            yhat_cs[group] = model_c.predict_proba(X)[:, 1]
+            yhat_cs[group] = yhat_c
             yhat_ts[group] = model_t.predict_proba(X)[:, 1]
 
             if (y is not None) and (treatment is not None) and verbose:
