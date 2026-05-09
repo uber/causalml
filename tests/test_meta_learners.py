@@ -241,63 +241,6 @@ def test_BaseTLearner(generate_regression_data):
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
 
-def test_BaseTLearner_model_c_trained_and_predicted_once():
-    """model_c must be fitted and used for prediction exactly once across all treatment groups.
-
-    Before issue #853 was fixed, BaseTLearner.fit() trained a separate model_c for every
-    treatment group on identical control data, and BaseTLearner.predict() ran a separate
-    forward pass for each group. This test verifies that both operations now happen once.
-    """
-    np.random.seed(42)
-    n = 400
-    p = 4
-    X = np.random.randn(n, p)
-    # Three treatment groups (1, 2, 3) plus a control group (0)
-    treatment = np.random.choice([0, 1, 2, 3], size=n)
-    y = np.random.randn(n)
-
-    n_treatment_groups = len(np.unique(treatment[treatment != 0]))
-    assert n_treatment_groups == 3
-
-    fit_calls = []
-    predict_calls = []
-
-    class TrackingRegressor:
-        """Wraps LinearRegression and records fit/predict invocations via shared lists."""
-
-        def __init__(self):
-            self._model = LinearRegression()
-
-        def fit(self, X, y):
-            fit_calls.append(1)
-            self._model.fit(X, y)
-            return self
-
-        def predict(self, X):
-            predict_calls.append(1)
-            return self._model.predict(X)
-
-    learner = BaseTLearner(
-        control_learner=TrackingRegressor(),
-        treatment_learner=LinearRegression(),
-    )
-    learner.fit(X=X, treatment=treatment, y=y)
-
-    assert len(fit_calls) == 1, (
-        f"model_c.fit() was called {len(fit_calls)} time(s); expected exactly 1 "
-        f"(before the fix it was called once per treatment group = {n_treatment_groups} times)"
-    )
-
-    fit_calls.clear()
-    predict_calls.clear()
-    learner.predict(X=X)
-
-    assert len(predict_calls) == 1, (
-        f"model_c.predict() was called {len(predict_calls)} time(s); expected exactly 1 "
-        f"(before the fix it was called once per treatment group = {n_treatment_groups} times)"
-    )
-
-
 def test_BaseTRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 

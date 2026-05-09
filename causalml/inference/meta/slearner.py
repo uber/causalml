@@ -106,16 +106,15 @@ class BaseSLearner(BaseLearner):
         yhat_cs = {}
         yhat_ts = {}
 
+        # Build the augmented arrays once; they are identical for every group.
+        # (Separate allocations avoid in-place mutation by learners like CatBoost
+        # that set the writeable flag to False on arrays passed to predict().)
+        X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
+        X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
+
         for group in self.t_groups:
             model = self.models[group]
-
-            # Build separate arrays for control and treatment to avoid in-place
-            # mutation, which fails when learners like CatBoost set the
-            # writeable flag to False on arrays passed to predict().
-            X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
             yhat_cs[group] = model.predict(X_new_c)
-
-            X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
             yhat_ts[group] = model.predict(X_new_t)
 
             if (y is not None) and (treatment is not None) and verbose:
@@ -344,16 +343,13 @@ class BaseSClassifier(BaseSLearner):
         yhat_cs = {}
         yhat_ts = {}
 
+        # Build the augmented arrays once; they are identical for every group.
+        X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
+        X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
+
         for group in self.t_groups:
             model = self.models[group]
-
-            # Build separate arrays for control and treatment to avoid in-place
-            # mutation, which fails when learners like CatBoost set the
-            # writeable flag to False on arrays passed to predict().
-            X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
             yhat_cs[group] = model.predict_proba(X_new_c)[:, 1]
-
-            X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
             yhat_ts[group] = model.predict_proba(X_new_t)[:, 1]
 
             if y is not None and (treatment is not None) and verbose:

@@ -84,12 +84,11 @@ class BaseTLearner(BaseLearner):
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
 
-        # model_c is trained on the control group, which is the same data for every
-        # treatment group, so we fit it once and share the reference across groups.
+        # model_c is trained on the control group, which is identical for every
+        # treatment group, so fit it once and store as a single model (not a dict).
         control_mask = treatment == self.control_name
-        fitted_model_c = deepcopy(self.model_c)
-        fitted_model_c.fit(X[control_mask], y[control_mask])
-        self.models_c = {group: fitted_model_c for group in self.t_groups}
+        self.model_c = deepcopy(self.model_c)
+        self.model_c.fit(X[control_mask], y[control_mask])
 
         for group in self.t_groups:
             treatment_mask = treatment == group
@@ -110,16 +109,12 @@ class BaseTLearner(BaseLearner):
             (numpy.ndarray): Predictions of treatment effects.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
-        yhat_cs = {}
         yhat_ts = {}
 
-        # All groups share the same fitted model_c, so predict control outcomes once.
-        yhat_c = self.models_c[self.t_groups[0]].predict(X)
+        yhat_c = self.model_c.predict(X)
 
         for group in self.t_groups:
-            model_t = self.models_t[group]
-            yhat_cs[group] = yhat_c
-            yhat_ts[group] = model_t.predict(X)
+            yhat_ts[group] = self.models_t[group].predict(X)
 
             if (y is not None) and (treatment is not None) and verbose:
                 mask = (treatment == group) | (treatment == self.control_name)
@@ -128,7 +123,7 @@ class BaseTLearner(BaseLearner):
                 w = (treatment_filt == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 0] = yhat_c[mask][w == 0]
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info("Error metrics for group {}".format(group))
@@ -136,12 +131,12 @@ class BaseTLearner(BaseLearner):
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
-            te[:, i] = yhat_ts[group] - yhat_cs[group]
+            te[:, i] = yhat_ts[group] - yhat_c
 
         if not return_components:
             return te
         else:
-            return te, yhat_cs, yhat_ts
+            return te, yhat_c, yhat_ts
 
     def fit_predict(
         self,
@@ -180,7 +175,7 @@ class BaseTLearner(BaseLearner):
         else:
             t_groups_global = self.t_groups
             _classes_global = self._classes
-            models_c_global = deepcopy(self.models_c)
+            model_c_global = deepcopy(self.model_c)
             models_t_global = deepcopy(self.models_t)
             te_bootstraps = np.zeros(
                 shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps)
@@ -199,7 +194,7 @@ class BaseTLearner(BaseLearner):
             # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
-            self.models_c = deepcopy(models_c_global)
+            self.model_c = deepcopy(model_c_global)
             self.models_t = deepcopy(models_t_global)
 
             return (te, te_lower, te_upper)
@@ -230,9 +225,9 @@ class BaseTLearner(BaseLearner):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         if pretrain:
-            te, yhat_cs, yhat_ts = self.predict(X, treatment, y, return_components=True)
+            te, yhat_c, yhat_ts = self.predict(X, treatment, y, return_components=True)
         else:
-            te, yhat_cs, yhat_ts = self.fit_predict(
+            te, yhat_c, yhat_ts = self.fit_predict(
                 X, treatment, y, return_components=True
             )
 
@@ -249,14 +244,14 @@ class BaseTLearner(BaseLearner):
             w = (treatment_filt == group).astype(int)
             prob_treatment = float(sum(w)) / w.shape[0]
 
-            yhat_c = yhat_cs[group][mask]
+            yhat_c_g = yhat_c[mask]
             yhat_t = yhat_ts[group][mask]
 
             se = np.sqrt(
                 (
-                    (y_filt[w == 0] - yhat_c[w == 0]).var() / (1 - prob_treatment)
+                    (y_filt[w == 0] - yhat_c_g[w == 0]).var() / (1 - prob_treatment)
                     + (y_filt[w == 1] - yhat_t[w == 1]).var() / prob_treatment
-                    + (yhat_t - yhat_c).var()
+                    + (yhat_t - yhat_c_g).var()
                 )
                 / y_filt.shape[0]
             )
@@ -273,7 +268,7 @@ class BaseTLearner(BaseLearner):
         else:
             t_groups_global = self.t_groups
             _classes_global = self._classes
-            models_c_global = deepcopy(self.models_c)
+            model_c_global = deepcopy(self.model_c)
             models_t_global = deepcopy(self.models_t)
 
             logger.info("Bootstrap Confidence Intervals for ATE")
@@ -293,7 +288,7 @@ class BaseTLearner(BaseLearner):
             # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
-            self.models_c = deepcopy(models_c_global)
+            self.model_c = deepcopy(model_c_global)
             self.models_t = deepcopy(models_t_global)
 
             return ate, ate_lower, ate_upper
@@ -373,16 +368,12 @@ class BaseTClassifier(BaseTLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        yhat_cs = {}
         yhat_ts = {}
 
-        # All groups share the same fitted model_c, so predict control outcomes once.
-        yhat_c = self.models_c[self.t_groups[0]].predict_proba(X)[:, 1]
+        yhat_c = self.model_c.predict_proba(X)[:, 1]
 
         for group in self.t_groups:
-            model_t = self.models_t[group]
-            yhat_cs[group] = yhat_c
-            yhat_ts[group] = model_t.predict_proba(X)[:, 1]
+            yhat_ts[group] = self.models_t[group].predict_proba(X)[:, 1]
 
             if (y is not None) and (treatment is not None) and verbose:
                 mask = (treatment == group) | (treatment == self.control_name)
@@ -391,7 +382,7 @@ class BaseTClassifier(BaseTLearner):
                 w = (treatment_filt == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 0] = yhat_c[mask][w == 0]
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info("Error metrics for group {}".format(group))
@@ -399,12 +390,12 @@ class BaseTClassifier(BaseTLearner):
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
-            te[:, i] = yhat_ts[group] - yhat_cs[group]
+            te[:, i] = yhat_ts[group] - yhat_c
 
         if not return_components:
             return te
         else:
-            return te, yhat_cs, yhat_ts
+            return te, yhat_c, yhat_ts
 
 
 class XGBTRegressor(BaseTRegressor):
