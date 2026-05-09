@@ -12,7 +12,7 @@ if version.parse(sklearn.__version__) >= version.parse("0.22.0"):
 else:
     from sklearn.utils.testing import ignore_warnings
 from tqdm import tqdm
-from xgboost import XGBRegressor
+from xgboost import XGBClassifier, XGBRegressor
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import check_treatment_vector, convert_pd_to_np
@@ -415,6 +415,22 @@ class XGBTRegressor(BaseTRegressor):
         """Initialize a T-learner with two XGBoost models."""
         super().__init__(
             learner=XGBRegressor(*args, **kwargs),
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+        )
+
+
+class XGBTClassifier(BaseTClassifier):
+    """Convenience subclass mirroring :class:`XGBTRegressor` for the
+    classification case. Symmetric with :class:`XGBTRegressor` so users
+    don't have to wire up ``BaseTClassifier(learner=XGBClassifier(...))``
+    by hand. See uber/causalml#824.
+    """
+
+    def __init__(self, ate_alpha=0.05, control_name=0, *args, **kwargs):
+        """Initialize a T-learner with two XGBoost classifier models."""
+        super().__init__(
+            learner=XGBClassifier(*args, **kwargs),
             ate_alpha=ate_alpha,
             control_name=control_name,
         )

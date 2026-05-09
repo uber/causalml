@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
-from xgboost import XGBRegressor
+from xgboost import XGBClassifier, XGBRegressor
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
@@ -693,3 +693,52 @@ class XGBRRegressor(BaseRRegressor):
             sample_weight_filt_t = sample_weight_filt[w == 1]
             self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
             self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
+
+
+class XGBRClassifier(BaseRClassifier):
+    """Convenience subclass mirroring :class:`XGBRRegressor` for the
+    classification case. The outcome learner is an ``XGBClassifier``
+    (``BaseRClassifier.fit`` calls ``cross_val_predict(method='predict_proba')``)
+    while the effect learner stays an ``XGBRegressor`` because the
+    R-loss target is real-valued. See uber/causalml#824.
+    """
+
+    def __init__(
+        self,
+        propensity_learner=ElasticNetPropensityModel(),
+        ate_alpha=0.05,
+        control_name=0,
+        n_fold=5,
+        random_state=None,
+        outcome_learner_kwargs=None,
+        effect_learner_kwargs=None,
+    ):
+        """Initialize an R-learner classifier with XGBoost models.
+
+        Args:
+            propensity_learner: see :class:`BaseRClassifier`.
+            ate_alpha: see :class:`BaseRClassifier`.
+            control_name: see :class:`BaseRClassifier`.
+            n_fold: see :class:`BaseRClassifier`.
+            random_state: forwarded to both XGBoost models.
+            outcome_learner_kwargs (dict, optional): extra kwargs forwarded
+                to the underlying ``XGBClassifier`` outcome learner. Use
+                e.g. ``{"max_depth": 3, "n_estimators": 200}``.
+            effect_learner_kwargs (dict, optional): extra kwargs forwarded
+                to the underlying ``XGBRegressor`` effect learner.
+        """
+        # Use explicit kwargs dicts rather than ``*args, **kwargs`` so the two
+        # models can be tuned independently — they have non-overlapping
+        # hyperparameter spaces in practice (objective, eval_metric, etc.).
+        outcome_kwargs = dict(outcome_learner_kwargs or {})
+        effect_kwargs = dict(effect_learner_kwargs or {})
+
+        super().__init__(
+            outcome_learner=XGBClassifier(random_state=random_state, **outcome_kwargs),
+            effect_learner=XGBRegressor(random_state=random_state, **effect_kwargs),
+            propensity_learner=propensity_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+            n_fold=n_fold,
+            random_state=random_state,
+        )
