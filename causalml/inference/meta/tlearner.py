@@ -92,13 +92,8 @@ class BaseTLearner(BaseLearner):
         self.models_c = {group: fitted_model_c for group in self.t_groups}
 
         for group in self.t_groups:
-            mask = (treatment == group) | (treatment == self.control_name)
-            treatment_filt = treatment[mask]
-            X_filt = X[mask]
-            y_filt = y[mask]
-            w = (treatment_filt == group).astype(int)
-
-            self.models_t[group].fit(X_filt[w == 1], y_filt[w == 1])
+            treatment_mask = treatment == group
+            self.models_t[group].fit(X[treatment_mask], y[treatment_mask])
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
