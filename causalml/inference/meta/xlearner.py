@@ -130,6 +130,10 @@ class BaseXLearner(BaseLearner):
         self.model_mu_c = deepcopy(self.model_mu_c)
         self.model_mu_c.fit(X[control_mask], y[control_mask])
 
+        # var_c depends only on model_mu_c and control data, both constant across groups.
+        y_control_pred = self.model_mu_c.predict(X[control_mask])
+        var_c = (y[control_mask] - y_control_pred).var()
+
         for group in self.t_groups:
             treatment_mask = treatment == group
             X_treat = X[treatment_mask]
@@ -137,8 +141,6 @@ class BaseXLearner(BaseLearner):
 
             self.models_mu_t[group].fit(X_treat, y_treat)
 
-            # Calculate variances
-            var_c = (y[control_mask] - self.model_mu_c.predict(X[control_mask])).var()
             self.vars_c[group] = var_c
             var_t = (y_treat - self.models_mu_t[group].predict(X_treat)).var()
             self.vars_t[group] = var_t
@@ -181,6 +183,12 @@ class BaseXLearner(BaseLearner):
         dhat_cs = {}
         dhat_ts = {}
 
+        # For verbose metrics, control predictions are constant across groups.
+        yhat_c_verbose = None
+        if (y is not None) and (treatment is not None) and verbose:
+            control_mask = treatment == self.control_name
+            yhat_c_verbose = self.model_mu_c.predict(X[control_mask])
+
         for i, group in enumerate(self.t_groups):
             model_tau_c = self.models_tau_c[group]
             model_tau_t = self.models_tau_t[group]
@@ -192,7 +200,7 @@ class BaseXLearner(BaseLearner):
             )
             te[:, i] = np.ravel(_te)
 
-            if (y is not None) and (treatment is not None) and verbose:
+            if yhat_c_verbose is not None:
                 mask = (treatment == group) | (treatment == self.control_name)
                 treatment_filt = treatment[mask]
                 X_filt = X[mask]
@@ -200,7 +208,7 @@ class BaseXLearner(BaseLearner):
                 w = (treatment_filt == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = self.model_mu_c.predict(X_filt[w == 0])
+                yhat[w == 0] = yhat_c_verbose
                 yhat[w == 1] = self.models_mu_t[group].predict(X_filt[w == 1])
 
                 logger.info("Error metrics for group {}".format(group))
@@ -541,6 +549,10 @@ class BaseXClassifier(BaseXLearner):
         self.model_mu_c = deepcopy(self.model_mu_c)
         self.model_mu_c.fit(X[control_mask], y[control_mask])
 
+        # var_c depends only on model_mu_c and control data, both constant across groups.
+        y_control_pred = self.model_mu_c.predict_proba(X[control_mask])[:, 1]
+        var_c = (y[control_mask] - y_control_pred).var()
+
         for group in self.t_groups:
             treatment_mask = treatment == group
             X_treat = X[treatment_mask]
@@ -548,10 +560,6 @@ class BaseXClassifier(BaseXLearner):
 
             self.models_mu_t[group].fit(X_treat, y_treat)
 
-            # Calculate variances
-            var_c = (
-                y[control_mask] - self.model_mu_c.predict_proba(X[control_mask])[:, 1]
-            ).var()
             self.vars_c[group] = var_c
             var_t = (
                 y_treat - self.models_mu_t[group].predict_proba(X_treat)[:, 1]
@@ -600,6 +608,12 @@ class BaseXClassifier(BaseXLearner):
         dhat_cs = {}
         dhat_ts = {}
 
+        # For verbose metrics, control predictions are constant across groups.
+        yhat_c_verbose = None
+        if (y is not None) and (treatment is not None) and verbose:
+            control_mask = treatment == self.control_name
+            yhat_c_verbose = self.model_mu_c.predict_proba(X[control_mask])[:, 1]
+
         for i, group in enumerate(self.t_groups):
             model_tau_c = self.models_tau_c[group]
             model_tau_t = self.models_tau_t[group]
@@ -611,7 +625,7 @@ class BaseXClassifier(BaseXLearner):
             )
             te[:, i] = np.ravel(_te)
 
-            if (y is not None) and (treatment is not None) and verbose:
+            if yhat_c_verbose is not None:
                 mask = (treatment == group) | (treatment == self.control_name)
                 treatment_filt = treatment[mask]
                 X_filt = X[mask]
@@ -619,7 +633,7 @@ class BaseXClassifier(BaseXLearner):
                 w = (treatment_filt == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = self.model_mu_c.predict_proba(X_filt[w == 0])[:, 1]
+                yhat[w == 0] = yhat_c_verbose
                 yhat[w == 1] = self.models_mu_t[group].predict_proba(X_filt[w == 1])[
                     :, 1
                 ]
