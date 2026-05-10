@@ -239,6 +239,8 @@ class BaseDRLearner(BaseLearner):
 
         # models_mu_c is fold-specific but not group-specific; predict once and reuse.
         yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
+        # Shared-reference dict preserves the public yhat_cs[group] API cheaply.
+        yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for i, group in enumerate(self.t_groups):
             models_tau = self.models_tau[group]
@@ -264,7 +266,7 @@ class BaseDRLearner(BaseLearner):
         if not return_components:
             return te
         else:
-            return te, yhat_c, yhat_ts
+            return te, yhat_cs, yhat_ts
 
     def fit_predict(
         self,
@@ -394,11 +396,11 @@ class BaseDRLearner(BaseLearner):
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         if pretrain:
-            te, yhat_c, yhat_ts = self.predict(
+            te, yhat_cs, yhat_ts = self.predict(
                 X, treatment, y, p, return_components=True
             )
         else:
-            te, yhat_c, yhat_ts = self.fit_predict(
+            te, yhat_cs, yhat_ts = self.fit_predict(
                 X, treatment, y, p, return_components=True, seed=seed
             )
         X, treatment, y = convert_pd_to_np(X, treatment, y)
@@ -427,7 +429,7 @@ class BaseDRLearner(BaseLearner):
             w = (treatment_filt == group).astype(int)
             prob_treatment = float(sum(w)) / w.shape[0]
 
-            yhat_c_g = yhat_c[mask]
+            yhat_c = yhat_cs[group][mask]
             yhat_t = yhat_ts[group][mask]
             y_filt = y[mask]
 
@@ -435,9 +437,9 @@ class BaseDRLearner(BaseLearner):
             # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
             se = np.sqrt(
                 (
-                    (y_filt[w == 0] - yhat_c_g[w == 0]).var() / (1 - prob_treatment)
+                    (y_filt[w == 0] - yhat_c[w == 0]).var() / (1 - prob_treatment)
                     + (y_filt[w == 1] - yhat_t[w == 1]).var() / prob_treatment
-                    + (yhat_t - yhat_c_g).var()
+                    + (yhat_t - yhat_c).var()
                 )
                 / y_filt.shape[0]
             )
@@ -600,6 +602,7 @@ class BaseDRClassifier(BaseDRLearner):
         yhat_c = np.r_[
             [model.predict_proba(X)[:, 1] for model in self.models_mu_c]
         ].mean(axis=0)
+        yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for i, group in enumerate(self.t_groups):
             models_tau = self.models_tau[group]
@@ -625,7 +628,7 @@ class BaseDRClassifier(BaseDRLearner):
         if not return_components:
             return te
         else:
-            return te, yhat_c, yhat_ts
+            return te, yhat_cs, yhat_ts
 
 
 class XGBDRRegressor(BaseDRRegressor):

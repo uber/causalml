@@ -55,6 +55,9 @@ class BaseTLearner(BaseLearner):
         else:
             self.model_c = control_learner
 
+        # Preserve the unfitted template so repeated fit() calls always start fresh.
+        self._model_c_template = self.model_c
+
         if treatment_learner is None:
             self.model_t = deepcopy(learner)
         else:
@@ -85,10 +88,13 @@ class BaseTLearner(BaseLearner):
         self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
 
         # model_c is trained on the control group, which is identical for every
-        # treatment group, so fit it once and store as a single model (not a dict).
+        # treatment group, so fit it once. Deepcopy from the unfitted template so
+        # re-calling fit() always starts from a clean state (safe with warm_start).
         control_mask = treatment == self.control_name
-        self.model_c = deepcopy(self.model_c)
+        self.model_c = deepcopy(self._model_c_template)
         self.model_c.fit(X[control_mask], y[control_mask])
+        # Expose as a shared-reference dict to preserve the public models_c API.
+        self.models_c = {group: self.model_c for group in self.t_groups}
 
         for group in self.t_groups:
             treatment_mask = treatment == group
@@ -112,6 +118,9 @@ class BaseTLearner(BaseLearner):
         yhat_ts = {}
 
         yhat_c = self.model_c.predict(X)
+        # Build a shared-reference dict so return_components callers keep the
+        # yhat_cs[group] indexing API without duplicating the underlying array.
+        yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for group in self.t_groups:
             yhat_ts[group] = self.models_t[group].predict(X)
@@ -136,7 +145,7 @@ class BaseTLearner(BaseLearner):
         if not return_components:
             return te
         else:
-            return te, yhat_c, yhat_ts
+            return te, yhat_cs, yhat_ts
 
     def fit_predict(
         self,
@@ -195,6 +204,7 @@ class BaseTLearner(BaseLearner):
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.model_c = deepcopy(model_c_global)
+            self.models_c = {group: self.model_c for group in self.t_groups}
             self.models_t = deepcopy(models_t_global)
 
             return (te, te_lower, te_upper)
@@ -225,9 +235,9 @@ class BaseTLearner(BaseLearner):
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         if pretrain:
-            te, yhat_c, yhat_ts = self.predict(X, treatment, y, return_components=True)
+            te, yhat_cs, yhat_ts = self.predict(X, treatment, y, return_components=True)
         else:
-            te, yhat_c, yhat_ts = self.fit_predict(
+            te, yhat_cs, yhat_ts = self.fit_predict(
                 X, treatment, y, return_components=True
             )
 
@@ -244,14 +254,14 @@ class BaseTLearner(BaseLearner):
             w = (treatment_filt == group).astype(int)
             prob_treatment = float(sum(w)) / w.shape[0]
 
-            yhat_c_g = yhat_c[mask]
+            yhat_c = yhat_cs[group][mask]
             yhat_t = yhat_ts[group][mask]
 
             se = np.sqrt(
                 (
-                    (y_filt[w == 0] - yhat_c_g[w == 0]).var() / (1 - prob_treatment)
+                    (y_filt[w == 0] - yhat_c[w == 0]).var() / (1 - prob_treatment)
                     + (y_filt[w == 1] - yhat_t[w == 1]).var() / prob_treatment
-                    + (yhat_t - yhat_c_g).var()
+                    + (yhat_t - yhat_c).var()
                 )
                 / y_filt.shape[0]
             )
@@ -289,6 +299,7 @@ class BaseTLearner(BaseLearner):
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.model_c = deepcopy(model_c_global)
+            self.models_c = {group: self.model_c for group in self.t_groups}
             self.models_t = deepcopy(models_t_global)
 
             return ate, ate_lower, ate_upper
@@ -371,6 +382,7 @@ class BaseTClassifier(BaseTLearner):
         yhat_ts = {}
 
         yhat_c = self.model_c.predict_proba(X)[:, 1]
+        yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for group in self.t_groups:
             yhat_ts[group] = self.models_t[group].predict_proba(X)[:, 1]
@@ -395,7 +407,7 @@ class BaseTClassifier(BaseTLearner):
         if not return_components:
             return te
         else:
-            return te, yhat_c, yhat_ts
+            return te, yhat_cs, yhat_ts
 
 
 class XGBTRegressor(BaseTRegressor):
