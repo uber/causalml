@@ -25,6 +25,7 @@ from .visualize import (
     get_tmleqini,
 )  # noqa
 from .visualize import auuc_score, qini_score  # noqa
+from .rate import get_toc, rate_score, plot_toc  # noqa
 from .sensitivity import Sensitivity, SensitivityPlaceboTreatment  # noqa
 from .sensitivity import (
     SensitivityRandomCause,

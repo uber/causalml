@@ -235,16 +235,17 @@ class BaseDRLearner(BaseLearner):
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
-        yhat_cs = {}
         yhat_ts = {}
+
+        # models_mu_c is fold-specific but not group-specific; predict once and reuse.
+        yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
+        # Shared-reference dict preserves the public yhat_cs[group] API cheaply.
+        yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for i, group in enumerate(self.t_groups):
             models_tau = self.models_tau[group]
             _te = np.r_[[model.predict(X) for model in models_tau]].mean(axis=0)
             te[:, i] = np.ravel(_te)
-            yhat_cs[group] = np.r_[
-                [model.predict(X) for model in self.models_mu_c]
-            ].mean(axis=0)
             yhat_ts[group] = np.r_[
                 [model.predict(X) for model in self.models_mu_t[group]]
             ].mean(axis=0)
@@ -256,7 +257,7 @@ class BaseDRLearner(BaseLearner):
                 w = (treatment_filt == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 0] = yhat_c[mask][w == 0]
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info("Error metrics for group {}".format(group))
@@ -595,16 +596,18 @@ class BaseDRClassifier(BaseDRLearner):
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
-        yhat_cs = {}
         yhat_ts = {}
+
+        # models_mu_c is fold-specific but not group-specific; predict once and reuse.
+        yhat_c = np.r_[
+            [model.predict_proba(X)[:, 1] for model in self.models_mu_c]
+        ].mean(axis=0)
+        yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for i, group in enumerate(self.t_groups):
             models_tau = self.models_tau[group]
             _te = np.r_[[model.predict(X) for model in models_tau]].mean(axis=0)
             te[:, i] = np.ravel(_te)
-            yhat_cs[group] = np.r_[
-                [model.predict_proba(X)[:, 1] for model in self.models_mu_c]
-            ].mean(axis=0)
             yhat_ts[group] = np.r_[
                 [model.predict_proba(X)[:, 1] for model in self.models_mu_t[group]]
             ].mean(axis=0)
@@ -616,7 +619,7 @@ class BaseDRClassifier(BaseDRLearner):
                 w = (treatment_filt == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = yhat_cs[group][mask][w == 0]
+                yhat[w == 0] = yhat_c[mask][w == 0]
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info("Error metrics for group {}".format(group))

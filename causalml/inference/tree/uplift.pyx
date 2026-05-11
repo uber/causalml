@@ -60,6 +60,28 @@ cdef extern from "math.h":
     double fabs(double x) nogil
     double sqrt(double x) nogil
 
+
+def _align_tree_predict(tree, X, forest_classes, class_to_forest_idx):
+    """Predict with a single tree and align output to the forest's classes.
+
+    When a bootstrap sample excludes some treatment groups, the tree's
+    classes_ will be a subset of the forest's classes_. This function
+    maps the tree's predictions to the forest-level class ordering.
+
+    Args:
+        class_to_forest_idx: Precomputed {class_label: forest_index} mapping.
+    """
+    raw = tree.predict(X=X)
+    if len(tree.classes_) == len(forest_classes):
+        return raw
+    aligned = np.zeros((raw.shape[0], len(forest_classes)), dtype=raw.dtype)
+    for tree_idx, cls in enumerate(tree.classes_):
+        forest_idx = class_to_forest_idx.get(cls)
+        if forest_idx is not None:
+            aligned[:, forest_idx] = raw[:, tree_idx]
+    return aligned
+
+
 @cython.cfunc
 def kl_divergence(pk: cython.float, qk: cython.float) -> cython.float:
     '''
@@ -2095,7 +2117,14 @@ class UpliftTreeClassifier:
         else:
             p_t = cur_summary_p[suboptTreatment]
             n_t = cur_summary_n[suboptTreatment]
-        p_value = (1. - stats.norm.cdf(fabs(p_c - p_t) / sqrt(p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c))) * 2
+        if n_t > 0 and n_c > 0:
+            variance = p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c
+            if variance > 0:
+                p_value = (1. - stats.norm.cdf(fabs(p_c - p_t) / sqrt(variance))) * 2
+            else:
+                p_value = 1.0
+        else:
+            p_value = 1.0
         upliftScore = [maxDiff, p_value]
 
         bestGain = 0.0
@@ -2685,14 +2714,15 @@ class UpliftRandomForestClassifier:
 
         '''
         # Make predictions with all trees and take the average
+        class_to_forest_idx = {cls: idx for idx, cls in enumerate(self.classes_)}
 
         if self.n_jobs != 1:
             y_pred_ensemble = sum(
                 Parallel(n_jobs=self.n_jobs, prefer=self.joblib_prefer)
-                (delayed(tree.predict)(X=X) for tree in self.uplift_forest)
+                (delayed(_align_tree_predict)(tree, X, self.classes_, class_to_forest_idx) for tree in self.uplift_forest)
             ) / len(self.uplift_forest)
         else:
-            y_pred_ensemble = sum([tree.predict(X=X) for tree in self.uplift_forest]) / len(self.uplift_forest)
+            y_pred_ensemble = sum([_align_tree_predict(tree, X, self.classes_, class_to_forest_idx) for tree in self.uplift_forest]) / len(self.uplift_forest)
 
         # Summarize results into dataframe
         df_res = pd.DataFrame(y_pred_ensemble, columns=self.classes_)

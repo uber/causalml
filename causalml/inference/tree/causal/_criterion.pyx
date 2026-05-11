@@ -463,7 +463,8 @@ cdef class CausalMSE(CausalRegressionCriterion):
             tr_var = self.state.node.outcome_var(tr_group_idx)
             tr_count = self.state.node.count_1d[tr_group_idx]
 
-            impurity += (tr_var / tr_count + ct_var / ct_count) - node_tau * node_tau
+            if tr_count > 0 and ct_count > 0:
+                impurity += (tr_var / tr_count + ct_var / ct_count) - node_tau * node_tau
 
         impurity /= (self.n_outputs - 1)
         impurity += self.get_groups_penalty(self.state.node)
@@ -500,8 +501,10 @@ cdef class CausalMSE(CausalRegressionCriterion):
             left_tr_var = self.state.left.outcome_var(tr_group_idx)
             left_tr_count = self.state.left.count_1d[tr_group_idx]
 
-            impurity_right[0] += (right_tr_var / right_tr_count + right_ct_var / right_ct_count) - right_tau * right_tau
-            impurity_left[0] += (left_tr_var / left_tr_count + left_ct_var / left_ct_count) - left_tau * left_tau
+            if right_tr_count > 0 and right_ct_count > 0:
+                impurity_right[0] += (right_tr_var / right_tr_count + right_ct_var / right_ct_count) - right_tau * right_tau
+            if left_tr_count > 0 and left_ct_count > 0:
+                impurity_left[0] += (left_tr_var / left_tr_count + left_ct_var / left_ct_count) - left_tau * left_tau
 
         impurity_right[0] /= (self.n_outputs - 1)
         impurity_left[0] /= (self.n_outputs - 1)
@@ -577,16 +580,22 @@ cdef class TTest(CausalRegressionCriterion):
             left_tr_var = self.state.left.outcome_var(tr_group_idx)
             left_tr_count = self.state.left.count_1d[tr_group_idx]
 
-            denom_left = sqrt(left_tr_var / left_tr_count + left_ct_var / left_ct_count)
-            denom_right = sqrt(right_tr_var / right_tr_count + right_ct_var / right_ct_count)
+            denom_left = 0.0
+            denom_right = 0.0
+            if left_tr_count > 0 and left_ct_count > 0:
+                denom_left = sqrt(left_tr_var / left_tr_count + left_ct_var / left_ct_count)
+            if right_tr_count > 0 and right_ct_count > 0:
+                denom_right = sqrt(right_tr_var / right_tr_count + right_ct_var / right_ct_count)
             if denom_left > 0.:
                 t_left_sum += left_tau / denom_left
             if denom_right > 0.:
                 t_right_sum += right_tau / denom_right
-    
+
             # Per-treatment squared difference in taus between sides
-            inv_n_sum = (1.0 / right_tr_count + 1.0 / right_ct_count +
-                        1.0 / left_tr_count + 1.0 / left_ct_count)
+            inv_n_sum = 0.0
+            if right_tr_count > 0 and right_ct_count > 0 and left_tr_count > 0 and left_ct_count > 0:
+                inv_n_sum = (1.0 / right_tr_count + 1.0 / right_ct_count +
+                            1.0 / left_tr_count + 1.0 / left_ct_count)
 
             # Pooled variance across four cells (left/right × tr/ct)
             pooled_var_t = 0.0
