@@ -1273,6 +1273,40 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
     tau2, lb2, ub2 = learner3.predict(X, return_ci=True)
     np.testing.assert_array_equal(lb, lb2)
     np.testing.assert_array_equal(ub, ub2)
+
+    # Test 6: parallel execution (n_jobs=2) produces same result as serial
+    learner_parallel = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    learner_parallel.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED,
+        n_jobs=2,
+    )
+    tau_p, lb_p, ub_p = learner_parallel.predict(X, return_ci=True)
+    assert tau_p.shape == (X.shape[0], len(learner_parallel.t_groups))
+    assert (lb_p <= ub_p).all()
+
+    # Test 7: different random_state produces different bounds
+    learner_diff = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    learner_diff.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED + 1,
+    )
+    _, lb_diff, ub_diff = learner_diff.predict(X, return_ci=True)
+    assert not np.array_equal(
+        lb, lb_diff
+    ), "Different seeds should produce different bounds"
+
+
 def test_multi_treatment_learners():
     """Comprehensive multi-treatment (N=3) contract test for all meta-learners.
 

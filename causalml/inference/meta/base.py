@@ -13,6 +13,31 @@ from causalml.propensity import compute_propensity_score
 logger = logging.getLogger("causalml")
 
 
+def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_size):
+    """Module-level bootstrap helper for joblib pickling compatibility.
+
+    Args:
+        learner_template: the fitted learner to clone as a template
+        X: feature matrix
+        treatment: treatment vector
+        y: outcome vector
+        p: propensity scores or None
+        seed (int): random seed for this bootstrap iteration
+        bootstrap_size (int): number of samples to draw
+    Returns:
+        A fitted clone of learner_template trained on a bootstrap sample.
+    """
+    rng = np.random.RandomState(seed)
+    idxs = rng.choice(np.arange(X.shape[0]), size=bootstrap_size)
+    X_b = X[idxs]
+    treatment_b = treatment[idxs]
+    y_b = y[idxs]
+    p_b = {group: _p[idxs] for group, _p in p.items()} if p is not None else None
+    learner_b = clone(learner_template, safe=False)
+    learner_b.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
+    return learner_b
+
+
 class BaseLearner(metaclass=ABCMeta):
     @classmethod
     @abstractmethod
@@ -107,27 +132,14 @@ class BaseLearner(metaclass=ABCMeta):
             random_state (int, optional): random seed for reproducibility.
             n_jobs (int, optional): number of parallel jobs. -1 uses all cores. Default: 1.
         """
-        from sklearn.base import clone
 
         rng = np.random.RandomState(random_state)
         seeds = rng.randint(0, np.iinfo(np.int32).max, size=n_bootstraps)
         logger.info("Storing bootstrap ensemble ({} iterations)".format(n_bootstraps))
 
-        def _fit_one(seed):
-            local_rng = np.random.RandomState(seed)
-            idxs = local_rng.choice(np.arange(X.shape[0]), size=bootstrap_size)
-            X_b = X[idxs]
-            treatment_b = treatment[idxs]
-            y_b = y[idxs]
-            p_b = (
-                {group: _p[idxs] for group, _p in p.items()} if p is not None else None
-            )
-            learner_b = clone(self, safe=False)
-            learner_b.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
-            return learner_b
-
         self.bootstrap_models_ = Parallel(n_jobs=n_jobs)(
-            delayed(_fit_one)(s) for s in tqdm(seeds)
+            delayed(_fit_bootstrap_clone)(self, X, treatment, y, p, s, bootstrap_size)
+            for s in tqdm(seeds)
         )
 
     @staticmethod
