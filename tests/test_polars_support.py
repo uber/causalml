@@ -2,7 +2,7 @@
 Tests for Polars DataFrame/Series support across CausalML meta-learners.
 
 Run with:
-    pytest tests/test_polars_support.py -v
+    pytest tests/test_polars_support.py -v --noconftest
 """
 
 import pytest
@@ -163,7 +163,6 @@ class TestTLearnerPolars:
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
         te_np = self._fit_predict(*synthetic_data_numpy)
-        # Re-init so models are fresh
         self.learner = BaseTRegressor(learner=LinearRegression())
         te_pl = self._fit_predict(*synthetic_data_polars)
         _assert_te_close(te_np, te_pl)
@@ -215,8 +214,12 @@ class TestSLearnerPolars:
 
     def test_estimate_ate_polars(self, synthetic_data_polars):
         X, treatment, y = synthetic_data_polars
-        ate, lb, ub = self.learner.estimate_ate(X, treatment, y)
+        # BaseSLearner.estimate_ate returns only `ate` when return_ci=False (default)
+        ate = self.learner.estimate_ate(X, treatment, y)
         assert isinstance(ate, np.ndarray)
+        # With return_ci=True it returns (ate, lb, ub)
+        ate, lb, ub = self.learner.estimate_ate(X, treatment, y, return_ci=True)
+        assert lb[0] < ate[0] < ub[0]
 
 
 # X-Learner
@@ -248,15 +251,22 @@ class TestXLearnerPolars:
 class TestRLearnerPolars:
     @pytest.fixture(autouse=True)
     def _learner(self):
-        self.learner = BaseRRegressor(learner=LinearRegression())
+        # fixed random_state so KFold splits are identical across both runs
+        self.learner = BaseRRegressor(
+            learner=LinearRegression(), random_state=RANDOM_STATE
+        )
 
     def _fit_predict(self, X, treatment, y):
         self.learner.fit(X, treatment, y)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
+        # With a fixed random_state the KFold splits are deterministic,
+        # so numpy and polars inputs must produce identical results.
         te_np = self._fit_predict(*synthetic_data_numpy)
-        self.learner = BaseRRegressor(learner=LinearRegression())
+        self.learner = BaseRRegressor(
+            learner=LinearRegression(), random_state=RANDOM_STATE
+        )
         te_pl = self._fit_predict(*synthetic_data_polars)
         _assert_te_close(te_np, te_pl)
 
@@ -273,14 +283,16 @@ class TestDRLearnerPolars:
     def _learner(self):
         self.learner = BaseDRRegressor(learner=LinearRegression())
 
-    def _fit_predict(self, X, treatment, y):
-        self.learner.fit(X, treatment, y)
+    def _fit_predict(self, X, treatment, y, seed=None):
+        self.learner.fit(X, treatment, y, seed=seed)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
-        te_np = self._fit_predict(*synthetic_data_numpy)
+        # DR-Learner uses KFold with a seed parameter passed to fit(); fix it
+        # so both runs use the same splits.
+        te_np = self._fit_predict(*synthetic_data_numpy, seed=RANDOM_STATE)
         self.learner = BaseDRRegressor(learner=LinearRegression())
-        te_pl = self._fit_predict(*synthetic_data_polars)
+        te_pl = self._fit_predict(*synthetic_data_polars, seed=RANDOM_STATE)
         _assert_te_close(te_np, te_pl)
 
     def test_fit_predict_returns_numpy(self, synthetic_data_polars):
