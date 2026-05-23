@@ -212,6 +212,25 @@ class BaseTLearner(BaseLearner):
             )
             return te, te_lower, te_upper
 
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
+
+        if return_ci:
+            if self.bootstrap_models_ is None:
+                raise ValueError(
+                    "No bootstrap ensemble found. Call fit(..., store_bootstraps=True) first."
+                )
+            te_bootstraps = np.zeros(
+                (X.shape[0], self.t_groups.shape[0], len(self.bootstrap_models_))
+            )
+            for b, learner_b in enumerate(self.bootstrap_models_):
+                te_bootstraps[:, :, b] = learner_b.predict(X)
+            te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
+            te_upper = np.percentile(
+                te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2
+            )
+            return te, te_lower, te_upper
+
         if not return_components:
             return te
         else:
@@ -437,7 +456,14 @@ class BaseTClassifier(BaseTLearner):
         )
 
     def predict(
-        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+        self,
+        X,
+        treatment=None,
+        y=None,
+        p=None,
+        return_components=False,
+        verbose=True,
+        return_ci=False,
     ):
         """Predict treatment effects.
 
