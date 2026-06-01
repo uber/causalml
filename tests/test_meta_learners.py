@@ -1679,3 +1679,48 @@ def test_multi_treatment_learners():
     _assert_ate(
         rl.estimate_ate(X=X, treatment=treatment, y=y, p=p_scores, pretrain=True), name
     )
+
+
+def test_BaseTClassifier_predict_return_ci(generate_classification_data):
+    np.random.seed(RANDOM_SEED)
+
+    df, x_names = generate_classification_data()
+    df["treatment_group_key"] = np.where(
+        df["treatment_group_key"] == CONTROL_NAME, 0, 1
+    )
+
+    X = df[x_names].values
+    treatment = df["treatment_group_key"].values
+    y = df[CONVERSION].values
+
+    learner = BaseTClassifier(learner=LogisticRegression(), control_name=0)
+
+    # Test 1: return_ci=True returns (te, lb, ub)
+    learner.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED,
+    )
+    tau, lb, ub = learner.predict(X, return_ci=True)
+    assert tau.shape == (X.shape[0], len(learner.t_groups))
+    assert lb.shape == tau.shape
+    assert ub.shape == tau.shape
+    assert (lb <= ub).all()
+
+    # Test 2: ValueError without store_bootstraps
+    learner2 = BaseTClassifier(learner=LogisticRegression(), control_name=0)
+    learner2.fit(X, treatment, y)
+    with pytest.raises(ValueError):
+        learner2.predict(X, return_ci=True)
+
+    # Test 3: return_ci + return_components raises ValueError
+    with pytest.raises(ValueError):
+        learner.predict(X, return_ci=True, return_components=True)
+
+    # Test 4: old API unchanged
+    tau_plain = learner.predict(X)
+    assert tau_plain.shape == (X.shape[0], len(learner.t_groups))
