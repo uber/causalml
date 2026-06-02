@@ -11,7 +11,9 @@ from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
     check_treatment_vector,
     check_p_conditions,
-    convert_pd_to_np,
+    filter_mask,
+    filter_index,
+    to_numpy,
 )
 from causalml.metrics import regression_metrics, classification_metrics
 from causalml.propensity import compute_propensity_score
@@ -20,12 +22,7 @@ logger = logging.getLogger("causalml")
 
 
 class BaseDRLearner(BaseLearner):
-    """A parent class for DR-learner regressor classes.
-
-    A DR-learner estimates treatment effects with machine learning models.
-
-    Details of DR-learner are available at `Kennedy (2020) <https://arxiv.org/abs/2004.14497>`_.
-    """
+    """A parent class for DR-learner regressor classes."""
 
     def __init__(
         self,
@@ -36,41 +33,30 @@ class BaseDRLearner(BaseLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
-        """Initialize a DR-learner.
-
-        Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
-                groups
-            control_outcome_learner (optional): a model to estimate outcomes in the control group
-            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
-            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
-            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
-            control_name (str or int, optional): name of control group
-        """
         assert (learner is not None) or (
             (control_outcome_learner is not None)
             and (treatment_outcome_learner is not None)
             and (treatment_effect_learner is not None)
         )
 
-        if control_outcome_learner is None:
-            self.model_mu_c = deepcopy(learner)
-        else:
-            self.model_mu_c = control_outcome_learner
-
-        if treatment_outcome_learner is None:
-            self.model_mu_t = deepcopy(learner)
-        else:
-            self.model_mu_t = treatment_outcome_learner
-
-        if treatment_effect_learner is None:
-            self.model_tau = deepcopy(learner)
-        else:
-            self.model_tau = treatment_effect_learner
+        self.model_mu_c = (
+            deepcopy(learner)
+            if control_outcome_learner is None
+            else control_outcome_learner
+        )
+        self.model_mu_t = (
+            deepcopy(learner)
+            if treatment_outcome_learner is None
+            else treatment_outcome_learner
+        )
+        self.model_tau = (
+            deepcopy(learner)
+            if treatment_effect_learner is None
+            else treatment_effect_learner
+        )
 
         self.ate_alpha = ate_alpha
         self.control_name = control_name
-
         self.propensity = None
 
     def __repr__(self):
@@ -86,78 +72,63 @@ class BaseDRLearner(BaseLearner):
         )
 
     def fit(self, X, treatment, y, p=None, seed=None):
-        """Fit the inference model.
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            seed (int): random seed for cross-fitting
-        """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
-        self.t_groups = np.unique(treatment[treatment != self.control_name])
+        treatment_np = to_numpy(treatment)
+        y_np = to_numpy(y)
+
+        self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
-        # The estimator splits the data into 3 partitions for cross-fit on the propensity score estimation,
-        # the outcome regression, and the treatment regression on the doubly robust estimates. The use of
-        # the partitions is rotated so we do not lose on the sample size.
         cv = KFold(n_splits=3, shuffle=True, random_state=seed)
-        split_indices = [index for _, index in cv.split(y)]
+        split_indices = [index for _, index in cv.split(y_np)]
 
-        self.models_mu_c = [
-            deepcopy(self.model_mu_c),
-            deepcopy(self.model_mu_c),
-            deepcopy(self.model_mu_c),
-        ]
+        self.models_mu_c = [deepcopy(self.model_mu_c) for _ in range(3)]
         self.models_mu_t = {
-            group: [
-                deepcopy(self.model_mu_t),
-                deepcopy(self.model_mu_t),
-                deepcopy(self.model_mu_t),
-            ]
+            group: [deepcopy(self.model_mu_t) for _ in range(3)]
             for group in self.t_groups
         }
         self.models_tau = {
-            group: [
-                deepcopy(self.model_tau),
-                deepcopy(self.model_tau),
-                deepcopy(self.model_tau),
-            ]
+            group: [deepcopy(self.model_tau) for _ in range(3)]
             for group in self.t_groups
         }
+
         if p is None:
-            self.propensity = {group: np.zeros(y.shape[0]) for group in self.t_groups}
+            self.propensity = {
+                group: np.zeros(y_np.shape[0]) for group in self.t_groups
+            }
 
         for ifold in range(3):
             treatment_idx = split_indices[ifold]
             outcome_idx = split_indices[(ifold + 1) % 3]
             tau_idx = split_indices[(ifold + 2) % 3]
 
-            treatment_treat, treatment_out, treatment_tau = (
-                treatment[treatment_idx],
-                treatment[outcome_idx],
-                treatment[tau_idx],
-            )
-            y_out, y_tau = y[outcome_idx], y[tau_idx]
-            X_treat, X_out, X_tau = X[treatment_idx], X[outcome_idx], X[tau_idx]
+            treatment_treat = filter_index(treatment, treatment_idx)
+            treatment_out = filter_index(treatment, outcome_idx)
+            treatment_tau = filter_index(treatment, tau_idx)
+
+            treatment_treat_np = to_numpy(treatment_treat)
+            treatment_out_np = to_numpy(treatment_out)
+            treatment_tau_np = to_numpy(treatment_tau)
+
+            y_out = y_np[outcome_idx]
+            y_tau = y_np[tau_idx]
+
+            X_treat = filter_index(X, treatment_idx)
+            X_out = filter_index(X, outcome_idx)
+            X_tau = filter_index(X, tau_idx)
 
             if p is None:
                 logger.info("Generating propensity score")
                 cur_p = dict()
-
                 for group in self.t_groups:
-                    mask = (treatment_treat == group) | (
-                        treatment_treat == self.control_name
+                    mask = (treatment_treat_np == group) | (
+                        treatment_treat_np == self.control_name
                     )
-                    treatment_filt = treatment_treat[mask]
-                    X_filt = X_treat[mask]
-                    w_filt = (treatment_filt == group).astype(int)
-                    w = (treatment_tau == group).astype(int)
+                    treatment_filt = filter_mask(treatment_treat, mask)
+                    X_filt = filter_mask(X_treat, mask)
+                    w_filt = (to_numpy(treatment_filt) == group).astype(int)
+                    w = (treatment_tau_np == group).astype(int)
                     cur_p[group], _ = compute_propensity_score(
                         X=X_filt, treatment=w_filt, X_pred=X_tau, treatment_pred=w
                     )
@@ -165,29 +136,34 @@ class BaseDRLearner(BaseLearner):
             else:
                 cur_p = dict()
                 if isinstance(p, (np.ndarray, pd.Series)):
-                    cur_p = {self.t_groups[0]: convert_pd_to_np(p[tau_idx])}
+                    cur_p = {self.t_groups[0]: to_numpy(filter_index(p, tau_idx))}
                 else:
-                    cur_p = {g: prop[tau_idx] for g, prop in p.items()}
+                    cur_p = {
+                        g: to_numpy(filter_index(prop, tau_idx))
+                        for g, prop in p.items()
+                    }
                 check_p_conditions(cur_p, self.t_groups)
 
             logger.info("Generate outcome regressions")
             self.models_mu_c[ifold].fit(
-                X_out[treatment_out == self.control_name],
-                y_out[treatment_out == self.control_name],
+                filter_mask(X_out, treatment_out_np == self.control_name),
+                y_out[treatment_out_np == self.control_name],
             )
             for group in self.t_groups:
                 self.models_mu_t[group][ifold].fit(
-                    X_out[treatment_out == group], y_out[treatment_out == group]
+                    filter_mask(X_out, treatment_out_np == group),
+                    y_out[treatment_out_np == group],
                 )
 
             logger.info("Fit pseudo outcomes from the DR formula")
-
             for group in self.t_groups:
-                mask = (treatment_tau == group) | (treatment_tau == self.control_name)
-                treatment_filt = treatment_tau[mask]
-                X_filt = X_tau[mask]
+                mask = (treatment_tau_np == group) | (
+                    treatment_tau_np == self.control_name
+                )
+                treatment_filt_np = treatment_tau_np[mask]
+                X_filt = filter_mask(X_tau, mask)
                 y_filt = y_tau[mask]
-                w_filt = (treatment_filt == group).astype(int)
+                w_filt = (treatment_filt_np == group).astype(int)
                 p_filt = cur_p[group][mask]
                 mu_t = self.models_mu_t[group][ifold].predict(X_filt)
                 mu_c = self.models_mu_c[ifold].predict(X_filt)
@@ -202,45 +178,29 @@ class BaseDRLearner(BaseLearner):
                 self.models_tau[group][ifold].fit(X_filt, dr)
 
     def bootstrap(self, X, treatment, y, p=None, size=10000, rng=None, seed=None):
-        """Runs a single bootstrap with optional deterministic cross-fit seed."""
         if rng is not None:
-            idxs = rng.choice(np.arange(0, X.shape[0]), size=size)
+            idxs = rng.choice(np.arange(0, to_numpy(X).shape[0]), size=size)
         else:
-            idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
-        X_b = X[idxs]
-
-        if p is not None:
-            p_b = {group: _p[idxs] for group, _p in p.items()}
-        else:
-            p_b = None
-
-        treatment_b = treatment[idxs]
-        y_b = y[idxs]
+            idxs = np.random.choice(np.arange(0, to_numpy(X).shape[0]), size=size)
+        X_b = filter_index(X, idxs)
+        p_b = {group: _p[idxs] for group, _p in p.items()} if p is not None else None
+        treatment_b = filter_index(treatment, idxs)
+        y_b = to_numpy(y)[idxs]
         self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b, seed=seed)
         return self.predict(X=X, p=p)
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
-        """Predict treatment effects.
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series, optional): a treatment vector
-            y (np.array or pd.Series, optional): an outcome vector
-            verbose (bool, optional): whether to output progress logs
-        Returns:
-            (numpy.ndarray): Predictions of treatment effects.
-        """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
-
-        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        X_np = to_numpy(X)
+        te = np.zeros((X_np.shape[0], self.t_groups.shape[0]))
         yhat_cs = {}
         yhat_ts = {}
 
         for i, group in enumerate(self.t_groups):
-            models_tau = self.models_tau[group]
-            _te = np.r_[[model.predict(X) for model in models_tau]].mean(axis=0)
+            _te = np.r_[[model.predict(X) for model in self.models_tau[group]]].mean(
+                axis=0
+            )
             te[:, i] = np.ravel(_te)
             yhat_cs[group] = np.r_[
                 [model.predict(X) for model in self.models_mu_c]
@@ -250,10 +210,11 @@ class BaseDRLearner(BaseLearner):
             ].mean(axis=0)
 
             if (y is not None) and (treatment is not None) and verbose:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                y_filt = y[mask]
-                w = (treatment_filt == group).astype(int)
+                treatment_np = to_numpy(treatment)
+                mask = (treatment_np == group) | (treatment_np == self.control_name)
+                treatment_filt_np = treatment_np[mask]
+                y_filt = to_numpy(filter_mask(y, mask))
+                w = (treatment_filt_np == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
                 yhat[w == 0] = yhat_cs[group][mask][w == 0]
@@ -280,27 +241,6 @@ class BaseDRLearner(BaseLearner):
         verbose=True,
         seed=None,
     ):
-        """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            return_ci (bool): whether to return confidence intervals
-            n_bootstraps (int): number of bootstrap iterations
-            bootstrap_size (int): number of samples per bootstrap
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
-            verbose (str): whether to output progress logs
-            seed (int): random seed for cross-fitting
-        Returns:
-            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
-                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
-                UB [n_samples, n_treatment]
-        """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.fit(X, treatment, y, p, seed)
 
         if p is None:
@@ -308,12 +248,9 @@ class BaseDRLearner(BaseLearner):
 
         check_p_conditions(p, self.t_groups)
         if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
+            p = {self.t_groups[0]: to_numpy(p)}
         elif isinstance(p, dict):
-            p = {
-                treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()
-            }
+            p = {k: to_numpy(v) for k, v in p.items()}
 
         te = self.predict(
             X, treatment=treatment, y=y, return_components=return_components
@@ -322,15 +259,18 @@ class BaseDRLearner(BaseLearner):
         if not return_ci:
             return te
         else:
+            X_np = to_numpy(X)
+            treatment_np = to_numpy(treatment)
+            y_np = to_numpy(y)
+
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_mu_c_global = deepcopy(self.models_mu_c)
             models_mu_t_global = deepcopy(self.models_mu_t)
             models_tau_global = deepcopy(self.models_tau)
             te_bootstraps = np.zeros(
-                shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps)
+                shape=(X_np.shape[0], self.t_groups.shape[0], n_bootstraps)
             )
-            # seed controls both bootstrap resampling and cross-fit randomness.
             rng = np.random.default_rng(seed) if seed is not None else None
 
             logger.info("Bootstrap Confidence Intervals")
@@ -341,9 +281,9 @@ class BaseDRLearner(BaseLearner):
                     else None
                 )
                 te_b = self.bootstrap(
-                    X,
-                    treatment,
-                    y,
+                    X_np,
+                    treatment_np,
+                    y_np,
                     p,
                     size=bootstrap_size,
                     rng=rng,
@@ -356,7 +296,6 @@ class BaseDRLearner(BaseLearner):
                 te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2
             )
 
-            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.models_mu_c = deepcopy(models_mu_c_global)
@@ -377,23 +316,6 @@ class BaseDRLearner(BaseLearner):
         seed=None,
         pretrain=False,
     ):
-        """Estimate the Average Treatment Effect (ATE).
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            bootstrap_ci (bool): whether run bootstrap for confidence intervals
-            n_bootstraps (int): number of bootstrap iterations
-            bootstrap_size (int): number of samples per bootstrap
-            seed (int): random seed for cross-fitting
-            pretrain (bool): whether a model has been fit, default False.
-        Returns:
-            The mean and confidence interval (LB, UB) of the ATE estimate.
-        """
         if pretrain:
             te, yhat_cs, yhat_ts = self.predict(
                 X, treatment, y, p, return_components=True
@@ -402,19 +324,18 @@ class BaseDRLearner(BaseLearner):
             te, yhat_cs, yhat_ts = self.fit_predict(
                 X, treatment, y, p, return_components=True, seed=seed
             )
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+
+        treatment_np = to_numpy(treatment)
+        y_np = to_numpy(y)
 
         if p is None:
             p = self.propensity
         else:
             check_p_conditions(p, self.t_groups)
         if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
+            p = {self.t_groups[0]: to_numpy(p)}
         elif isinstance(p, dict):
-            p = {
-                treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()
-            }
+            p = {k: to_numpy(v) for k, v in p.items()}
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -422,18 +343,15 @@ class BaseDRLearner(BaseLearner):
 
         for i, group in enumerate(self.t_groups):
             _ate = te[:, i].mean()
-
-            mask = (treatment == group) | (treatment == self.control_name)
-            treatment_filt = treatment[mask]
+            mask = (treatment_np == group) | (treatment_np == self.control_name)
+            treatment_filt = treatment_np[mask]
             w = (treatment_filt == group).astype(int)
             prob_treatment = float(sum(w)) / w.shape[0]
 
             yhat_c = yhat_cs[group][mask]
             yhat_t = yhat_ts[group][mask]
-            y_filt = y[mask]
+            y_filt = y_np[mask]
 
-            # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
-            # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
             se = np.sqrt(
                 (
                     (y_filt[w == 0] - yhat_c[w == 0]).var() / (1 - prob_treatment)
@@ -453,6 +371,7 @@ class BaseDRLearner(BaseLearner):
         if not bootstrap_ci:
             return ate, ate_lb, ate_ub
         else:
+            X_np = to_numpy(X)
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_mu_c_global = deepcopy(self.models_mu_c)
@@ -461,7 +380,6 @@ class BaseDRLearner(BaseLearner):
 
             logger.info("Bootstrap Confidence Intervals for ATE")
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
-            # seed controls both bootstrap resampling and cross-fit randomness.
             rng = np.random.default_rng(seed) if seed is not None else None
 
             for n in tqdm(range(n_bootstraps)):
@@ -471,9 +389,9 @@ class BaseDRLearner(BaseLearner):
                     else None
                 )
                 cate_b = self.bootstrap(
-                    X,
-                    treatment,
-                    y,
+                    X_np,
+                    treatment_np,
+                    y_np,
                     p,
                     size=bootstrap_size,
                     rng=rng,
@@ -488,7 +406,6 @@ class BaseDRLearner(BaseLearner):
                 ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1
             )
 
-            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.models_mu_c = deepcopy(models_mu_c_global)
@@ -498,10 +415,6 @@ class BaseDRLearner(BaseLearner):
 
 
 class BaseDRRegressor(BaseDRLearner):
-    """
-    A parent class for DR-learner regressor classes.
-    """
-
     def __init__(
         self,
         learner=None,
@@ -511,17 +424,6 @@ class BaseDRRegressor(BaseDRLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
-        """Initialize an DR-learner regressor.
-
-        Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
-                groups
-            control_outcome_learner (optional): a model to estimate outcomes in the control group
-            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
-            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
-            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
-            control_name (str or int, optional): name of control group
-        """
         super().__init__(
             learner=learner,
             control_outcome_learner=control_outcome_learner,
@@ -533,10 +435,6 @@ class BaseDRRegressor(BaseDRLearner):
 
 
 class BaseDRClassifier(BaseDRLearner):
-    """
-    A parent class for DR-learner classifier classes.
-    """
-
     def __init__(
         self,
         learner=None,
@@ -546,20 +444,6 @@ class BaseDRClassifier(BaseDRLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
-        """Initialize a DR-learner classifier.
-
-        Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
-                groups. Should have a predict_proba() method for outcome models.
-            control_outcome_learner (optional): a model to estimate outcomes in the control group.
-                Should have a predict_proba() method.
-            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group.
-                Should have a predict_proba() method.
-            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group.
-                Should be a regressor.
-            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
-            control_name (str or int, optional): name of control group
-        """
         super().__init__(
             learner=learner,
             control_outcome_learner=control_outcome_learner,
@@ -572,35 +456,15 @@ class BaseDRClassifier(BaseDRLearner):
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
-        """Predict treatment effects.
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series, optional): a treatment vector. Used for computing
-                classification metrics when y is also provided.
-            y (np.array or pd.Series, optional): an outcome vector. Used for computing
-                classification metrics when treatment is also provided.
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1). Currently not used in prediction but kept for API consistency.
-            return_components (bool, optional): whether to return outcome probabilities for treatment and control
-                groups separately. Defaults to False.
-            verbose (bool, optional): whether to output progress logs. Defaults to True.
-        Returns:
-            (numpy.ndarray): Predictions of treatment effects.
-            If return_components is True, also returns:
-                - dict: Predicted probabilities for the control group (yhat_cs).
-                - dict: Predicted probabilities for the treatment group (yhat_ts).
-        """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
-
-        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        X_np = to_numpy(X)
+        te = np.zeros((X_np.shape[0], self.t_groups.shape[0]))
         yhat_cs = {}
         yhat_ts = {}
 
         for i, group in enumerate(self.t_groups):
-            models_tau = self.models_tau[group]
-            _te = np.r_[[model.predict(X) for model in models_tau]].mean(axis=0)
+            _te = np.r_[[model.predict(X) for model in self.models_tau[group]]].mean(
+                axis=0
+            )
             te[:, i] = np.ravel(_te)
             yhat_cs[group] = np.r_[
                 [model.predict_proba(X)[:, 1] for model in self.models_mu_c]
@@ -610,10 +474,11 @@ class BaseDRClassifier(BaseDRLearner):
             ].mean(axis=0)
 
             if (y is not None) and (treatment is not None) and verbose:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                y_filt = y[mask]
-                w = (treatment_filt == group).astype(int)
+                treatment_np = to_numpy(treatment)
+                mask = (treatment_np == group) | (treatment_np == self.control_name)
+                treatment_filt_np = treatment_np[mask]
+                y_filt = to_numpy(filter_mask(y, mask))
+                w = (treatment_filt_np == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
                 yhat[w == 0] = yhat_cs[group][mask][w == 0]
@@ -630,7 +495,6 @@ class BaseDRClassifier(BaseDRLearner):
 
 class XGBDRRegressor(BaseDRRegressor):
     def __init__(self, ate_alpha=0.05, control_name=0, *args, **kwargs):
-        """Initialize a DR-learner with two XGBoost models."""
         super().__init__(
             learner=XGBRegressor(*args, **kwargs),
             ate_alpha=ate_alpha,
