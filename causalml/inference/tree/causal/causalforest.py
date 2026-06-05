@@ -29,6 +29,17 @@ except ModuleNotFoundError:
 DOUBLE = np.float64
 DTYPE = np.float32
 
+# scikit-learn 1.9 refactored the forest sample_weight handling
+# (https://github.com/scikit-learn/scikit-learn/pull/31529), making `sample_weight`
+# a required positional argument on several private helpers vendored below.
+# We pass `sample_weight=None` on >=1.9 to preserve the pre-1.9 uniform-bootstrap
+# behavior (the vendored `_parallel_build_trees` already applies the user's
+# `sample_weight` itself), keeping causal-forest results identical across versions.
+# Compare against "1.9.0.dev0" (not "1.9.0") so 1.9 pre-releases (e.g. 1.9.0rc1,
+# which already carries the new signatures) also take the >=1.9 path; under PEP 440
+# a release candidate sorts before its final release.
+_SKLEARN_GE_19 = Version(sklearn_version) >= Version("1.9.0.dev0")
+
 if Version(sklearn_version) >= Version("1.1.0"):
     _joblib_parallel_args = dict(prefer="threads")
 else:
@@ -62,9 +73,15 @@ def _parallel_build_trees(
         else:
             curr_sample_weight = sample_weight.copy()
 
-        indices = _generate_sample_indices(
-            tree.random_state, n_samples, n_samples_bootstrap
-        )
+        if _SKLEARN_GE_19:
+            # 4th arg `sample_weight=None` -> uniform draw, matching pre-1.9 behavior
+            indices = _generate_sample_indices(
+                tree.random_state, n_samples, n_samples_bootstrap, None
+            )
+        else:
+            indices = _generate_sample_indices(
+                tree.random_state, n_samples, n_samples_bootstrap
+            )
         sample_counts = np.bincount(indices, minlength=n_samples)
         curr_sample_weight *= sample_counts
 
@@ -322,7 +339,12 @@ class CausalRandomForestRegressor(ForestRegressor):
         groups = np.unique(treatment).astype(int).size
         self.n_outputs_ = groups - 1
         self.max_outputs_ = self.n_outputs_ + groups
-        y, expanded_class_weight = self._validate_y_class_weight(y)
+        if _SKLEARN_GE_19:
+            # 1.9 requires sample_weight; for a regressor this returns (y, None)
+            # regardless, so threading it through is harmless.
+            y, expanded_class_weight = self._validate_y_class_weight(y, sample_weight)
+        else:
+            y, expanded_class_weight = self._validate_y_class_weight(y)
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
@@ -340,9 +362,16 @@ class CausalRandomForestRegressor(ForestRegressor):
                 "`max_sample=None`."
             )
         elif self.bootstrap:
-            n_samples_bootstrap = _get_n_samples_bootstrap(
-                n_samples=X.shape[0], max_samples=self.max_samples
-            )
+            if _SKLEARN_GE_19:
+                n_samples_bootstrap = _get_n_samples_bootstrap(
+                    n_samples=X.shape[0],
+                    max_samples=self.max_samples,
+                    sample_weight=None,
+                )
+            else:
+                n_samples_bootstrap = _get_n_samples_bootstrap(
+                    n_samples=X.shape[0], max_samples=self.max_samples
+                )
         else:
             n_samples_bootstrap = None
 
@@ -500,6 +529,17 @@ class CausalRandomForestRegressor(ForestRegressor):
 
         Returns:
             (np.ndarray), An array with the unbiased sampling variance for a RandomForest object.
+
+        Note:
+            This method delegates to ``forestci`` (forest-confidence-interval), which
+            calls scikit-learn's private ``_get_n_samples_bootstrap`` and
+            ``_generate_sample_indices`` with their pre-1.9 signatures. Under
+            scikit-learn >= 1.9 those helpers require an extra ``sample_weight``
+            argument, so ``forestci`` (<= 0.7) raises ``TypeError`` here. The error
+            originates upstream and is not yet fixed; ``calculate_error`` is therefore
+            unsupported on scikit-learn >= 1.9 until ``forestci`` is updated. ``fit``
+            and ``predict`` are unaffected. See
+            https://github.com/uber/causalml/issues/906.
         """
         if self.n_outputs_ != 1:
             raise NotImplementedError(
