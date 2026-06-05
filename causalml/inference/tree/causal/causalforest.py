@@ -13,7 +13,7 @@ from sklearn.utils.validation import (
 )
 from sklearn.utils.multiclass import type_of_target
 from sklearn import __version__ as sklearn_version
-from sklearn.ensemble._forest import DOUBLE, DTYPE, MAX_INT
+from sklearn.ensemble._forest import MAX_INT
 from sklearn.ensemble._forest import ForestRegressor
 from sklearn.ensemble._forest import compute_sample_weight, issparse
 from sklearn.ensemble._forest import _generate_sample_indices, _get_n_samples_bootstrap
@@ -25,6 +25,9 @@ try:
     from packaging.version import parse as Version
 except ModuleNotFoundError:
     from distutils.version import LooseVersion as Version
+
+DOUBLE = np.float64
+DTYPE = np.float32
 
 if Version(sklearn_version) >= Version("1.1.0"):
     _joblib_parallel_args = dict(prefer="threads")
