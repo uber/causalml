@@ -65,6 +65,7 @@ class BaseTLearner(BaseLearner):
 
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.bootstrap_models_ = None
 
     def __repr__(self):
         return "{}(model_c={}, model_t={})".format(
@@ -72,13 +73,36 @@ class BaseTLearner(BaseLearner):
         )
 
     @ignore_warnings(category=ConvergenceWarning)
-    def fit(self, X, treatment, y, p=None):
+    def fit(
+        self,
+        X,
+        treatment,
+        y,
+        p=None,
+        store_bootstraps=False,
+        n_bootstraps=200,
+        bootstrap_size=10000,
+        random_state=None,
+        n_jobs=1,
+    ):
         """Fit the inference model
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
+            p: unused, kept for API consistency
+            store_bootstraps (bool, optional): if True, trains a bootstrap ensemble
+                during fit and stores it in self.bootstrap_models_ for post-fit CI
+                estimation via predict(return_ci=True). Default: False.
+            n_bootstraps (int, optional): number of bootstrap iterations. Default: 200.
+                Note: storing N bootstraps of a GBM-based learner with k treatment
+                groups holds 2*N*k model objects in memory. Monitor RAM for large N
+                or heavy base learners.
+            n_jobs (int, optional): number of parallel jobs for bootstrap fitting.
+                -1 uses all available cores. Default: 1.
+            bootstrap_size (int, optional): number of samples per bootstrap. Default: 10000.
+            random_state (int, optional): random seed for reproducible bootstrap sampling.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
@@ -100,8 +124,49 @@ class BaseTLearner(BaseLearner):
             treatment_mask = treatment == group
             self.models_t[group].fit(X[treatment_mask], y[treatment_mask])
 
+        if store_bootstraps:
+            self.fit_bootstrap_ensemble(
+                X=X,
+                treatment=treatment,
+                y=y,
+                n_bootstraps=n_bootstraps,
+                bootstrap_size=bootstrap_size,
+                random_state=random_state,
+                n_jobs=n_jobs,
+            )
+        else:
+            self.bootstrap_models_ = None
+
+    def _compute_bootstrap_ci(self, X):
+        """Compute bootstrap CI using stored ensemble.
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+        Returns:
+            (te_lower, te_upper): percentile CI bounds, each of shape [n_samples, n_treatment]
+        """
+        if self.bootstrap_models_ is None:
+            raise ValueError(
+                "No bootstrap ensemble found. Call fit(..., store_bootstraps=True) first."
+            )
+        te_bootstraps = np.zeros(
+            (X.shape[0], self.t_groups.shape[0], len(self.bootstrap_models_))
+        )
+        for b, learner_b in enumerate(self.bootstrap_models_):
+            te_bootstraps[:, :, b] = learner_b.predict(X)
+        te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
+        te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
+        return te_lower, te_upper
+
     def predict(
-        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+        self,
+        X,
+        treatment=None,
+        y=None,
+        p=None,
+        return_components=False,
+        verbose=True,
+        return_ci=False,
     ):
         """Predict treatment effects.
 
@@ -109,11 +174,21 @@ class BaseTLearner(BaseLearner):
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            return_components (bool, optional): whether to return outcome for
+                treatment and control separately
             verbose (bool, optional): whether to output progress logs
+            return_ci (bool, optional): whether to return confidence intervals
+                using the stored bootstrap ensemble. Requires fit() to have been
+                called with store_bootstraps=True. CI width is controlled by
+                self.ate_alpha set at init time.
         Returns:
-            (numpy.ndarray): Predictions of treatment effects.
+            (numpy.ndarray): Predictions of treatment effects. If return_ci=True,
+                returns (te, te_lower, te_upper) each of shape [n_samples, n_treatment].
+                return_ci=True and return_components=True cannot be used together.
         """
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
+
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         yhat_ts = {}
 
@@ -141,6 +216,10 @@ class BaseTLearner(BaseLearner):
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = yhat_ts[group] - yhat_c
+
+        if return_ci:
+            te_lower, te_upper = self._compute_bootstrap_ci(X)
+            return te, te_lower, te_upper
 
         if not return_components:
             return te
@@ -367,7 +446,14 @@ class BaseTClassifier(BaseTLearner):
         )
 
     def predict(
-        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
+        self,
+        X,
+        treatment=None,
+        y=None,
+        p=None,
+        return_components=False,
+        verbose=True,
+        return_ci=False,
     ):
         """Predict treatment effects.
 
@@ -403,6 +489,13 @@ class BaseTClassifier(BaseTLearner):
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = yhat_ts[group] - yhat_c
+
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
+
+        if return_ci:
+            te_lower, te_upper = self._compute_bootstrap_ci(X)
+            return te, te_lower, te_upper
 
         if not return_components:
             return te
