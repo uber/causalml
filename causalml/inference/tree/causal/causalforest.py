@@ -35,10 +35,7 @@ DTYPE = np.float32
 # We pass `sample_weight=None` on >=1.9 to preserve the pre-1.9 uniform-bootstrap
 # behavior (the vendored `_parallel_build_trees` already applies the user's
 # `sample_weight` itself), keeping causal-forest results identical across versions.
-# Compare against "1.9.0.dev0" (not "1.9.0") so 1.9 pre-releases (e.g. 1.9.0rc1,
-# which already carries the new signatures) also take the >=1.9 path; under PEP 440
-# a release candidate sorts before its final release.
-_SKLEARN_GE_19 = Version(sklearn_version) >= Version("1.9.0.dev0")
+_SKLEARN_GE_19 = Version(sklearn_version) >= Version("1.9.0")
 
 if Version(sklearn_version) >= Version("1.1.0"):
     _joblib_parallel_args = dict(prefer="threads")
@@ -74,9 +71,9 @@ def _parallel_build_trees(
             curr_sample_weight = sample_weight.copy()
 
         if _SKLEARN_GE_19:
-            # 4th arg `sample_weight=None` -> uniform draw, matching pre-1.9 behavior
+            # `sample_weight=None` -> uniform draw, matching pre-1.9 behavior
             indices = _generate_sample_indices(
-                tree.random_state, n_samples, n_samples_bootstrap, None
+                tree.random_state, n_samples, n_samples_bootstrap, sample_weight=None
             )
         else:
             indices = _generate_sample_indices(

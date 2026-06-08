@@ -15,9 +15,8 @@ from .const import RANDOM_SEED, ERROR_THRESHOLD, N_SAMPLE
 
 # scikit-learn >= 1.9 changed the private forest sampler signatures; forestci (<= 0.7)
 # still calls them with the pre-1.9 arity, so CausalRandomForestRegressor.calculate_error()
-# raises TypeError until forestci is updated upstream. Compare against "1.9.0.dev0" so 1.9
-# pre-releases (which already carry the new signatures) are also covered.
-SKLEARN_GE_19 = Version(sklearn_version) >= Version("1.9.0.dev0")
+# raises TypeError until forestci is updated upstream.
+SKLEARN_GE_19 = Version(sklearn_version) >= Version("1.9.0")
 
 
 class CausalTreeBase:
@@ -277,7 +276,6 @@ class TestCausalRandomForestCase(CausalTreeBase):
             treatment_train,
             treatment_test,
         ) = self.split_data(data)
-        crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
         crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
         if n_treatments == 1:
             if SKLEARN_GE_19:
