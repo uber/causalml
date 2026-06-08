@@ -1,5 +1,6 @@
 from typing import Union
 
+from contextlib import contextmanager
 import numpy as np
 import forestci as fci
 from joblib import Parallel, delayed
@@ -36,6 +37,48 @@ DTYPE = np.float32
 # behavior (the vendored `_parallel_build_trees` already applies the user's
 # `sample_weight` itself), keeping causal-forest results identical across versions.
 _SKLEARN_GE_19 = Version(sklearn_version) >= Version("1.9.0")
+
+
+@contextmanager
+def _forestci_sklearn19_compat():
+    """Make forestci's pre-1.9 sampler calls work under scikit-learn >= 1.9.
+
+    forestci (<= 0.7) calls scikit-learn's private ``_generate_sample_indices``
+    and ``_get_n_samples_bootstrap`` with their pre-1.9 arity (no
+    ``sample_weight``), which raises ``TypeError`` on scikit-learn >= 1.9 (the
+    same refactor handled elsewhere in this module). Until the upstream fix
+    (scikit-learn-contrib/forest-confidence-interval#122) ships in a release and
+    we can bump the ``forestci`` pin, temporarily wrap those names in forestci's
+    module namespace to supply ``sample_weight=None`` -- the pre-1.9
+    uniform-bootstrap default, so results are unchanged. This patches the exact
+    globals ``forestci.calc_inbag`` resolves at call time, covering both the
+    direct call and the recursive ``calibrate=True`` path. No-op on < 1.9.
+
+    Note: this mutates ``forestci.forestci`` module globals for the duration of
+    the call (restored in ``finally``); it is not safe under concurrent calls
+    from multiple threads.
+    """
+    if not _SKLEARN_GE_19:
+        yield
+        return
+
+    import forestci.forestci as _impl
+
+    def _gsi(random_state, n_samples, n_samples_bootstrap, sample_weight=None):
+        return _generate_sample_indices(
+            random_state, n_samples, n_samples_bootstrap, sample_weight
+        )
+
+    def _gnsb(n_samples, max_samples, sample_weight=None):
+        return _get_n_samples_bootstrap(n_samples, max_samples, sample_weight)
+
+    orig = (_impl._generate_sample_indices, _impl._get_n_samples_bootstrap)
+    _impl._generate_sample_indices, _impl._get_n_samples_bootstrap = _gsi, _gnsb
+    try:
+        yield
+    finally:
+        _impl._generate_sample_indices, _impl._get_n_samples_bootstrap = orig
+
 
 if Version(sklearn_version) >= Version("1.1.0"):
     _joblib_parallel_args = dict(prefer="threads")
@@ -532,10 +575,12 @@ class CausalRandomForestRegressor(ForestRegressor):
             calls scikit-learn's private ``_get_n_samples_bootstrap`` and
             ``_generate_sample_indices`` with their pre-1.9 signatures. Under
             scikit-learn >= 1.9 those helpers require an extra ``sample_weight``
-            argument, so ``forestci`` (<= 0.7) raises ``TypeError`` here. The error
-            originates upstream and is not yet fixed; ``calculate_error`` is therefore
-            unsupported on scikit-learn >= 1.9 until ``forestci`` is updated. ``fit``
-            and ``predict`` are unaffected. See
+            argument, so ``forestci`` (<= 0.7) would raise ``TypeError`` here. As a
+            temporary measure this call runs inside ``_forestci_sklearn19_compat()``,
+            which patches those helpers to pass ``sample_weight=None`` (the pre-1.9
+            uniform-bootstrap default, so results are unchanged), pending the upstream
+            fix (forest-confidence-interval#122) and a ``forestci`` pin bump. The shim
+            is not thread-safe (see its docstring). See
             https://github.com/uber/causalml/issues/906.
         """
         if self.n_outputs_ != 1:
@@ -543,13 +588,14 @@ class CausalRandomForestRegressor(ForestRegressor):
                 f"forestci supports n_outputs=1. n_outputs={self.n_outputs_}"
             )
 
-        var = fci.random_forest_error(
-            self,
-            X_train,
-            X_test,
-            inbag=inbag,
-            calibrate=calibrate,
-            memory_constrained=memory_constrained,
-            memory_limit=memory_limit,
-        )
+        with _forestci_sklearn19_compat():
+            var = fci.random_forest_error(
+                self,
+                X_train,
+                X_test,
+                inbag=inbag,
+                calibrate=calibrate,
+                memory_constrained=memory_constrained,
+                memory_limit=memory_limit,
+            )
         return var

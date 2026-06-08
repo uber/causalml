@@ -4,19 +4,12 @@ from abc import abstractmethod
 import numpy as np
 import pandas as pd
 import pytest
-from packaging.version import parse as Version
-from sklearn import __version__ as sklearn_version
 from sklearn.model_selection import train_test_split
 
 from causalml.inference.tree import CausalTreeRegressor, CausalRandomForestRegressor
 from causalml.metrics import ape
 from causalml.metrics import qini_score
 from .const import RANDOM_SEED, ERROR_THRESHOLD, N_SAMPLE
-
-# scikit-learn >= 1.9 changed the private forest sampler signatures; forestci (<= 0.7)
-# still calls them with the pre-1.9 arity, so CausalRandomForestRegressor.calculate_error()
-# raises TypeError until forestci is updated upstream.
-SKLEARN_GE_19 = Version(sklearn_version) >= Version("1.9.0")
 
 
 class CausalTreeBase:
@@ -264,7 +257,7 @@ class TestCausalRandomForestCase(CausalTreeBase):
         )
 
     def test_unbiased_sampling_error(
-        self, request, generate_regression_data, n_estimators: int, n_treatments: int
+        self, generate_regression_data, n_estimators: int, n_treatments: int
     ):
         crforest = self.prepare_model(n_estimators=n_estimators)
         data = self.prepare_multi_treatment_data(generate_regression_data, n_treatments)
@@ -278,19 +271,6 @@ class TestCausalRandomForestCase(CausalTreeBase):
         ) = self.split_data(data)
         crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
         if n_treatments == 1:
-            if SKLEARN_GE_19:
-                # calculate_error() delegates to forestci, which calls sklearn's private
-                # samplers with the pre-1.9 signature and raises TypeError on >= 1.9.
-                # Run the code (non-strict xfail) so this XPASSes once forestci is fixed.
-                request.node.add_marker(
-                    pytest.mark.xfail(
-                        reason="forestci (<= 0.7) is incompatible with scikit-learn >= 1.9; "
-                        "calculate_error() unsupported until forestci is updated upstream "
-                        "(see https://github.com/uber/causalml/issues/906)",
-                        raises=TypeError,
-                        strict=False,
-                    )
-                )
             crforest_test_var = crforest.calculate_error(X_train=X_train, X_test=X_test)
             assert (crforest_test_var > 0).all()
             assert crforest_test_var.shape[0] == y_test.shape[0]
