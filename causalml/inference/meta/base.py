@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+import copy
 import logging
 import numpy as np
 import pandas as pd
@@ -17,7 +18,7 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
     """Module-level bootstrap helper for joblib pickling compatibility.
 
     Args:
-        learner_template: the fitted learner to clone as a template
+        learner_template: an unfitted template to clone
         X: feature matrix
         treatment: treatment vector
         y: outcome vector
@@ -98,32 +99,10 @@ class BaseLearner(metaclass=ABCMeta):
         self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
         return self.predict(X=X, p=p)
 
-    def _get_unfitted_template(self):
-        """Create a lightweight, unfitted copy of the meta-learner to prevent deepcopying heavy fitted weights."""
-        import copy
-
-        template = copy.copy(self)
-
-        # Remove heavy fitted arrays/models
-        for attr in [
-            "models",
-            "models_c",
-            "models_t",
-            "bootstrap_models_",
-            "propensity_model",
-            "propensity",
-            "models_tau",
-        ]:
-            if hasattr(template, attr):
-                delattr(template, attr)
-
-        # Revert model_c and model_t to their unfitted state
-        if hasattr(template, "_model_c_template"):
-            template.model_c = template._model_c_template
-        if hasattr(template, "_model_t_template"):
-            template.model_t = template._model_t_template
-
-        return template
+    def _unfitted_clone(self):
+        """Return an unfitted copy for bootstrap refitting. Subclasses that hold fitted
+        sub-models should override to reset them to their unfitted templates."""
+        return clone(self, safe=False)
 
     def fit_bootstrap_ensemble(
         self,
@@ -164,11 +143,7 @@ class BaseLearner(metaclass=ABCMeta):
         seeds = rng.randint(0, np.iinfo(np.int32).max, size=n_bootstraps)
         logger.info("Storing bootstrap ensemble ({} iterations)".format(n_bootstraps))
 
-        learner_template = (
-            self._get_unfitted_template()
-            if hasattr(self, "_get_unfitted_template")
-            else self
-        )
+        learner_template = self._unfitted_clone()
         self.bootstrap_models_ = Parallel(n_jobs=n_jobs)(
             delayed(_fit_bootstrap_clone)(
                 learner_template, X, treatment, y, p, s, bootstrap_size

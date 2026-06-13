@@ -1,3 +1,4 @@
+import copy
 from copy import deepcopy
 import logging
 import numpy as np
@@ -74,6 +75,15 @@ class BaseTLearner(BaseLearner):
         return "{}(model_c={}, model_t={})".format(
             self.__class__.__name__, self.model_c.__repr__(), self.model_t.__repr__()
         )
+
+    def _unfitted_clone(self):
+        template = copy.copy(self)
+        for attr in ("models_c", "models_t", "bootstrap_models_"):
+            if hasattr(template, attr):
+                delattr(template, attr)
+        template.model_c = self._model_c_template
+        template.model_t = self._model_t_template
+        return template
 
     @ignore_warnings(category=ConvergenceWarning)
     def fit(
