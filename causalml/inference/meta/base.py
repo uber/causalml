@@ -4,7 +4,13 @@ import numpy as np
 import pandas as pd
 
 from causalml.inference.meta.explainer import Explainer
-from causalml.inference.meta.utils import check_p_conditions, convert_pd_to_np
+from causalml.inference.meta.utils import (
+    check_p_conditions,
+    filter_mask,
+    filter_index,
+    n_rows,
+    to_numpy,
+)
 from causalml.propensity import compute_propensity_score
 
 logger = logging.getLogger("causalml")
@@ -53,12 +59,27 @@ class BaseLearner(metaclass=ABCMeta):
         pass
 
     def bootstrap(self, X, treatment, y, p=None, size=10000, rng=None):
-        """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population."""
+        """Runs a single bootstrap. Fits on bootstrapped sample, then predicts on whole population.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, or pl.DataFrame): a feature matrix.
+                Resampled natively via :func:`filter_index`, so X stays in its
+                original format (numpy/pandas/polars) throughout.
+            treatment (np.array): a treatment vector (numpy)
+            y (np.array): an outcome vector (numpy)
+            p (dict, optional): a dict of {treatment group: propensity scores (numpy)}
+            size (int, optional): number of samples to draw with replacement
+            rng (np.random.Generator, optional): random number generator for
+                deterministic resampling
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects on the full X
+                from a model trained on the resampled subset.
+        """
         if rng is not None:
-            idxs = rng.choice(np.arange(0, X.shape[0]), size=size)
+            idxs = rng.choice(np.arange(0, n_rows(X)), size=size)
         else:
-            idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
-        X_b = X[idxs]
+            idxs = np.random.choice(np.arange(0, n_rows(X)), size=size)
+        X_b = filter_index(X, idxs)
 
         if p is not None:
             p_b = {group: _p[idxs] for group, _p in p.items()}
@@ -75,21 +96,19 @@ class BaseLearner(metaclass=ABCMeta):
         """Format propensity scores into a dictionary of {treatment group: propensity scores}.
 
         Args:
-            p (np.ndarray, pd.Series, or dict): propensity scores
+            p (np.ndarray, pd.Series, pl.Series, or dict): propensity scores
             t_groups (list): treatment group names.
 
         Returns:
-            dict of {treatment group: propensity scores}
+            dict of {treatment group: propensity scores (numpy.ndarray)}
         """
         check_p_conditions(p, t_groups)
 
-        if isinstance(p, (np.ndarray, pd.Series)):
+        if isinstance(p, dict):
+            p = {treatment_name: to_numpy(_p) for treatment_name, _p in p.items()}
+        else:
             treatment_name = t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
-        elif isinstance(p, dict):
-            p = {
-                treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()
-            }
+            p = {treatment_name: to_numpy(p)}
 
         return p
 
@@ -103,19 +122,22 @@ class BaseLearner(metaclass=ABCMeta):
         PropensityModel (i.e. ElasticNetPropensityModel).
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
+            X (np.matrix, np.array, pd.DataFrame, or pl.DataFrame): a feature matrix.
+                Kept in its native format; scikit-learn >= 1.6 accepts pandas
+                and Polars DataFrames natively, so no conversion is performed.
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
         """
         logger.info("Generating propensity score")
+        treatment_np = to_numpy(treatment)
         p = dict()
         p_model = dict()
         for group in self.t_groups:
-            mask = (treatment == group) | (treatment == self.control_name)
-            treatment_filt = treatment[mask]
-            X_filt = X[mask]
-            w_filt = (treatment_filt == group).astype(int)
-            w = (treatment == group).astype(int)
+            mask = (treatment_np == group) | (treatment_np == self.control_name)
+            treatment_filt_np = treatment_np[mask]
+            X_filt = filter_mask(X, mask)
+            w_filt = (treatment_filt_np == group).astype(int)
+            w = (treatment_np == group).astype(int)
             propensity_model = self.model_p if hasattr(self, "model_p") else None
             p[group], p_model[group] = compute_propensity_score(
                 X=X_filt,

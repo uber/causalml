@@ -16,9 +16,10 @@ from xgboost import XGBRegressor
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
-    _POLARS_AVAILABLE,
     check_treatment_vector,
+    collect_if_lazy,
     filter_mask,
+    n_rows,
     to_numpy,
 )
 from causalml.metrics import regression_metrics, classification_metrics
@@ -75,23 +76,24 @@ class BaseTLearner(BaseLearner):
 
     @ignore_warnings(category=ConvergenceWarning)
     def fit(self, X, treatment, y, p=None):
-        """Fit the inference model
+        """Fit the inference model.
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe or pl.DataFrame): a feature matrix
-            treatment (np.array or pd.Series or pl.Series): a treatment vector
-            y (np.array or pd.Series or pl.Series): an outcome vector
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method; the
+                feature matrix is otherwise kept in its native format throughout.
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
         """
+        X = collect_if_lazy(X)
         check_treatment_vector(treatment, self.control_name)
-        self.t_groups = np.unique(
-            to_numpy(treatment)[to_numpy(treatment) != self.control_name]
-        )
+        treatment_np = to_numpy(treatment)
+        self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
         self.models_c = {group: deepcopy(self.model_c) for group in self.t_groups}
         self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
 
-        treatment_np = to_numpy(treatment)
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
             treatment_filt = filter_mask(treatment, mask)
@@ -112,21 +114,16 @@ class BaseTLearner(BaseLearner):
         """Predict treatment effects.
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe or pl.DataFrame): a feature matrix
-            treatment (np.array or pd.Series or pl.Series, optional): a treatment vector
-            y (np.array or pd.Series or pl.Series, optional): an outcome vector
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+            treatment (np.array, pd.Series, or pl.Series, optional): a treatment vector
+            y (np.array, pd.Series, or pl.Series, optional): an outcome vector
             return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-
-        if _POLARS_AVAILABLE:
-            import polars as pl
-
-            if isinstance(X, pl.LazyFrame):
-                X = X.collect()
-
+        X = collect_if_lazy(X)
         yhat_cs = {}
         yhat_ts = {}
 
@@ -150,8 +147,7 @@ class BaseTLearner(BaseLearner):
                 logger.info("Error metrics for group {}".format(group))
                 regression_metrics(y_filt, yhat, w)
 
-        X_np = to_numpy(X)
-        te = np.zeros((X_np.shape[0], self.t_groups.shape[0]))
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = yhat_ts[group] - yhat_cs[group]
 
@@ -175,9 +171,9 @@ class BaseTLearner(BaseLearner):
         """Fit the inference model of the T learner and predict treatment effects.
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe or pl.DataFrame): a feature matrix
-            treatment (np.array or pd.Series or pl.Series): a treatment vector
-            y (np.array or pd.Series or pl.Series): an outcome vector
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -188,13 +184,13 @@ class BaseTLearner(BaseLearner):
                 If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
                 UB [n_samples, n_treatment]
         """
+        X = collect_if_lazy(X)
         self.fit(X, treatment, y)
         te = self.predict(X, treatment, y, return_components=return_components)
 
         if not return_ci:
             return te
         else:
-            X_np = to_numpy(X)
             treatment_np = to_numpy(treatment)
             y_np = to_numpy(y)
 
@@ -203,12 +199,12 @@ class BaseTLearner(BaseLearner):
             models_c_global = deepcopy(self.models_c)
             models_t_global = deepcopy(self.models_t)
             te_bootstraps = np.zeros(
-                shape=(X_np.shape[0], self.t_groups.shape[0], n_bootstraps)
+                shape=(n_rows(X), self.t_groups.shape[0], n_bootstraps)
             )
 
             logger.info("Bootstrap Confidence Intervals")
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X_np, treatment_np, y_np, size=bootstrap_size)
+                te_b = self.bootstrap(X, treatment_np, y_np, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -216,6 +212,7 @@ class BaseTLearner(BaseLearner):
                 te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2
             )
 
+            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.models_c = deepcopy(models_c_global)
@@ -237,9 +234,9 @@ class BaseTLearner(BaseLearner):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe or pl.DataFrame): a feature matrix
-            treatment (np.array or pd.Series or pl.Series): a treatment vector
-            y (np.array or pd.Series or pl.Series): an outcome vector
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
             bootstrap_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -247,6 +244,7 @@ class BaseTLearner(BaseLearner):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
+        X = collect_if_lazy(X)
         if pretrain:
             te, yhat_cs, yhat_ts = self.predict(X, treatment, y, return_components=True)
         else:
@@ -254,7 +252,6 @@ class BaseTLearner(BaseLearner):
                 X, treatment, y, return_components=True
             )
 
-        # work in numpy for the ATE calculation
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
 
@@ -293,7 +290,6 @@ class BaseTLearner(BaseLearner):
         if not bootstrap_ci:
             return ate, ate_lb, ate_ub
         else:
-            X_np = to_numpy(X)
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_c_global = deepcopy(self.models_c)
@@ -303,7 +299,7 @@ class BaseTLearner(BaseLearner):
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
             for n in tqdm(range(n_bootstraps)):
-                ate_b = self.bootstrap(X_np, treatment_np, y_np, size=bootstrap_size)
+                ate_b = self.bootstrap(X, treatment_np, y_np, size=bootstrap_size)
                 ate_bootstraps[:, n] = ate_b.mean(axis=0)
 
             ate_lower = np.percentile(
@@ -313,6 +309,7 @@ class BaseTLearner(BaseLearner):
                 ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1
             )
 
+            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.models_c = deepcopy(models_c_global)
@@ -332,6 +329,15 @@ class BaseTRegressor(BaseTLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
+        """Initialize a T-learner regressor.
+
+        Args:
+            learner (model): a model to estimate control and treatment outcomes.
+            control_learner (model, optional): a model to estimate control outcomes
+            treatment_learner (model, optional): a model to estimate treatment outcomes
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
         super().__init__(
             learner=learner,
             control_learner=control_learner,
@@ -352,6 +358,15 @@ class BaseTClassifier(BaseTLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
+        """Initialize a T-learner classifier.
+
+        Args:
+            learner (model): a model to estimate control and treatment outcomes.
+            control_learner (model, optional): a model to estimate control outcomes
+            treatment_learner (model, optional): a model to estimate treatment outcomes
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
         super().__init__(
             learner=learner,
             control_learner=control_learner,
@@ -366,19 +381,16 @@ class BaseTClassifier(BaseTLearner):
         """Predict treatment effects.
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe or pl.DataFrame): a feature matrix
-            treatment (np.array or pd.Series or pl.Series, optional): a treatment vector
-            y (np.array or pd.Series or pl.Series, optional): an outcome vector
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+            treatment (np.array, pd.Series, or pl.Series, optional): a treatment vector
+            y (np.array, pd.Series, or pl.Series, optional): an outcome vector
+            return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        if _POLARS_AVAILABLE:
-            import polars as pl
-
-            if isinstance(X, pl.LazyFrame):
-                X = X.collect()
-
+        X = collect_if_lazy(X)
         yhat_cs = {}
         yhat_ts = {}
 
@@ -402,8 +414,7 @@ class BaseTClassifier(BaseTLearner):
                 logger.info("Error metrics for group {}".format(group))
                 classification_metrics(y_filt, yhat, w)
 
-        X_np = to_numpy(X)
-        te = np.zeros((X_np.shape[0], self.t_groups.shape[0]))
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = yhat_ts[group] - yhat_cs[group]
 

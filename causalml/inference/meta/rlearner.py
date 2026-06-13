@@ -9,7 +9,9 @@ from xgboost import XGBRegressor
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
     check_treatment_vector,
+    collect_if_lazy,
     filter_mask,
+    n_rows,
     to_numpy,
     get_xgboost_objective_metric,
     get_weighted_variance,
@@ -20,7 +22,12 @@ logger = logging.getLogger("causalml")
 
 
 class BaseRLearner(BaseLearner):
-    """A parent class for R-learner classes."""
+    """A parent class for R-learner classes.
+
+    An R-learner estimates treatment effects with two machine learning models and the propensity score.
+
+    Details of R-learner are available at `Nie and Wager (2019) <https://arxiv.org/abs/1712.04912>`_.
+    """
 
     def __init__(
         self,
@@ -34,6 +41,22 @@ class BaseRLearner(BaseLearner):
         random_state=None,
         cv_n_jobs=-1,
     ):
+        """Initialize an R-learner.
+
+        Args:
+            learner (optional): a model to estimate outcomes and treatment effects
+            outcome_learner (optional): a model to estimate outcomes
+            effect_learner (optional): a model to estimate treatment effects. It needs to take `sample_weight` as an
+                input argument for `fit()`
+            propensity_learner (optional): a model to estimate propensity scores. `ElasticNetPropensityModel()` will
+                be used by default.
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+            n_fold (int, optional): the number of cross validation folds for outcome_learner
+            random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
+            cv_n_jobs (int, optional): number of parallel jobs to run for cross_val_predict. -1 means using all
+                processors
+        """
         assert (learner is not None) or (
             (outcome_learner is not None) and (effect_learner is not None)
         )
@@ -49,9 +72,11 @@ class BaseRLearner(BaseLearner):
 
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+
         self.random_state = random_state
         self.cv = KFold(n_splits=n_fold, shuffle=True, random_state=random_state)
         self.cv_n_jobs = cv_n_jobs
+
         self.propensity = None
         self.propensity_model = None
 
@@ -64,13 +89,31 @@ class BaseRLearner(BaseLearner):
         )
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
+        """Fit the treatment effect and outcome models of the R learner.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method; the
+                feature matrix is otherwise kept in its native format throughout,
+                including the call to ``cross_val_predict`` (scikit-learn >= 1.6
+                accepts pandas and Polars DataFrames natively).
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
+            verbose (bool, optional): whether to output progress logs
+        """
+        X = collect_if_lazy(X)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
 
         if sample_weight is not None:
             assert len(sample_weight) == len(
-                y
+                y_np
             ), "Data length must be equal for sample_weight and the input data"
             sample_weight = to_numpy(sample_weight)
 
@@ -78,7 +121,7 @@ class BaseRLearner(BaseLearner):
         self.t_groups.sort()
 
         if p is None:
-            self._set_propensity_models(X=to_numpy(X), treatment=treatment_np, y=y_np)
+            self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
@@ -90,7 +133,6 @@ class BaseRLearner(BaseLearner):
 
         if verbose:
             logger.info("generating out-of-fold CV outcome estimates")
-        # sklearn >= 1.6 accepts DataFrames natively — pass X as-is
         yhat = cross_val_predict(
             self.model_mu, X, y_np, cv=self.cv, n_jobs=self.cv_n_jobs
         )
@@ -131,8 +173,17 @@ class BaseRLearner(BaseLearner):
             )
 
     def predict(self, X, p=None):
-        X_np = to_numpy(X)
-        te = np.zeros((X_np.shape[0], self.t_groups.shape[0]))
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        X = collect_if_lazy(X)
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = self.models_tau[group].predict(X)
         return te
@@ -149,13 +200,33 @@ class BaseRLearner(BaseLearner):
         bootstrap_size=10000,
         verbose=True,
     ):
+        """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
+            return_ci (bool): whether to return confidence intervals
+            n_bootstraps (int): number of bootstrap iterations
+            bootstrap_size (int): number of samples per bootstrap
+            verbose (bool): whether to output progress logs
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment].
+                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
+                UB [n_samples, n_treatment]
+        """
+        X = collect_if_lazy(X)
         self.fit(X, treatment, y, p, sample_weight, verbose=verbose)
         te = self.predict(X)
 
         if not return_ci:
             return te
         else:
-            X_np = to_numpy(X)
             treatment_np = to_numpy(treatment)
             y_np = to_numpy(y)
 
@@ -164,7 +235,7 @@ class BaseRLearner(BaseLearner):
             model_mu_global = deepcopy(self.model_mu)
             models_tau_global = deepcopy(self.models_tau)
             te_bootstraps = np.zeros(
-                shape=(X_np.shape[0], self.t_groups.shape[0], n_bootstraps)
+                shape=(n_rows(X), self.t_groups.shape[0], n_bootstraps)
             )
 
             logger.info("Bootstrap Confidence Intervals")
@@ -173,7 +244,7 @@ class BaseRLearner(BaseLearner):
                     p = self.propensity
                 else:
                     p = self._format_p(p, self.t_groups)
-                te_b = self.bootstrap(X_np, treatment_np, y_np, p, size=bootstrap_size)
+                te_b = self.bootstrap(X, treatment_np, y_np, p, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -181,6 +252,7 @@ class BaseRLearner(BaseLearner):
                 te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2
             )
 
+            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.model_mu = deepcopy(model_mu_global)
@@ -200,13 +272,37 @@ class BaseRLearner(BaseLearner):
         bootstrap_size=10000,
         pretrain=False,
     ):
+        """Estimate the Average Treatment Effect (ATE).
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): only needed when pretrain=False, a treatment vector
+            y (np.array, pd.Series, or pl.Series): only needed when pretrain=False, an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
+            bootstrap_ci (bool): whether run bootstrap for confidence intervals
+            n_bootstraps (int): number of bootstrap iterations
+            bootstrap_size (int): number of samples per bootstrap
+            pretrain (bool): whether a model has been fit, default False.
+        Returns:
+            The mean and confidence interval (LB, UB) of the ATE estimate.
+        """
+        X = collect_if_lazy(X)
         treatment_np = to_numpy(treatment)
-        X_np = to_numpy(X)
+        y_np = to_numpy(y)
 
         if pretrain:
             te = self.predict(X, p)
         else:
-            if not len(treatment_np) or not len(to_numpy(y)):
+            if (
+                treatment_np is None
+                or not len(treatment_np)
+                or y_np is None
+                or not len(y_np)
+            ):
                 raise ValueError("treatment and y must be provided when pretrain=False")
             te = self.fit_predict(X, treatment, y, p, sample_weight, return_ci=False)
 
@@ -216,17 +312,14 @@ class BaseRLearner(BaseLearner):
 
         for i, group in enumerate(self.t_groups):
             w = (treatment_np == group).astype(int)
-            prob_treatment = float(sum(w)) / X_np.shape[0]
+            prob_treatment = float(sum(w)) / n_rows(X)
             _ate = te[:, i].mean()
 
-            se = (
-                np.sqrt(
-                    (self.vars_t[group] / prob_treatment)
-                    + (self.vars_c[group] / (1 - prob_treatment))
-                    + te[:, i].var()
-                )
-                / X_np.shape[0]
-            )
+            se = np.sqrt(
+                (self.vars_t[group] / prob_treatment)
+                + (self.vars_c[group] / (1 - prob_treatment))
+                + te[:, i].var()
+            ) / n_rows(X)
 
             _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
             _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
@@ -238,7 +331,6 @@ class BaseRLearner(BaseLearner):
         if not bootstrap_ci:
             return ate, ate_lb, ate_ub
         else:
-            y_np = to_numpy(y)
             t_groups_global = self.t_groups
             _classes_global = self._classes
             model_mu_global = deepcopy(self.model_mu)
@@ -252,9 +344,7 @@ class BaseRLearner(BaseLearner):
                     p = self.propensity
                 else:
                     p = self._format_p(p, self.t_groups)
-                cate_b = self.bootstrap(
-                    X_np, treatment_np, y_np, p, size=bootstrap_size
-                )
+                cate_b = self.bootstrap(X, treatment_np, y_np, p, size=bootstrap_size)
                 ate_bootstraps[:, n] = cate_b.mean(axis=0)
 
             ate_lower = np.percentile(
@@ -264,6 +354,7 @@ class BaseRLearner(BaseLearner):
                 ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1
             )
 
+            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.model_mu = deepcopy(model_mu_global)
@@ -272,6 +363,8 @@ class BaseRLearner(BaseLearner):
 
 
 class BaseRRegressor(BaseRLearner):
+    """A parent class for R-learner regressor classes."""
+
     def __init__(
         self,
         learner=None,
@@ -283,6 +376,20 @@ class BaseRRegressor(BaseRLearner):
         n_fold=5,
         random_state=None,
     ):
+        """Initialize an R-learner regressor.
+
+        Args:
+            learner (optional): a model to estimate outcomes and treatment effects
+            outcome_learner (optional): a model to estimate outcomes
+            effect_learner (optional): a model to estimate treatment effects. It needs to take `sample_weight` as an
+                input argument for `fit()`
+            propensity_learner (optional): a model to estimate propensity scores. `ElasticNetPropensityModel()` will
+                be used by default.
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+            n_fold (int, optional): the number of cross validation folds for outcome_learner
+            random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
+        """
         super().__init__(
             learner=learner,
             outcome_learner=outcome_learner,
@@ -296,6 +403,8 @@ class BaseRRegressor(BaseRLearner):
 
 
 class BaseRClassifier(BaseRLearner):
+    """A parent class for R-learner classifier classes."""
+
     def __init__(
         self,
         outcome_learner=None,
@@ -306,6 +415,19 @@ class BaseRClassifier(BaseRLearner):
         n_fold=5,
         random_state=None,
     ):
+        """Initialize an R-learner classifier.
+
+        Args:
+            outcome_learner: a model to estimate outcomes. Should be a classifier.
+            effect_learner: a model to estimate treatment effects. It needs to take `sample_weight` as an
+                input argument for `fit()`. Should be a regressor.
+            propensity_learner (optional): a model to estimate propensity scores. `ElasticNetPropensityModel()` will
+                be used by default.
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+            n_fold (int, optional): the number of cross validation folds for outcome_learner
+            random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
+        """
         super().__init__(
             learner=None,
             outcome_learner=outcome_learner,
@@ -316,19 +438,35 @@ class BaseRClassifier(BaseRLearner):
             n_fold=n_fold,
             random_state=random_state,
         )
+
         if (outcome_learner is None) and (effect_learner is None):
             raise ValueError(
                 "Either the outcome learner or the effect learner must be specified."
             )
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
+        """Fit the treatment effect and outcome models of the R learner.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
+            verbose (bool, optional): whether to output progress logs
+        """
+        X = collect_if_lazy(X)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
 
         if sample_weight is not None:
             assert len(sample_weight) == len(
-                y
+                y_np
             ), "Data length must be equal for sample_weight and the input data"
             sample_weight = to_numpy(sample_weight)
 
@@ -336,7 +474,7 @@ class BaseRClassifier(BaseRLearner):
         self.t_groups.sort()
 
         if p is None:
-            self._set_propensity_models(X=to_numpy(X), treatment=treatment_np, y=y_np)
+            self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
@@ -388,8 +526,17 @@ class BaseRClassifier(BaseRLearner):
             )
 
     def predict(self, X, p=None):
-        X_np = to_numpy(X)
-        te = np.zeros((X_np.shape[0], self.t_groups.shape[0]))
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        X = collect_if_lazy(X)
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = self.models_tau[group].predict(X)
         return te
@@ -407,7 +554,21 @@ class XGBRRegressor(BaseRRegressor):
         *args,
         **kwargs,
     ):
+        """Initialize an R-learner regressor with XGBoost model using pairwise ranking objective.
+
+        Args:
+            early_stopping: whether or not to use early stopping when fitting effect learner
+            test_size (float, optional): the proportion of the dataset to use as validation set when early stopping is
+                                         enabled
+            early_stopping_rounds (int, optional): validation metric needs to improve at least once in every
+                                                   early_stopping_rounds round(s) to continue training
+            effect_learner_objective (str, optional): the learning objective for the effect learner
+                                                      (default = 'reg:squarederror')
+            effect_learner_n_estimators (int, optional): number of trees to fit for the effect learner (default = 500)
+        """
+
         assert isinstance(random_state, int), "random_state should be int."
+
         objective, metric = get_xgboost_objective_metric(effect_learner_objective)
         self.effect_learner_objective = objective
         self.effect_learner_eval_metric = metric
@@ -416,6 +577,7 @@ class XGBRRegressor(BaseRRegressor):
         if self.early_stopping:
             self.test_size = test_size
             self.early_stopping_rounds = early_stopping_rounds
+
             effect_learner = XGBRegressor(
                 objective=self.effect_learner_objective,
                 n_estimators=self.effect_learner_n_estimators,
@@ -434,28 +596,43 @@ class XGBRRegressor(BaseRRegressor):
                 *args,
                 **kwargs,
             )
+
         super().__init__(
             outcome_learner=XGBRegressor(random_state=random_state, *args, **kwargs),
             effect_learner=effect_learner,
         )
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
+        """Fit the treatment effect and outcome models of the R learner.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
+                weight of each observation for `effect_learner`. If None, it assumes equal weight.
+            verbose (bool, optional): whether to output progress logs
+        """
+        X = collect_if_lazy(X)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
 
+        # initialize equal sample weight if it's not provided, for simplicity purpose
         sample_weight = (
             to_numpy(sample_weight) if sample_weight is not None else np.ones(len(y_np))
         )
         assert len(sample_weight) == len(
             y_np
         ), "Data length must be equal for sample_weight and the input data"
-
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
 
         if p is None:
-            self._set_propensity_models(X=to_numpy(X), treatment=treatment_np, y=y_np)
+            self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
@@ -470,15 +647,17 @@ class XGBRRegressor(BaseRRegressor):
         yhat = cross_val_predict(self.model_mu, X, y_np, cv=self.cv, n_jobs=-1)
 
         for group in self.t_groups:
-            mask = (treatment_np == group) | (treatment_np == self.control_name)
-            treatment_filt_np = treatment_np[mask]
-            w = (treatment_filt_np == group).astype(int)
+            treatment_mask = (treatment_np == group) | (
+                treatment_np == self.control_name
+            )
+            treatment_filt = filter_mask(treatment, treatment_mask)
+            w = (to_numpy(treatment_filt) == group).astype(int)
 
-            X_filt = filter_mask(X, mask)
-            y_filt = y_np[mask]
-            yhat_filt = yhat[mask]
-            p_filt = p[group][mask]
-            sample_weight_filt = sample_weight[mask]
+            X_filt = filter_mask(X, treatment_mask)
+            y_filt = y_np[treatment_mask]
+            yhat_filt = yhat[treatment_mask]
+            p_filt = p[group][treatment_mask]
+            sample_weight_filt = sample_weight[treatment_mask]
 
             if verbose:
                 logger.info(
@@ -511,6 +690,7 @@ class XGBRRegressor(BaseRRegressor):
                     test_size=self.test_size,
                     random_state=self.random_state,
                 )
+
                 self.models_tau[group].fit(
                     X=X_train_filt,
                     y=(y_train_filt - yhat_train_filt) / (w_train - p_train_filt),
@@ -527,6 +707,7 @@ class XGBRRegressor(BaseRRegressor):
                     ],
                     verbose=verbose,
                 )
+
             else:
                 self.models_tau[group].fit(
                     X_filt,
@@ -536,9 +717,7 @@ class XGBRRegressor(BaseRRegressor):
 
             diff_c = y_filt[w == 0] - yhat_filt[w == 0]
             diff_t = y_filt[w == 1] - yhat_filt[w == 1]
-            self.vars_c[group] = get_weighted_variance(
-                diff_c, sample_weight_filt[w == 0]
-            )
-            self.vars_t[group] = get_weighted_variance(
-                diff_t, sample_weight_filt[w == 1]
-            )
+            sample_weight_filt_c = sample_weight_filt[w == 0]
+            sample_weight_filt_t = sample_weight_filt[w == 1]
+            self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
+            self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)

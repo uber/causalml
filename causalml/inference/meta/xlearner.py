@@ -7,7 +7,9 @@ from scipy.stats import norm
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
     check_treatment_vector,
+    collect_if_lazy,
     filter_mask,
+    n_rows,
     to_numpy,
 )
 from causalml.metrics import regression_metrics, classification_metrics
@@ -16,7 +18,12 @@ logger = logging.getLogger("causalml")
 
 
 class BaseXLearner(BaseLearner):
-    """A parent class for X-learner regressor classes."""
+    """A parent class for X-learner regressor classes.
+
+    An X-learner estimates treatment effects with four machine learning models.
+
+    Details of X-learner are available at `Kunzel et al. (2018) <https://arxiv.org/abs/1706.03461>`_.
+    """
 
     def __init__(
         self,
@@ -28,6 +35,18 @@ class BaseXLearner(BaseLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
+        """Initialize a X-learner.
+
+        Args:
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
+                groups
+            control_outcome_learner (optional): a model to estimate outcomes in the control group
+            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
+            control_effect_learner (optional): a model to estimate treatment effects in the control group
+            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
         assert (learner is not None) or (
             (control_outcome_learner is not None)
             and (treatment_outcome_learner is not None)
@@ -58,6 +77,7 @@ class BaseXLearner(BaseLearner):
 
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+
         self.propensity = None
         self.propensity_model = None
 
@@ -76,16 +96,26 @@ class BaseXLearner(BaseLearner):
         )
 
     def fit(self, X, treatment, y, p=None):
+        """Fit the inference model.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method; the
+                feature matrix is otherwise kept in its native format throughout.
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in
+                the single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+        """
+        X = collect_if_lazy(X)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
 
         if p is None:
-            # base.py does raw numpy indexing internally — convert at this boundary
-            self._set_propensity_models(
-                X=to_numpy(X), treatment=treatment_np, y=to_numpy(y)
-            )
+            self._set_propensity_models(X=X, treatment=treatment_np, y=to_numpy(y))
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
@@ -109,17 +139,15 @@ class BaseXLearner(BaseLearner):
             y_filt = filter_mask(y, mask)
             w = (to_numpy(treatment_filt) == group).astype(int)
 
-            self.models_mu_c[group].fit(
-                filter_mask(X_filt, w == 0), filter_mask(y_filt, w == 0)
-            )
-            self.models_mu_t[group].fit(
-                filter_mask(X_filt, w == 1), filter_mask(y_filt, w == 1)
-            )
-
-            y_filt_np = to_numpy(y_filt)
             X_filt_c = filter_mask(X_filt, w == 0)
             X_filt_t = filter_mask(X_filt, w == 1)
+            y_filt_np = to_numpy(y_filt)
 
+            # Train outcome models
+            self.models_mu_c[group].fit(X_filt_c, filter_mask(y_filt, w == 0))
+            self.models_mu_t[group].fit(X_filt_t, filter_mask(y_filt, w == 1))
+
+            # Calculate variances and treatment effects
             var_c = (
                 y_filt_np[w == 0] - self.models_mu_c[group].predict(X_filt_c)
             ).var()
@@ -129,6 +157,7 @@ class BaseXLearner(BaseLearner):
             ).var()
             self.vars_t[group] = var_t
 
+            # Train treatment models
             d_c = self.models_mu_t[group].predict(X_filt_c) - y_filt_np[w == 0]
             d_t = y_filt_np[w == 1] - self.models_mu_c[group].predict(X_filt_t)
             self.models_tau_c[group].fit(X_filt_c, d_c)
@@ -137,6 +166,23 @@ class BaseXLearner(BaseLearner):
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+            treatment (np.array, pd.Series, or pl.Series, optional): a treatment vector
+            y (np.array, pd.Series, or pl.Series, optional): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in
+                the single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            verbose (bool, optional): whether to output progress logs
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        X = collect_if_lazy(X)
+
         if p is None:
             logger.info("Generating propensity score")
             p = {
@@ -146,8 +192,7 @@ class BaseXLearner(BaseLearner):
         else:
             p = self._format_p(p, self.t_groups)
 
-        X_np = to_numpy(X)
-        te = np.zeros((X_np.shape[0], self.t_groups.shape[0]))
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         dhat_cs = {}
         dhat_ts = {}
 
@@ -196,6 +241,26 @@ class BaseXLearner(BaseLearner):
         return_components=False,
         verbose=True,
     ):
+        """Fit the treatment effect and outcome models of the X learner and predict treatment effects.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in
+                the single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            return_ci (bool): whether to return confidence intervals
+            n_bootstraps (int): number of bootstrap iterations
+            bootstrap_size (int): number of samples per bootstrap
+            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            verbose (str): whether to output progress logs
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
+                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
+                UB [n_samples, n_treatment]
+        """
+        X = collect_if_lazy(X)
         self.fit(X, treatment, y, p)
 
         if p is None:
@@ -210,7 +275,6 @@ class BaseXLearner(BaseLearner):
         if not return_ci:
             return te
         else:
-            X_np = to_numpy(X)
             treatment_np = to_numpy(treatment)
             y_np = to_numpy(y)
 
@@ -221,12 +285,12 @@ class BaseXLearner(BaseLearner):
             models_tau_c_global = deepcopy(self.models_tau_c)
             models_tau_t_global = deepcopy(self.models_tau_t)
             te_bootstraps = np.zeros(
-                shape=(X_np.shape[0], self.t_groups.shape[0], n_bootstraps)
+                shape=(n_rows(X), self.t_groups.shape[0], n_bootstraps)
             )
 
             logger.info("Bootstrap Confidence Intervals")
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X_np, treatment_np, y_np, p, size=bootstrap_size)
+                te_b = self.bootstrap(X, treatment_np, y_np, p, size=bootstrap_size)
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -254,6 +318,24 @@ class BaseXLearner(BaseLearner):
         bootstrap_size=10000,
         pretrain=False,
     ):
+        """Estimate the Average Treatment Effect (ATE).
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in
+                the single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            bootstrap_ci (bool): whether run bootstrap for confidence intervals
+            n_bootstraps (int): number of bootstrap iterations
+            bootstrap_size (int): number of samples per bootstrap
+            pretrain (bool): whether a model has been fit, default False.
+        Returns:
+            The mean and confidence interval (LB, UB) of the ATE estimate.
+        """
+        X = collect_if_lazy(X)
+
         if pretrain:
             if p is None:
                 if not self.propensity:
@@ -294,6 +376,8 @@ class BaseXLearner(BaseLearner):
             dhat_t = dhat_ts[group][mask]
             p_filt = p[group][mask]
 
+            # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
+            # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
             se = np.sqrt(
                 (
                     self.vars_t[group] / prob_treatment
@@ -313,7 +397,7 @@ class BaseXLearner(BaseLearner):
         if not bootstrap_ci:
             return ate, ate_lb, ate_ub
         else:
-            X_np = to_numpy(X)
+            y_np = to_numpy(y)
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_mu_c_global = deepcopy(self.models_mu_c)
@@ -325,9 +409,7 @@ class BaseXLearner(BaseLearner):
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
             for n in tqdm(range(n_bootstraps)):
-                cate_b = self.bootstrap(
-                    X_np, treatment_np, to_numpy(y), p, size=bootstrap_size
-                )
+                cate_b = self.bootstrap(X, treatment_np, y_np, p, size=bootstrap_size)
                 ate_bootstraps[:, n] = cate_b.mean(axis=0)
 
             ate_lower = np.percentile(
@@ -347,6 +429,8 @@ class BaseXLearner(BaseLearner):
 
 
 class BaseXRegressor(BaseXLearner):
+    """A parent class for X-learner regressor classes."""
+
     def __init__(
         self,
         learner=None,
@@ -357,6 +441,18 @@ class BaseXRegressor(BaseXLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
+        """Initialize an X-learner regressor.
+
+        Args:
+            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
+                groups
+            control_outcome_learner (optional): a model to estimate outcomes in the control group
+            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
+            control_effect_learner (optional): a model to estimate treatment effects in the control group
+            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
         super().__init__(
             learner=learner,
             control_outcome_learner=control_outcome_learner,
@@ -369,6 +465,8 @@ class BaseXRegressor(BaseXLearner):
 
 
 class BaseXClassifier(BaseXLearner):
+    """A parent class for X-learner classifier classes."""
+
     def __init__(
         self,
         outcome_learner=None,
@@ -380,6 +478,24 @@ class BaseXClassifier(BaseXLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
+        """Initialize an X-learner classifier.
+
+        Args:
+            outcome_learner (optional): a model to estimate outcomes in both the control and treatment groups.
+                Should be a classifier.
+            effect_learner (optional): a model to estimate treatment effects in both the control and treatment groups.
+                Should be a regressor.
+            control_outcome_learner (optional): a model to estimate outcomes in the control group.
+                Should be a classifier.
+            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group.
+                Should be a classifier.
+            control_effect_learner (optional): a model to estimate treatment effects in the control group.
+                Should be a regressor.
+            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
+                Should be a regressor.
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+        """
         if outcome_learner is not None:
             control_outcome_learner = outcome_learner
             treatment_outcome_learner = outcome_learner
@@ -405,16 +521,26 @@ class BaseXClassifier(BaseXLearner):
             )
 
     def fit(self, X, treatment, y, p=None):
+        """Fit the inference model.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method; the
+                feature matrix is otherwise kept in its native format throughout.
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in
+                the single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+        """
+        X = collect_if_lazy(X)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
 
         if p is None:
-            # base.py does raw numpy indexing internally — convert at this boundary
-            self._set_propensity_models(
-                X=to_numpy(X), treatment=treatment_np, y=to_numpy(y)
-            )
+            self._set_propensity_models(X=X, treatment=treatment_np, y=to_numpy(y))
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
@@ -438,17 +564,15 @@ class BaseXClassifier(BaseXLearner):
             y_filt = filter_mask(y, mask)
             w = (to_numpy(treatment_filt) == group).astype(int)
 
-            self.models_mu_c[group].fit(
-                filter_mask(X_filt, w == 0), filter_mask(y_filt, w == 0)
-            )
-            self.models_mu_t[group].fit(
-                filter_mask(X_filt, w == 1), filter_mask(y_filt, w == 1)
-            )
-
-            y_filt_np = to_numpy(y_filt)
             X_filt_c = filter_mask(X_filt, w == 0)
             X_filt_t = filter_mask(X_filt, w == 1)
+            y_filt_np = to_numpy(y_filt)
 
+            # Train outcome models
+            self.models_mu_c[group].fit(X_filt_c, filter_mask(y_filt, w == 0))
+            self.models_mu_t[group].fit(X_filt_t, filter_mask(y_filt, w == 1))
+
+            # Calculate variances and treatment effects
             var_c = (
                 y_filt_np[w == 0]
                 - self.models_mu_c[group].predict_proba(X_filt_c)[:, 1]
@@ -460,6 +584,7 @@ class BaseXClassifier(BaseXLearner):
             ).var()
             self.vars_t[group] = var_t
 
+            # Train treatment models
             d_c = (
                 self.models_mu_t[group].predict_proba(X_filt_c)[:, 1]
                 - y_filt_np[w == 0]
@@ -474,6 +599,23 @@ class BaseXClassifier(BaseXLearner):
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
+        """Predict treatment effects.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+            treatment (np.array, pd.Series, or pl.Series, optional): a treatment vector
+            y (np.array, pd.Series, or pl.Series, optional): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in
+                the single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            return_components (bool, optional): whether to return outcome for treatment and control seperately
+            verbose (bool, optional): whether to output progress logs
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+        """
+        X = collect_if_lazy(X)
+
         if p is None:
             logger.info("Generating propensity score")
             p = {
@@ -483,8 +625,7 @@ class BaseXClassifier(BaseXLearner):
         else:
             p = self._format_p(p, self.t_groups)
 
-        X_np = to_numpy(X)
-        te = np.zeros((X_np.shape[0], self.t_groups.shape[0]))
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         dhat_cs = {}
         dhat_ts = {}
 
