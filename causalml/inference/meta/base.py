@@ -2,6 +2,9 @@ from abc import ABCMeta, abstractmethod
 import logging
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
+from sklearn.base import BaseEstimator, clone
+from tqdm import tqdm
 
 from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import check_p_conditions, convert_pd_to_np
@@ -10,7 +13,52 @@ from causalml.propensity import compute_propensity_score
 logger = logging.getLogger("causalml")
 
 
-class BaseLearner(metaclass=ABCMeta):
+def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_size):
+    """Module-level bootstrap helper for joblib pickling compatibility.
+
+    Args:
+        learner_template: an *unfitted* learner to clone as a template.
+            Because BaseLearner now inherits BaseEstimator, ``clone(learner_template)``
+            produces a clean unfitted copy via ``get_params``/``set_params``.
+        X: feature matrix
+        treatment: treatment vector
+        y: outcome vector
+        p: propensity scores or None
+        seed (int): random seed for this bootstrap iteration
+        bootstrap_size (int): number of samples to draw
+    Returns:
+        A fitted clone of learner_template trained on a bootstrap sample.
+    """
+    rng = np.random.RandomState(seed)
+    idxs = rng.choice(np.arange(X.shape[0]), size=bootstrap_size)
+    X_b = X[idxs]
+    treatment_b = treatment[idxs]
+    y_b = y[idxs]
+    p_b = {group: _p[idxs] for group, _p in p.items()} if p is not None else None
+    learner_b = clone(learner_template)  # safe=True works now via get_params/set_params
+    learner_b.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
+    return learner_b
+
+
+class BaseLearner(BaseEstimator, metaclass=ABCMeta):
+    """Base class for all causalml meta-learners.
+
+    Inheriting ``sklearn.base.BaseEstimator`` gives every subclass:
+    * ``get_params`` / ``set_params`` for free (requires verbatim ``__init__``
+      argument storage — see scikit-learn conventions).
+    * ``sklearn.base.clone`` support without ``safe=False``.
+    * ``Pipeline`` / ``GridSearchCV`` compatibility.
+
+    Subclass contract
+    -----------------
+    * ``__init__`` **must** store every argument verbatim as ``self.<param> = param``.
+      No logic, no ``deepcopy``, no derived attributes.
+    * All model construction and validation moves to ``fit()``.
+    * Fitted attributes are named with a trailing underscore (e.g. ``models_t_``),
+      though the public API keeps legacy names (``models_t``) as aliases set in
+      ``fit()`` for backwards compatibility.
+    """
+
     @classmethod
     @abstractmethod
     def fit(self, X, treatment, y, p=None):
@@ -69,6 +117,51 @@ class BaseLearner(metaclass=ABCMeta):
         y_b = y[idxs]
         self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
         return self.predict(X=X, p=p)
+
+    def fit_bootstrap_ensemble(
+        self,
+        X,
+        treatment,
+        y,
+        p=None,
+        n_bootstraps=200,
+        bootstrap_size=10000,
+        random_state=None,
+        n_jobs=1,
+    ):
+        """Train and store a bootstrap ensemble for post-fit CI estimation.
+
+        Fits n_bootstraps cloned copies of the entire learner on bootstrap samples
+        and stores them in self.bootstrap_models_. Used by predict(return_ci=True)
+        to compute percentile-based confidence intervals on new data without refitting.
+
+        Because ``BaseLearner`` now inherits ``BaseEstimator``, ``clone(self)``
+        produces a clean unfitted copy via ``get_params``/``set_params`` — no
+        bespoke ``_unfitted_clone`` machinery required.
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
+            p: propensity scores, passed through to fit() if provided
+            n_bootstraps (int, optional): number of bootstrap iterations. Default: 200.
+            bootstrap_size (int, optional): number of samples per bootstrap. Default: 10000.
+            random_state (int, optional): random seed for reproducibility.
+            n_jobs (int, optional): number of parallel jobs. -1 uses all cores. Default: 1.
+        """
+        # clone(self) is now a proper sklearn clone — unfitted and cheap.
+        unfitted_template = clone(self)
+
+        rng = np.random.RandomState(random_state)
+        seeds = rng.randint(0, np.iinfo(np.int32).max, size=n_bootstraps)
+        logger.info("Storing bootstrap ensemble ({} iterations)".format(n_bootstraps))
+
+        self.bootstrap_models_ = Parallel(n_jobs=n_jobs)(
+            delayed(_fit_bootstrap_clone)(
+                unfitted_template, X, treatment, y, p, s, bootstrap_size
+            )
+            for s in tqdm(seeds)
+        )
 
     @staticmethod
     def _format_p(p, t_groups):

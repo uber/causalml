@@ -43,6 +43,9 @@ class BaseXLearner(BaseLearner):
             treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
+
+        Note: arguments are stored verbatim (scikit-learn convention) so that
+        ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
         """
         assert (learner is not None) or (
             (control_outcome_learner is not None)
@@ -51,45 +54,14 @@ class BaseXLearner(BaseLearner):
             and (treatment_effect_learner is not None)
         )
 
-        if control_outcome_learner is None:
-            self.model_mu_c = deepcopy(learner)
-        else:
-            self.model_mu_c = control_outcome_learner
-
-        if treatment_outcome_learner is None:
-            self.model_mu_t = deepcopy(learner)
-        else:
-            self.model_mu_t = treatment_outcome_learner
-
-        if control_effect_learner is None:
-            self.model_tau_c = deepcopy(learner)
-        else:
-            self.model_tau_c = control_effect_learner
-
-        if treatment_effect_learner is None:
-            self.model_tau_t = deepcopy(learner)
-        else:
-            self.model_tau_t = treatment_effect_learner
-
+        # Store verbatim — no deepcopy, no logic (scikit-learn convention).
+        self.learner = learner
+        self.control_outcome_learner = control_outcome_learner
+        self.treatment_outcome_learner = treatment_outcome_learner
+        self.control_effect_learner = control_effect_learner
+        self.treatment_effect_learner = treatment_effect_learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
-
-        self.propensity = None
-        self.propensity_model = None
-
-    def __repr__(self):
-        return (
-            "{}(control_outcome_learner={},\n"
-            "\ttreatment_outcome_learner={},\n"
-            "\tcontrol_effect_learner={},\n"
-            "\ttreatment_effect_learner={})".format(
-                self.__class__.__name__,
-                self.model_mu_c.__repr__(),
-                self.model_mu_t.__repr__(),
-                self.model_tau_c.__repr__(),
-                self.model_tau_t.__repr__(),
-            )
-        )
 
     def fit(self, X, treatment, y, p=None):
         """Fit the inference model.
@@ -114,43 +86,68 @@ class BaseXLearner(BaseLearner):
             p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-        self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
-        self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
+
+        # Resolve base models from stored constructor args (no templates needed).
+        _control_outcome_learner = (
+            self.control_outcome_learner
+            if self.control_outcome_learner is not None
+            else deepcopy(self.learner)
+        )
+        _treatment_outcome_learner = (
+            self.treatment_outcome_learner
+            if self.treatment_outcome_learner is not None
+            else deepcopy(self.learner)
+        )
+        _control_effect_learner = (
+            self.control_effect_learner
+            if self.control_effect_learner is not None
+            else deepcopy(self.learner)
+        )
+        _treatment_effect_learner = (
+            self.treatment_effect_learner
+            if self.treatment_effect_learner is not None
+            else deepcopy(self.learner)
+        )
+
+        self.models_mu_t = {
+            group: deepcopy(_treatment_outcome_learner) for group in self.t_groups
+        }
         self.models_tau_c = {
-            group: deepcopy(self.model_tau_c) for group in self.t_groups
+            group: deepcopy(_control_effect_learner) for group in self.t_groups
         }
         self.models_tau_t = {
-            group: deepcopy(self.model_tau_t) for group in self.t_groups
+            group: deepcopy(_treatment_effect_learner) for group in self.t_groups
         }
         self.vars_c = {}
         self.vars_t = {}
 
+        # model_mu_c is trained on control data, identical for every treatment group.
+        control_mask = treatment == self.control_name
+        self.model_mu_c = deepcopy(_control_outcome_learner)
+        self.model_mu_c.fit(X[control_mask], y[control_mask])
+        self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
+
+        y_control_pred = self.model_mu_c.predict(X[control_mask])
+        self.var_c = (y[control_mask] - y_control_pred).var()
+        self.vars_c = {group: self.var_c for group in self.t_groups}
+
         for group in self.t_groups:
-            mask = (treatment == group) | (treatment == self.control_name)
-            treatment_filt = treatment[mask]
-            X_filt = X[mask]
-            y_filt = y[mask]
-            w = (treatment_filt == group).astype(int)
+            treatment_mask = treatment == group
+            X_treat = X[treatment_mask]
+            y_treat = y[treatment_mask]
 
-            # Train outcome models
-            self.models_mu_c[group].fit(X_filt[w == 0], y_filt[w == 0])
-            self.models_mu_t[group].fit(X_filt[w == 1], y_filt[w == 1])
+            self.models_mu_t[group].fit(X_treat, y_treat)
 
-            # Calculate variances and treatment effects
-            var_c = (
-                y_filt[w == 0] - self.models_mu_c[group].predict(X_filt[w == 0])
+            self.vars_t[group] = (
+                y_treat - self.models_mu_t[group].predict(X_treat)
             ).var()
-            self.vars_c[group] = var_c
-            var_t = (
-                y_filt[w == 1] - self.models_mu_t[group].predict(X_filt[w == 1])
-            ).var()
-            self.vars_t[group] = var_t
 
-            # Train treatment models
-            d_c = self.models_mu_t[group].predict(X_filt[w == 0]) - y_filt[w == 0]
-            d_t = y_filt[w == 1] - self.models_mu_c[group].predict(X_filt[w == 1])
-            self.models_tau_c[group].fit(X_filt[w == 0], d_c)
-            self.models_tau_t[group].fit(X_filt[w == 1], d_t)
+            d_c = self.models_mu_t[group].predict(X[control_mask]) - y[control_mask]
+            d_t = y_treat - self.model_mu_c.predict(X_treat)
+            self.models_tau_c[group].fit(X[control_mask], d_c)
+            self.models_tau_t[group].fit(X_treat, d_t)
+
+        return self
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
@@ -161,9 +158,7 @@ class BaseXLearner(BaseLearner):
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series, optional): a treatment vector
             y (np.array or pd.Series, optional): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            p (np.ndarray or pd.Series or dict, optional): propensity scores
             return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (bool, optional): whether to output progress logs
         Returns:
@@ -184,6 +179,11 @@ class BaseXLearner(BaseLearner):
         dhat_cs = {}
         dhat_ts = {}
 
+        yhat_c_verbose = None
+        if (y is not None) and (treatment is not None) and verbose:
+            control_mask = treatment == self.control_name
+            yhat_c_verbose = self.model_mu_c.predict(X[control_mask])
+
         for i, group in enumerate(self.t_groups):
             model_tau_c = self.models_tau_c[group]
             model_tau_t = self.models_tau_t[group]
@@ -195,7 +195,7 @@ class BaseXLearner(BaseLearner):
             )
             te[:, i] = np.ravel(_te)
 
-            if (y is not None) and (treatment is not None) and verbose:
+            if yhat_c_verbose is not None:
                 mask = (treatment == group) | (treatment == self.control_name)
                 treatment_filt = treatment[mask]
                 X_filt = X[mask]
@@ -203,7 +203,7 @@ class BaseXLearner(BaseLearner):
                 w = (treatment_filt == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = self.models_mu_c[group].predict(X_filt[w == 0])
+                yhat[w == 0] = yhat_c_verbose
                 yhat[w == 1] = self.models_mu_t[group].predict(X_filt[w == 1])
 
                 logger.info("Error metrics for group {}".format(group))
@@ -226,24 +226,20 @@ class BaseXLearner(BaseLearner):
         return_components=False,
         verbose=True,
     ):
-        """Fit the treatment effect and outcome models of the R learner and predict treatment effects.
+        """Fit the X-learner and predict treatment effects.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            p (np.ndarray or pd.Series or dict, optional): propensity scores
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
             return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (str): whether to output progress logs
         Returns:
-            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
-                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
-                UB [n_samples, n_treatment]
+            (numpy.ndarray): Predictions of treatment effects.
         """
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         self.fit(X, treatment, y, p)
@@ -262,7 +258,7 @@ class BaseXLearner(BaseLearner):
         else:
             t_groups_global = self.t_groups
             _classes_global = self._classes
-            models_mu_c_global = deepcopy(self.models_mu_c)
+            model_mu_c_global = deepcopy(self.model_mu_c)
             models_mu_t_global = deepcopy(self.models_mu_t)
             models_tau_c_global = deepcopy(self.models_tau_c)
             models_tau_t_global = deepcopy(self.models_tau_t)
@@ -280,10 +276,10 @@ class BaseXLearner(BaseLearner):
                 te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2
             )
 
-            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
-            self.models_mu_c = deepcopy(models_mu_c_global)
+            self.model_mu_c = deepcopy(model_mu_c_global)
+            self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
             self.models_mu_t = deepcopy(models_mu_t_global)
             self.models_tau_c = deepcopy(models_tau_c_global)
             self.models_tau_t = deepcopy(models_tau_t_global)
@@ -307,9 +303,7 @@ class BaseXLearner(BaseLearner):
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            p (np.ndarray or pd.Series or dict, optional): propensity scores
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -319,7 +313,6 @@ class BaseXLearner(BaseLearner):
         """
         if pretrain:
             if p is None:
-                # when p is null, use pretrain propensity score
                 if not self.propensity:
                     raise ValueError("no propensity score, please call fit() first")
                 te, dhat_cs, dhat_ts = self.predict(
@@ -357,12 +350,10 @@ class BaseXLearner(BaseLearner):
             dhat_t = dhat_ts[group][mask]
             p_filt = p[group][mask]
 
-            # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
-            # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
             se = np.sqrt(
                 (
                     self.vars_t[group] / prob_treatment
-                    + self.vars_c[group] / (1 - prob_treatment)
+                    + self.var_c / (1 - prob_treatment)
                     + (p_filt * dhat_c + (1 - p_filt) * dhat_t).var()
                 )
                 / w.shape[0]
@@ -380,7 +371,7 @@ class BaseXLearner(BaseLearner):
         else:
             t_groups_global = self.t_groups
             _classes_global = self._classes
-            models_mu_c_global = deepcopy(self.models_mu_c)
+            model_mu_c_global = deepcopy(self.model_mu_c)
             models_mu_t_global = deepcopy(self.models_mu_t)
             models_tau_c_global = deepcopy(self.models_tau_c)
             models_tau_t_global = deepcopy(self.models_tau_t)
@@ -399,10 +390,10 @@ class BaseXLearner(BaseLearner):
                 ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1
             )
 
-            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
-            self.models_mu_c = deepcopy(models_mu_c_global)
+            self.model_mu_c = deepcopy(model_mu_c_global)
+            self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
             self.models_mu_t = deepcopy(models_mu_t_global)
             self.models_tau_c = deepcopy(models_tau_c_global)
             self.models_tau_t = deepcopy(models_tau_t_global)
@@ -424,18 +415,6 @@ class BaseXRegressor(BaseXLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
-        """Initialize an X-learner regressor.
-
-        Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
-                groups
-            control_outcome_learner (optional): a model to estimate outcomes in the control group
-            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
-            control_effect_learner (optional): a model to estimate treatment effects in the control group
-            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
-            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
-            control_name (str or int, optional): name of control group
-        """
         super().__init__(
             learner=learner,
             control_outcome_learner=control_outcome_learner,
@@ -466,56 +445,46 @@ class BaseXClassifier(BaseXLearner):
         """Initialize an X-learner classifier.
 
         Args:
-            outcome_learner (optional): a model to estimate outcomes in both the control and treatment groups.
-                Should be a classifier.
-            effect_learner (optional): a model to estimate treatment effects in both the control and treatment groups.
-                Should be a regressor.
-            control_outcome_learner (optional): a model to estimate outcomes in the control group.
-                Should be a classifier.
-            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group.
-                Should be a classifier.
-            control_effect_learner (optional): a model to estimate treatment effects in the control group.
-                Should be a regressor.
-            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
-                Should be a regressor.
-            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            outcome_learner (optional): a classifier for outcomes in both groups.
+            effect_learner (optional): a regressor for treatment effects in both groups.
+            control_outcome_learner (optional): a classifier for control outcomes.
+            treatment_outcome_learner (optional): a classifier for treatment outcomes.
+            control_effect_learner (optional): a regressor for control effects.
+            treatment_effect_learner (optional): a regressor for treatment effects.
+            ate_alpha (float, optional): confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        if outcome_learner is not None:
-            control_outcome_learner = outcome_learner
-            treatment_outcome_learner = outcome_learner
-        if effect_learner is not None:
-            control_effect_learner = effect_learner
-            treatment_effect_learner = effect_learner
+        # Store all args verbatim for get_params / clone compatibility.
+        self.outcome_learner = outcome_learner
+        self.effect_learner = effect_learner
+
+        # Resolve to specific learner slots.
+        _control_outcome_learner = control_outcome_learner or outcome_learner
+        _treatment_outcome_learner = treatment_outcome_learner or outcome_learner
+        _control_effect_learner = control_effect_learner or effect_learner
+        _treatment_effect_learner = treatment_effect_learner or effect_learner
 
         super().__init__(
             learner=None,
-            control_outcome_learner=control_outcome_learner,
-            treatment_outcome_learner=treatment_outcome_learner,
-            control_effect_learner=control_effect_learner,
-            treatment_effect_learner=treatment_effect_learner,
+            control_outcome_learner=_control_outcome_learner,
+            treatment_outcome_learner=_treatment_outcome_learner,
+            control_effect_learner=_control_effect_learner,
+            treatment_effect_learner=_treatment_effect_learner,
             ate_alpha=ate_alpha,
             control_name=control_name,
         )
 
         if (
-            (control_outcome_learner is None) or (treatment_outcome_learner is None)
-        ) and ((control_effect_learner is None) or (treatment_effect_learner is None)):
+            (_control_outcome_learner is None) or (_treatment_outcome_learner is None)
+        ) and (
+            (_control_effect_learner is None) or (_treatment_effect_learner is None)
+        ):
             raise ValueError(
                 "Either the outcome learner or the effect learner pair must be specified."
             )
 
     def fit(self, X, treatment, y, p=None):
-        """Fit the inference model.
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-        """
+        """Fit the inference model (classifier variant — uses predict_proba)."""
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
@@ -528,70 +497,61 @@ class BaseXClassifier(BaseXLearner):
             p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-        self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
-        self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
+
+        # Resolve base models from stored constructor args.
+        _control_outcome_learner = self.control_outcome_learner or self.outcome_learner
+        _treatment_outcome_learner = (
+            self.treatment_outcome_learner or self.outcome_learner
+        )
+        _control_effect_learner = self.control_effect_learner or self.effect_learner
+        _treatment_effect_learner = self.treatment_effect_learner or self.effect_learner
+
+        self.models_mu_t = {
+            group: deepcopy(_treatment_outcome_learner) for group in self.t_groups
+        }
         self.models_tau_c = {
-            group: deepcopy(self.model_tau_c) for group in self.t_groups
+            group: deepcopy(_control_effect_learner) for group in self.t_groups
         }
         self.models_tau_t = {
-            group: deepcopy(self.model_tau_t) for group in self.t_groups
+            group: deepcopy(_treatment_effect_learner) for group in self.t_groups
         }
         self.vars_c = {}
         self.vars_t = {}
 
+        control_mask = treatment == self.control_name
+        self.model_mu_c = deepcopy(_control_outcome_learner)
+        self.model_mu_c.fit(X[control_mask], y[control_mask])
+        self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
+
+        y_control_pred = self.model_mu_c.predict_proba(X[control_mask])[:, 1]
+        self.var_c = (y[control_mask] - y_control_pred).var()
+        self.vars_c = {group: self.var_c for group in self.t_groups}
+
         for group in self.t_groups:
-            mask = (treatment == group) | (treatment == self.control_name)
-            treatment_filt = treatment[mask]
-            X_filt = X[mask]
-            y_filt = y[mask]
-            w = (treatment_filt == group).astype(int)
+            treatment_mask = treatment == group
+            X_treat = X[treatment_mask]
+            y_treat = y[treatment_mask]
 
-            # Train outcome models
-            self.models_mu_c[group].fit(X_filt[w == 0], y_filt[w == 0])
-            self.models_mu_t[group].fit(X_filt[w == 1], y_filt[w == 1])
+            self.models_mu_t[group].fit(X_treat, y_treat)
 
-            # Calculate variances and treatment effects
-            var_c = (
-                y_filt[w == 0]
-                - self.models_mu_c[group].predict_proba(X_filt[w == 0])[:, 1]
+            self.vars_t[group] = (
+                y_treat - self.models_mu_t[group].predict_proba(X_treat)[:, 1]
             ).var()
-            self.vars_c[group] = var_c
-            var_t = (
-                y_filt[w == 1]
-                - self.models_mu_t[group].predict_proba(X_filt[w == 1])[:, 1]
-            ).var()
-            self.vars_t[group] = var_t
 
-            # Train treatment models
             d_c = (
-                self.models_mu_t[group].predict_proba(X_filt[w == 0])[:, 1]
-                - y_filt[w == 0]
+                self.models_mu_t[group].predict_proba(X[control_mask])[:, 1]
+                - y[control_mask]
             )
-            d_t = (
-                y_filt[w == 1]
-                - self.models_mu_c[group].predict_proba(X_filt[w == 1])[:, 1]
-            )
-            self.models_tau_c[group].fit(X_filt[w == 0], d_c)
-            self.models_tau_t[group].fit(X_filt[w == 1], d_t)
+            d_t = y_treat - self.model_mu_c.predict_proba(X_treat)[:, 1]
+            self.models_tau_c[group].fit(X[control_mask], d_c)
+            self.models_tau_t[group].fit(X_treat, d_t)
+
+        return self
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
-        """Predict treatment effects.
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series, optional): a treatment vector
-            y (np.array or pd.Series, optional): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): an array of propensity scores of float (0,1) in the
-                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            return_components (bool, optional): whether to return outcome for treatment and control seperately
-            return_p_score (bool, optional): whether to return propensity score
-            verbose (bool, optional): whether to output progress logs
-        Returns:
-            (numpy.ndarray): Predictions of treatment effects.
-        """
+        """Predict treatment effects (classifier variant — uses predict_proba)."""
         X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         if p is None:
@@ -607,6 +567,11 @@ class BaseXClassifier(BaseXLearner):
         dhat_cs = {}
         dhat_ts = {}
 
+        yhat_c_verbose = None
+        if (y is not None) and (treatment is not None) and verbose:
+            control_mask = treatment == self.control_name
+            yhat_c_verbose = self.model_mu_c.predict_proba(X[control_mask])[:, 1]
+
         for i, group in enumerate(self.t_groups):
             model_tau_c = self.models_tau_c[group]
             model_tau_t = self.models_tau_t[group]
@@ -618,7 +583,7 @@ class BaseXClassifier(BaseXLearner):
             )
             te[:, i] = np.ravel(_te)
 
-            if (y is not None) and (treatment is not None) and verbose:
+            if yhat_c_verbose is not None:
                 mask = (treatment == group) | (treatment == self.control_name)
                 treatment_filt = treatment[mask]
                 X_filt = X[mask]
@@ -626,9 +591,7 @@ class BaseXClassifier(BaseXLearner):
                 w = (treatment_filt == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = self.models_mu_c[group].predict_proba(X_filt[w == 0])[
-                    :, 1
-                ]
+                yhat[w == 0] = yhat_c_verbose
                 yhat[w == 1] = self.models_mu_t[group].predict_proba(X_filt[w == 1])[
                     :, 1
                 ]

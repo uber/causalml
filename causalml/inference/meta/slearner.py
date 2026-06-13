@@ -51,22 +51,23 @@ class BaseSLearner(BaseLearner):
 
     def __init__(self, learner=None, ate_alpha=0.05, control_name=0):
         """Initialize an S-learner.
+
         Args:
-            learner (optional): a model to estimate the treatment effect
+            learner (optional): a model to estimate the treatment effect.
+                If None, a DummyRegressor is used.  The argument is stored
+                verbatim so that ``get_params`` / ``clone`` work correctly
+                (scikit-learn convention).
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        if learner is not None:
-            self.model = learner
-        else:
-            self.model = DummyRegressor()
+        # Store verbatim — no deepcopy, no logic (scikit-learn convention).
+        self.learner = learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
 
-    def __repr__(self):
-        return "{}(model={})".format(self.__class__.__name__, self.model.__repr__())
-
     def fit(self, X, treatment, y, p=None):
-        """Fit the inference model
+        """Fit the inference model.
+
         Args:
             X (np.matrix, np.array, or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series): a treatment vector
@@ -77,7 +78,10 @@ class BaseSLearner(BaseLearner):
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-        self.models = {group: deepcopy(self.model) for group in self.t_groups}
+
+        # Resolve the base model here (not in __init__) so clone() works cleanly.
+        _base_model = self.learner if self.learner is not None else DummyRegressor()
+        self.models = {group: deepcopy(_base_model) for group in self.t_groups}
 
         for group in self.t_groups:
             mask = (treatment == group) | (treatment == self.control_name)
@@ -88,6 +92,8 @@ class BaseSLearner(BaseLearner):
             w = (treatment_filt == group).astype(int)
             X_new = np.hstack((w.reshape((-1, 1)), X_filt))
             self.models[group].fit(X_new, y_filt)
+
+        return self
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
@@ -106,16 +112,15 @@ class BaseSLearner(BaseLearner):
         yhat_cs = {}
         yhat_ts = {}
 
+        # Build the augmented arrays once; they are identical for every group.
+        # (Separate allocations avoid in-place mutation by learners like CatBoost
+        # that set the writeable flag to False on arrays passed to predict().)\
+        X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
+        X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
+
         for group in self.t_groups:
             model = self.models[group]
-
-            # Build separate arrays for control and treatment to avoid in-place
-            # mutation, which fails when learners like CatBoost set the
-            # writeable flag to False on arrays passed to predict().
-            X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
             yhat_cs[group] = model.predict(X_new_c)
-
-            X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
             yhat_ts[group] = model.predict(X_new_t)
 
             if (y is not None) and (treatment is not None) and verbose:
@@ -344,16 +349,13 @@ class BaseSClassifier(BaseSLearner):
         yhat_cs = {}
         yhat_ts = {}
 
+        # Build the augmented arrays once; they are identical for every group.
+        X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
+        X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
+
         for group in self.t_groups:
             model = self.models[group]
-
-            # Build separate arrays for control and treatment to avoid in-place
-            # mutation, which fails when learners like CatBoost set the
-            # writeable flag to False on arrays passed to predict().
-            X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
             yhat_cs[group] = model.predict_proba(X_new_c)[:, 1]
-
-            X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))
             yhat_ts[group] = model.predict_proba(X_new_t)[:, 1]
 
             if y is not None and (treatment is not None) and verbose:
