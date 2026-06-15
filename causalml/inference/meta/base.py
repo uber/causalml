@@ -1,4 +1,5 @@
 from abc import ABCMeta, abstractmethod
+import copy
 import logging
 import numpy as np
 import pandas as pd
@@ -17,7 +18,7 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
     """Module-level bootstrap helper for joblib pickling compatibility.
 
     Args:
-        learner_template: the fitted learner to clone as a template
+        learner_template: an unfitted template to clone
         X: feature matrix
         treatment: treatment vector
         y: outcome vector
@@ -98,6 +99,11 @@ class BaseLearner(metaclass=ABCMeta):
         self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
         return self.predict(X=X, p=p)
 
+    def _unfitted_clone(self):
+        """Return an unfitted copy for bootstrap refitting. Subclasses that hold fitted
+        sub-models should override to reset them to their unfitted templates."""
+        return clone(self, safe=False)
+
     def fit_bootstrap_ensemble(
         self,
         X,
@@ -137,8 +143,11 @@ class BaseLearner(metaclass=ABCMeta):
         seeds = rng.randint(0, np.iinfo(np.int32).max, size=n_bootstraps)
         logger.info("Storing bootstrap ensemble ({} iterations)".format(n_bootstraps))
 
+        learner_template = self._unfitted_clone()
         self.bootstrap_models_ = Parallel(n_jobs=n_jobs)(
-            delayed(_fit_bootstrap_clone)(self, X, treatment, y, p, s, bootstrap_size)
+            delayed(_fit_bootstrap_clone)(
+                learner_template, X, treatment, y, p, s, bootstrap_size
+            )
             for s in tqdm(seeds)
         )
 

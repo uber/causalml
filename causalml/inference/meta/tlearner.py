@@ -1,3 +1,4 @@
+import copy
 from copy import deepcopy
 import logging
 import numpy as np
@@ -63,6 +64,9 @@ class BaseTLearner(BaseLearner):
         else:
             self.model_t = treatment_learner
 
+        # Preserve the unfitted template so repeated fit() calls always start fresh.
+        self._model_t_template = self.model_t
+
         self.ate_alpha = ate_alpha
         self.control_name = control_name
         self.bootstrap_models_ = None
@@ -71,6 +75,15 @@ class BaseTLearner(BaseLearner):
         return "{}(model_c={}, model_t={})".format(
             self.__class__.__name__, self.model_c.__repr__(), self.model_t.__repr__()
         )
+
+    def _unfitted_clone(self):
+        template = copy.copy(self)
+        for attr in ("models_c", "models_t", "bootstrap_models_"):
+            if hasattr(template, attr):
+                delattr(template, attr)
+        template.model_c = self._model_c_template
+        template.model_t = self._model_t_template
+        return template
 
     @ignore_warnings(category=ConvergenceWarning)
     def fit(
@@ -465,6 +478,9 @@ class BaseTClassifier(BaseTLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
+
         yhat_ts = {}
 
         yhat_c = self.model_c.predict_proba(X)[:, 1]
@@ -489,9 +505,6 @@ class BaseTClassifier(BaseTLearner):
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = yhat_ts[group] - yhat_c
-
-        if return_ci and return_components:
-            raise ValueError("return_ci and return_components cannot both be True.")
 
         if return_ci:
             te_lower, te_upper = self._compute_bootstrap_ci(X)
