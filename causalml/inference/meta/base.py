@@ -1,7 +1,11 @@
 from abc import ABCMeta, abstractmethod
+import copy
 import logging
 import numpy as np
 import pandas as pd
+from joblib import Parallel, delayed
+from sklearn.base import clone
+from tqdm import tqdm
 
 from causalml.inference.meta.explainer import Explainer
 from causalml.inference.meta.utils import (
@@ -14,6 +18,31 @@ from causalml.inference.meta.utils import (
 from causalml.propensity import compute_propensity_score
 
 logger = logging.getLogger("causalml")
+
+
+def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_size):
+    """Module-level bootstrap helper for joblib pickling compatibility.
+
+    Args:
+        learner_template: an unfitted template to clone
+        X: feature matrix
+        treatment: treatment vector
+        y: outcome vector
+        p: propensity scores or None
+        seed (int): random seed for this bootstrap iteration
+        bootstrap_size (int): number of samples to draw
+    Returns:
+        A fitted clone of learner_template trained on a bootstrap sample.
+    """
+    rng = np.random.RandomState(seed)
+    idxs = rng.choice(np.arange(X.shape[0]), size=bootstrap_size)
+    X_b = X[idxs]
+    treatment_b = treatment[idxs]
+    y_b = y[idxs]
+    p_b = {group: _p[idxs] for group, _p in p.items()} if p is not None else None
+    learner_b = clone(learner_template, safe=False)
+    learner_b.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
+    return learner_b
 
 
 class BaseLearner(metaclass=ABCMeta):
@@ -90,6 +119,58 @@ class BaseLearner(metaclass=ABCMeta):
         y_b = y[idxs]
         self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
         return self.predict(X=X, p=p)
+
+    def _unfitted_clone(self):
+        """Return an unfitted copy for bootstrap refitting. Subclasses that hold fitted
+        sub-models should override to reset them to their unfitted templates."""
+        return clone(self, safe=False)
+
+    def fit_bootstrap_ensemble(
+        self,
+        X,
+        treatment,
+        y,
+        p=None,
+        n_bootstraps=200,
+        bootstrap_size=10000,
+        random_state=None,
+        n_jobs=1,
+    ):
+        """Train and store a bootstrap ensemble for post-fit CI estimation.
+
+        Fits n_bootstraps cloned copies of the entire learner on bootstrap samples
+        and stores them in self.bootstrap_models_. Used by predict(return_ci=True)
+        to compute percentile-based confidence intervals on new data without refitting.
+
+        This design follows EconML's BootstrapEstimator pattern — each bootstrap
+        clone is a full copy of the learner, making this method generic across all
+        meta-learners.
+
+        Note: storing N bootstrap clones can be memory-intensive for heavy base
+        learners. Monitor RAM for large n_bootstraps.
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
+            p: propensity scores, passed through to fit() if provided
+            n_bootstraps (int, optional): number of bootstrap iterations. Default: 200.
+            bootstrap_size (int, optional): number of samples per bootstrap. Default: 10000.
+            random_state (int, optional): random seed for reproducibility.
+            n_jobs (int, optional): number of parallel jobs. -1 uses all cores. Default: 1.
+        """
+
+        rng = np.random.RandomState(random_state)
+        seeds = rng.randint(0, np.iinfo(np.int32).max, size=n_bootstraps)
+        logger.info("Storing bootstrap ensemble ({} iterations)".format(n_bootstraps))
+
+        learner_template = self._unfitted_clone()
+        self.bootstrap_models_ = Parallel(n_jobs=n_jobs)(
+            delayed(_fit_bootstrap_clone)(
+                learner_template, X, treatment, y, p, s, bootstrap_size
+            )
+            for s in tqdm(seeds)
+        )
 
     @staticmethod
     def _format_p(p, t_groups):

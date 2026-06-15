@@ -1,5 +1,6 @@
 from typing import Union
 
+from contextlib import contextmanager
 import numpy as np
 import forestci as fci
 from joblib import Parallel, delayed
@@ -13,7 +14,7 @@ from sklearn.utils.validation import (
 )
 from sklearn.utils.multiclass import type_of_target
 from sklearn import __version__ as sklearn_version
-from sklearn.ensemble._forest import DOUBLE, DTYPE, MAX_INT
+from sklearn.ensemble._forest import MAX_INT
 from sklearn.ensemble._forest import ForestRegressor
 from sklearn.ensemble._forest import compute_sample_weight, issparse
 from sklearn.ensemble._forest import _generate_sample_indices, _get_n_samples_bootstrap
@@ -25,6 +26,59 @@ try:
     from packaging.version import parse as Version
 except ModuleNotFoundError:
     from distutils.version import LooseVersion as Version
+
+DOUBLE = np.float64
+DTYPE = np.float32
+
+# scikit-learn 1.9 refactored the forest sample_weight handling
+# (https://github.com/scikit-learn/scikit-learn/pull/31529), making `sample_weight`
+# a required positional argument on several private helpers vendored below.
+# We pass `sample_weight=None` on >=1.9 to preserve the pre-1.9 uniform-bootstrap
+# behavior (the vendored `_parallel_build_trees` already applies the user's
+# `sample_weight` itself), keeping causal-forest results identical across versions.
+_SKLEARN_GE_19 = Version(sklearn_version) >= Version("1.9.0")
+
+
+@contextmanager
+def _forestci_sklearn19_compat():
+    """Make forestci's pre-1.9 sampler calls work under scikit-learn >= 1.9.
+
+    forestci (<= 0.7) calls scikit-learn's private ``_generate_sample_indices``
+    and ``_get_n_samples_bootstrap`` with their pre-1.9 arity (no
+    ``sample_weight``), which raises ``TypeError`` on scikit-learn >= 1.9 (the
+    same refactor handled elsewhere in this module). Until the upstream fix
+    (scikit-learn-contrib/forest-confidence-interval#122) ships in a release and
+    we can bump the ``forestci`` pin, temporarily wrap those names in forestci's
+    module namespace to supply ``sample_weight=None`` -- the pre-1.9
+    uniform-bootstrap default, so results are unchanged. This patches the exact
+    globals ``forestci.calc_inbag`` resolves at call time, covering both the
+    direct call and the recursive ``calibrate=True`` path. No-op on < 1.9.
+
+    Note: this mutates ``forestci.forestci`` module globals for the duration of
+    the call (restored in ``finally``); it is not safe under concurrent calls
+    from multiple threads.
+    """
+    if not _SKLEARN_GE_19:
+        yield
+        return
+
+    import forestci.forestci as _impl
+
+    def _gsi(random_state, n_samples, n_samples_bootstrap, sample_weight=None):
+        return _generate_sample_indices(
+            random_state, n_samples, n_samples_bootstrap, sample_weight
+        )
+
+    def _gnsb(n_samples, max_samples, sample_weight=None):
+        return _get_n_samples_bootstrap(n_samples, max_samples, sample_weight)
+
+    orig = (_impl._generate_sample_indices, _impl._get_n_samples_bootstrap)
+    _impl._generate_sample_indices, _impl._get_n_samples_bootstrap = _gsi, _gnsb
+    try:
+        yield
+    finally:
+        _impl._generate_sample_indices, _impl._get_n_samples_bootstrap = orig
+
 
 if Version(sklearn_version) >= Version("1.1.0"):
     _joblib_parallel_args = dict(prefer="threads")
@@ -59,9 +113,15 @@ def _parallel_build_trees(
         else:
             curr_sample_weight = sample_weight.copy()
 
-        indices = _generate_sample_indices(
-            tree.random_state, n_samples, n_samples_bootstrap
-        )
+        if _SKLEARN_GE_19:
+            # `sample_weight=None` -> uniform draw, matching pre-1.9 behavior
+            indices = _generate_sample_indices(
+                tree.random_state, n_samples, n_samples_bootstrap, sample_weight=None
+            )
+        else:
+            indices = _generate_sample_indices(
+                tree.random_state, n_samples, n_samples_bootstrap
+            )
         sample_counts = np.bincount(indices, minlength=n_samples)
         curr_sample_weight *= sample_counts
 
@@ -319,7 +379,12 @@ class CausalRandomForestRegressor(ForestRegressor):
         groups = np.unique(treatment).astype(int).size
         self.n_outputs_ = groups - 1
         self.max_outputs_ = self.n_outputs_ + groups
-        y, expanded_class_weight = self._validate_y_class_weight(y)
+        if _SKLEARN_GE_19:
+            # 1.9 requires sample_weight; for a regressor this returns (y, None)
+            # regardless, so threading it through is harmless.
+            y, expanded_class_weight = self._validate_y_class_weight(y, sample_weight)
+        else:
+            y, expanded_class_weight = self._validate_y_class_weight(y)
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
@@ -337,9 +402,16 @@ class CausalRandomForestRegressor(ForestRegressor):
                 "`max_sample=None`."
             )
         elif self.bootstrap:
-            n_samples_bootstrap = _get_n_samples_bootstrap(
-                n_samples=X.shape[0], max_samples=self.max_samples
-            )
+            if _SKLEARN_GE_19:
+                n_samples_bootstrap = _get_n_samples_bootstrap(
+                    n_samples=X.shape[0],
+                    max_samples=self.max_samples,
+                    sample_weight=None,
+                )
+            else:
+                n_samples_bootstrap = _get_n_samples_bootstrap(
+                    n_samples=X.shape[0], max_samples=self.max_samples
+                )
         else:
             n_samples_bootstrap = None
 
@@ -497,19 +569,33 @@ class CausalRandomForestRegressor(ForestRegressor):
 
         Returns:
             (np.ndarray), An array with the unbiased sampling variance for a RandomForest object.
+
+        Note:
+            This method delegates to ``forestci`` (forest-confidence-interval), which
+            calls scikit-learn's private ``_get_n_samples_bootstrap`` and
+            ``_generate_sample_indices`` with their pre-1.9 signatures. Under
+            scikit-learn >= 1.9 those helpers require an extra ``sample_weight``
+            argument, so ``forestci`` (<= 0.7) would raise ``TypeError`` here. As a
+            temporary measure this call runs inside ``_forestci_sklearn19_compat()``,
+            which patches those helpers to pass ``sample_weight=None`` (the pre-1.9
+            uniform-bootstrap default, so results are unchanged), pending the upstream
+            fix (forest-confidence-interval#122) and a ``forestci`` pin bump. The shim
+            is not thread-safe (see its docstring). See
+            https://github.com/uber/causalml/issues/906.
         """
         if self.n_outputs_ != 1:
             raise NotImplementedError(
                 f"forestci supports n_outputs=1. n_outputs={self.n_outputs_}"
             )
 
-        var = fci.random_forest_error(
-            self,
-            X_train,
-            X_test,
-            inbag=inbag,
-            calibrate=calibrate,
-            memory_constrained=memory_constrained,
-            memory_limit=memory_limit,
-        )
+        with _forestci_sklearn19_compat():
+            var = fci.random_forest_error(
+                self,
+                X_train,
+                X_test,
+                inbag=inbag,
+                calibrate=calibrate,
+                memory_constrained=memory_constrained,
+                memory_limit=memory_limit,
+            )
         return var

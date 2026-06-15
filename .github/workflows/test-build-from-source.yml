@@ -6,6 +6,9 @@ on:
       - 'envs/*.yml'
       - '.github/workflows/test-build-from-source.yml'
 
+permissions:
+  contents: read
+
 jobs:
   build:
     name: ${{ matrix.os }}${{ matrix.tf-label }}-py${{ matrix.python-version }}

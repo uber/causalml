@@ -270,7 +270,6 @@ class TestCausalRandomForestCase(CausalTreeBase):
             treatment_test,
         ) = self.split_data(data)
         crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
-        crforest.fit(X=X_train, treatment=treatment_train, y=y_train)
         if n_treatments == 1:
             crforest_test_var = crforest.calculate_error(X_train=X_train, X_test=X_test)
             assert (crforest_test_var > 0).all()
