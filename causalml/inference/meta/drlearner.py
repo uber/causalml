@@ -234,6 +234,9 @@ class BaseDRLearner(BaseLearner):
         yhat_ts = {}
 
         yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
+        # models_mu_c is fold-specific but not group-specific; predict once and reuse.
+        yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
+        # Shared-reference dict preserves the public yhat_cs[group] API cheaply.
         yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for i, group in enumerate(self.t_groups):
@@ -536,6 +539,7 @@ class BaseDRClassifier(BaseDRLearner):
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         yhat_ts = {}
 
+        # models_mu_c is fold-specific but not group-specific; predict once and reuse.
         yhat_c = np.r_[
             [model.predict_proba(X)[:, 1] for model in self.models_mu_c]
         ].mean(axis=0)

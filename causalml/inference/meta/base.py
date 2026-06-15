@@ -1,9 +1,11 @@
 from abc import ABCMeta, abstractmethod
+import copy
 import logging
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.base import BaseEstimator, clone
+from sklearn.base import clone
 from tqdm import tqdm
 
 from causalml.inference.meta.explainer import Explainer
@@ -20,6 +22,7 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
         learner_template: an *unfitted* learner to clone as a template.
             Because BaseLearner now inherits BaseEstimator, ``clone(learner_template)``
             produces a clean unfitted copy via ``get_params``/``set_params``.
+        learner_template: an unfitted template to clone
         X: feature matrix
         treatment: treatment vector
         y: outcome vector
@@ -36,6 +39,7 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
     y_b = y[idxs]
     p_b = {group: _p[idxs] for group, _p in p.items()} if p is not None else None
     learner_b = clone(learner_template)  # safe=True works now via get_params/set_params
+    learner_b = clone(learner_template, safe=False)
     learner_b.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
     return learner_b
 
@@ -59,6 +63,7 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
       ``fit()`` for backwards compatibility.
     """
 
+class BaseLearner(metaclass=ABCMeta):
     @classmethod
     @abstractmethod
     def fit(self, X, treatment, y, p=None):
@@ -118,6 +123,11 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         self.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
         return self.predict(X=X, p=p)
 
+    def _unfitted_clone(self):
+        """Return an unfitted copy for bootstrap refitting. Subclasses that hold fitted
+        sub-models should override to reset them to their unfitted templates."""
+        return clone(self, safe=False)
+
     def fit_bootstrap_ensemble(
         self,
         X,
@@ -138,6 +148,12 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         Because ``BaseLearner`` now inherits ``BaseEstimator``, ``clone(self)``
         produces a clean unfitted copy via ``get_params``/``set_params`` — no
         bespoke ``_unfitted_clone`` machinery required.
+        This design follows EconML's BootstrapEstimator pattern — each bootstrap
+        clone is a full copy of the learner, making this method generic across all
+        meta-learners.
+
+        Note: storing N bootstrap clones can be memory-intensive for heavy base
+        learners. Monitor RAM for large n_bootstraps.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
@@ -159,6 +175,10 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         self.bootstrap_models_ = Parallel(n_jobs=n_jobs)(
             delayed(_fit_bootstrap_clone)(
                 unfitted_template, X, treatment, y, p, s, bootstrap_size
+        learner_template = self._unfitted_clone()
+        self.bootstrap_models_ = Parallel(n_jobs=n_jobs)(
+            delayed(_fit_bootstrap_clone)(
+                learner_template, X, treatment, y, p, s, bootstrap_size
             )
             for s in tqdm(seeds)
         )

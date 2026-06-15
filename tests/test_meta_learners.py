@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
@@ -1220,3 +1221,506 @@ def test_BaseDRClassifier(generate_classification_data):
 
     te_separate = learner_separate.fit_predict(X=X, treatment=treatment, y=y)
     assert te_separate.shape == te.shape
+
+
+def test_BaseTLearner_predict_return_ci(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseTRegressor(learner=LinearRegression(), control_name=0)
+
+    # Test 1: store_bootstraps=True then predict with return_ci=True
+    learner.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED,
+    )
+    tau_pred, lb, ub = learner.predict(X, return_ci=True)
+
+    assert tau_pred.shape == (X.shape[0], len(learner.t_groups))
+    assert lb.shape == tau_pred.shape
+    assert ub.shape == tau_pred.shape
+    assert (lb <= ub).all()
+
+    # Test 2: ValueError without store_bootstraps
+    learner2 = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    learner2.fit(X, treatment, y)
+    with pytest.raises(ValueError):
+        learner2.predict(X, return_ci=True)
+
+    # Test 3: ValueError when return_ci and return_components both True
+    with pytest.raises(ValueError):
+        learner.predict(X, return_ci=True, return_components=True)
+
+    # Test 4: old API unchanged
+    tau_plain = learner.predict(X)
+    assert tau_plain.shape == (X.shape[0], len(learner.t_groups))
+
+    # Test 5: reproducibility via random_state
+    learner3 = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    learner3.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED,
+    )
+    tau2, lb2, ub2 = learner3.predict(X, return_ci=True)
+    np.testing.assert_array_equal(lb, lb2)
+    np.testing.assert_array_equal(ub, ub2)
+
+    # Test 6: parallel execution (n_jobs=2) produces same result as serial
+    learner_parallel = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    learner_parallel.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED,
+        n_jobs=2,
+    )
+    tau_p, lb_p, ub_p = learner_parallel.predict(X, return_ci=True)
+    assert tau_p.shape == (X.shape[0], len(learner_parallel.t_groups))
+    assert (lb_p <= ub_p).all()
+
+    # Test 7: different random_state produces different bounds
+    learner_diff = BaseTRegressor(learner=LinearRegression(), control_name=0)
+    learner_diff.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED + 1,
+    )
+    _, lb_diff, ub_diff = learner_diff.predict(X, return_ci=True)
+    assert not np.array_equal(
+        lb, lb_diff
+    ), "Different seeds should produce different bounds"
+
+
+def test_multi_treatment_learners():
+    """Comprehensive multi-treatment (N=3) contract test for all meta-learners.
+
+    Verifies three classes of invariants:
+      1. Common API contracts — return types and shapes for every public method.
+      2. Structural post-fit invariants — shared-reference dicts, attribute presence.
+      3. Optimisation correctness — control models trained once and shared.
+
+    Covers: BaseTLearner, BaseXLearner, BaseSLearner, BaseDRLearner, BaseRLearner.
+
+    Shared return-type contracts (regression learners below):
+      - ``fit(...)`` → ``None``
+      - ``predict(...)`` → ``np.ndarray`` of shape ``(n_samples, n_treatment_groups)``
+      - ``predict(..., return_components=True)`` → ``tuple`` of length 3 ``(te, comp_a, comp_b)``
+        (not implemented for R-learner; its ``predict`` only returns CATE).
+      - ``fit_predict(..., return_ci=False)`` → CATE ``np.ndarray`` only (not a tuple)
+      - ``fit_predict(..., return_ci=True)`` → ``tuple`` ``(te, lb, ub)`` of three ndarrays
+      - ``estimate_ate(...)`` → ``tuple`` ``(ate, lb, ub)`` with each vector of shape
+        ``(n_treatment_groups,)`` for T/X/R/DR by default; **BaseSLearner** returns only
+        ``ate`` unless ``return_ci=True`` (then same triple as the others).
+    """
+    np.random.seed(RANDOM_SEED)
+    n, p, n_groups = 600, 5, 3
+    X = np.random.randn(n, p)
+    # Three treatment groups (1, 2, 3) plus control (0), ~150 obs each.
+    treatment = np.tile([0, 1, 2, 3], n // 4)
+    tau = np.where(
+        treatment == 1,
+        1.0,
+        np.where(treatment == 2, 2.0, np.where(treatment == 3, 3.0, 0.0)),
+    )
+    y = X[:, 0] + tau + 0.1 * np.random.randn(n)
+    # Flat propensity scores for learners that require them (X, R).
+    p_scores = {g: np.full(n, 1.0 / (n_groups + 1)) for g in [1, 2, 3]}
+
+    # ── Shared assertion helpers ───────────────────────────────────────────────
+
+    def _assert_fit_attrs(lrn, name):
+        """t_groups must be a sorted ndarray; _classes must map each group to 0..N-1."""
+        assert hasattr(lrn, "t_groups"), f"{name}: missing t_groups after fit"
+        assert isinstance(lrn.t_groups, np.ndarray), f"{name}: t_groups must be ndarray"
+        assert lrn.t_groups.shape == (
+            n_groups,
+        ), f"{name}: t_groups shape {lrn.t_groups.shape}"
+        np.testing.assert_array_equal(
+            lrn.t_groups,
+            np.sort(lrn.t_groups),
+            err_msg=f"{name}: t_groups must be sorted",
+        )
+        assert hasattr(lrn, "_classes") and isinstance(lrn._classes, dict)
+        assert set(lrn._classes.keys()) == set(lrn.t_groups)
+        assert set(lrn._classes.values()) == set(range(n_groups))
+
+    def _assert_te(te, name, method):
+        """te must be ndarray (n, n_groups) of finite values."""
+        assert isinstance(te, np.ndarray), f"{name}.{method}: te must be ndarray"
+        assert te.shape == (n, n_groups), f"{name}.{method}: te.shape={te.shape}"
+        assert np.all(np.isfinite(te)), f"{name}.{method}: te has non-finite values"
+
+    def _assert_components(yhat_cs, yhat_ts, t_groups, name):
+        """yhat_cs and yhat_ts must be dicts of finite (n,) arrays covering all groups."""
+        for label, d in [("yhat_cs", yhat_cs), ("yhat_ts", yhat_ts)]:
+            assert isinstance(d, dict), f"{name}: {label} must be dict, got {type(d)}"
+            assert set(d.keys()) == set(t_groups), f"{name}: {label} keys != t_groups"
+            for g in t_groups:
+                assert isinstance(d[g], np.ndarray) and d[g].shape == (n,)
+                assert np.all(np.isfinite(d[g])), f"{name}: {label}[{g}] has non-finite"
+
+    def _assert_ate(result, name):
+        """estimate_ate must return (ate, lb, ub) — finite ndarrays of shape (n_groups,), lb<=ub."""
+        assert (
+            isinstance(result, tuple) and len(result) == 3
+        ), f"{name}.estimate_ate: expected 3-tuple, got {type(result)}"
+        ate, lb, ub = result
+        for arr, label in [(ate, "ate"), (lb, "lb"), (ub, "ub")]:
+            assert isinstance(
+                arr, np.ndarray
+            ), f"{name}.estimate_ate {label} must be ndarray"
+            assert arr.shape == (
+                n_groups,
+            ), f"{name}.estimate_ate {label}.shape={arr.shape}"
+            assert np.all(
+                np.isfinite(arr)
+            ), f"{name}.estimate_ate {label} has non-finite"
+        assert np.all(lb <= ub), f"{name}.estimate_ate: lb > ub"
+
+    def _assert_ci_triple(result, name, method):
+        """fit_predict(return_ci=True) must return (te, lb, ub), each (n, n_groups)."""
+        assert isinstance(result, tuple) and len(result) == 3
+        for arr, label in zip(result, ["te", "lb", "ub"]):
+            _assert_te(arr, name, f"{method}[{label}]")
+
+    def _assert_shared_ref_dict(d, single_obj, keys, name, attr):
+        """Every value in d must be the same Python object as single_obj."""
+        assert isinstance(d, dict), f"{name}: {attr} must be dict"
+        assert set(d.keys()) == set(keys), f"{name}: {attr} keys mismatch"
+        assert all(
+            d[g] is single_obj for g in keys
+        ), f"{name}: all {attr} values must be shared refs to the single fitted model"
+
+    def _assert_fit_returns_none(result, name):
+        assert result is None, f"{name}.fit(): expected None, got {type(result)}"
+
+    def _assert_plain_fit_predict(result, name):
+        """fit_predict(return_ci=False) must return a single ndarray (CATE), not a tuple."""
+        assert isinstance(
+            result, np.ndarray
+        ), f"{name}.fit_predict(return_ci=False): expected ndarray, got {type(result)}"
+
+    # ── T-Learner ─────────────────────────────────────────────────────────────
+    name = "BaseTLearner"
+    tl = BaseTLearner(learner=LinearRegression())
+    _assert_fit_returns_none(tl.fit(X=X, treatment=treatment, y=y), name)
+
+    _assert_fit_attrs(tl, name)
+    assert hasattr(tl, "model_c"), f"{name}: missing model_c"
+    _assert_shared_ref_dict(tl.models_c, tl.model_c, tl.t_groups, name, "models_c")
+    assert hasattr(tl, "models_t") and isinstance(tl.models_t, dict)
+    assert set(tl.models_t.keys()) == set(tl.t_groups)
+    # Treatment models must be distinct objects (trained on different per-group data).
+    assert all(
+        tl.models_t[g1] is not tl.models_t[g2]
+        for g1, g2 in zip(tl.t_groups[:-1], tl.t_groups[1:])
+    ), f"{name}: models_t must be distinct objects per group"
+
+    te = tl.predict(X=X)
+    _assert_te(te, name, "predict()")
+
+    out_pc = tl.predict(X=X, return_components=True)
+    assert (
+        isinstance(out_pc, tuple) and len(out_pc) == 3
+    ), f"{name}.predict(return_components=True) must return (te, yhat_cs, yhat_ts)"
+    te2, yhat_cs, yhat_ts = out_pc
+    np.testing.assert_array_equal(te, te2, err_msg=f"{name}: predict inconsistency")
+    _assert_components(yhat_cs, yhat_ts, tl.t_groups, name)
+    assert all(
+        yhat_cs[g] is yhat_cs[tl.t_groups[0]] for g in tl.t_groups
+    ), f"{name}: yhat_cs values must share the same underlying array"
+
+    fp_plain = tl.fit_predict(X=X, treatment=treatment, y=y)
+    _assert_plain_fit_predict(fp_plain, name)
+    _assert_te(fp_plain, name, "fit_predict()")
+    _assert_ci_triple(
+        tl.fit_predict(
+            X=X,
+            treatment=treatment,
+            y=y,
+            return_ci=True,
+            n_bootstraps=5,
+            bootstrap_size=150,
+        ),
+        name,
+        "fit_predict",
+    )
+    _assert_ate(tl.estimate_ate(X=X, treatment=treatment, y=y), name)
+    _assert_ate(tl.estimate_ate(X=X, treatment=treatment, y=y, pretrain=True), name)
+
+    # ── X-Learner ─────────────────────────────────────────────────────────────
+    name = "BaseXLearner"
+    xl = BaseXLearner(learner=LinearRegression())
+    _assert_fit_returns_none(xl.fit(X=X, treatment=treatment, y=y, p=p_scores), name)
+
+    _assert_fit_attrs(xl, name)
+    assert hasattr(xl, "model_mu_c"), f"{name}: missing model_mu_c"
+    _assert_shared_ref_dict(
+        xl.models_mu_c, xl.model_mu_c, xl.t_groups, name, "models_mu_c"
+    )
+    assert (
+        hasattr(xl, "var_c") and np.isscalar(xl.var_c) and np.isfinite(xl.var_c)
+    ), f"{name}: var_c must be a finite scalar"
+    assert hasattr(xl, "vars_c") and isinstance(xl.vars_c, dict)
+    assert all(
+        xl.vars_c[g] == xl.var_c for g in xl.t_groups
+    ), f"{name}: vars_c values must all equal var_c"
+    for attr in ("models_mu_t", "models_tau_c", "models_tau_t", "vars_t"):
+        assert hasattr(xl, attr) and isinstance(
+            getattr(xl, attr), dict
+        ), f"{name}: missing {attr}"
+        assert set(getattr(xl, attr).keys()) == set(
+            xl.t_groups
+        ), f"{name}: {attr} keys mismatch"
+
+    te = xl.predict(X=X, p=p_scores)
+    _assert_te(te, name, "predict()")
+
+    out_pc = xl.predict(X=X, p=p_scores, return_components=True)
+    assert (
+        isinstance(out_pc, tuple) and len(out_pc) == 3
+    ), f"{name}.predict(return_components=True) must return (te, dhat_cs, dhat_ts)"
+    te2, dhat_cs, dhat_ts = out_pc
+    np.testing.assert_array_equal(te, te2, err_msg=f"{name}: predict inconsistency")
+    for label, d in [("dhat_cs", dhat_cs), ("dhat_ts", dhat_ts)]:
+        assert isinstance(d, dict) and set(d.keys()) == set(
+            xl.t_groups
+        ), f"{name}: {label} mismatch"
+
+    fp_plain_x = xl.fit_predict(X=X, treatment=treatment, y=y, p=p_scores)
+    _assert_plain_fit_predict(fp_plain_x, name)
+    _assert_te(fp_plain_x, name, "fit_predict()")
+    _assert_ci_triple(
+        xl.fit_predict(
+            X=X,
+            treatment=treatment,
+            y=y,
+            p=p_scores,
+            return_ci=True,
+            n_bootstraps=5,
+            bootstrap_size=150,
+        ),
+        name,
+        "fit_predict",
+    )
+    _assert_ate(xl.estimate_ate(X=X, treatment=treatment, y=y, p=p_scores), name)
+    _assert_ate(
+        xl.estimate_ate(X=X, treatment=treatment, y=y, p=p_scores, pretrain=True), name
+    )
+
+    # ── S-Learner ─────────────────────────────────────────────────────────────
+    name = "BaseSLearner"
+    sl = BaseSLearner(learner=LinearRegression())
+    _assert_fit_returns_none(sl.fit(X=X, treatment=treatment, y=y), name)
+
+    _assert_fit_attrs(sl, name)
+    assert hasattr(sl, "models") and isinstance(
+        sl.models, dict
+    ), f"{name}: missing models dict"
+    assert set(sl.models.keys()) == set(sl.t_groups)
+    # Each group's model is trained on different data so must be a distinct object.
+    assert all(
+        sl.models[g1] is not sl.models[g2]
+        for g1, g2 in zip(sl.t_groups[:-1], sl.t_groups[1:])
+    ), f"{name}: models must be distinct per group"
+
+    te = sl.predict(X=X)
+    _assert_te(te, name, "predict()")
+
+    out_pc = sl.predict(X=X, return_components=True)
+    assert isinstance(out_pc, tuple) and len(out_pc) == 3
+    te2, yhat_cs, yhat_ts = out_pc
+    np.testing.assert_array_equal(te, te2, err_msg=f"{name}: predict inconsistency")
+    _assert_components(yhat_cs, yhat_ts, sl.t_groups, name)
+
+    fp_plain_s = sl.fit_predict(X=X, treatment=treatment, y=y)
+    _assert_plain_fit_predict(fp_plain_s, name)
+    _assert_te(fp_plain_s, name, "fit_predict()")
+    _assert_ci_triple(
+        sl.fit_predict(
+            X=X,
+            treatment=treatment,
+            y=y,
+            return_ci=True,
+            n_bootstraps=5,
+            bootstrap_size=150,
+        ),
+        name,
+        "fit_predict",
+    )
+    ate_only = sl.estimate_ate(X=X, treatment=treatment, y=y, return_ci=False)
+    assert isinstance(ate_only, np.ndarray) and ate_only.shape == (
+        n_groups,
+    ), f"{name}.estimate_ate(return_ci=False) must be shape (n_groups,)"
+    _assert_ate(sl.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True), name)
+    _assert_ate(
+        sl.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True, pretrain=True),
+        name,
+    )
+
+    # ── DR-Learner ────────────────────────────────────────────────────────────
+    name = "BaseDRLearner"
+    dr = BaseDRLearner(
+        learner=LinearRegression(), treatment_effect_learner=LinearRegression()
+    )
+    _assert_fit_returns_none(dr.fit(X=X, treatment=treatment, y=y), name)
+
+    _assert_fit_attrs(dr, name)
+    # models_mu_c: list of 3 fold models (fold-specific, NOT per-group).
+    assert hasattr(dr, "models_mu_c") and isinstance(
+        dr.models_mu_c, list
+    ), f"{name}: models_mu_c must be a list"
+    assert len(dr.models_mu_c) == 3, f"{name}: models_mu_c must have 3 fold models"
+    # Per-group outcome and effect models: each a list of 3 fold models.
+    for attr in ("models_mu_t", "models_tau"):
+        assert hasattr(dr, attr) and isinstance(getattr(dr, attr), dict)
+        assert set(getattr(dr, attr).keys()) == set(dr.t_groups)
+        for g in dr.t_groups:
+            val = getattr(dr, attr)[g]
+            assert (
+                isinstance(val, list) and len(val) == 3
+            ), f"{name}: {attr}[{g}] must be list of 3 fold models"
+
+    te = dr.predict(X=X)
+    _assert_te(te, name, "predict()")
+
+    out_pc = dr.predict(X=X, return_components=True)
+    assert isinstance(out_pc, tuple) and len(out_pc) == 3
+    te2, yhat_cs, yhat_ts = out_pc
+    np.testing.assert_array_equal(te, te2, err_msg=f"{name}: predict inconsistency")
+    _assert_components(yhat_cs, yhat_ts, dr.t_groups, name)
+    # yhat_cs must be a shared-reference dict (one fold-averaged control prediction).
+    assert all(
+        yhat_cs[g] is yhat_cs[dr.t_groups[0]] for g in dr.t_groups
+    ), f"{name}: yhat_cs values must share the same underlying array"
+
+    fp_plain_dr = dr.fit_predict(X=X, treatment=treatment, y=y)
+    _assert_plain_fit_predict(fp_plain_dr, name)
+    _assert_te(fp_plain_dr, name, "fit_predict()")
+    _assert_ci_triple(
+        dr.fit_predict(
+            X=X,
+            treatment=treatment,
+            y=y,
+            return_ci=True,
+            n_bootstraps=5,
+            bootstrap_size=150,
+        ),
+        name,
+        "fit_predict",
+    )
+    _assert_ate(dr.estimate_ate(X=X, treatment=treatment, y=y), name)
+    _assert_ate(dr.estimate_ate(X=X, treatment=treatment, y=y, pretrain=True), name)
+
+    # ── R-Learner ─────────────────────────────────────────────────────────────
+    name = "BaseRLearner"
+    rl = BaseRLearner(
+        learner=LinearRegression(),
+        effect_learner=LinearRegression(),
+        cv_n_jobs=1,
+    )
+    _assert_fit_returns_none(
+        rl.fit(X=X, treatment=treatment, y=y, p=p_scores, verbose=False), name
+    )
+
+    _assert_fit_attrs(rl, name)
+    # R-learner: single shared outcome model fitted once via cross-validation.
+    assert hasattr(rl, "model_mu"), f"{name}: missing model_mu"
+    assert hasattr(rl, "models_tau") and isinstance(rl.models_tau, dict)
+    assert set(rl.models_tau.keys()) == set(rl.t_groups)
+    assert all(
+        rl.models_tau[g1] is not rl.models_tau[g2]
+        for g1, g2 in zip(rl.t_groups[:-1], rl.t_groups[1:])
+    ), f"{name}: models_tau must be distinct per group"
+    for attr in ("vars_c", "vars_t"):
+        assert hasattr(rl, attr) and isinstance(getattr(rl, attr), dict)
+        assert set(getattr(rl, attr).keys()) == set(rl.t_groups)
+
+    # R-learner: predict(X, p=...) returns CATE only (no return_components path).
+    te = rl.predict(X=X, p=p_scores)
+    _assert_te(te, name, "predict()")
+
+    fp_plain_r = rl.fit_predict(
+        X=X, treatment=treatment, y=y, p=p_scores, verbose=False
+    )
+    _assert_plain_fit_predict(fp_plain_r, name)
+    _assert_te(fp_plain_r, name, "fit_predict()")
+    _assert_ci_triple(
+        rl.fit_predict(
+            X=X,
+            treatment=treatment,
+            y=y,
+            p=p_scores,
+            return_ci=True,
+            n_bootstraps=5,
+            bootstrap_size=150,
+            verbose=False,
+        ),
+        name,
+        "fit_predict",
+    )
+    _assert_ate(rl.estimate_ate(X=X, treatment=treatment, y=y, p=p_scores), name)
+    _assert_ate(
+        rl.estimate_ate(X=X, treatment=treatment, y=y, p=p_scores, pretrain=True), name
+    )
+
+
+def test_BaseTClassifier_predict_return_ci(generate_classification_data):
+    np.random.seed(RANDOM_SEED)
+
+    df, x_names = generate_classification_data()
+    df["treatment_group_key"] = np.where(
+        df["treatment_group_key"] == CONTROL_NAME, 0, 1
+    )
+
+    X = df[x_names].values
+    treatment = df["treatment_group_key"].values
+    y = df[CONVERSION].values
+
+    learner = BaseTClassifier(learner=LogisticRegression(), control_name=0)
+
+    # Test 1: return_ci=True returns (te, lb, ub)
+    learner.fit(
+        X,
+        treatment,
+        y,
+        store_bootstraps=True,
+        n_bootstraps=50,
+        bootstrap_size=500,
+        random_state=RANDOM_SEED,
+    )
+    tau, lb, ub = learner.predict(X, return_ci=True)
+    assert tau.shape == (X.shape[0], len(learner.t_groups))
+    assert lb.shape == tau.shape
+    assert ub.shape == tau.shape
+    assert (lb <= ub).all()
+
+    # Test 2: ValueError without store_bootstraps
+    learner2 = BaseTClassifier(learner=LogisticRegression(), control_name=0)
+    learner2.fit(X, treatment, y)
+    with pytest.raises(ValueError):
+        learner2.predict(X, return_ci=True)
+
+    # Test 3: return_ci + return_components raises ValueError
+    with pytest.raises(ValueError):
+        learner.predict(X, return_ci=True, return_components=True)
+
+    # Test 4: old API unchanged
+    tau_plain = learner.predict(X)
+    assert tau_plain.shape == (X.shape[0], len(learner.t_groups))

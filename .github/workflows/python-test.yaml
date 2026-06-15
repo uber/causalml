@@ -2,6 +2,9 @@ name: build
 
 on: [push, pull_request]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     # [macos-latest, macos-latest, windows-latest]

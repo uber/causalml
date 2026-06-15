@@ -159,3 +159,52 @@ def test_plot_toc(synthetic_df, monkeypatch):
     monkeypatch.setattr(plt, "show", lambda: None)
     ax = plot_toc(synthetic_df, treatment_effect_col="tau")
     assert isinstance(ax, plt.Axes)
+
+
+def test_rate_score_return_ci_returns_dataframe(synthetic_df):
+    result = rate_score(
+        synthetic_df,
+        treatment_effect_col="tau",
+        return_ci=True,
+        n_bootstrap=50,
+        random_state=RANDOM_SEED,
+    )
+    assert isinstance(result, pd.DataFrame)
+    assert set(result.columns) == {"rate", "se", "ci_lower", "ci_upper", "p_value"}
+
+
+def test_rate_score_ci_bounds_ordered(synthetic_df):
+    result = rate_score(
+        synthetic_df,
+        treatment_effect_col="tau",
+        return_ci=True,
+        n_bootstrap=50,
+        random_state=RANDOM_SEED,
+    )
+    assert (result["ci_lower"] < result["rate"]).all()
+    assert (result["ci_upper"] > result["rate"]).all()
+
+
+def test_rate_score_p_value_range(synthetic_df):
+    result = rate_score(
+        synthetic_df,
+        treatment_effect_col="tau",
+        return_ci=True,
+        n_bootstrap=50,
+        random_state=RANDOM_SEED,
+    )
+    assert (result["p_value"] >= 0).all()
+    assert (result["p_value"] <= 1).all()
+
+
+def test_rate_score_ci_qini_weighting(synthetic_df):
+    result = rate_score(
+        synthetic_df,
+        treatment_effect_col="tau",
+        weighting="qini",
+        return_ci=True,
+        n_bootstrap=50,
+        random_state=RANDOM_SEED,
+    )
+    assert isinstance(result, pd.DataFrame)
+    assert not result["se"].isnull().any()
