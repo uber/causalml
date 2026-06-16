@@ -3,7 +3,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: language_level=3
-# cython: linetrace=True
 
 
 from libc.stdint cimport INTPTR_MAX

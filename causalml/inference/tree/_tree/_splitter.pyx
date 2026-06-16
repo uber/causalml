@@ -15,7 +15,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: language_level=3
-# cython: linetrace=True
 
 from cython cimport final
 from libc.math cimport isnan
