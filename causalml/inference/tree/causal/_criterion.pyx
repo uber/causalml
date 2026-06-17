@@ -2,7 +2,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: language_level=3
-# cython: linetrace=True
 
 
 cdef int32_t CONTROL_GROUP_IDX = 0

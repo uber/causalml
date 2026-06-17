@@ -11,7 +11,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: language_level=3
-# cython: linetrace=True
 
 # See _criterion.pyx for implementation details.
 from ._typedefs cimport float64_t, int8_t, int32_t, intp_t

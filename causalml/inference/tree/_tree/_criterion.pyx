@@ -16,7 +16,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: language_level=3
-# cython: linetrace=True
 
 from libc.string cimport memcpy
 from libc.string cimport memset

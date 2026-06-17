@@ -2,7 +2,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: language_level=3
-# cython: linetrace=True
 # distutils: language = c++
 
 from libc.math cimport fabs
