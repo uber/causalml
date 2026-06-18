@@ -1,4 +1,3 @@
-import copy
 from copy import deepcopy
 import logging
 import numpy as np
@@ -62,34 +61,18 @@ class BaseTLearner(BaseLearner):
         else:
             self.model_c = control_learner
 
-        # Preserve the unfitted template so repeated fit() calls always start fresh.
-        self._model_c_template = self.model_c
-
         if treatment_learner is None:
             self.model_t = deepcopy(learner)
         else:
             self.model_t = treatment_learner
 
-        # Preserve the unfitted template so repeated fit() calls always start fresh.
-        self._model_t_template = self.model_t
-
         self.ate_alpha = ate_alpha
         self.control_name = control_name
-        self.bootstrap_models_ = None
 
     def __repr__(self):
         return "{}(model_c={}, model_t={})".format(
             self.__class__.__name__, self.model_c.__repr__(), self.model_t.__repr__()
         )
-
-    def _unfitted_clone(self):
-        template = copy.copy(self)
-        for attr in ("models_c", "models_t", "bootstrap_models_"):
-            if hasattr(template, attr):
-                delattr(template, attr)
-        template.model_c = self._model_c_template
-        template.model_t = self._model_t_template
-        return template
 
     @ignore_warnings(category=ConvergenceWarning)
     def fit(self, X, treatment, y, p=None):
@@ -101,36 +84,6 @@ class BaseTLearner(BaseLearner):
                 feature matrix is otherwise kept in its native format throughout.
             treatment (np.array, pd.Series, or pl.Series): a treatment vector
             y (np.array, pd.Series, or pl.Series): an outcome vector
-    def fit(
-        self,
-        X,
-        treatment,
-        y,
-        p=None,
-        store_bootstraps=False,
-        n_bootstraps=200,
-        bootstrap_size=10000,
-        random_state=None,
-        n_jobs=1,
-    ):
-        """Fit the inference model
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p: unused, kept for API consistency
-            store_bootstraps (bool, optional): if True, trains a bootstrap ensemble
-                during fit and stores it in self.bootstrap_models_ for post-fit CI
-                estimation via predict(return_ci=True). Default: False.
-            n_bootstraps (int, optional): number of bootstrap iterations. Default: 200.
-                Note: storing N bootstraps of a GBM-based learner with k treatment
-                groups holds 2*N*k model objects in memory. Monitor RAM for large N
-                or heavy base learners.
-            n_jobs (int, optional): number of parallel jobs for bootstrap fitting.
-                -1 uses all available cores. Default: 1.
-            bootstrap_size (int, optional): number of samples per bootstrap. Default: 10000.
-            random_state (int, optional): random seed for reproducible bootstrap sampling.
         """
         X = collect_if_lazy(X)
         check_treatment_vector(treatment, self.control_name)
@@ -138,16 +91,8 @@ class BaseTLearner(BaseLearner):
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
+        self.models_c = {group: deepcopy(self.model_c) for group in self.t_groups}
         self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
-
-        # model_c is trained on the control group, which is identical for every
-        # treatment group, so fit it once. Deepcopy from the unfitted template so
-        # re-calling fit() always starts from a clean state (safe with warm_start).
-        control_mask = treatment == self.control_name
-        self.model_c = deepcopy(self._model_c_template)
-        self.model_c.fit(X[control_mask], y[control_mask])
-        # Expose as a shared-reference dict to preserve the public models_c API.
-        self.models_c = {group: self.model_c for group in self.t_groups}
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -162,52 +107,9 @@ class BaseTLearner(BaseLearner):
             self.models_t[group].fit(
                 filter_mask(X_filt, w == 1), filter_mask(y_filt, w == 1)
             )
-            treatment_mask = treatment == group
-            self.models_t[group].fit(X[treatment_mask], y[treatment_mask])
-
-        if store_bootstraps:
-            self.fit_bootstrap_ensemble(
-                X=X,
-                treatment=treatment,
-                y=y,
-                n_bootstraps=n_bootstraps,
-                bootstrap_size=bootstrap_size,
-                random_state=random_state,
-                n_jobs=n_jobs,
-            )
-        else:
-            self.bootstrap_models_ = None
-
-    def _compute_bootstrap_ci(self, X):
-        """Compute bootstrap CI using stored ensemble.
-
-        Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-        Returns:
-            (te_lower, te_upper): percentile CI bounds, each of shape [n_samples, n_treatment]
-        """
-        if self.bootstrap_models_ is None:
-            raise ValueError(
-                "No bootstrap ensemble found. Call fit(..., store_bootstraps=True) first."
-            )
-        te_bootstraps = np.zeros(
-            (X.shape[0], self.t_groups.shape[0], len(self.bootstrap_models_))
-        )
-        for b, learner_b in enumerate(self.bootstrap_models_):
-            te_bootstraps[:, :, b] = learner_b.predict(X)
-        te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
-        te_upper = np.percentile(te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2)
-        return te_lower, te_upper
 
     def predict(
-        self,
-        X,
-        treatment=None,
-        y=None,
-        p=None,
-        return_components=False,
-        verbose=True,
-        return_ci=False,
+        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
         """Predict treatment effects.
 
@@ -217,36 +119,19 @@ class BaseTLearner(BaseLearner):
             treatment (np.array, pd.Series, or pl.Series, optional): a treatment vector
             y (np.array, pd.Series, or pl.Series, optional): an outcome vector
             return_components (bool, optional): whether to return outcome for treatment and control seperately
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series, optional): a treatment vector
-            y (np.array or pd.Series, optional): an outcome vector
-            return_components (bool, optional): whether to return outcome for
-                treatment and control separately
             verbose (bool, optional): whether to output progress logs
-            return_ci (bool, optional): whether to return confidence intervals
-                using the stored bootstrap ensemble. Requires fit() to have been
-                called with store_bootstraps=True. CI width is controlled by
-                self.ate_alpha set at init time.
         Returns:
-            (numpy.ndarray): Predictions of treatment effects. If return_ci=True,
-                returns (te, te_lower, te_upper) each of shape [n_samples, n_treatment].
-                return_ci=True and return_components=True cannot be used together.
+            (numpy.ndarray): Predictions of treatment effects.
         """
         X = collect_if_lazy(X)
         yhat_cs = {}
-        if return_ci and return_components:
-            raise ValueError("return_ci and return_components cannot both be True.")
-
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         yhat_ts = {}
 
-        yhat_c = self.model_c.predict(X)
-        # Build a shared-reference dict so return_components callers keep the
-        # yhat_cs[group] indexing API without duplicating the underlying array.
-        yhat_cs = {group: yhat_c for group in self.t_groups}
-
         for group in self.t_groups:
-            yhat_ts[group] = self.models_t[group].predict(X)
+            model_c = self.models_c[group]
+            model_t = self.models_t[group]
+            yhat_cs[group] = model_c.predict(X)
+            yhat_ts[group] = model_t.predict(X)
 
             if (y is not None) and (treatment is not None) and verbose:
                 treatment_np = to_numpy(treatment)
@@ -256,7 +141,7 @@ class BaseTLearner(BaseLearner):
                 w = (treatment_filt_np == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = yhat_c[mask][w == 0]
+                yhat[w == 0] = yhat_cs[group][mask][w == 0]
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info("Error metrics for group {}".format(group))
@@ -264,11 +149,7 @@ class BaseTLearner(BaseLearner):
 
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
-            te[:, i] = yhat_ts[group] - yhat_c
-
-        if return_ci:
-            te_lower, te_upper = self._compute_bootstrap_ci(X)
-            return te, te_lower, te_upper
+            te[:, i] = yhat_ts[group] - yhat_cs[group]
 
         if not return_components:
             return te
@@ -315,7 +196,7 @@ class BaseTLearner(BaseLearner):
 
             t_groups_global = self.t_groups
             _classes_global = self._classes
-            model_c_global = deepcopy(self.model_c)
+            models_c_global = deepcopy(self.models_c)
             models_t_global = deepcopy(self.models_t)
             te_bootstraps = np.zeros(
                 shape=(n_rows(X), self.t_groups.shape[0], n_bootstraps)
@@ -334,8 +215,7 @@ class BaseTLearner(BaseLearner):
             # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
-            self.model_c = deepcopy(model_c_global)
-            self.models_c = {group: self.model_c for group in self.t_groups}
+            self.models_c = deepcopy(models_c_global)
             self.models_t = deepcopy(models_t_global)
 
             return (te, te_lower, te_upper)
@@ -412,7 +292,7 @@ class BaseTLearner(BaseLearner):
         else:
             t_groups_global = self.t_groups
             _classes_global = self._classes
-            model_c_global = deepcopy(self.model_c)
+            models_c_global = deepcopy(self.models_c)
             models_t_global = deepcopy(self.models_t)
 
             logger.info("Bootstrap Confidence Intervals for ATE")
@@ -432,8 +312,7 @@ class BaseTLearner(BaseLearner):
             # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
-            self.model_c = deepcopy(model_c_global)
-            self.models_c = {group: self.model_c for group in self.t_groups}
+            self.models_c = deepcopy(models_c_global)
             self.models_t = deepcopy(models_t_global)
 
             return ate, ate_lower, ate_upper
@@ -497,14 +376,7 @@ class BaseTClassifier(BaseTLearner):
         )
 
     def predict(
-        self,
-        X,
-        treatment=None,
-        y=None,
-        p=None,
-        return_components=False,
-        verbose=True,
-        return_ci=False,
+        self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
         """Predict treatment effects.
 
@@ -520,16 +392,13 @@ class BaseTClassifier(BaseTLearner):
         """
         X = collect_if_lazy(X)
         yhat_cs = {}
-        if return_ci and return_components:
-            raise ValueError("return_ci and return_components cannot both be True.")
-
         yhat_ts = {}
 
-        yhat_c = self.model_c.predict_proba(X)[:, 1]
-        yhat_cs = {group: yhat_c for group in self.t_groups}
-
         for group in self.t_groups:
-            yhat_ts[group] = self.models_t[group].predict_proba(X)[:, 1]
+            model_c = self.models_c[group]
+            model_t = self.models_t[group]
+            yhat_cs[group] = model_c.predict_proba(X)[:, 1]
+            yhat_ts[group] = model_t.predict_proba(X)[:, 1]
 
             if (y is not None) and (treatment is not None) and verbose:
                 treatment_np = to_numpy(treatment)
@@ -539,7 +408,7 @@ class BaseTClassifier(BaseTLearner):
                 w = (treatment_filt_np == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
-                yhat[w == 0] = yhat_c[mask][w == 0]
+                yhat[w == 0] = yhat_cs[group][mask][w == 0]
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info("Error metrics for group {}".format(group))
@@ -547,11 +416,7 @@ class BaseTClassifier(BaseTLearner):
 
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
-            te[:, i] = yhat_ts[group] - yhat_c
-
-        if return_ci:
-            te_lower, te_upper = self._compute_bootstrap_ci(X)
-            return te, te_lower, te_upper
+            te[:, i] = yhat_ts[group] - yhat_cs[group]
 
         if not return_components:
             return te
