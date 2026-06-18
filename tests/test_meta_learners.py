@@ -1220,3 +1220,45 @@ def test_BaseDRClassifier(generate_classification_data):
 
     te_separate = learner_separate.fit_predict(X=X, treatment=treatment, y=y)
     assert te_separate.shape == te.shape
+
+
+def test_BaseTLearner_with_categorical_features():
+    np.random.seed(RANDOM_SEED)
+    n = 200
+
+    X = pd.DataFrame(
+        {
+            "num1": np.random.randn(n),
+            "num2": np.random.randn(n),
+            "cat1": pd.Categorical(np.random.choice([0, 1, 2], size=n)),
+        }
+    )
+    treatment = np.random.binomial(1, 0.5, n)
+    y = X["num1"].values + (treatment * 0.5) + np.random.randn(n) * 0.1
+
+    learner = BaseTRegressor(learner=XGBRegressor(enable_categorical=True))
+    learner.fit(X=X, treatment=treatment, y=y)
+    te = learner.predict(X=X)
+
+    assert te.shape == (n, 1)
+
+
+def test_BaseRLearner_with_categorical_features():
+    np.random.seed(RANDOM_SEED)
+    n = 200
+
+    X = pd.DataFrame(
+        {
+            "num1": np.random.randn(n),
+            "num2": np.random.randn(n),
+            "cat1": pd.Categorical(np.random.choice([0, 1, 2], size=n)),
+        }
+    )
+    treatment = np.random.binomial(1, 0.5, n)
+    y = X["num1"].values + (treatment * 0.5) + np.random.randn(n) * 0.1
+
+    learner = BaseRRegressor(learner=XGBRegressor(enable_categorical=True))
+    learner.fit(X=X, treatment=treatment, y=y)
+    te = learner.predict(X=X)
+
+    assert te.shape == (n, 1)

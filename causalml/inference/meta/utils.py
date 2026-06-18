@@ -6,7 +6,14 @@ from xgboost import __version__ as xgboost_version
 
 
 def convert_pd_to_np(*args):
-    output = [obj.to_numpy() if hasattr(obj, "to_numpy") else obj for obj in args]
+    def _convert(obj):
+        if isinstance(obj, pd.DataFrame) and any(
+            pd.api.types.is_categorical_dtype(obj[c]) for c in obj.columns
+        ):
+            return obj  # pass through so learners can handle categoricals natively
+        return obj.to_numpy() if hasattr(obj, "to_numpy") else obj
+
+    output = [_convert(obj) for obj in args]
     return output if len(output) > 1 else output[0]
 
 

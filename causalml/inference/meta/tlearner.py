@@ -77,7 +77,7 @@ class BaseTLearner(BaseLearner):
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        treatment, y = convert_pd_to_np(treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
@@ -88,7 +88,7 @@ class BaseTLearner(BaseLearner):
         for group in self.t_groups:
             mask = (treatment == group) | (treatment == self.control_name)
             treatment_filt = treatment[mask]
-            X_filt = X[mask]
+            X_filt = X[mask].reset_index(drop=True) if hasattr(X, "loc") else X[mask]
             y_filt = y[mask]
             w = (treatment_filt == group).astype(int)
 
@@ -109,7 +109,7 @@ class BaseTLearner(BaseLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        treatment, y = convert_pd_to_np(treatment, y)
         yhat_cs = {}
         yhat_ts = {}
 
@@ -169,7 +169,7 @@ class BaseTLearner(BaseLearner):
                 If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
                 UB [n_samples, n_treatment]
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        treatment, y = convert_pd_to_np(treatment, y)
         self.fit(X, treatment, y)
         te = self.predict(X, treatment, y, return_components=return_components)
 
@@ -226,7 +226,7 @@ class BaseTLearner(BaseLearner):
             The mean and confidence interval (LB, UB) of the ATE estimate.
             pretrain (bool): whether a model has been fit, default False.
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        treatment, y = convert_pd_to_np(treatment, y)
         if pretrain:
             te, yhat_cs, yhat_ts = self.predict(X, treatment, y, return_components=True)
         else:
