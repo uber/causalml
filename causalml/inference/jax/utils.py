@@ -1,10 +1,15 @@
 """Loss functions for the JAX DragonNet implementation."""
 
+import jax
 import jax.numpy as jnp
 
 
+@jax.jit
 def binary_classification_loss(concat_true, concat_pred):
     """Binary cross-entropy loss on the treatment (propensity) head.
+
+    Mirrors TF's K.binary_crossentropy: clips predictions to [eps, 1-eps]
+    before computing log, then computes the standard cross-entropy.
 
     Args:
         concat_true: Array of shape (n, 2) where each row is (y, treatment).
@@ -17,12 +22,14 @@ def binary_classification_loss(concat_true, concat_pred):
     t_true = concat_true[:, 1]
     t_pred = concat_pred[:, 2]
     t_pred = (t_pred + 0.001) / 1.002
+    t_pred = jnp.clip(t_pred, 1e-7, 1.0 - 1e-7)
     losst = -jnp.sum(
-        t_true * jnp.log(t_pred + 1e-7) + (1.0 - t_true) * jnp.log(1.0 - t_pred + 1e-7)
+        t_true * jnp.log(t_pred) + (1.0 - t_true) * jnp.log(1.0 - t_pred)
     )
     return losst
 
 
+@jax.jit
 def regression_loss(concat_true, concat_pred):
     """Weighted MSE loss on the two outcome heads.
 

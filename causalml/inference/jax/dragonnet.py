@@ -34,10 +34,14 @@ class EpsilonLayer(nnx.Module):
     def __init__(self, rngs: nnx.Rngs):
         """Initializes EpsilonLayer with a random scalar parameter.
 
+        Matches TF's RandomNormal(stddev=0.05) initializer.
+
         Args:
             rngs: flax.nnx RNG container.
         """
-        self.epsilon = nnx.Param(jax.random.normal(rngs.params(), shape=(1, 1)))
+        self.epsilon = nnx.Param(
+            jax.random.normal(rngs.params(), shape=(1, 1)) * 0.05
+        )
 
     def __call__(self, inputs):
         """Broadcasts epsilon to (batch, 1).
@@ -72,23 +76,28 @@ class DragonNetModule(nnx.Module):
         """
         half = neurons_per_layer // 2
 
+        # Match TF initializers: RandomNormal for representation,
+        # glorot_uniform (Keras default) for all other layers.
+        repr_init = jax.nn.initializers.normal(stddev=0.05)
+        default_init = jax.nn.initializers.glorot_uniform()
+
         # Shared representation
-        self.repr1 = nnx.Linear(input_dim, neurons_per_layer, rngs=rngs)
-        self.repr2 = nnx.Linear(neurons_per_layer, neurons_per_layer, rngs=rngs)
-        self.repr3 = nnx.Linear(neurons_per_layer, neurons_per_layer, rngs=rngs)
+        self.repr1 = nnx.Linear(input_dim, neurons_per_layer, kernel_init=repr_init, rngs=rngs)
+        self.repr2 = nnx.Linear(neurons_per_layer, neurons_per_layer, kernel_init=repr_init, rngs=rngs)
+        self.repr3 = nnx.Linear(neurons_per_layer, neurons_per_layer, kernel_init=repr_init, rngs=rngs)
 
         # Propensity head
-        self.t_head = nnx.Linear(neurons_per_layer, 1, rngs=rngs)
+        self.t_head = nnx.Linear(neurons_per_layer, 1, kernel_init=default_init, rngs=rngs)
 
         # Outcome head y0
-        self.y0_h1 = nnx.Linear(neurons_per_layer, half, rngs=rngs)
-        self.y0_h2 = nnx.Linear(half, half, rngs=rngs)
-        self.y0_out = nnx.Linear(half, 1, rngs=rngs)
+        self.y0_h1 = nnx.Linear(neurons_per_layer, half, kernel_init=default_init, rngs=rngs)
+        self.y0_h2 = nnx.Linear(half, half, kernel_init=default_init, rngs=rngs)
+        self.y0_out = nnx.Linear(half, 1, kernel_init=default_init, rngs=rngs)
 
         # Outcome head y1
-        self.y1_h1 = nnx.Linear(neurons_per_layer, half, rngs=rngs)
-        self.y1_h2 = nnx.Linear(half, half, rngs=rngs)
-        self.y1_out = nnx.Linear(half, 1, rngs=rngs)
+        self.y1_h1 = nnx.Linear(neurons_per_layer, half, kernel_init=default_init, rngs=rngs)
+        self.y1_h2 = nnx.Linear(half, half, kernel_init=default_init, rngs=rngs)
+        self.y1_out = nnx.Linear(half, 1, kernel_init=default_init, rngs=rngs)
 
         # Epsilon
         self.epsilon_layer = EpsilonLayer(rngs=rngs)
@@ -143,23 +152,6 @@ class DragonNetModule(nnx.Module):
         return self.reg_l2 * sum(jnp.sum(k**2) for k in kernels)
 
 
-def _reduce_lr_on_plateau(lr, factor, no_improve_count, patience):
-    """Returns updated lr if plateau patience is exceeded.
-
-    Args:
-        lr: Current learning rate.
-        factor: Multiplicative reduction factor.
-        no_improve_count: Number of epochs without improvement.
-        patience: Number of epochs to wait before reducing.
-
-    Returns:
-        Updated learning rate.
-    """
-    if no_improve_count > 0 and no_improve_count % patience == 0:
-        return lr * factor
-    return lr
-
-
 def _make_train_step(loss_fn):
     """Returns a jit-compiled train step for a given loss function.
 
@@ -183,36 +175,26 @@ def _make_train_step(loss_fn):
     return train_step
 
 
-def _compute_val_loss(model, loss_fn, X_val, y_val, batch_size):
-    """Evaluates loss over the validation set in mini-batches.
+def _make_val_step(loss_fn):
+    """Returns a JIT-compiled validation loss function.
 
-    Args:
-        model: DragonNetModule instance.
-        loss_fn: Loss function.
-        X_val: Validation features array.
-        y_val: Validation targets array.
-        batch_size: Mini-batch size.
-
-    Returns:
-        Mean validation loss across all batches.
+    Computes loss on the full validation set in one JIT call.
+    Since IHDP is small (~150 samples), this avoids Python-loop overhead.
     """
-    n = X_val.shape[0]
-    total_loss = 0.0
-    n_batches = 0
-    for start in range(0, n, batch_size):
-        xb = jnp.array(X_val[start : start + batch_size])
-        yb = jnp.array(y_val[start : start + batch_size])
-        preds = model(xb)
-        total_loss += float(loss_fn(yb, preds) + model.l2_penalty())
-        n_batches += 1
-    return total_loss / max(n_batches, 1)
+
+    @nnx.jit
+    def val_step(model, X_val, y_val):
+        preds = model(X_val)
+        return loss_fn(y_val, preds) + model.l2_penalty()
+
+    return val_step
 
 
 def _run_training_loop(
     model,
     optimizer,
     train_step_fn,
-    loss_fn,
+    val_step_fn,
     X_train,
     y_train,
     X_val,
@@ -220,27 +202,23 @@ def _run_training_loop(
     epochs,
     batch_size,
     early_stop_patience,
-    reduce_lr_patience,
-    reduce_lr_factor,
     verbose,
     phase_name,
 ):
-    """Generic training loop with early stopping and LR reduction on plateau.
+    """Generic training loop with early stopping.
 
     Args:
         model: DragonNetModule instance (mutated in-place).
         optimizer: optax optimizer wrapped with nnx.Optimizer.
         train_step_fn: Compiled train step function.
-        loss_fn: Loss function for validation evaluation.
-        X_train: Training features.
-        y_train: Training targets.
-        X_val: Validation features.
-        y_val: Validation targets.
+        val_step_fn: JIT-compiled validation loss function.
+        X_train: Training features (JAX array).
+        y_train: Training targets (JAX array).
+        X_val: Validation features (JAX array).
+        y_val: Validation targets (JAX array).
         epochs: Maximum number of epochs.
         batch_size: Mini-batch size.
         early_stop_patience: Stop if val_loss does not improve for this many epochs.
-        reduce_lr_patience: Reduce LR after this many epochs without improvement.
-        reduce_lr_factor: Multiplicative LR reduction factor.
         verbose: Whether to print epoch summaries.
         phase_name: Label printed in verbose output.
 
@@ -251,22 +229,22 @@ def _run_training_loop(
     no_improve = 0
     n_train = X_train.shape[0]
     rng = np.random.default_rng(0)
-    current_lr = (
-        optimizer.opt_state[0].hyperparams["learning_rate"]
-        if hasattr(optimizer.opt_state[0], "hyperparams")
-        else None
-    )
+
+    # Drop incomplete last batch to avoid JIT shape polymorphism.
+    # With batch_size=64 and ~598 training samples, this discards ~22
+    # samples per epoch, well within typical SGD variance tolerance.
+    n_full = (n_train // batch_size) * batch_size
 
     for epoch in range(epochs):
         idx = rng.permutation(n_train)
         X_shuf, y_shuf = X_train[idx], y_train[idx]
 
-        for start in range(0, n_train, batch_size):
-            xb = jnp.array(X_shuf[start : start + batch_size])
-            yb = jnp.array(y_shuf[start : start + batch_size])
+        for start in range(0, n_full, batch_size):
+            xb = X_shuf[start : start + batch_size]
+            yb = y_shuf[start : start + batch_size]
             train_step_fn(model, optimizer, xb, yb)
 
-        val_loss = _compute_val_loss(model, loss_fn, X_val, y_val, batch_size)
+        val_loss = float(val_step_fn(model, X_val, y_val))
 
         if verbose:
             print(f"[{phase_name}] epoch {epoch + 1}/{epochs}  val_loss={val_loss:.6f}")
@@ -314,7 +292,7 @@ class DragonNet:
         targeted_reg=True,
         ratio=1.0,
         val_split=0.2,
-        batch_size=64,
+        batch_size=256,
         epochs=100,
         learning_rate=1e-5,
         momentum=0.9,
@@ -371,6 +349,12 @@ class DragonNet:
             X, targets, test_size=self.val_split, random_state=self.seed
         )
 
+        # Pre-convert to JAX arrays once to avoid per-batch jnp.array() overhead.
+        X_train = jnp.array(X_train)
+        y_train = jnp.array(y_train)
+        X_val = jnp.array(X_val)
+        y_val = jnp.array(y_val)
+
         self._model = self._build_model(X.shape[1])
 
         loss_fn = (
@@ -379,6 +363,7 @@ class DragonNet:
             else self.loss_func
         )
         train_step_fn = _make_train_step(loss_fn)
+        val_step_fn = _make_val_step(loss_fn)  # compile once, reuse across phases
 
         if self.use_adam:
             adam_tx = optax.adam(self.adam_learning_rate)
@@ -387,7 +372,7 @@ class DragonNet:
                 model=self._model,
                 optimizer=adam_opt,
                 train_step_fn=train_step_fn,
-                loss_fn=loss_fn,
+                val_step_fn=val_step_fn,
                 X_train=X_train,
                 y_train=y_train,
                 X_val=X_val,
@@ -395,8 +380,6 @@ class DragonNet:
                 epochs=self.adam_epochs,
                 batch_size=self.batch_size,
                 early_stop_patience=2,
-                reduce_lr_patience=5,
-                reduce_lr_factor=0.5,
                 verbose=self.verbose,
                 phase_name="Adam",
             )
@@ -407,7 +390,7 @@ class DragonNet:
             model=self._model,
             optimizer=sgd_opt,
             train_step_fn=train_step_fn,
-            loss_fn=loss_fn,
+            val_step_fn=val_step_fn,
             X_train=X_train,
             y_train=y_train,
             X_val=X_val,
@@ -415,8 +398,6 @@ class DragonNet:
             epochs=self.epochs,
             batch_size=self.batch_size,
             early_stop_patience=40,
-            reduce_lr_patience=5,
-            reduce_lr_factor=0.5,
             verbose=self.verbose,
             phase_name="SGD",
         )
