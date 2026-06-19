@@ -17,7 +17,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: language_level=3
-# cython: linetrace=True
 
 from cpython cimport Py_INCREF, PyObject, PyTypeObject
 

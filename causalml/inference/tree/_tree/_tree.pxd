@@ -13,7 +13,6 @@
 # cython: boundscheck=False
 # cython: wraparound=False
 # cython: language_level=3
-# cython: linetrace=True
 
 # See _tree.pyx for details.
 
