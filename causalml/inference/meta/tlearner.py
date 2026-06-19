@@ -179,8 +179,6 @@ class BaseTLearner(BaseLearner):
         else:
             self.bootstrap_models_ = None
 
-        return self
-
     def _compute_bootstrap_ci(self, X):
         """Compute bootstrap CI using stored ensemble.
 

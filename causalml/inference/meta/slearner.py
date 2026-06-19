@@ -93,8 +93,6 @@ class BaseSLearner(BaseLearner):
             X_new = np.hstack((w.reshape((-1, 1)), X_filt))
             self.models[group].fit(X_new, y_filt)
 
-        return self
-
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):

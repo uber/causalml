@@ -161,8 +161,6 @@ class BaseRLearner(BaseLearner):
                 X_filt, (y_filt - yhat_filt) / (w - p_filt), sample_weight=weight
             )
 
-        return self
-
     def predict(self, X, p=None):
         """Predict treatment effects.
 

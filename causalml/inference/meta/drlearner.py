@@ -195,8 +195,6 @@ class BaseDRLearner(BaseLearner):
                 )
                 self.models_tau[group][ifold].fit(X_filt, dr)
 
-        return self
-
     def bootstrap(self, X, treatment, y, p=None, size=10000, rng=None, seed=None):
         """Runs a single bootstrap with optional deterministic cross-fit seed."""
         if rng is not None:
