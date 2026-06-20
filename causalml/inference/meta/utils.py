@@ -152,7 +152,8 @@ def prepend_column(value, X):
     n = n_rows(X)
 
     if isinstance(X, pd.DataFrame):
-        col = pd.DataFrame({"_w": np.full(n, value)}, index=X.index)
+        col_name = X.columns[0].__class__(0) if len(X.columns) > 0 else "_w"
+        col = pd.DataFrame({col_name: np.full(n, value)}, index=X.index)
         return pd.concat([col, X], axis=1)
 
     if _POLARS_AVAILABLE and isinstance(X, pl.DataFrame):
@@ -181,7 +182,8 @@ def concat_treatment_col(w, X):
     X = collect_if_lazy(X)
 
     if isinstance(X, pd.DataFrame):
-        col = pd.DataFrame({"_w": np.asarray(w)}, index=X.index)
+        col_name = X.columns[0].__class__(0) if len(X.columns) > 0 else "_w"
+        col = pd.DataFrame({col_name: np.asarray(w)}, index=X.index)
         return pd.concat([col, X], axis=1)
 
     if _POLARS_AVAILABLE and isinstance(X, pl.DataFrame):
