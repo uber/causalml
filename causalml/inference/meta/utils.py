@@ -152,9 +152,11 @@ def prepend_column(value, X):
     n = n_rows(X)
 
     if isinstance(X, pd.DataFrame):
-        col_name = X.columns[0].__class__(0) if len(X.columns) > 0 else "_w"
-        col = pd.DataFrame({col_name: np.full(n, value)}, index=X.index)
-        return pd.concat([col, X], axis=1)
+        # Reset to range-index column names to avoid type clashes, then restore.
+        # We prepend a treatment column then rename all columns to 0..n so
+        # downstream sklearn sees consistent integer names.
+        arr = np.hstack((np.full((n, 1), value), X.to_numpy()))
+        return pd.DataFrame(arr, index=X.index)
 
     if _POLARS_AVAILABLE and isinstance(X, pl.DataFrame):
         col = pl.Series("_w", np.full(n, value))
@@ -182,9 +184,8 @@ def concat_treatment_col(w, X):
     X = collect_if_lazy(X)
 
     if isinstance(X, pd.DataFrame):
-        col_name = X.columns[0].__class__(0) if len(X.columns) > 0 else "_w"
-        col = pd.DataFrame({col_name: np.asarray(w)}, index=X.index)
-        return pd.concat([col, X], axis=1)
+        arr = np.hstack((np.asarray(w).reshape(-1, 1), X.to_numpy()))
+        return pd.DataFrame(arr, index=X.index)
 
     if _POLARS_AVAILABLE and isinstance(X, pl.DataFrame):
         col = pl.Series("_w", np.asarray(w))

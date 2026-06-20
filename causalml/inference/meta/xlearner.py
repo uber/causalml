@@ -121,7 +121,6 @@ class BaseXLearner(BaseLearner):
             p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-        self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
         self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
         self.models_tau_c = {
             group: deepcopy(self.model_tau_c) for group in self.t_groups
@@ -131,6 +130,12 @@ class BaseXLearner(BaseLearner):
         }
         self.vars_c = {}
         self.vars_t = {}
+
+        # model_mu_c is trained on control only (identical across groups) - fit once.
+        control_mask = treatment_np == self.control_name
+        self.model_mu_c = deepcopy(self.model_mu_c)
+        self.model_mu_c.fit(filter_mask(X, control_mask), filter_mask(y, control_mask))
+        self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -143,23 +148,20 @@ class BaseXLearner(BaseLearner):
             X_filt_t = filter_mask(X_filt, w == 1)
             y_filt_np = to_numpy(y_filt)
 
-            # Train outcome models
-            self.models_mu_c[group].fit(X_filt_c, filter_mask(y_filt, w == 0))
+            # Train treatment outcome model
             self.models_mu_t[group].fit(X_filt_t, filter_mask(y_filt, w == 1))
 
             # Calculate variances and treatment effects
-            var_c = (
-                y_filt_np[w == 0] - self.models_mu_c[group].predict(X_filt_c)
-            ).var()
+            var_c = (y_filt_np[w == 0] - self.model_mu_c.predict(X_filt_c)).var()
             self.vars_c[group] = var_c
             var_t = (
                 y_filt_np[w == 1] - self.models_mu_t[group].predict(X_filt_t)
             ).var()
             self.vars_t[group] = var_t
 
-            # Train treatment models
+            # Train treatment effect models
             d_c = self.models_mu_t[group].predict(X_filt_c) - y_filt_np[w == 0]
-            d_t = y_filt_np[w == 1] - self.models_mu_c[group].predict(X_filt_t)
+            d_t = y_filt_np[w == 1] - self.model_mu_c.predict(X_filt_t)
             self.models_tau_c[group].fit(X_filt_c, d_c)
             self.models_tau_t[group].fit(X_filt_t, d_t)
 
