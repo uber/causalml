@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build:
-    name: ${{ matrix.os }}${{ matrix.tf-label }}-py${{ matrix.python-version }}
+    name: ${{ matrix.os }}${{ matrix.extra }}-py${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
 
     defaults:
@@ -23,14 +23,18 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         python-version: ["3.11", "3.12"]
-        tf-label: ['', '-tf']
+        extra: ['', 'tf', 'jax']
         include:
           - python-version: "3.11"
             python-version-nd: 311
           - python-version: "3.12"
             python-version-nd: 312
-          - tf-label: '-tf'
-            tf-label-pip: ',tf'
+          - extra: 'tf'
+            extra-pip: ',tf'
+            pytest-flag: '--runtf'
+          - extra: 'jax'
+            extra-pip: ',jax'
+            pytest-flag: '--runjax'
 
     steps:
       - name: checkout repository
@@ -47,7 +51,7 @@ jobs:
       - name: create environment
         uses: conda-incubator/setup-miniconda@v3
         with:
-          activate-environment: causalml${{ matrix.tf-label }}-py${{ matrix.python-version-nd }} 
+          activate-environment: causalml${{ matrix.extra }}-py${{ matrix.python-version-nd }} 
           python-version: ${{ matrix.python-version }}
           channels: defaults
 
@@ -69,10 +73,10 @@ jobs:
         run: |
             pip install -U pip
             pip install -U setuptools
-            python -m pip install -e ".[test${{ matrix.tf-label-pip}}]"
+            python -m pip install -e ".[test${{ matrix.extra-pip }}]"
 
       - name: Test with pytest
-        run: pytest -vs tests/ --cov causalml/
+        run: pytest -vs tests/ ${{ matrix.pytest-flag }} --cov causalml/
 
       - name: echo conda env
         run: |

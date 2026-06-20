@@ -68,7 +68,7 @@ def test_dragonnet_jax_save_load(tmp_path):
     dragon.save(ckpt_dir)
 
     dragon2 = DragonNet(neurons_per_layer=50, targeted_reg=False)
-    dragon2.load(ckpt_dir, X.shape[1])
+    dragon2.load(ckpt_dir)
 
     ate_after = float(dragon2.predict_tau(X).mean())
     assert ate_after == pytest.approx(ate_before, rel=1e-5)

@@ -10,6 +10,9 @@ References:
         https://arxiv.org/pdf/1906.02120.pdf
 """
 
+import json
+import os
+
 import numpy as np
 import jax
 import jax.numpy as jnp
@@ -204,6 +207,7 @@ def _run_training_loop(
     early_stop_patience,
     verbose,
     phase_name,
+    seed,
 ):
     """Generic training loop with early stopping.
 
@@ -221,6 +225,7 @@ def _run_training_loop(
         early_stop_patience: Stop if val_loss does not improve for this many epochs.
         verbose: Whether to print epoch summaries.
         phase_name: Label printed in verbose output.
+        seed: Random seed for shuffling.
 
     Returns:
         None; model and optimizer are updated in-place.
@@ -228,20 +233,22 @@ def _run_training_loop(
     best_val_loss = float("inf")
     no_improve = 0
     n_train = X_train.shape[0]
-    rng = np.random.default_rng(0)
+    rng = np.random.default_rng(seed)
+
+    # Clamp batch size to the number of training examples so that we never
+    # silently run zero training steps on small datasets.
+    effective_batch_size = min(batch_size, n_train)
 
     # Drop incomplete last batch to avoid JIT shape polymorphism.
-    # With batch_size=64 and ~598 training samples, this discards ~22
-    # samples per epoch, well within typical SGD variance tolerance.
-    n_full = (n_train // batch_size) * batch_size
+    n_full = (n_train // effective_batch_size) * effective_batch_size
 
     for epoch in range(epochs):
         idx = rng.permutation(n_train)
         X_shuf, y_shuf = X_train[idx], y_train[idx]
 
-        for start in range(0, n_full, batch_size):
-            xb = X_shuf[start : start + batch_size]
-            yb = y_shuf[start : start + batch_size]
+        for start in range(0, n_full, effective_batch_size):
+            xb = X_shuf[start : start + effective_batch_size]
+            yb = y_shuf[start : start + effective_batch_size]
             train_step_fn(model, optimizer, xb, yb)
 
         val_loss = float(val_step_fn(model, X_val, y_val))
@@ -284,6 +291,10 @@ class DragonNet:
         loss_func: Base loss function; defaults to dragonnet_loss_binarycross.
         verbose: Whether to print epoch summaries.
         seed: Random seed for parameter initialization and data shuffling.
+
+    Note:
+        Unlike the TensorFlow backend, this JAX implementation does not
+        currently use ``ReduceLROnPlateau`` or ``TerminateOnNaN`` callbacks.
     """
 
     def __init__(
@@ -292,7 +303,7 @@ class DragonNet:
         targeted_reg=True,
         ratio=1.0,
         val_split=0.2,
-        batch_size=256,
+        batch_size=64,
         epochs=100,
         learning_rate=1e-5,
         momentum=0.9,
@@ -382,6 +393,7 @@ class DragonNet:
                 early_stop_patience=2,
                 verbose=self.verbose,
                 phase_name="Adam",
+                seed=self.seed,
             )
 
         sgd_tx = optax.sgd(self.learning_rate, momentum=self.momentum, nesterov=True)
@@ -400,6 +412,7 @@ class DragonNet:
             early_stop_patience=40,
             verbose=self.verbose,
             phase_name="SGD",
+            seed=self.seed,
         )
 
     def predict(self, X, treatment=None, y=None, p=None):
@@ -466,23 +479,52 @@ class DragonNet:
         """
         import orbax.checkpoint as ocp
 
-        path = str(path)
+        path = os.path.abspath(str(path))
         state = nnx.state(self._model)
         checkpointer = ocp.StandardCheckpointer()
-        checkpointer.save(path, state)
+        checkpointer.save(path, state, force=True)
         checkpointer.wait_until_finished()
 
-    def load(self, path, input_dim):
+        # Persist architecture metadata so load() can reconstruct the model.
+        config = {
+            "input_dim": int(self._model.repr1.in_features),
+            "neurons_per_layer": int(self.neurons_per_layer),
+            "reg_l2": float(self.reg_l2),
+        }
+        with open(os.path.join(path, "config.json"), "w", encoding="utf-8") as f:
+            json.dump(config, f, indent=2)
+
+    def load(self, path, input_dim=None):
         """Restores model parameters from an orbax checkpoint.
 
         Args:
             path: Directory path of a previously saved checkpoint.
-            input_dim: Number of input features (needed to reconstruct the model).
+            input_dim: Deprecated. Architecture metadata is read from the
+                checkpoint's config.json.
         """
         import orbax.checkpoint as ocp
 
-        path = str(path)
-        self._model = self._build_model(input_dim)
+        path = os.path.abspath(str(path))
+        config_path = os.path.join(path, "config.json")
+        if os.path.exists(config_path):
+            with open(config_path, encoding="utf-8") as f:
+                config = json.load(f)
+        elif input_dim is not None:
+            # Backward compatibility with old checkpoints that lack config.json.
+            config = {
+                "input_dim": input_dim,
+                "neurons_per_layer": self.neurons_per_layer,
+                "reg_l2": self.reg_l2,
+            }
+        else:
+            raise ValueError(
+                f"Checkpoint at {path!r} does not contain config.json and "
+                "input_dim was not provided."
+            )
+
+        self.neurons_per_layer = config["neurons_per_layer"]
+        self.reg_l2 = config["reg_l2"]
+        self._model = self._build_model(config["input_dim"])
         state = nnx.state(self._model)
         checkpointer = ocp.StandardCheckpointer()
         restored = checkpointer.restore(path, state)
