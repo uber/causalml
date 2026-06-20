@@ -42,9 +42,7 @@ class EpsilonLayer(nnx.Module):
         Args:
             rngs: flax.nnx RNG container.
         """
-        self.epsilon = nnx.Param(
-            jax.random.normal(rngs.params(), shape=(1, 1)) * 0.05
-        )
+        self.epsilon = nnx.Param(jax.random.normal(rngs.params(), shape=(1, 1)) * 0.05)
 
     def __call__(self, inputs):
         """Broadcasts epsilon to (batch, 1).
@@ -85,20 +83,32 @@ class DragonNetModule(nnx.Module):
         default_init = jax.nn.initializers.glorot_uniform()
 
         # Shared representation
-        self.repr1 = nnx.Linear(input_dim, neurons_per_layer, kernel_init=repr_init, rngs=rngs)
-        self.repr2 = nnx.Linear(neurons_per_layer, neurons_per_layer, kernel_init=repr_init, rngs=rngs)
-        self.repr3 = nnx.Linear(neurons_per_layer, neurons_per_layer, kernel_init=repr_init, rngs=rngs)
+        self.repr1 = nnx.Linear(
+            input_dim, neurons_per_layer, kernel_init=repr_init, rngs=rngs
+        )
+        self.repr2 = nnx.Linear(
+            neurons_per_layer, neurons_per_layer, kernel_init=repr_init, rngs=rngs
+        )
+        self.repr3 = nnx.Linear(
+            neurons_per_layer, neurons_per_layer, kernel_init=repr_init, rngs=rngs
+        )
 
         # Propensity head
-        self.t_head = nnx.Linear(neurons_per_layer, 1, kernel_init=default_init, rngs=rngs)
+        self.t_head = nnx.Linear(
+            neurons_per_layer, 1, kernel_init=default_init, rngs=rngs
+        )
 
         # Outcome head y0
-        self.y0_h1 = nnx.Linear(neurons_per_layer, half, kernel_init=default_init, rngs=rngs)
+        self.y0_h1 = nnx.Linear(
+            neurons_per_layer, half, kernel_init=default_init, rngs=rngs
+        )
         self.y0_h2 = nnx.Linear(half, half, kernel_init=default_init, rngs=rngs)
         self.y0_out = nnx.Linear(half, 1, kernel_init=default_init, rngs=rngs)
 
         # Outcome head y1
-        self.y1_h1 = nnx.Linear(neurons_per_layer, half, kernel_init=default_init, rngs=rngs)
+        self.y1_h1 = nnx.Linear(
+            neurons_per_layer, half, kernel_init=default_init, rngs=rngs
+        )
         self.y1_h2 = nnx.Linear(half, half, kernel_init=default_init, rngs=rngs)
         self.y1_out = nnx.Linear(half, 1, kernel_init=default_init, rngs=rngs)
 

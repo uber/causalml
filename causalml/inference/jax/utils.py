@@ -23,9 +23,7 @@ def binary_classification_loss(concat_true, concat_pred):
     t_pred = concat_pred[:, 2]
     t_pred = (t_pred + 0.001) / 1.002
     t_pred = jnp.clip(t_pred, 1e-7, 1.0 - 1e-7)
-    losst = -jnp.sum(
-        t_true * jnp.log(t_pred) + (1.0 - t_true) * jnp.log(1.0 - t_pred)
-    )
+    losst = -jnp.sum(t_true * jnp.log(t_pred) + (1.0 - t_true) * jnp.log(1.0 - t_pred))
     return losst
 
 
