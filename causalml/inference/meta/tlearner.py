@@ -129,7 +129,12 @@ class BaseTLearner(BaseLearner):
         # re-calling fit() always starts from a clean state (safe with warm_start).
         control_mask = treatment == self.control_name
         self.model_c = deepcopy(self._model_c_template)
-        self.model_c.fit(X[control_mask], y[control_mask])
+        X_control = (
+            X[control_mask].reset_index(drop=True)
+            if hasattr(X, "loc")
+            else X[control_mask]
+        )
+        self.model_c.fit(X_control, y[control_mask])
         # Expose as a shared-reference dict to preserve the public models_c API.
         self.models_c = {group: self.model_c for group in self.t_groups}
 
@@ -139,6 +144,21 @@ class BaseTLearner(BaseLearner):
             X_filt = X[mask].reset_index(drop=True) if hasattr(X, "loc") else X[mask]
             y_filt = y[mask]
             w = (treatment_filt == group).astype(int)
+
+            self.models_t[group].fit(X_filt[w == 1], y_filt[w == 1])
+
+        if store_bootstraps:
+            self.fit_bootstrap_ensemble(
+                X=X,
+                treatment=treatment,
+                y=y,
+                n_bootstraps=n_bootstraps,
+                bootstrap_size=bootstrap_size,
+                random_state=random_state,
+                n_jobs=n_jobs,
+            )
+        else:
+            self.bootstrap_models_ = None
 
     def _compute_bootstrap_ci(self, X):
         """Compute bootstrap CI using stored ensemble.
@@ -189,8 +209,10 @@ class BaseTLearner(BaseLearner):
                 returns (te, te_lower, te_upper) each of shape [n_samples, n_treatment].
                 return_ci=True and return_components=True cannot be used together.
         """
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
+
         treatment, y = convert_pd_to_np(treatment, y)
-        yhat_cs = {}
         yhat_ts = {}
 
         yhat_c = self.model_c.predict(X)
