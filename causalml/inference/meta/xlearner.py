@@ -184,8 +184,6 @@ class BaseXLearner(BaseLearner):
             self.models_tau_c[group].fit(X[control_mask], d_c)
             self.models_tau_t[group].fit(X_treat, d_t)
 
-        return self
-
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):

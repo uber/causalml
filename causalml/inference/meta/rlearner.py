@@ -475,8 +475,6 @@ class BaseRClassifier(BaseRLearner):
                 X_filt, (y_filt - yhat_filt) / (w - p_filt), sample_weight=weight
             )
 
-        return self
-
     def predict(self, X, p=None):
         """Predict treatment effects."""
         X = convert_pd_to_np(X)
@@ -646,8 +644,6 @@ class XGBRRegressor(BaseRRegressor):
             sample_weight_filt_t = sample_weight_filt[w == 1]
             self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
             self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
-
-        return self
 
     def predict(self, X, p=None):
         """Predict treatment effects."""
