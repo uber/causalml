@@ -128,14 +128,19 @@ class BaseXLearner(BaseLearner):
         self.models_tau_t = {
             group: deepcopy(self.model_tau_t) for group in self.t_groups
         }
-        self.vars_c = {}
         self.vars_t = {}
 
-        # model_mu_c is trained on control only (identical across groups) - fit once.
+        # model_mu_c is trained on control only (identical across groups) — fit once.
         control_mask = treatment_np == self.control_name
+        X_control = filter_mask(X, control_mask)
+        y_control = to_numpy(filter_mask(y, control_mask))
         self.model_mu_c = deepcopy(self.model_mu_c)
-        self.model_mu_c.fit(filter_mask(X, control_mask), filter_mask(y, control_mask))
+        self.model_mu_c.fit(X_control, y_control)
         self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
+        # var_c is a single scalar since control model is shared across groups
+        self.var_c = (y_control - self.model_mu_c.predict(X_control)).var()
+        # Keep vars_c dict for backward compat with estimate_ate
+        self.vars_c = {group: self.var_c for group in self.t_groups}
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -151,9 +156,6 @@ class BaseXLearner(BaseLearner):
             # Train treatment outcome model
             self.models_mu_t[group].fit(X_filt_t, filter_mask(y_filt, w == 1))
 
-            # Calculate variances and treatment effects
-            var_c = (y_filt_np[w == 0] - self.model_mu_c.predict(X_filt_c)).var()
-            self.vars_c[group] = var_c
             var_t = (
                 y_filt_np[w == 1] - self.models_mu_t[group].predict(X_filt_t)
             ).var()
