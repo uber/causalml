@@ -271,7 +271,7 @@ class BaseDRLearner(BaseLearner):
 
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         yhat_cs = {}
-        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+
         yhat_ts = {}
 
         # models_mu_c is fold-specific but not group-specific; predict once and reuse.
@@ -633,7 +633,7 @@ class BaseDRClassifier(BaseDRLearner):
 
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         yhat_cs = {}
-        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+
         yhat_ts = {}
 
         # models_mu_c is fold-specific but not group-specific; predict once and reuse.

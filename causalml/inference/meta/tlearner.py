@@ -518,7 +518,6 @@ class BaseTClassifier(BaseTLearner):
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info("Error metrics for group {}".format(group))
-                from causalml.metrics import classification_metrics
 
                 classification_metrics(y_filt, yhat, w)
 

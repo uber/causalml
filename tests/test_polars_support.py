@@ -15,6 +15,10 @@ import polars as pl
 
 from sklearn.linear_model import LinearRegression
 
+from sklearn.linear_model import LogisticRegression
+from causalml.inference.meta.tlearner import BaseTClassifier
+from causalml.inference.meta.slearner import BaseSClassifier
+from causalml.inference.meta.xlearner import BaseXClassifier
 from causalml.inference.meta.tlearner import BaseTRegressor
 from causalml.inference.meta.slearner import BaseSRegressor
 from causalml.inference.meta.xlearner import BaseXRegressor
@@ -324,3 +328,99 @@ class TestEdgeCases:
         te = learner.predict(X_pl)
         assert isinstance(te, np.ndarray)
         assert te.shape[0] == N
+
+
+# T-Learner Classifier
+
+
+class TestTClassifierPolars:
+    @pytest.fixture(autouse=True)
+    def _learner(self):
+        self.learner = BaseTClassifier(learner=LogisticRegression())
+
+    def _fit_predict(self, X, treatment, y):
+        self.learner.fit(X, treatment, y)
+        return self.learner.predict(X)
+
+    def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
+        te_np = self._fit_predict(*synthetic_data_numpy)
+        self.learner = BaseTClassifier(learner=LogisticRegression())
+        te_pl = self._fit_predict(*synthetic_data_polars)
+        _assert_te_close(te_np, te_pl)
+
+    def test_lazyframe_input(self, synthetic_data_numpy, synthetic_data_polars_lazy):
+        te_np = self._fit_predict(*synthetic_data_numpy)
+        self.learner = BaseTClassifier(learner=LogisticRegression())
+        te_pl = self._fit_predict(*synthetic_data_polars_lazy)
+        _assert_te_close(te_np, te_pl)
+
+    def test_fit_predict_returns_numpy(self, synthetic_data_polars):
+        te = self._fit_predict(*synthetic_data_polars)
+        assert isinstance(te, np.ndarray)
+
+
+# S-Learner Classifier
+
+
+class TestSClassifierPolars:
+    @pytest.fixture(autouse=True)
+    def _learner(self):
+        self.learner = BaseSClassifier(learner=LogisticRegression())
+
+    def _fit_predict(self, X, treatment, y):
+        self.learner.fit(X, treatment, y)
+        return self.learner.predict(X)
+
+    def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
+        te_np = self._fit_predict(*synthetic_data_numpy)
+        self.learner = BaseSClassifier(learner=LogisticRegression())
+        te_pl = self._fit_predict(*synthetic_data_polars)
+        _assert_te_close(te_np, te_pl)
+
+    def test_lazyframe_input(self, synthetic_data_numpy, synthetic_data_polars_lazy):
+        te_np = self._fit_predict(*synthetic_data_numpy)
+        self.learner = BaseSClassifier(learner=LogisticRegression())
+        te_pl = self._fit_predict(*synthetic_data_polars_lazy)
+        _assert_te_close(te_np, te_pl)
+
+    def test_fit_predict_returns_numpy(self, synthetic_data_polars):
+        te = self._fit_predict(*synthetic_data_polars)
+        assert isinstance(te, np.ndarray)
+
+
+# X-Learner Classifier
+
+
+class TestXClassifierPolars:
+    @pytest.fixture(autouse=True)
+    def _learner(self):
+        self.learner = BaseXClassifier(
+            outcome_learner=LogisticRegression(),
+            effect_learner=LinearRegression(),
+        )
+
+    def _fit_predict(self, X, treatment, y):
+        self.learner.fit(X, treatment, y)
+        return self.learner.predict(X)
+
+    def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
+        te_np = self._fit_predict(*synthetic_data_numpy)
+        self.learner = BaseXClassifier(
+            outcome_learner=LogisticRegression(),
+            effect_learner=LinearRegression(),
+        )
+        te_pl = self._fit_predict(*synthetic_data_polars)
+        _assert_te_close(te_np, te_pl)
+
+    def test_lazyframe_input(self, synthetic_data_numpy, synthetic_data_polars_lazy):
+        te_np = self._fit_predict(*synthetic_data_numpy)
+        self.learner = BaseXClassifier(
+            outcome_learner=LogisticRegression(),
+            effect_learner=LinearRegression(),
+        )
+        te_pl = self._fit_predict(*synthetic_data_polars_lazy)
+        _assert_te_close(te_np, te_pl)
+
+    def test_fit_predict_returns_numpy(self, synthetic_data_polars):
+        te = self._fit_predict(*synthetic_data_polars)
+        assert isinstance(te, np.ndarray)

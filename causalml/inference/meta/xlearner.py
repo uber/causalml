@@ -550,7 +550,6 @@ class BaseXClassifier(BaseXLearner):
             p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-        self.models_mu_c = {group: deepcopy(self.model_mu_c) for group in self.t_groups}
         self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
         self.models_tau_c = {
             group: deepcopy(self.model_tau_c) for group in self.t_groups
@@ -558,8 +557,19 @@ class BaseXClassifier(BaseXLearner):
         self.models_tau_t = {
             group: deepcopy(self.model_tau_t) for group in self.t_groups
         }
-        self.vars_c = {}
         self.vars_t = {}
+
+        # model_mu_c is trained on control only (identical across groups) — fit once.
+        control_mask = treatment_np == self.control_name
+        X_control = filter_mask(X, control_mask)
+        y_control = filter_mask(y, control_mask)
+        self.model_mu_c = deepcopy(self.model_mu_c)
+        self.model_mu_c.fit(X_control, y_control)
+        self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
+        self.var_c = (
+            to_numpy(y_control) - self.model_mu_c.predict_proba(X_control)[:, 1]
+        ).var()
+        self.vars_c = {group: self.var_c for group in self.t_groups}
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -572,16 +582,9 @@ class BaseXClassifier(BaseXLearner):
             X_filt_t = filter_mask(X_filt, w == 1)
             y_filt_np = to_numpy(y_filt)
 
-            # Train outcome models
-            self.models_mu_c[group].fit(X_filt_c, filter_mask(y_filt, w == 0))
+            # Train treatment outcome model
             self.models_mu_t[group].fit(X_filt_t, filter_mask(y_filt, w == 1))
 
-            # Calculate variances and treatment effects
-            var_c = (
-                y_filt_np[w == 0]
-                - self.models_mu_c[group].predict_proba(X_filt_c)[:, 1]
-            ).var()
-            self.vars_c[group] = var_c
             var_t = (
                 y_filt_np[w == 1]
                 - self.models_mu_t[group].predict_proba(X_filt_t)[:, 1]
