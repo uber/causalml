@@ -70,6 +70,31 @@ def synthetic_data_polars_lazy(synthetic_data_polars):
     return X.lazy(), treatment, y
 
 
+@pytest.fixture(scope="module")
+def synthetic_data_numpy_binary():
+    """Return (X, treatment, y) with binary y for classifier tests."""
+    rng = np.random.default_rng(RANDOM_STATE)
+    X = rng.standard_normal((N, N_FEATURES))
+    treatment = rng.choice([0, 1], size=N)
+    y = rng.choice([0, 1], size=N)
+    return X, treatment, y
+
+
+@pytest.fixture(scope="module")
+def synthetic_data_polars_binary(synthetic_data_numpy_binary):
+    X_np, t_np, y_np = synthetic_data_numpy_binary
+    X = pl.DataFrame({f"f{i}": X_np[:, i] for i in range(N_FEATURES)})
+    treatment = pl.Series("treatment", t_np)
+    y = pl.Series("outcome", y_np)
+    return X, treatment, y
+
+
+@pytest.fixture(scope="module")
+def synthetic_data_polars_lazy_binary(synthetic_data_polars_binary):
+    X, treatment, y = synthetic_data_polars_binary
+    return X.lazy(), treatment, y
+
+
 # convert_pd_to_np unit tests
 
 
@@ -342,20 +367,24 @@ class TestTClassifierPolars:
         self.learner.fit(X, treatment, y)
         return self.learner.predict(X)
 
-    def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
-        te_np = self._fit_predict(*synthetic_data_numpy)
+    def test_polars_matches_numpy(
+        self, synthetic_data_numpy_binary, synthetic_data_polars_binary
+    ):
+        te_np = self._fit_predict(*synthetic_data_numpy_binary)
         self.learner = BaseTClassifier(learner=LogisticRegression())
-        te_pl = self._fit_predict(*synthetic_data_polars)
+        te_pl = self._fit_predict(*synthetic_data_polars_binary)
         _assert_te_close(te_np, te_pl)
 
-    def test_lazyframe_input(self, synthetic_data_numpy, synthetic_data_polars_lazy):
-        te_np = self._fit_predict(*synthetic_data_numpy)
+    def test_lazyframe_input(
+        self, synthetic_data_numpy_binary, synthetic_data_polars_lazy_binary
+    ):
+        te_np = self._fit_predict(*synthetic_data_numpy_binary)
         self.learner = BaseTClassifier(learner=LogisticRegression())
-        te_pl = self._fit_predict(*synthetic_data_polars_lazy)
+        te_pl = self._fit_predict(*synthetic_data_polars_lazy_binary)
         _assert_te_close(te_np, te_pl)
 
-    def test_fit_predict_returns_numpy(self, synthetic_data_polars):
-        te = self._fit_predict(*synthetic_data_polars)
+    def test_fit_predict_returns_numpy(self, synthetic_data_polars_binary):
+        te = self._fit_predict(*synthetic_data_polars_binary)
         assert isinstance(te, np.ndarray)
 
 
@@ -371,20 +400,24 @@ class TestSClassifierPolars:
         self.learner.fit(X, treatment, y)
         return self.learner.predict(X)
 
-    def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
-        te_np = self._fit_predict(*synthetic_data_numpy)
+    def test_polars_matches_numpy(
+        self, synthetic_data_numpy_binary, synthetic_data_polars_binary
+    ):
+        te_np = self._fit_predict(*synthetic_data_numpy_binary)
         self.learner = BaseSClassifier(learner=LogisticRegression())
-        te_pl = self._fit_predict(*synthetic_data_polars)
+        te_pl = self._fit_predict(*synthetic_data_polars_binary)
         _assert_te_close(te_np, te_pl)
 
-    def test_lazyframe_input(self, synthetic_data_numpy, synthetic_data_polars_lazy):
-        te_np = self._fit_predict(*synthetic_data_numpy)
+    def test_lazyframe_input(
+        self, synthetic_data_numpy_binary, synthetic_data_polars_lazy_binary
+    ):
+        te_np = self._fit_predict(*synthetic_data_numpy_binary)
         self.learner = BaseSClassifier(learner=LogisticRegression())
-        te_pl = self._fit_predict(*synthetic_data_polars_lazy)
+        te_pl = self._fit_predict(*synthetic_data_polars_lazy_binary)
         _assert_te_close(te_np, te_pl)
 
-    def test_fit_predict_returns_numpy(self, synthetic_data_polars):
-        te = self._fit_predict(*synthetic_data_polars)
+    def test_fit_predict_returns_numpy(self, synthetic_data_polars_binary):
+        te = self._fit_predict(*synthetic_data_polars_binary)
         assert isinstance(te, np.ndarray)
 
 
@@ -403,24 +436,28 @@ class TestXClassifierPolars:
         self.learner.fit(X, treatment, y)
         return self.learner.predict(X)
 
-    def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
-        te_np = self._fit_predict(*synthetic_data_numpy)
+    def test_polars_matches_numpy(
+        self, synthetic_data_numpy_binary, synthetic_data_polars_binary
+    ):
+        te_np = self._fit_predict(*synthetic_data_numpy_binary)
         self.learner = BaseXClassifier(
             outcome_learner=LogisticRegression(),
             effect_learner=LinearRegression(),
         )
-        te_pl = self._fit_predict(*synthetic_data_polars)
+        te_pl = self._fit_predict(*synthetic_data_polars_binary)
         _assert_te_close(te_np, te_pl)
 
-    def test_lazyframe_input(self, synthetic_data_numpy, synthetic_data_polars_lazy):
-        te_np = self._fit_predict(*synthetic_data_numpy)
+    def test_lazyframe_input(
+        self, synthetic_data_numpy_binary, synthetic_data_polars_lazy_binary
+    ):
+        te_np = self._fit_predict(*synthetic_data_numpy_binary)
         self.learner = BaseXClassifier(
             outcome_learner=LogisticRegression(),
             effect_learner=LinearRegression(),
         )
-        te_pl = self._fit_predict(*synthetic_data_polars_lazy)
+        te_pl = self._fit_predict(*synthetic_data_polars_lazy_binary)
         _assert_te_close(te_np, te_pl)
 
-    def test_fit_predict_returns_numpy(self, synthetic_data_polars):
-        te = self._fit_predict(*synthetic_data_polars)
+    def test_fit_predict_returns_numpy(self, synthetic_data_polars_binary):
+        te = self._fit_predict(*synthetic_data_polars_binary)
         assert isinstance(te, np.ndarray)
