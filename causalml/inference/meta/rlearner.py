@@ -56,12 +56,9 @@ class BaseRLearner(BaseLearner):
 
         Note: arguments are stored verbatim (scikit-learn convention) so that
         ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
+        Per the scikit-learn convention, ``__init__`` does not validate or raise —
+        validation of ``learner``/``outcome_learner``/``effect_learner`` happens in ``fit()``.
         """
-        assert (learner is not None) or (
-            (outcome_learner is not None) and (effect_learner is not None)
-        )
-        assert propensity_learner is not None
-
         # Store verbatim — no deepcopy, no logic (scikit-learn convention).
         self.learner = learner
         self.outcome_learner = outcome_learner
@@ -84,6 +81,15 @@ class BaseRLearner(BaseLearner):
             sample_weight (np.array or pd.Series, optional): sample weights for `effect_learner`.
             verbose (bool, optional): whether to output progress logs
         """
+        if (self.learner is None) and (
+            (self.outcome_learner is None) or (self.effect_learner is None)
+        ):
+            raise ValueError(
+                "Either `learner` or both `outcome_learner` and `effect_learner` "
+                "must be specified."
+            )
+        if self.propensity_learner is None:
+            raise ValueError("`propensity_learner` must be specified.")
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         if sample_weight is not None:
@@ -487,6 +493,17 @@ class BaseRClassifier(BaseRLearner):
 
 
 class XGBRRegressor(BaseRRegressor):
+    """An R-learner regressor using XGBoost models, with an explicit,
+    sklearn-compliant ``__init__`` signature.
+
+    Note: earlier versions accepted arbitrary ``*args, **kwargs`` and
+    transformed ``effect_learner_objective`` in ``__init__``. That breaks
+    ``get_params()``/``clone()`` because ``BaseEstimator.get_params``
+    introspects the constructor signature and reads back ``self.<param>``
+    verbatim. This version stores every argument as-is and defers all
+    XGBRegressor construction to ``fit()``.
+    """
+
     def __init__(
         self,
         early_stopping=True,
@@ -495,43 +512,44 @@ class XGBRRegressor(BaseRRegressor):
         effect_learner_objective="reg:squarederror",
         effect_learner_n_estimators=500,
         random_state=42,
-        *args,
-        **kwargs,
+        ate_alpha=0.05,
+        control_name=0,
+        n_fold=5,
     ):
-        """Initialize an R-learner regressor with XGBoost model using pairwise ranking objective."""
+        """Initialize an R-learner regressor with XGBoost models.
+
+        Args:
+            early_stopping (bool, optional): whether to use early stopping for the effect learner
+            test_size (float, optional): held-out fraction for early stopping eval set
+            early_stopping_rounds (int, optional): early stopping patience
+            effect_learner_objective (str, optional): XGBoost objective name for the effect learner
+            effect_learner_n_estimators (int, optional): n_estimators for the effect learner
+            random_state (int, optional): random seed
+            ate_alpha (float, optional): confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+            n_fold (int, optional): CV folds for the outcome learner
+
+        Note: arguments are stored verbatim (scikit-learn convention) so that
+        ``get_params`` / ``clone`` work correctly. Model construction is
+        deferred to ``fit()``.
+        """
         assert isinstance(random_state, int), "random_state should be int."
 
-        objective, metric = get_xgboost_objective_metric(effect_learner_objective)
-        self.effect_learner_objective = objective
-        self.effect_learner_eval_metric = metric
-        self.effect_learner_n_estimators = effect_learner_n_estimators
+        # Store verbatim — no transformation, no XGBRegressor construction here.
         self.early_stopping = early_stopping
-        if self.early_stopping:
-            self.test_size = test_size
-            self.early_stopping_rounds = early_stopping_rounds
-
-            effect_learner = XGBRegressor(
-                objective=self.effect_learner_objective,
-                n_estimators=self.effect_learner_n_estimators,
-                eval_metric=self.effect_learner_eval_metric,
-                early_stopping_rounds=self.early_stopping_rounds,
-                random_state=random_state,
-                *args,
-                **kwargs,
-            )
-        else:
-            effect_learner = XGBRegressor(
-                objective=self.effect_learner_objective,
-                n_estimators=self.effect_learner_n_estimators,
-                eval_metric=self.effect_learner_eval_metric,
-                random_state=random_state,
-                *args,
-                **kwargs,
-            )
+        self.test_size = test_size
+        self.early_stopping_rounds = early_stopping_rounds
+        self.effect_learner_objective = effect_learner_objective
+        self.effect_learner_n_estimators = effect_learner_n_estimators
 
         super().__init__(
-            outcome_learner=XGBRegressor(random_state=random_state, *args, **kwargs),
-            effect_learner=effect_learner,
+            learner=None,
+            outcome_learner=None,
+            effect_learner=None,
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+            n_fold=n_fold,
+            random_state=random_state,
         )
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
@@ -557,8 +575,28 @@ class XGBRRegressor(BaseRRegressor):
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
-        self.model_mu = self.outcome_learner
-        self.model_tau = self.effect_learner
+        # Resolve XGBRegressor models here (not in __init__) so get_params/clone
+        # stay correct — the constructor only stores plain, verbatim values.
+        objective, metric = get_xgboost_objective_metric(self.effect_learner_objective)
+        if self.early_stopping:
+            effect_learner = XGBRegressor(
+                objective=objective,
+                n_estimators=self.effect_learner_n_estimators,
+                eval_metric=metric,
+                early_stopping_rounds=self.early_stopping_rounds,
+                random_state=self.random_state,
+            )
+        else:
+            effect_learner = XGBRegressor(
+                objective=objective,
+                n_estimators=self.effect_learner_n_estimators,
+                eval_metric=metric,
+                random_state=self.random_state,
+            )
+        outcome_learner = XGBRegressor(random_state=self.random_state)
+
+        self.model_mu = outcome_learner
+        self.model_tau = effect_learner
         self.model_p = self.propensity_learner
         self.cv = KFold(
             n_splits=self.n_fold, shuffle=True, random_state=self.random_state

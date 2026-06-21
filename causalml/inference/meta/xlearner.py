@@ -46,43 +46,15 @@ class BaseXLearner(BaseLearner):
 
         Note: arguments are stored verbatim (scikit-learn convention) so that
         ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
+        Per the scikit-learn convention, ``__init__`` does not validate or raise —
+        validation happens in ``fit()``.
         """
-        assert (learner is not None) or (
-            (control_outcome_learner is not None)
-            and (treatment_outcome_learner is not None)
-            and (control_effect_learner is not None)
-            and (treatment_effect_learner is not None)
-        )
-
         # Store verbatim — no deepcopy, no logic (scikit-learn convention).
         self.learner = learner
         self.control_outcome_learner = control_outcome_learner
         self.treatment_outcome_learner = treatment_outcome_learner
         self.control_effect_learner = control_effect_learner
         self.treatment_effect_learner = treatment_effect_learner
-        if control_outcome_learner is None:
-            self.model_mu_c = deepcopy(learner)
-        else:
-            self.model_mu_c = control_outcome_learner
-
-        # Preserve the unfitted template so repeated fit() calls always start fresh.
-        self._model_mu_c_template = self.model_mu_c
-
-        if treatment_outcome_learner is None:
-            self.model_mu_t = deepcopy(learner)
-        else:
-            self.model_mu_t = treatment_outcome_learner
-
-        if control_effect_learner is None:
-            self.model_tau_c = deepcopy(learner)
-        else:
-            self.model_tau_c = control_effect_learner
-
-        if treatment_effect_learner is None:
-            self.model_tau_t = deepcopy(learner)
-        else:
-            self.model_tau_t = treatment_effect_learner
-
         self.ate_alpha = ate_alpha
         self.control_name = control_name
 
@@ -97,6 +69,17 @@ class BaseXLearner(BaseLearner):
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
         """
+        if (self.learner is None) and (
+            (self.control_outcome_learner is None)
+            or (self.treatment_outcome_learner is None)
+            or (self.control_effect_learner is None)
+            or (self.treatment_effect_learner is None)
+        ):
+            raise ValueError(
+                "Either `learner` or all four of `control_outcome_learner`, "
+                "`treatment_outcome_learner`, `control_effect_learner`, and "
+                "`treatment_effect_learner` must be specified."
+            )
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
@@ -135,7 +118,6 @@ class BaseXLearner(BaseLearner):
         self.models_mu_t = {
             group: deepcopy(_treatment_outcome_learner) for group in self.t_groups
         }
-        self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
         self.models_tau_c = {
             group: deepcopy(_control_effect_learner) for group in self.t_groups
         }
@@ -153,18 +135,6 @@ class BaseXLearner(BaseLearner):
 
         y_control_pred = self.model_mu_c.predict(X[control_mask])
         self.var_c = (y[control_mask] - y_control_pred).var()
-        # model_mu_c is trained on control data, which is the same for every treatment
-        # group. Deepcopy from the unfitted template so re-calling fit() starts fresh.
-        control_mask = treatment == self.control_name
-        self.model_mu_c = deepcopy(self._model_mu_c_template)
-        self.model_mu_c.fit(X[control_mask], y[control_mask])
-        # Expose as a shared-reference dict to preserve the public models_mu_c API.
-        self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
-
-        # var_c depends only on model_mu_c and control data — constant across groups.
-        y_control_pred = self.model_mu_c.predict(X[control_mask])
-        self.var_c = (y[control_mask] - y_control_pred).var()
-        # Keep vars_c dict for backward compatibility with existing callers.
         self.vars_c = {group: self.var_c for group in self.t_groups}
 
         for group in self.t_groups:
@@ -178,7 +148,6 @@ class BaseXLearner(BaseLearner):
                 y_treat - self.models_mu_t[group].predict(X_treat)
             ).var()
 
-            # Train treatment effect models using cross-group imputation
             d_c = self.models_mu_t[group].predict(X[control_mask]) - y[control_mask]
             d_t = y_treat - self.model_mu_c.predict(X_treat)
             self.models_tau_c[group].fit(X[control_mask], d_c)
@@ -214,7 +183,6 @@ class BaseXLearner(BaseLearner):
         dhat_cs = {}
         dhat_ts = {}
 
-        # For verbose metrics, control predictions are constant across groups.
         yhat_c_verbose = None
         if (y is not None) and (treatment is not None) and verbose:
             control_mask = treatment == self.control_name
@@ -545,7 +513,6 @@ class BaseXClassifier(BaseXLearner):
         self.models_mu_t = {
             group: deepcopy(_treatment_outcome_learner) for group in self.t_groups
         }
-        self.models_mu_t = {group: deepcopy(self.model_mu_t) for group in self.t_groups}
         self.models_tau_c = {
             group: deepcopy(_control_effect_learner) for group in self.t_groups
         }
@@ -560,14 +527,6 @@ class BaseXClassifier(BaseXLearner):
         self.model_mu_c.fit(X[control_mask], y[control_mask])
         self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
 
-        # model_mu_c is trained on control data, which is the same for every treatment
-        # group, so fit it once and store as a single model (not a per-group dict).
-        control_mask = treatment == self.control_name
-        self.model_mu_c = deepcopy(self._model_mu_c_template)
-        self.model_mu_c.fit(X[control_mask], y[control_mask])
-        self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
-
-        # var_c depends only on model_mu_c and control data — constant across groups.
         y_control_pred = self.model_mu_c.predict_proba(X[control_mask])[:, 1]
         self.var_c = (y[control_mask] - y_control_pred).var()
         self.vars_c = {group: self.var_c for group in self.t_groups}
@@ -583,7 +542,6 @@ class BaseXClassifier(BaseXLearner):
                 y_treat - self.models_mu_t[group].predict_proba(X_treat)[:, 1]
             ).var()
 
-            # Train treatment effect models using cross-group imputation
             d_c = (
                 self.models_mu_t[group].predict_proba(X[control_mask])[:, 1]
                 - y[control_mask]
@@ -611,7 +569,6 @@ class BaseXClassifier(BaseXLearner):
         dhat_cs = {}
         dhat_ts = {}
 
-        # For verbose metrics, control predictions are constant across groups.
         yhat_c_verbose = None
         if (y is not None) and (treatment is not None) and verbose:
             control_mask = treatment == self.control_name

@@ -35,7 +35,7 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
     treatment_b = treatment[idxs]
     y_b = y[idxs]
     p_b = {group: _p[idxs] for group, _p in p.items()} if p is not None else None
-    learner_b = clone(learner_template)
+    learner_b = clone(learner_template)  # safe=True works now via get_params/set_params
     learner_b.fit(X=X_b, treatment=treatment_b, y=y_b, p=p_b)
     return learner_b
 
@@ -54,6 +54,9 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
     * ``__init__`` **must** store every argument verbatim as ``self.<param> = param``.
       No logic, no ``deepcopy``, no derived attributes.
     * All model construction and validation moves to ``fit()``.
+    * Fitted attributes are named with a trailing underscore (e.g. ``models_t_``),
+      though the public API keeps legacy names (``models_t``) as aliases set in
+      ``fit()`` for backwards compatibility.
     """
 
     @classmethod
@@ -128,6 +131,14 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
     ):
         """Train and store a bootstrap ensemble for post-fit CI estimation.
 
+        Fits n_bootstraps cloned copies of the entire learner on bootstrap samples
+        and stores them in self.bootstrap_models_. Used by predict(return_ci=True)
+        to compute percentile-based confidence intervals on new data without refitting.
+
+        Because ``BaseLearner`` now inherits ``BaseEstimator``, ``clone(self)``
+        produces a clean unfitted copy via ``get_params``/``set_params`` — no
+        bespoke ``_unfitted_clone`` machinery required.
+
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series): a treatment vector
@@ -138,6 +149,7 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
             random_state (int, optional): random seed for reproducibility.
             n_jobs (int, optional): number of parallel jobs. -1 uses all cores. Default: 1.
         """
+        # clone(self) is now a proper sklearn clone — unfitted and cheap.
         unfitted_template = clone(self)
 
         rng = np.random.RandomState(random_state)
@@ -175,7 +187,19 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         return p
 
     def _set_propensity_models(self, X, treatment, y):
-        """Set self.propensity and self.propensity_models."""
+        """Set self.propensity and self.propensity_models.
+
+        It trains propensity models for all treatment groups, save them in self.propensity_models, and
+        save propensity scores in self.propensity in dictionaries with treatment groups as keys.
+
+        It will use self.model_p if available to train propensity models. Otherwise, it will use a default
+        PropensityModel (i.e. ElasticNetPropensityModel).
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
+        """
         logger.info("Generating propensity score")
         p = dict()
         p_model = dict()
@@ -207,6 +231,31 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         test_size=0.3,
         random_state=None,
     ):
+        """
+        Builds a model (using X to predict estimated/actual tau), and then calculates feature importances
+        based on a specified method.
+
+        Currently supported methods are:
+            - auto (calculates importance based on estimator's default implementation of feature importance;
+                    estimator must be tree-based)
+                    Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
+                    importance type
+            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted;
+                           estimator can be any form)
+        Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
+            features (np.array): list/array of feature names. If None, an enumerated list will be used
+            method (str): auto, permutation
+            normalize (bool): normalize by sum of importances if method=auto (defaults to True)
+            test_size (float/int): if float, represents the proportion of the dataset to include in the test split.
+                                   If int, represents the absolute number of test samples (used for estimating
+                                   permutation importance)
+            random_state (int/RandomState instance/None): random state used in permutation importance estimation
+        """
         explainer = Explainer(
             method=method,
             control_name=self.control_name,
@@ -222,6 +271,14 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         return explainer.get_importance()
 
     def get_shap_values(self, X=None, model_tau_feature=None, tau=None, features=None):
+        """
+        Builds a model (using X to predict estimated/actual tau), and then calculates shapley values.
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
+            features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
+        """
         explainer = Explainer(
             method="shapley",
             control_name=self.control_name,
@@ -244,6 +301,31 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         test_size=0.3,
         random_state=None,
     ):
+        """
+        Builds a model (using X to predict estimated/actual tau), and then plots feature importances
+        based on a specified method.
+
+        Currently supported methods are:
+            - auto (calculates importance based on estimator's default implementation of feature importance;
+                    estimator must be tree-based)
+                    Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
+                    importance type
+            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted;
+                           estimator can be any form)
+        Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
+            features (optional, np.array): list/array of feature names. If None, an enumerated list will be used
+            method (str): auto, permutation
+            normalize (bool): normalize by sum of importances if method=auto (defaults to True)
+            test_size (float/int): if float, represents the proportion of the dataset to include in the test split.
+                                   If int, represents the absolute number of test samples (used for estimating
+                                   permutation importance)
+            random_state (int/RandomState instance/None): random state used in permutation importance estimation
+        """
         explainer = Explainer(
             method=method,
             control_name=self.control_name,
@@ -267,6 +349,20 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         shap_dict=None,
         **kwargs,
     ):
+        """
+        Plots distribution of shapley values.
+
+        If shapley values have been pre-computed, pass it through the shap_dict parameter.
+        If shap_dict is not provided, this builds a new model (using X to predict estimated/actual tau),
+        and then calculates shapley values.
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix. Required if shap_dict is None.
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
+            features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
+            shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
+        """
         override_checks = shap_dict is not None
         explainer = Explainer(
             method="shapley",
@@ -292,6 +388,31 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         interaction_idx="auto",
         **kwargs,
     ):
+        """
+        Plots dependency of shapley values for a specified feature, colored by an interaction feature.
+
+        If shapley values have been pre-computed, pass it through the shap_dict parameter.
+        If shap_dict is not provided, this builds a new model (using X to predict estimated/actual tau),
+        and then calculates shapley values.
+
+        This plots the value of the feature on the x-axis and the SHAP value of the same feature
+        on the y-axis. This shows how the model depends on the given feature, and is like a
+        richer extension of the classical partial dependence plots. Vertical dispersion of the
+        data points represents interaction effects.
+
+        Args:
+            treatment_group (str or int): name of treatment group to create dependency plot on
+            feature_idx (str or int): feature index / name to create dependency plot on
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            tau (np.array): a treatment effect vector (estimated/actual)
+            model_tau_feature (sklearn/lightgbm/xgboost model object): an unfitted model object
+            features (optional, np.array): list/array of feature names. If None, an enumerated list will be used.
+            shap_dict (optional, dict): a dict of shapley value matrices. If None, shap_dict will be computed.
+            interaction_idx (optional, str or int): feature index / name used in coloring scheme as interaction feature.
+                If "auto" then shap.common.approximate_interactions is used to pick what seems to be the
+                strongest interaction (note that to find to true strongest interaction you need to compute
+                the SHAP interaction values).
+        """
         override_checks = False if shap_dict is None else True
         explainer = Explainer(
             method="shapley",

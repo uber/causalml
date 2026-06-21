@@ -112,7 +112,6 @@ class BaseSLearner(BaseLearner):
 
         # Build the augmented arrays once; they are identical for every group.
         # (Separate allocations avoid in-place mutation by learners like CatBoost
-        # that set the writeable flag to False on arrays passed to predict().)\
         # that set the writeable flag to False on arrays passed to predict().)
         X_new_c = np.hstack((np.zeros((X.shape[0], 1)), X))
         X_new_t = np.hstack((np.ones((X.shape[0], 1)), X))

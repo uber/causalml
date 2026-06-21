@@ -49,13 +49,9 @@ class BaseDRLearner(BaseLearner):
 
         Note: arguments are stored verbatim (scikit-learn convention) so that
         ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
+        Per the scikit-learn convention, ``__init__`` does not validate or raise —
+        validation happens in ``fit()``.
         """
-        assert (learner is not None) or (
-            (control_outcome_learner is not None)
-            and (treatment_outcome_learner is not None)
-            and (treatment_effect_learner is not None)
-        )
-
         # Store verbatim — no deepcopy, no logic (scikit-learn convention).
         self.learner = learner
         self.control_outcome_learner = control_outcome_learner
@@ -74,6 +70,16 @@ class BaseDRLearner(BaseLearner):
             p (np.ndarray or pd.Series or dict, optional): propensity scores
             seed (int): random seed for cross-fitting
         """
+        if (self.learner is None) and (
+            (self.control_outcome_learner is None)
+            or (self.treatment_outcome_learner is None)
+            or (self.treatment_effect_learner is None)
+        ):
+            raise ValueError(
+                "Either `learner` or all three of `control_outcome_learner`, "
+                "`treatment_outcome_learner`, and `treatment_effect_learner` "
+                "must be specified."
+            )
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
@@ -232,9 +238,6 @@ class BaseDRLearner(BaseLearner):
         yhat_ts = {}
 
         yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
-        # models_mu_c is fold-specific but not group-specific; predict once and reuse.
-        yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
-        # Shared-reference dict preserves the public yhat_cs[group] API cheaply.
         yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for i, group in enumerate(self.t_groups):
@@ -537,7 +540,6 @@ class BaseDRClassifier(BaseDRLearner):
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         yhat_ts = {}
 
-        # models_mu_c is fold-specific but not group-specific; predict once and reuse.
         yhat_c = np.r_[
             [model.predict_proba(X)[:, 1] for model in self.models_mu_c]
         ].mean(axis=0)
