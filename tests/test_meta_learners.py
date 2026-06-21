@@ -21,6 +21,7 @@ from causalml.inference.meta import (
     BaseTRegressor,
     BaseTClassifier,
     XGBTRegressor,
+    XGBTClassifier,
     MLPTRegressor,
 )
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
@@ -29,6 +30,7 @@ from causalml.inference.meta import (
     BaseRClassifier,
     BaseRRegressor,
     XGBRRegressor,
+    XGBRClassifier,
 )
 from causalml.inference.meta import TMLELearner
 from causalml.inference.meta import BaseDRLearner
@@ -764,6 +766,125 @@ def test_BaseSClassifier(generate_classification_data):
     )
 
     # Check if the normalized AUUC score of model's prediction is higher than random (0.5).
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col=CONVERSION,
+        treatment_col="W",
+        treatment_effect_col="treatment_effect_col",
+        normalize=True,
+    )
+    assert auuc["tau_pred"] > 0.5
+
+
+def test_XGBTClassifier(generate_classification_data):
+    """Regression test for uber/causalml#824.
+
+    Asserts that the new ``XGBTClassifier`` convenience subclass exists,
+    is importable from ``causalml.inference.meta``, behaves like a
+    ``BaseTClassifier`` wired with two ``XGBClassifier`` instances, and
+    produces a non-trivial AUUC. On master this test would fail at
+    import-time (the symbol does not exist).
+    """
+    np.random.seed(RANDOM_SEED)
+
+    df, x_names = generate_classification_data()
+
+    df["treatment_group_key"] = np.where(
+        df["treatment_group_key"] == CONTROL_NAME, 0, 1
+    )
+
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
+
+    # Forward an XGBoost-specific kwarg to make sure the subclass passes
+    # them through to the underlying XGBClassifier.
+    uplift_model = XGBTClassifier(n_estimators=20)
+
+    uplift_model.fit(
+        X=df_train[x_names].values,
+        treatment=df_train["treatment_group_key"].values,
+        y=df_train[CONVERSION].values,
+    )
+
+    tau_pred = uplift_model.predict(
+        X=df_test[x_names].values, treatment=df_test["treatment_group_key"].values
+    )
+
+    # Verify the underlying models are XGBClassifier (the load-bearing
+    # invariant the convenience subclass exists to enforce).
+    sample_group = next(iter(uplift_model.models_c))
+    assert isinstance(uplift_model.models_c[sample_group], XGBClassifier)
+    assert isinstance(uplift_model.models_t[sample_group], XGBClassifier)
+
+    auuc_metrics = pd.DataFrame(
+        {
+            "tau_pred": tau_pred.flatten(),
+            "W": df_test["treatment_group_key"].values,
+            CONVERSION: df_test[CONVERSION].values,
+            "treatment_effect_col": df_test["treatment_effect"].values,
+        }
+    )
+
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col=CONVERSION,
+        treatment_col="W",
+        treatment_effect_col="treatment_effect_col",
+        normalize=True,
+    )
+    assert auuc["tau_pred"] > 0.5
+
+
+def test_XGBRClassifier(generate_classification_data):
+    """Regression test for uber/causalml#824 (R-learner counterpart).
+
+    Asserts that ``XGBRClassifier`` exists, wires an ``XGBClassifier``
+    outcome learner and an ``XGBRegressor`` effect learner (the only
+    correct combination — R-loss has a real-valued target), and produces
+    a non-trivial AUUC.
+    """
+    np.random.seed(RANDOM_SEED)
+
+    df, x_names = generate_classification_data()
+
+    df["treatment_group_key"] = np.where(
+        df["treatment_group_key"] == CONTROL_NAME, 0, 1
+    )
+
+    propensity_model = LogisticRegression()
+    propensity_model.fit(X=df[x_names].values, y=df["treatment_group_key"].values)
+    df["propensity_score"] = propensity_model.predict_proba(df[x_names].values)[:, 1]
+
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
+
+    uplift_model = XGBRClassifier(
+        outcome_learner_kwargs={"n_estimators": 20},
+        effect_learner_kwargs={"n_estimators": 20},
+        random_state=RANDOM_SEED,
+    )
+
+    uplift_model.fit(
+        X=df_train[x_names].values,
+        treatment=df_train["treatment_group_key"].values,
+        y=df_train[CONVERSION].values,
+    )
+
+    # Verify the underlying model types — outcome must be a classifier
+    # (BaseRClassifier.fit calls cross_val_predict with predict_proba),
+    # effect must be a regressor (R-loss target is real-valued).
+    assert isinstance(uplift_model.model_mu, XGBClassifier)
+    assert isinstance(uplift_model.model_tau, XGBRegressor)
+
+    tau_pred = uplift_model.predict(X=df_test[x_names].values)
+
+    auuc_metrics = pd.DataFrame(
+        {
+            "tau_pred": tau_pred.flatten(),
+            "W": df_test["treatment_group_key"].values,
+            CONVERSION: df_test[CONVERSION].values,
+            "treatment_effect_col": df_test["treatment_effect"].values,
+        }
+    )
+
     auuc = auuc_score(
         auuc_metrics,
         outcome_col=CONVERSION,
