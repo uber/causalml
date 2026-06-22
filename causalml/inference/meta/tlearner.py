@@ -462,6 +462,11 @@ class BaseTClassifier(BaseTLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        # Fail-fast: validate mutually exclusive flags before doing any work.
+        # Consistent with BaseTLearner.predict which checks at the top.
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
+
         yhat_ts = {}
 
         yhat_c = self.model_c.predict_proba(X)[:, 1]
@@ -486,9 +491,6 @@ class BaseTClassifier(BaseTLearner):
         te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = yhat_ts[group] - yhat_c
-
-        if return_ci and return_components:
-            raise ValueError("return_ci and return_components cannot both be True.")
 
         if return_ci:
             te_lower, te_upper = self._compute_bootstrap_ci(X)

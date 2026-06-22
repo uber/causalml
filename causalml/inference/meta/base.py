@@ -54,9 +54,10 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
     * ``__init__`` **must** store every argument verbatim as ``self.<param> = param``.
       No logic, no ``deepcopy``, no derived attributes.
     * All model construction and validation moves to ``fit()``.
-    * Fitted attributes are named with a trailing underscore (e.g. ``models_t_``),
-      though the public API keeps legacy names (``models_t``) as aliases set in
-      ``fit()`` for backwards compatibility.
+    * ``fit()`` deepcopies the verbatim-stored arg before fitting, so ``self.learner``
+      (and related params) remain unfitted across repeated ``fit()`` calls — this is
+      the warm-start invariant that replaces the old ``_model_*_template`` mechanism.
+    * ``__repr__`` is inherited from ``BaseEstimator`` and reflects constructor params.
     """
 
     @classmethod
@@ -136,8 +137,10 @@ class BaseLearner(BaseEstimator, metaclass=ABCMeta):
         to compute percentile-based confidence intervals on new data without refitting.
 
         Because ``BaseLearner`` now inherits ``BaseEstimator``, ``clone(self)``
-        produces a clean unfitted copy via ``get_params``/``set_params`` — no
-        bespoke ``_unfitted_clone`` machinery required.
+        produces a clean unfitted copy via ``get_params``/``set_params``. The
+        warm-start invariant — that ``self.learner`` stays unfitted across calls —
+        is maintained by each ``fit()`` deepcopying the verbatim-stored constructor
+        arg before fitting it.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix

@@ -493,15 +493,16 @@ class BaseRClassifier(BaseRLearner):
 
 
 class XGBRRegressor(BaseRRegressor):
-    """An R-learner regressor using XGBoost models, with an explicit,
-    sklearn-compliant ``__init__`` signature.
+    """An R-learner regressor using XGBoost models.
 
-    Note: earlier versions accepted arbitrary ``*args, **kwargs`` and
-    transformed ``effect_learner_objective`` in ``__init__``. That breaks
-    ``get_params()``/``clone()`` because ``BaseEstimator.get_params``
-    introspects the constructor signature and reads back ``self.<param>``
-    verbatim. This version stores every argument as-is and defers all
-    XGBRegressor construction to ``fit()``.
+    Stores every constructor argument verbatim (scikit-learn convention) so
+    that ``get_params()`` / ``clone()`` work correctly. All XGBRegressor
+    construction is deferred to ``fit()``.
+
+    Additional XGBoost keyword arguments (e.g. ``max_depth``, ``learning_rate``)
+    are accepted via ``**xgb_kwargs`` and stored verbatim as ``self.xgb_kwargs``,
+    so that ``get_params()`` surfaces them and ``clone()`` round-trips them
+    correctly.
     """
 
     def __init__(
@@ -515,6 +516,7 @@ class XGBRRegressor(BaseRRegressor):
         ate_alpha=0.05,
         control_name=0,
         n_fold=5,
+        xgb_kwargs=None,
     ):
         """Initialize an R-learner regressor with XGBoost models.
 
@@ -522,15 +524,18 @@ class XGBRRegressor(BaseRRegressor):
             early_stopping (bool, optional): whether to use early stopping for the effect learner
             test_size (float, optional): held-out fraction for early stopping eval set
             early_stopping_rounds (int, optional): early stopping patience
-            effect_learner_objective (str, optional): XGBoost objective name for the effect learner
+            effect_learner_objective (str, optional): XGBoost objective for the effect learner
             effect_learner_n_estimators (int, optional): n_estimators for the effect learner
-            random_state (int, optional): random seed
+            random_state (int, optional): random seed (must be int)
             ate_alpha (float, optional): confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
             n_fold (int, optional): CV folds for the outcome learner
+            xgb_kwargs (dict, optional): additional keyword arguments forwarded verbatim
+                to both XGBRegressor instances (outcome and effect learners), e.g.
+                ``xgb_kwargs={'max_depth': 4, 'learning_rate': 0.05}``.
 
-        Note: arguments are stored verbatim (scikit-learn convention) so that
-        ``get_params`` / ``clone`` work correctly. Model construction is
+        Note: all arguments are stored verbatim (scikit-learn convention) so that
+        ``get_params`` / ``clone`` work correctly. XGBRegressor construction is
         deferred to ``fit()``.
         """
         assert isinstance(random_state, int), "random_state should be int."
@@ -541,6 +546,7 @@ class XGBRRegressor(BaseRRegressor):
         self.early_stopping_rounds = early_stopping_rounds
         self.effect_learner_objective = effect_learner_objective
         self.effect_learner_n_estimators = effect_learner_n_estimators
+        self.xgb_kwargs = xgb_kwargs if xgb_kwargs is not None else {}
 
         super().__init__(
             learner=None,
@@ -551,6 +557,19 @@ class XGBRRegressor(BaseRRegressor):
             n_fold=n_fold,
             random_state=random_state,
         )
+
+    def get_params(self, deep=True):
+        """Return parameters, including verbatim ``xgb_kwargs``."""
+        params = super().get_params(deep=deep)
+        params["xgb_kwargs"] = self.xgb_kwargs
+        return params
+
+    def set_params(self, **params):
+        """Set parameters, routing ``xgb_kwargs`` to ``self.xgb_kwargs``."""
+        xgb_kwargs = params.pop("xgb_kwargs", None)
+        if xgb_kwargs is not None:
+            self.xgb_kwargs = xgb_kwargs
+        return super().set_params(**params)
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
         """Fit using early-stopping XGBoost R-learner."""
@@ -577,7 +596,9 @@ class XGBRRegressor(BaseRRegressor):
 
         # Resolve XGBRegressor models here (not in __init__) so get_params/clone
         # stay correct — the constructor only stores plain, verbatim values.
+        # self.xgb_kwargs holds any extra XGBoost params (e.g. max_depth) verbatim.
         objective, metric = get_xgboost_objective_metric(self.effect_learner_objective)
+        xgb_kw = self.xgb_kwargs if self.xgb_kwargs else {}
         if self.early_stopping:
             effect_learner = XGBRegressor(
                 objective=objective,
@@ -585,6 +606,7 @@ class XGBRRegressor(BaseRRegressor):
                 eval_metric=metric,
                 early_stopping_rounds=self.early_stopping_rounds,
                 random_state=self.random_state,
+                **xgb_kw,
             )
         else:
             effect_learner = XGBRegressor(
@@ -592,8 +614,9 @@ class XGBRRegressor(BaseRRegressor):
                 n_estimators=self.effect_learner_n_estimators,
                 eval_metric=metric,
                 random_state=self.random_state,
+                **xgb_kw,
             )
-        outcome_learner = XGBRegressor(random_state=self.random_state)
+        outcome_learner = XGBRegressor(random_state=self.random_state, **xgb_kw)
 
         self.model_mu = outcome_learner
         self.model_tau = effect_learner
@@ -682,13 +705,3 @@ class XGBRRegressor(BaseRRegressor):
             sample_weight_filt_t = sample_weight_filt[w == 1]
             self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
             self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
-
-    def predict(self, X, p=None):
-        """Predict treatment effects."""
-        X = convert_pd_to_np(X)
-        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
-        for i, group in enumerate(self.t_groups):
-            dhat = self.models_tau[group].predict(X)
-            te[:, i] = dhat
-
-        return te

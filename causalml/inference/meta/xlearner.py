@@ -57,6 +57,10 @@ class BaseXLearner(BaseLearner):
         self.treatment_effect_learner = treatment_effect_learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        # Sentinel so estimate_ate(pretrain=True) raises a clean ValueError
+        # ("no propensity score, please call fit() first") instead of AttributeError
+        # when called before fit().
+        self.propensity = {}
 
     def fit(self, X, treatment, y, p=None):
         """Fit the inference model.
@@ -458,37 +462,35 @@ class BaseXClassifier(BaseXLearner):
             ate_alpha (float, optional): confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        # Store all args verbatim for get_params / clone compatibility.
+        # Store all args verbatim (scikit-learn convention) — no resolution here.
         self.outcome_learner = outcome_learner
         self.effect_learner = effect_learner
+        self.control_outcome_learner = control_outcome_learner
+        self.treatment_outcome_learner = treatment_outcome_learner
+        self.control_effect_learner = control_effect_learner
+        self.treatment_effect_learner = treatment_effect_learner
+        self.ate_alpha = ate_alpha
+        self.control_name = control_name
+        # Sentinel so estimate_ate(pretrain=True) raises cleanly before fit().
+        self.propensity = {}
 
-        # Resolve to specific learner slots.
-        _control_outcome_learner = control_outcome_learner or outcome_learner
-        _treatment_outcome_learner = treatment_outcome_learner or outcome_learner
-        _control_effect_learner = control_effect_learner or effect_learner
-        _treatment_effect_learner = treatment_effect_learner or effect_learner
-
-        super().__init__(
-            learner=None,
-            control_outcome_learner=_control_outcome_learner,
-            treatment_outcome_learner=_treatment_outcome_learner,
-            control_effect_learner=_control_effect_learner,
-            treatment_effect_learner=_treatment_effect_learner,
-            ate_alpha=ate_alpha,
-            control_name=control_name,
+    def fit(self, X, treatment, y, p=None):
+        """Fit the inference model (classifier variant — uses predict_proba)."""
+        # Resolve and validate here (not in __init__) — sklearn convention.
+        _control_outcome_learner = self.control_outcome_learner or self.outcome_learner
+        _treatment_outcome_learner = (
+            self.treatment_outcome_learner or self.outcome_learner
         )
+        _control_effect_learner = self.control_effect_learner or self.effect_learner
+        _treatment_effect_learner = self.treatment_effect_learner or self.effect_learner
 
         if (
-            (_control_outcome_learner is None) or (_treatment_outcome_learner is None)
-        ) and (
-            (_control_effect_learner is None) or (_treatment_effect_learner is None)
-        ):
+            _control_outcome_learner is None or _treatment_outcome_learner is None
+        ) and (_control_effect_learner is None or _treatment_effect_learner is None):
             raise ValueError(
                 "Either the outcome learner or the effect learner pair must be specified."
             )
 
-    def fit(self, X, treatment, y, p=None):
-        """Fit the inference model (classifier variant — uses predict_proba)."""
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         self.t_groups = np.unique(treatment[treatment != self.control_name])
@@ -501,14 +503,6 @@ class BaseXClassifier(BaseXLearner):
             p = self._format_p(p, self.t_groups)
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-
-        # Resolve base models from stored constructor args.
-        _control_outcome_learner = self.control_outcome_learner or self.outcome_learner
-        _treatment_outcome_learner = (
-            self.treatment_outcome_learner or self.outcome_learner
-        )
-        _control_effect_learner = self.control_effect_learner or self.effect_learner
-        _treatment_effect_learner = self.treatment_effect_learner or self.effect_learner
 
         self.models_mu_t = {
             group: deepcopy(_treatment_outcome_learner) for group in self.t_groups
