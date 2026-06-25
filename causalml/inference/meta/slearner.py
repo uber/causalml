@@ -36,6 +36,7 @@ class StatsmodelsOLS:
         self.model = sm.OLS(y, X).fit(cov_type=self.cov_type)
         self.coefficients = self.model.params
         self.conf_ints = self.model.conf_int(alpha=self.alpha)
+        return self
 
     def predict(self, X):
         # Append ones. The first column is for the treatment indicator.
@@ -92,6 +93,7 @@ class BaseSLearner(BaseLearner):
             w = (treatment_filt == group).astype(int)
             X_new = np.hstack((w.reshape((-1, 1)), X_filt))
             self.models[group].fit(X_new, y_filt)
+        return self
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True

@@ -156,6 +156,7 @@ class BaseXLearner(BaseLearner):
             d_t = y_treat - self.model_mu_c.predict(X_treat)
             self.models_tau_c[group].fit(X[control_mask], d_c)
             self.models_tau_t[group].fit(X_treat, d_t)
+        return self
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
@@ -543,6 +544,7 @@ class BaseXClassifier(BaseXLearner):
             d_t = y_treat - self.model_mu_c.predict_proba(X_treat)[:, 1]
             self.models_tau_c[group].fit(X[control_mask], d_c)
             self.models_tau_t[group].fit(X_treat, d_t)
+        return self
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True

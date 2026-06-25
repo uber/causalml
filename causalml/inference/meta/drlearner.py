@@ -59,6 +59,9 @@ class BaseDRLearner(BaseLearner):
         self.treatment_effect_learner = treatment_effect_learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        # Sentinel so estimate_ate(pretrain=True) raises a clean ValueError
+        # instead of AttributeError when called before fit().
+        self.propensity = {}
 
     def fit(self, X, treatment, y, p=None, seed=None):
         """Fit the inference model.
@@ -200,6 +203,7 @@ class BaseDRLearner(BaseLearner):
                     - mu_c
                 )
                 self.models_tau[group][ifold].fit(X_filt, dr)
+        return self
 
     def bootstrap(self, X, treatment, y, p=None, size=10000, rng=None, seed=None):
         """Runs a single bootstrap with optional deterministic cross-fit seed."""
@@ -386,6 +390,10 @@ class BaseDRLearner(BaseLearner):
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         if pretrain:
+            if not hasattr(self, "t_groups"):
+                raise ValueError(
+                    "No fitted model found. Call fit() before estimate_ate(pretrain=True)."
+                )
             te, yhat_cs, yhat_ts = self.predict(
                 X, treatment, y, p, return_components=True
             )

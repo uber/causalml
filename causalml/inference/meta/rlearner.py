@@ -166,6 +166,7 @@ class BaseRLearner(BaseLearner):
             self.models_tau[group].fit(
                 X_filt, (y_filt - yhat_filt) / (w - p_filt), sample_weight=weight
             )
+        return self
 
     def predict(self, X, p=None):
         """Predict treatment effects.
@@ -480,6 +481,7 @@ class BaseRClassifier(BaseRLearner):
             self.models_tau[group].fit(
                 X_filt, (y_filt - yhat_filt) / (w - p_filt), sample_weight=weight
             )
+        return self
 
     def predict(self, X, p=None):
         """Predict treatment effects."""
@@ -541,12 +543,15 @@ class XGBRRegressor(BaseRRegressor):
         assert isinstance(random_state, int), "random_state should be int."
 
         # Store verbatim — no transformation, no XGBRegressor construction here.
+        # xgb_kwargs=None is stored as-is; BaseEstimator.get_params surfaces it
+        # correctly since it is a named parameter.  The or {} coalesce happens in
+        # fit() so that clone(XGBRRegressor()) still round-trips None → None.
         self.early_stopping = early_stopping
         self.test_size = test_size
         self.early_stopping_rounds = early_stopping_rounds
         self.effect_learner_objective = effect_learner_objective
         self.effect_learner_n_estimators = effect_learner_n_estimators
-        self.xgb_kwargs = xgb_kwargs if xgb_kwargs is not None else {}
+        self.xgb_kwargs = xgb_kwargs
 
         super().__init__(
             learner=None,
@@ -557,19 +562,6 @@ class XGBRRegressor(BaseRRegressor):
             n_fold=n_fold,
             random_state=random_state,
         )
-
-    def get_params(self, deep=True):
-        """Return parameters, including verbatim ``xgb_kwargs``."""
-        params = super().get_params(deep=deep)
-        params["xgb_kwargs"] = self.xgb_kwargs
-        return params
-
-    def set_params(self, **params):
-        """Set parameters, routing ``xgb_kwargs`` to ``self.xgb_kwargs``."""
-        xgb_kwargs = params.pop("xgb_kwargs", None)
-        if xgb_kwargs is not None:
-            self.xgb_kwargs = xgb_kwargs
-        return super().set_params(**params)
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
         """Fit using early-stopping XGBoost R-learner."""
@@ -598,7 +590,7 @@ class XGBRRegressor(BaseRRegressor):
         # stay correct — the constructor only stores plain, verbatim values.
         # self.xgb_kwargs holds any extra XGBoost params (e.g. max_depth) verbatim.
         objective, metric = get_xgboost_objective_metric(self.effect_learner_objective)
-        xgb_kw = self.xgb_kwargs if self.xgb_kwargs else {}
+        xgb_kw = self.xgb_kwargs or {}
         if self.early_stopping:
             effect_learner = XGBRegressor(
                 objective=objective,
@@ -705,3 +697,4 @@ class XGBRRegressor(BaseRRegressor):
             sample_weight_filt_t = sample_weight_filt[w == 1]
             self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
             self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
+        return self
