@@ -4,7 +4,7 @@ Installation
 
 Installation with ``conda`` or ``pip`` is recommended.  Developers can follow the **Install from source** instructions below.  If building from source, consider doing so within a conda environment and then exporting the environment for reproducibility.
 
-To use models under the ``inference.tf`` or ``inference.torch`` module (e.g. ``DragonNet`` or ``CEVAE``), additional dependency of ``tensorflow`` or ``torch`` is required. For detailed instructions, see below.
+To use models under the ``inference.tf``, ``inference.torch`` or ``inference.jax`` module (e.g. ``DragonNet`` or ``CEVAE``), additional dependency of ``tensorflow``, ``torch`` or ``jax`` is required. For detailed instructions, see below.
 
 System Requirements
 -------------------
@@ -67,6 +67,13 @@ Install ``causalml`` with ``torch`` for ``CEVAE`` from ``PyPI``
 
     pip install causalml[torch]
 
+Install ``causalml`` with ``jax`` for ``DragonNet`` from ``PyPI``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+    pip install causalml[jax]
+
 
 Install using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
 ---------------------
@@ -89,6 +96,13 @@ Install ``causalml`` with ``torch`` for ``CEVAE`` using `uv <https://github.com/
 .. code-block:: bash
 
     uv add "causalml[torch]"
+
+Install ``causalml`` with ``jax`` for ``DragonNet`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: bash
+
+    uv add "causalml[jax]"
     
 
 
@@ -126,6 +140,12 @@ with ``torch`` for ``CEVAE``:
 
     pip install -e ".[torch]"
 
+with ``jax`` for ``DragonNet``:
+
+.. code-block:: bash
+
+    pip install -e ".[jax]"
+
 =======
 
 Windows
@@ -149,7 +169,7 @@ Run all tests with:
 
     pytest -vs tests/ --cov causalml/
 
-Add ``--runtf`` and/or ``--runtorch`` to run optional tensorflow/torch tests which will be skipped by default.
+Add ``--runtf``, ``--runtorch`` and/or ``--runjax`` to run optional tensorflow/torch/jax tests which will be skipped by default.
 
 You can also run tests via make:
 
