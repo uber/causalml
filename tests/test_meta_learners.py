@@ -2,9 +2,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from sklearn.base import clone
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from xgboost import XGBRegressor
 from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestRegressor
@@ -1318,7 +1320,7 @@ def test_multi_treatment_learners():
     Covers: BaseTLearner, BaseXLearner, BaseSLearner, BaseDRLearner, BaseRLearner.
 
     Shared return-type contracts (regression learners below):
-      - ``fit(...)`` → ``None``
+      - ``fit(...)`` → ``self`` (sklearn convention; enables method chaining)
       - ``predict(...)`` → ``np.ndarray`` of shape ``(n_samples, n_treatment_groups)``
       - ``predict(..., return_components=True)`` → ``tuple`` of length 3 ``(te, comp_a, comp_b)``
         (not implemented for R-learner; its ``predict`` only returns CATE).
@@ -1407,8 +1409,9 @@ def test_multi_treatment_learners():
             d[g] is single_obj for g in keys
         ), f"{name}: all {attr} values must be shared refs to the single fitted model"
 
-    def _assert_fit_returns_none(result, name):
-        assert result is None, f"{name}.fit(): expected None, got {type(result)}"
+    def _assert_fit_returns_self(result, learner, name):
+        """fit() must return self (sklearn convention enabling method chaining)."""
+        assert result is learner, f"{name}.fit(): expected self, got {type(result)}"
 
     def _assert_plain_fit_predict(result, name):
         """fit_predict(return_ci=False) must return a single ndarray (CATE), not a tuple."""
@@ -1419,7 +1422,7 @@ def test_multi_treatment_learners():
     # ── T-Learner ─────────────────────────────────────────────────────────────
     name = "BaseTLearner"
     tl = BaseTLearner(learner=LinearRegression())
-    _assert_fit_returns_none(tl.fit(X=X, treatment=treatment, y=y), name)
+    _assert_fit_returns_self(tl.fit(X=X, treatment=treatment, y=y), tl, name)
 
     _assert_fit_attrs(tl, name)
     assert hasattr(tl, "model_c"), f"{name}: missing model_c"
@@ -1467,7 +1470,9 @@ def test_multi_treatment_learners():
     # ── X-Learner ─────────────────────────────────────────────────────────────
     name = "BaseXLearner"
     xl = BaseXLearner(learner=LinearRegression())
-    _assert_fit_returns_none(xl.fit(X=X, treatment=treatment, y=y, p=p_scores), name)
+    _assert_fit_returns_self(
+        xl.fit(X=X, treatment=treatment, y=y, p=p_scores), xl, name
+    )
 
     _assert_fit_attrs(xl, name)
     assert hasattr(xl, "model_mu_c"), f"{name}: missing model_mu_c"
@@ -1527,7 +1532,7 @@ def test_multi_treatment_learners():
     # ── S-Learner ─────────────────────────────────────────────────────────────
     name = "BaseSLearner"
     sl = BaseSLearner(learner=LinearRegression())
-    _assert_fit_returns_none(sl.fit(X=X, treatment=treatment, y=y), name)
+    _assert_fit_returns_self(sl.fit(X=X, treatment=treatment, y=y), sl, name)
 
     _assert_fit_attrs(sl, name)
     assert hasattr(sl, "models") and isinstance(
@@ -1579,7 +1584,7 @@ def test_multi_treatment_learners():
     dr = BaseDRLearner(
         learner=LinearRegression(), treatment_effect_learner=LinearRegression()
     )
-    _assert_fit_returns_none(dr.fit(X=X, treatment=treatment, y=y), name)
+    _assert_fit_returns_self(dr.fit(X=X, treatment=treatment, y=y), dr, name)
 
     _assert_fit_attrs(dr, name)
     # models_mu_c: list of 3 fold models (fold-specific, NOT per-group).
@@ -1635,8 +1640,8 @@ def test_multi_treatment_learners():
         effect_learner=LinearRegression(),
         cv_n_jobs=1,
     )
-    _assert_fit_returns_none(
-        rl.fit(X=X, treatment=treatment, y=y, p=p_scores, verbose=False), name
+    _assert_fit_returns_self(
+        rl.fit(X=X, treatment=treatment, y=y, p=p_scores, verbose=False), rl, name
     )
 
     _assert_fit_attrs(rl, name)
@@ -1724,3 +1729,244 @@ def test_BaseTClassifier_predict_return_ci(generate_classification_data):
     # Test 4: old API unchanged
     tau_plain = learner.predict(X)
     assert tau_plain.shape == (X.shape[0], len(learner.t_groups))
+
+
+# =============================================================================
+# sklearn compliance tests — issue #911
+# =============================================================================
+
+# Fixed-seed data (independent of conftest fixtures so tests are self-contained)
+_RNG = np.random.RandomState(42)
+_N = 400
+_X = _RNG.randn(_N, 5)
+_TREATMENT = _RNG.choice([0, 1], _N)
+_Y_CONT = _X[:, 0] + _TREATMENT * 0.5 + _RNG.randn(_N) * 0.1
+_Y_BIN = (_Y_CONT > 0).astype(int)
+_DT_REG = DecisionTreeRegressor(random_state=0, max_depth=3)
+_DT_CLF = DecisionTreeClassifier(random_state=0, max_depth=3)
+
+
+def _sklearn_fit(learner, y=None):
+    """Fit with the right outcome type; returns whatever fit() returns."""
+    if y is None:
+        y = _Y_BIN if "Classifier" in type(learner).__name__ else _Y_CONT
+    return learner.fit(_X, _TREATMENT, y)
+
+
+def _sklearn_predict(learner, **kw):
+    """Call predict(), omitting verbose for R-learners which don't accept it."""
+    from causalml.inference.meta.rlearner import BaseRLearner
+
+    if isinstance(learner, BaseRLearner):
+        return learner.predict(_X, **kw)
+    return learner.predict(_X, verbose=False, **kw)
+
+
+def _params_repr_equal(p1, p2):
+    """Compare get_params() dicts via repr() — safe for numpy arrays and estimators."""
+    if p1.keys() != p2.keys():
+        return False
+    return all(repr(p1[k]) == repr(p2[k]) for k in p1)
+
+
+_REGRESSOR_CONFIGS = [
+    (BaseSRegressor, {"learner": _DT_REG}),
+    (BaseTRegressor, {"learner": _DT_REG}),
+    (BaseXRegressor, {"learner": _DT_REG}),
+    (BaseDRRegressor, {"learner": _DT_REG}),
+    (BaseRRegressor, {"learner": _DT_REG}),
+]
+
+_CLASSIFIER_CONFIGS = [
+    (BaseSClassifier, {"learner": _DT_CLF}),
+    (BaseTClassifier, {"learner": _DT_CLF}),
+    (BaseXClassifier, {"outcome_learner": _DT_CLF, "effect_learner": _DT_REG}),
+]
+
+
+@pytest.mark.parametrize("Cls,kwargs", _REGRESSOR_CONFIGS)
+def test_clone_get_params_regressor(Cls, kwargs):
+    """clone() / get_params() round-trip — all regressors."""
+    m = Cls(**kwargs)
+    params = m.get_params()
+    assert isinstance(params, dict)
+    m2 = clone(m)
+    assert type(m2) is type(m)
+    assert _params_repr_equal(
+        m2.get_params(), params
+    ), f"{Cls.__name__}: clone params mismatch"
+    assert not hasattr(m2, "t_groups"), "clone() must return an unfitted estimator"
+
+
+@pytest.mark.parametrize("Cls,kwargs", _CLASSIFIER_CONFIGS)
+def test_clone_get_params_classifier(Cls, kwargs):
+    """clone() / get_params() round-trip — all classifiers (botched-merge check)."""
+    m = Cls(**kwargs)
+    params = m.get_params()
+    assert isinstance(params, dict)
+    m2 = clone(m)
+    assert type(m2) is type(m)
+    assert _params_repr_equal(m2.get_params(), params)
+    assert not hasattr(m2, "t_groups")
+
+
+@pytest.mark.parametrize("Cls,kwargs", _REGRESSOR_CONFIGS)
+def test_fit_returns_self_regressor(Cls, kwargs):
+    """fit() returns self for all regressors (Pipeline / GridSearchCV requirement)."""
+    m = Cls(**kwargs)
+    assert _sklearn_fit(m) is m, f"{Cls.__name__}.fit() must return self"
+
+
+@pytest.mark.parametrize("Cls,kwargs", _CLASSIFIER_CONFIGS)
+def test_fit_returns_self_classifier(Cls, kwargs):
+    """fit() returns self for all classifiers."""
+    m = Cls(**kwargs)
+    assert _sklearn_fit(m) is m, f"{Cls.__name__}.fit() must return self"
+
+
+def test_xgb_rregressor_clone_no_kwargs():
+    """XGBRRegressor() (no extra kwargs) clones cleanly; xgb_kwargs stored verbatim."""
+    r = XGBRRegressor()
+    params = r.get_params()
+    assert "xgb_kwargs" in params and params["xgb_kwargs"] is None
+    r2 = clone(r)
+    assert r2.xgb_kwargs is None
+    assert _params_repr_equal(r2.get_params(), r.get_params())
+
+
+def test_xgb_rregressor_clone_with_kwargs():
+    """XGBRRegressor(xgb_kwargs={...}) round-trips through clone / get_params."""
+    r = XGBRRegressor(xgb_kwargs={"max_depth": 3, "learning_rate": 0.05})
+    assert r.get_params()["xgb_kwargs"] == {"max_depth": 3, "learning_rate": 0.05}
+    r2 = clone(r)
+    assert r2.xgb_kwargs == {"max_depth": 3, "learning_rate": 0.05}
+    assert _params_repr_equal(r2.get_params(), r.get_params())
+
+
+def test_xgb_rregressor_fit_predict_return_ci():
+    """XGBRRegressor.fit_predict(return_ci=True) exercises clone(self) in bootstrap.
+
+    Before the BaseEstimator refactor, clone(self, safe=False) silently deepcopied
+    a fitted model on every bootstrap iteration.
+    """
+    r = XGBRRegressor(effect_learner_n_estimators=20, random_state=0)
+    te, lo, hi = r.fit_predict(
+        _X, _TREATMENT, _Y_CONT, return_ci=True, n_bootstraps=5, bootstrap_size=200
+    )
+    assert te.shape == lo.shape == hi.shape == (_N, 1)
+    assert np.all(lo <= hi), "CI lower bound must be <= upper bound"
+
+
+@pytest.mark.parametrize(
+    "Cls,kwargs",
+    [
+        (BaseSRegressor, {"learner": _DT_REG}),
+        (BaseTRegressor, {"learner": _DT_REG}),
+        (BaseXRegressor, {"learner": _DT_REG}),
+    ],
+)
+def test_bit_identical_predict(Cls, kwargs):
+    """Two independently fitted clones produce identical predictions (deterministic learners)."""
+    m1 = Cls(**kwargs)
+    _sklearn_fit(m1)
+    te1 = _sklearn_predict(m1)
+    m2 = clone(m1)
+    _sklearn_fit(m2)
+    te2 = _sklearn_predict(m2)
+    np.testing.assert_array_equal(
+        te1,
+        te2,
+        err_msg=f"{Cls.__name__}: predict not bit-identical across clone+refit",
+    )
+
+
+@pytest.mark.parametrize(
+    "Cls,kwargs",
+    [(BaseDRRegressor, {"learner": _DT_REG}), (BaseRRegressor, {"learner": _DT_REG})],
+)
+def test_finite_predict_stochastic(Cls, kwargs):
+    """DR and R learners (internal shuffle-splits) produce finite predictions."""
+    m1 = Cls(**kwargs)
+    _sklearn_fit(m1)
+    te1 = _sklearn_predict(m1)
+    m2 = clone(m1)
+    _sklearn_fit(m2)
+    te2 = _sklearn_predict(m2)
+    assert te1.shape == te2.shape
+    assert np.isfinite(te1).all() and np.isfinite(te2).all()
+
+
+def test_bit_identical_estimate_ate_s():
+    """S-learner estimate_ate() CI triple is bit-identical across clone+refit."""
+    m1 = BaseSRegressor(learner=_DT_REG)
+    ate1, lb1, ub1 = m1.estimate_ate(_X, _TREATMENT, _Y_CONT, return_ci=True)
+    m2 = clone(m1)
+    ate2, lb2, ub2 = m2.estimate_ate(_X, _TREATMENT, _Y_CONT, return_ci=True)
+    np.testing.assert_array_equal(ate1, ate2)
+    np.testing.assert_array_equal(lb1, lb2)
+    np.testing.assert_array_equal(ub1, ub2)
+
+
+def test_t_regressor_return_ci_bit_identical():
+    """TLearner stored bootstrap ensemble is reproducible with fixed random_state."""
+    kw = dict(store_bootstraps=True, n_bootstraps=10, random_state=7)
+    m1 = BaseTRegressor(learner=_DT_REG)
+    m1.fit(_X, _TREATMENT, _Y_CONT, **kw)
+    te1, lo1, hi1 = m1.predict(_X, return_ci=True, verbose=False)
+    m2 = BaseTRegressor(learner=_DT_REG)
+    m2.fit(_X, _TREATMENT, _Y_CONT, **kw)
+    te2, lo2, hi2 = m2.predict(_X, return_ci=True, verbose=False)
+    np.testing.assert_array_equal(te1, te2)
+    np.testing.assert_array_equal(lo1, lo2)
+    np.testing.assert_array_equal(hi1, hi2)
+
+
+def test_t_classifier_clone_fit_predict():
+    """BaseTClassifier clone round-trip and fit/predict smoke test."""
+    m = BaseTClassifier(learner=_DT_CLF)
+    m2 = clone(m)
+    assert _params_repr_equal(m2.get_params(), m.get_params())
+    _sklearn_fit(m2)
+    assert _sklearn_predict(m2).shape == (_N, 1)
+
+
+def test_x_classifier_verbatim_store_clone():
+    """BaseXClassifier stores outcome/effect learner verbatim (not pre-resolved)."""
+    m = BaseXClassifier(outcome_learner=_DT_CLF, effect_learner=_DT_REG)
+    params = m.get_params()
+    assert params["outcome_learner"] is _DT_CLF
+    assert params["control_outcome_learner"] is None  # verbatim, not resolved
+    m2 = clone(m)
+    assert type(m2.outcome_learner) is type(_DT_CLF)
+    assert m2.outcome_learner is not _DT_CLF  # cloned copy
+    assert m2.control_outcome_learner is None
+    _sklearn_fit(m2)
+    assert _sklearn_predict(m2).shape == (_N, 1)
+
+
+def test_t_classifier_fail_fast_return_ci_and_components():
+    """BaseTClassifier.predict raises before any computation when both flags set."""
+    m = BaseTClassifier(learner=_DT_CLF)
+    _sklearn_fit(m)
+    with pytest.raises(ValueError, match="cannot both be True"):
+        m.predict(_X, return_ci=True, return_components=True, verbose=False)
+
+
+def test_x_learner_pretrain_before_fit_raises():
+    """BaseXRegressor.estimate_ate(pretrain=True) before fit() raises ValueError."""
+    with pytest.raises(ValueError):
+        BaseXRegressor(learner=_DT_REG).estimate_ate(
+            _X, _TREATMENT, _Y_CONT, pretrain=True
+        )
+
+
+def test_dr_learner_pretrain_before_fit_raises():
+    """BaseDRRegressor.estimate_ate(pretrain=True) before fit() raises ValueError.
+
+    self.propensity = {} sentinel in __init__ (consistent with BaseXLearner) ensures
+    a clean ValueError rather than an AttributeError on missing t_groups.
+    """
+    with pytest.raises(ValueError):
+        BaseDRRegressor(learner=_DT_REG).estimate_ate(
+            _X, _TREATMENT, _Y_CONT, pretrain=True
+        )
