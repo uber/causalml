@@ -92,7 +92,6 @@ class BaseRLearner(BaseLearner):
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
 
-        X = collect_if_lazy(X)
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series): a treatment vector
             y (np.array or pd.Series): an outcome vector
@@ -100,6 +99,7 @@ class BaseRLearner(BaseLearner):
             sample_weight (np.array or pd.Series, optional): sample weights for `effect_learner`.
             verbose (bool, optional): whether to output progress logs
         """
+        X = collect_if_lazy(X)
         if (self.learner is None) and (
             (self.outcome_learner is None) or (self.effect_learner is None)
         ):
@@ -121,9 +121,6 @@ class BaseRLearner(BaseLearner):
             sample_weight = to_numpy(sample_weight)
 
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
-        sample_weight = convert_pd_to_np(sample_weight)
-
-        self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
 
         if p is None:
@@ -175,12 +172,7 @@ class BaseRLearner(BaseLearner):
             diff_t = y_filt[w == 1] - yhat_filt[w == 1]
             if sample_weight is not None:
                 sample_weight_filt = sample_weight[mask]
-                self.vars_c[group] = get_weighted_variance(
-                    diff_c, sample_weight_filt[w == 0]
-                )
-                self.vars_t[group] = get_weighted_variance(
-                    diff_t, sample_weight_filt[w == 1]
-                )
+
                 sample_weight_filt_c = sample_weight_filt[w == 0]
                 sample_weight_filt_t = sample_weight_filt[w == 1]
                 self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
@@ -333,19 +325,17 @@ class BaseRLearner(BaseLearner):
         if pretrain:
             te = self.predict(X, p)
         else:
-            if (
-                treatment_np is None
-                or not len(treatment_np)
-                or y_np is None
-                or not len(y_np)
-            ):
-                if not len(treatment) or not len(y):
-                    raise ValueError(
-                        "treatment and y must be provided when pretrain=False"
-                    )
-                te = self.fit_predict(
-                    X, treatment, y, p, sample_weight, return_ci=False
-                )
+            if treatment is None or y is None:
+                raise ValueError("treatment and y must be provided when pretrain=False")
+
+            te = self.fit_predict(
+                X,
+                treatment,
+                y,
+                p,
+                sample_weight,
+                return_ci=False,
+            )
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -577,9 +567,6 @@ class BaseRClassifier(BaseRLearner):
         """
         X = collect_if_lazy(X)
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
-        """Predict treatment effects."""
-        X = convert_pd_to_np(X)
-        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
         for i, group in enumerate(self.t_groups):
             te[:, i] = self.models_tau[group].predict(X)
         return te
