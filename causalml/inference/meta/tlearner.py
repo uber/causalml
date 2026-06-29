@@ -21,6 +21,7 @@ from causalml.inference.meta.utils import (
     filter_mask,
     n_rows,
     to_numpy,
+    convert_pd_to_np,
 )
 from causalml.metrics import regression_metrics, classification_metrics
 
@@ -115,9 +116,7 @@ class BaseTLearner(BaseLearner):
         # model_c is trained on the control group, which is identical for every
         # treatment group, so fit it once. Deepcopy from the unfitted template so
         # re-calling fit() always starts from a clean state.
-        control_mask = treatment_np == self.control_name
-        self.model_c = deepcopy(self._model_c_template)
-        self.model_c.fit(filter_mask(X, control_mask), y_np[control_mask])
+
         # Resolve base models from stored constructor args (no templates needed).
         _control_learner = (
             self.control_learner

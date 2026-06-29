@@ -16,6 +16,7 @@ from causalml.inference.meta.utils import (
     filter_index,
     n_rows,
     to_numpy,
+    convert_pd_to_np,
 )
 from causalml.metrics import regression_metrics, classification_metrics
 from causalml.propensity import compute_propensity_score

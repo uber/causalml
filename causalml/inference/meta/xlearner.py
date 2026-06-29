@@ -11,6 +11,7 @@ from causalml.inference.meta.utils import (
     filter_mask,
     n_rows,
     to_numpy,
+    convert_pd_to_np,
 )
 from causalml.metrics import regression_metrics, classification_metrics
 
@@ -209,10 +210,6 @@ class BaseXLearner(BaseLearner):
             d_t = y_filt_np[w == 1] - self.model_mu_c.predict(X_filt_t)
             self.models_tau_c[group].fit(X_filt_c, d_c)
             self.models_tau_t[group].fit(X_filt_t, d_t)
-            d_c = self.models_mu_t[group].predict(X[control_mask]) - y[control_mask]
-            d_t = y_treat - self.model_mu_c.predict(X_treat)
-            self.models_tau_c[group].fit(X[control_mask], d_c)
-            self.models_tau_t[group].fit(X_treat, d_t)
         return self
 
     def predict(
@@ -551,23 +548,6 @@ class BaseXClassifier(BaseXLearner):
         self.propensity = {}
 
     def fit(self, X, treatment, y, p=None):
-        """Fit the inference model (classifier variant — uses predict_proba)."""
-        # Resolve and validate here (not in __init__) — sklearn convention.
-        _control_outcome_learner = self.control_outcome_learner or self.outcome_learner
-        _treatment_outcome_learner = (
-            self.treatment_outcome_learner or self.outcome_learner
-        )
-        _control_effect_learner = self.control_effect_learner or self.effect_learner
-        _treatment_effect_learner = self.treatment_effect_learner or self.effect_learner
-
-        if (
-            _control_outcome_learner is None or _treatment_outcome_learner is None
-        ) and (_control_effect_learner is None or _treatment_effect_learner is None):
-            raise ValueError(
-                "Either the outcome learner or the effect learner pair must be specified."
-            )
-
-    def fit(self, X, treatment, y, p=None):
         """Fit the inference model.
 
         Args:
@@ -581,6 +561,39 @@ class BaseXClassifier(BaseXLearner):
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
         """
         X = collect_if_lazy(X)
+        if (self.outcome_learner is None) and (
+            (self.control_outcome_learner is None)
+            or (self.treatment_outcome_learner is None)
+            or (self.control_effect_learner is None)
+            or (self.treatment_effect_learner is None)
+        ):
+            raise ValueError(
+                "Either `outcome_learner` and `effect_learner`, or all four specialized learners must be specified."
+            )
+
+        _control_outcome_learner = (
+            deepcopy(self.outcome_learner)
+            if self.control_outcome_learner is None
+            else deepcopy(self.control_outcome_learner)
+        )
+
+        _treatment_outcome_learner = (
+            deepcopy(self.outcome_learner)
+            if self.treatment_outcome_learner is None
+            else deepcopy(self.treatment_outcome_learner)
+        )
+
+        _control_effect_learner = (
+            deepcopy(self.effect_learner)
+            if self.control_effect_learner is None
+            else deepcopy(self.control_effect_learner)
+        )
+
+        _treatment_effect_learner = (
+            deepcopy(self.effect_learner)
+            if self.treatment_effect_learner is None
+            else deepcopy(self.treatment_effect_learner)
+        )
         X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
@@ -607,15 +620,6 @@ class BaseXClassifier(BaseXLearner):
         self.vars_t = {}
 
         # model_mu_c is trained on control only (identical across groups) — fit once.
-        control_mask = treatment_np == self.control_name
-        X_control = filter_mask(X, control_mask)
-        y_control = filter_mask(y, control_mask)
-        self.model_mu_c = deepcopy(self.model_mu_c)
-        self.model_mu_c.fit(X_control, y_control)
-        self.models_mu_c = {group: self.model_mu_c for group in self.t_groups}
-        self.var_c = (
-            to_numpy(y_control) - self.model_mu_c.predict_proba(X_control)[:, 1]
-        ).var()
         control_mask = treatment == self.control_name
         self.model_mu_c = deepcopy(_control_outcome_learner)
         self.model_mu_c.fit(X[control_mask], y[control_mask])
@@ -656,9 +660,7 @@ class BaseXClassifier(BaseXLearner):
             )
             self.models_tau_c[group].fit(X_filt_c, d_c)
             self.models_tau_t[group].fit(X_filt_t, d_t)
-            d_t = y_treat - self.model_mu_c.predict_proba(X_treat)[:, 1]
-            self.models_tau_c[group].fit(X[control_mask], d_c)
-            self.models_tau_t[group].fit(X_treat, d_t)
+
         return self
 
     def predict(

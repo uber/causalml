@@ -15,6 +15,7 @@ from causalml.inference.meta.utils import (
     to_numpy,
     get_xgboost_objective_metric,
     get_weighted_variance,
+    convert_pd_to_np,
 )
 from causalml.propensity import ElasticNetPropensityModel
 
