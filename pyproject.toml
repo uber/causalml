@@ -57,6 +57,12 @@ torch = [
     "torch",
     "pyro-ppl"
 ]
+jax = [
+    "jax>=0.4.1",
+    "flax>=0.11.0",
+    "optax>=0.1.4",
+    "orbax-checkpoint>=0.10.0",
+]
 
 [build-system]
 requires = [

@@ -46,6 +46,7 @@ class StatsmodelsOLS:
         self.model = sm.OLS(y, X).fit(cov_type=self.cov_type)
         self.coefficients = self.model.params
         self.conf_ints = self.model.conf_int(alpha=self.alpha)
+        return self
 
     def predict(self, X):
         # Append ones. The first column is for the treatment indicator.
@@ -66,18 +67,17 @@ class BaseSLearner(BaseLearner):
 
         Args:
             learner (optional): a model to estimate the treatment effect
+            learner (optional): a model to estimate the treatment effect.
+                If None, a DummyRegressor is used.  The argument is stored
+                verbatim so that ``get_params`` / ``clone`` work correctly
+                (scikit-learn convention).
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        if learner is not None:
-            self.model = learner
-        else:
-            self.model = DummyRegressor()
+        # Store verbatim — no deepcopy, no logic (scikit-learn convention).
+        self.learner = learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
-
-    def __repr__(self):
-        return "{}(model={})".format(self.__class__.__name__, self.model.__repr__())
 
     def fit(self, X, treatment, y, p=None):
         """Fit the inference model.
@@ -95,7 +95,10 @@ class BaseSLearner(BaseLearner):
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-        self.models = {group: deepcopy(self.model) for group in self.t_groups}
+
+        # Resolve the base model here (not in __init__) so clone() works cleanly.
+        _base_model = self.learner if self.learner is not None else DummyRegressor()
+        self.models = {group: deepcopy(_base_model) for group in self.t_groups}
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -106,6 +109,7 @@ class BaseSLearner(BaseLearner):
             w = (to_numpy(treatment_filt) == group).astype(int)
             X_new = concat_treatment_col(w, X_filt)
             self.models[group].fit(X_new, y_filt)
+        return self
 
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True

@@ -73,22 +73,21 @@ class BaseDRLearner(BaseLearner):
             else treatment_effect_learner
         )
 
+        Note: arguments are stored verbatim (scikit-learn convention) so that
+        ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
+        Per the scikit-learn convention, ``__init__`` does not validate or raise —
+        validation happens in ``fit()``.
+        """
+        # Store verbatim — no deepcopy, no logic (scikit-learn convention).
+        self.learner = learner
+        self.control_outcome_learner = control_outcome_learner
+        self.treatment_outcome_learner = treatment_outcome_learner
+        self.treatment_effect_learner = treatment_effect_learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
-
-        self.propensity = None
-
-    def __repr__(self):
-        return (
-            "{}(control_outcome_learner={},\n"
-            "\ttreatment_outcome_learner={},\n"
-            "\ttreatment_effect_learner={})".format(
-                self.__class__.__name__,
-                self.model_mu_c.__repr__(),
-                self.model_mu_t.__repr__(),
-                self.model_tau.__repr__(),
-            )
-        )
+        # Sentinel so estimate_ate(pretrain=True) raises a clean ValueError
+        # instead of AttributeError when called before fit().
+        self.propensity = {}
 
     def fit(self, X, treatment, y, p=None, seed=None):
         """Fit the inference model.
@@ -106,6 +105,23 @@ class BaseDRLearner(BaseLearner):
             seed (int): random seed for cross-fitting
         """
         X = collect_if_lazy(X)
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): propensity scores
+            seed (int): random seed for cross-fitting
+        """
+        if (self.learner is None) and (
+            (self.control_outcome_learner is None)
+            or (self.treatment_outcome_learner is None)
+            or (self.treatment_effect_learner is None)
+        ):
+            raise ValueError(
+                "Either `learner` or all three of `control_outcome_learner`, "
+                "`treatment_outcome_learner`, and `treatment_effect_learner` "
+                "must be specified."
+            )
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
@@ -114,6 +130,23 @@ class BaseDRLearner(BaseLearner):
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
+        # Resolve base models from stored constructor args (scikit-learn convention).
+        _control_outcome_learner = (
+            self.control_outcome_learner
+            if self.control_outcome_learner is not None
+            else deepcopy(self.learner)
+        )
+        _treatment_outcome_learner = (
+            self.treatment_outcome_learner
+            if self.treatment_outcome_learner is not None
+            else deepcopy(self.learner)
+        )
+        _treatment_effect_learner = (
+            self.treatment_effect_learner
+            if self.treatment_effect_learner is not None
+            else deepcopy(self.learner)
+        )
+
         # The estimator splits the data into 3 partitions for cross-fit on the propensity score estimation,
         # the outcome regression, and the treatment regression on the doubly robust estimates. The use of
         # the partitions is rotated so we do not lose on the sample size.
@@ -121,23 +154,23 @@ class BaseDRLearner(BaseLearner):
         split_indices = [index for _, index in cv.split(y_np)]
 
         self.models_mu_c = [
-            deepcopy(self.model_mu_c),
-            deepcopy(self.model_mu_c),
-            deepcopy(self.model_mu_c),
+            deepcopy(_control_outcome_learner),
+            deepcopy(_control_outcome_learner),
+            deepcopy(_control_outcome_learner),
         ]
         self.models_mu_t = {
             group: [
-                deepcopy(self.model_mu_t),
-                deepcopy(self.model_mu_t),
-                deepcopy(self.model_mu_t),
+                deepcopy(_treatment_outcome_learner),
+                deepcopy(_treatment_outcome_learner),
+                deepcopy(_treatment_outcome_learner),
             ]
             for group in self.t_groups
         }
         self.models_tau = {
             group: [
-                deepcopy(self.model_tau),
-                deepcopy(self.model_tau),
-                deepcopy(self.model_tau),
+                deepcopy(_treatment_effect_learner),
+                deepcopy(_treatment_effect_learner),
+                deepcopy(_treatment_effect_learner),
             ]
             for group in self.t_groups
         }
@@ -218,6 +251,7 @@ class BaseDRLearner(BaseLearner):
                     - mu_c
                 )
                 self.models_tau[group][ifold].fit(X_filt, dr)
+        return self
 
     def bootstrap(self, X, treatment, y, p=None, size=10000, rng=None, seed=None):
         """Runs a single bootstrap with optional deterministic cross-fit seed.
@@ -274,9 +308,7 @@ class BaseDRLearner(BaseLearner):
 
         yhat_ts = {}
 
-        # models_mu_c is fold-specific but not group-specific; predict once and reuse.
         yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
-        # Shared-reference dict preserves the public yhat_cs[group] API cheaply.
         yhat_cs = {group: yhat_c for group in self.t_groups}
 
         for i, group in enumerate(self.t_groups):
@@ -328,6 +360,13 @@ class BaseDRLearner(BaseLearner):
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+        """Fit the DR-learner and predict treatment effects.
+
+        Args:
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): propensity scores
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -335,9 +374,7 @@ class BaseDRLearner(BaseLearner):
             verbose (str): whether to output progress logs
             seed (int): random seed for cross-fitting
         Returns:
-            (numpy.ndarray): Predictions of treatment effects. Output dim: [n_samples, n_treatment]
-                If return_ci, returns CATE [n_samples, n_treatment], LB [n_samples, n_treatment],
-                UB [n_samples, n_treatment]
+            (numpy.ndarray): Predictions of treatment effects.
         """
         X = collect_if_lazy(X)
         self.fit(X, treatment, y, p, seed)
@@ -369,7 +406,6 @@ class BaseDRLearner(BaseLearner):
             te_bootstraps = np.zeros(
                 shape=(n_rows(X), self.t_groups.shape[0], n_bootstraps)
             )
-            # seed controls both bootstrap resampling and cross-fit randomness.
             rng = np.random.default_rng(seed) if seed is not None else None
 
             logger.info("Bootstrap Confidence Intervals")
@@ -395,7 +431,6 @@ class BaseDRLearner(BaseLearner):
                 te_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=2
             )
 
-            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.models_mu_c = deepcopy(models_mu_c_global)
@@ -425,6 +460,10 @@ class BaseDRLearner(BaseLearner):
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+            X (np.matrix or np.array or pd.Dataframe): a feature matrix
+            treatment (np.array or pd.Series): a treatment vector
+            y (np.array or pd.Series): an outcome vector
+            p (np.ndarray or pd.Series or dict, optional): propensity scores
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -436,6 +475,10 @@ class BaseDRLearner(BaseLearner):
         X = collect_if_lazy(X)
 
         if pretrain:
+            if not hasattr(self, "t_groups"):
+                raise ValueError(
+                    "No fitted model found. Call fit() before estimate_ate(pretrain=True)."
+                )
             te, yhat_cs, yhat_ts = self.predict(
                 X, treatment, y, p, return_components=True
             )
@@ -472,8 +515,6 @@ class BaseDRLearner(BaseLearner):
             yhat_t = yhat_ts[group][mask]
             y_filt = y_np[mask]
 
-            # SE formula is based on the lower bound formula (7) from Imbens, Guido W., and Jeffrey M. Wooldridge. 2009.
-            # "Recent Developments in the Econometrics of Program Evaluation." Journal of Economic Literature
             se = np.sqrt(
                 (
                     (y_filt[w == 0] - yhat_c[w == 0]).var() / (1 - prob_treatment)
@@ -501,7 +542,6 @@ class BaseDRLearner(BaseLearner):
 
             logger.info("Bootstrap Confidence Intervals for ATE")
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
-            # seed controls both bootstrap resampling and cross-fit randomness.
             rng = np.random.default_rng(seed) if seed is not None else None
 
             for n in tqdm(range(n_bootstraps)):
@@ -528,7 +568,6 @@ class BaseDRLearner(BaseLearner):
                 ate_bootstraps, (1 - self.ate_alpha / 2) * 100, axis=1
             )
 
-            # set member variables back to global (currently last bootstrapped outcome)
             self.t_groups = t_groups_global
             self._classes = _classes_global
             self.models_mu_c = deepcopy(models_mu_c_global)
@@ -549,17 +588,6 @@ class BaseDRRegressor(BaseDRLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
-        """Initialize an DR-learner regressor.
-
-        Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
-                groups
-            control_outcome_learner (optional): a model to estimate outcomes in the control group
-            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group
-            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
-            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
-            control_name (str or int, optional): name of control group
-        """
         super().__init__(
             learner=learner,
             control_outcome_learner=control_outcome_learner,
@@ -582,20 +610,6 @@ class BaseDRClassifier(BaseDRLearner):
         ate_alpha=0.05,
         control_name=0,
     ):
-        """Initialize a DR-learner classifier.
-
-        Args:
-            learner (optional): a model to estimate outcomes and treatment effects in both the control and treatment
-                groups. Should have a predict_proba() method for outcome models.
-            control_outcome_learner (optional): a model to estimate outcomes in the control group.
-                Should have a predict_proba() method.
-            treatment_outcome_learner (optional): a model to estimate outcomes in the treatment group.
-                Should have a predict_proba() method.
-            treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group.
-                Should be a regressor.
-            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
-            control_name (str or int, optional): name of control group
-        """
         super().__init__(
             learner=learner,
             control_outcome_learner=control_outcome_learner,
@@ -633,10 +647,11 @@ class BaseDRClassifier(BaseDRLearner):
 
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         yhat_cs = {}
+        """Predict treatment effects (classifier variant — uses predict_proba for outcomes)."""
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
 
         yhat_ts = {}
 
-        # models_mu_c is fold-specific but not group-specific; predict once and reuse.
         yhat_c = np.r_[
             [model.predict_proba(X)[:, 1] for model in self.models_mu_c]
         ].mean(axis=0)

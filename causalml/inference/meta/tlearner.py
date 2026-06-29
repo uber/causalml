@@ -1,4 +1,3 @@
-import copy
 from copy import deepcopy
 import logging
 import numpy as np
@@ -52,44 +51,18 @@ class BaseTLearner(BaseLearner):
             treatment_learner (model, optional): a model to estimate treatment outcomes
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
+
+        Note: arguments are stored verbatim (scikit-learn convention) so that
+        ``get_params`` / ``clone`` work correctly. Model construction is deferred
+        to ``fit()``. Per the scikit-learn convention, ``__init__`` does not
+        validate or raise — validation happens in ``fit()``.
         """
-        assert (learner is not None) or (
-            (control_learner is not None) and (treatment_learner is not None)
-        )
-
-        if control_learner is None:
-            self.model_c = deepcopy(learner)
-        else:
-            self.model_c = control_learner
-
-        # Preserve the unfitted template so repeated fit() calls always start fresh.
-        self._model_c_template = self.model_c
-
-        if treatment_learner is None:
-            self.model_t = deepcopy(learner)
-        else:
-            self.model_t = treatment_learner
-
-        # Preserve the unfitted template so repeated fit() calls always start fresh.
-        self._model_t_template = self.model_t
-
+        # Store verbatim — no deepcopy, no logic (scikit-learn convention).
+        self.learner = learner
+        self.control_learner = control_learner
+        self.treatment_learner = treatment_learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
-        self.bootstrap_models_ = None
-
-    def __repr__(self):
-        return "{}(model_c={}, model_t={})".format(
-            self.__class__.__name__, self.model_c.__repr__(), self.model_t.__repr__()
-        )
-
-    def _unfitted_clone(self):
-        template = copy.copy(self)
-        for attr in ("models_c", "models_t", "bootstrap_models_"):
-            if hasattr(template, attr):
-                delattr(template, attr)
-        template.model_c = self._model_c_template
-        template.model_t = self._model_t_template
-        return template
 
     @ignore_warnings(category=ConvergenceWarning)
     def fit(
@@ -123,6 +96,14 @@ class BaseTLearner(BaseLearner):
             random_state (int, optional): random seed for reproducible bootstrap sampling.
         """
         X = collect_if_lazy(X)
+        if (self.learner is None) and (
+            (self.control_learner is None) or (self.treatment_learner is None)
+        ):
+            raise ValueError(
+                "Either `learner` or both `control_learner` and `treatment_learner` "
+                "must be specified."
+            )
+        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
@@ -130,7 +111,6 @@ class BaseTLearner(BaseLearner):
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-        self.models_t = {group: deepcopy(self.model_t) for group in self.t_groups}
 
         # model_c is trained on the control group, which is identical for every
         # treatment group, so fit it once. Deepcopy from the unfitted template so
@@ -138,6 +118,24 @@ class BaseTLearner(BaseLearner):
         control_mask = treatment_np == self.control_name
         self.model_c = deepcopy(self._model_c_template)
         self.model_c.fit(filter_mask(X, control_mask), y_np[control_mask])
+        # Resolve base models from stored constructor args (no templates needed).
+        _control_learner = (
+            self.control_learner
+            if self.control_learner is not None
+            else deepcopy(self.learner)
+        )
+        _treatment_learner = (
+            self.treatment_learner
+            if self.treatment_learner is not None
+            else deepcopy(self.learner)
+        )
+
+        self.models_t = {group: deepcopy(_treatment_learner) for group in self.t_groups}
+
+        # model_c is trained on the control group, identical for every treatment group.
+        control_mask = treatment == self.control_name
+        self.model_c = deepcopy(_control_learner)
+        self.model_c.fit(X[control_mask], y[control_mask])
         # Expose as a shared-reference dict to preserve the public models_c API.
         self.models_c = {group: self.model_c for group in self.t_groups}
 
@@ -159,6 +157,7 @@ class BaseTLearner(BaseLearner):
             )
         else:
             self.bootstrap_models_ = None
+        return self
 
     def _compute_bootstrap_ci(self, X):
         """Compute bootstrap CI using stored ensemble.
@@ -203,6 +202,9 @@ class BaseTLearner(BaseLearner):
             return_ci (bool, optional): whether to return confidence intervals using
                 the stored bootstrap ensemble. Requires fit() to have been called
                 with store_bootstraps=True.
+            return_ci (bool, optional): whether to return confidence intervals
+                using the stored bootstrap ensemble. Requires fit() to have been
+                called with store_bootstraps=True.
         Returns:
             (numpy.ndarray): Predictions of treatment effects. If return_ci=True,
                 returns (te, te_lower, te_upper) each of shape [n_samples, n_treatment].
@@ -494,6 +496,8 @@ class BaseTClassifier(BaseTLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        # Fail-fast: validate mutually exclusive flags before doing any work.
+        # Consistent with BaseTLearner.predict which checks at the top.
         if return_ci and return_components:
             raise ValueError("return_ci and return_components cannot both be True.")
 

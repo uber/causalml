@@ -15,6 +15,7 @@ Follow the below links for an approximate ordering of example tutorials from int
     examples/feature_interpretations_example
     examples/validation_with_tmle
     examples/dragonnet_example
+    examples/dragonnet_jax_vs_tf
     examples/iv_nlsym_synthetic_data
     examples/sensitivity_example_with_synthetic_data
     examples/counterfactual_unit_selection
