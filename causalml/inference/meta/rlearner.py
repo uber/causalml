@@ -90,7 +90,7 @@ class BaseRLearner(BaseLearner):
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
-        """
+
         X = collect_if_lazy(X)
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
             treatment (np.array or pd.Series): a treatment vector
@@ -120,7 +120,7 @@ class BaseRLearner(BaseLearner):
             sample_weight = to_numpy(sample_weight)
 
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
-            sample_weight = convert_pd_to_np(sample_weight)
+        sample_weight = convert_pd_to_np(sample_weight)
 
         self.t_groups = np.unique(treatment[treatment != self.control_name])
         self.t_groups.sort()
@@ -338,9 +338,13 @@ class BaseRLearner(BaseLearner):
                 or y_np is None
                 or not len(y_np)
             ):
-            if not len(treatment) or not len(y):
-                raise ValueError("treatment and y must be provided when pretrain=False")
-            te = self.fit_predict(X, treatment, y, p, sample_weight, return_ci=False)
+                if not len(treatment) or not len(y):
+                    raise ValueError(
+                        "treatment and y must be provided when pretrain=False"
+                    )
+                te = self.fit_predict(
+                    X, treatment, y, p, sample_weight, return_ci=False
+                )
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])

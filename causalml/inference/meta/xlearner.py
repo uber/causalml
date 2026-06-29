@@ -74,7 +74,7 @@ class BaseXLearner(BaseLearner):
             if treatment_effect_learner is None
             else treatment_effect_learner
         )
-
+        """
         Note: arguments are stored verbatim (scikit-learn convention) so that
         ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
         Per the scikit-learn convention, ``__init__`` does not validate or raise —
@@ -302,16 +302,8 @@ class BaseXLearner(BaseLearner):
         return_components=False,
         verbose=True,
     ):
-        """Fit the treatment effect and outcome models of the X learner and predict treatment effects.
-
-        Args:
-            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
-            treatment (np.array, pd.Series, or pl.Series): a treatment vector
-            y (np.array, pd.Series, or pl.Series): an outcome vector
-            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in
-                the single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-        """Fit the X-learner and predict treatment effects.
+        """
+        Fit the X-learner and predict treatment effects.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
