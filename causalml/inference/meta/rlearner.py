@@ -15,7 +15,6 @@ from causalml.inference.meta.utils import (
     to_numpy,
     get_xgboost_objective_metric,
     get_weighted_variance,
-    convert_pd_to_np,
 )
 from causalml.propensity import ElasticNetPropensityModel
 
@@ -59,9 +58,10 @@ class BaseRLearner(BaseLearner):
                 processors
 
         Note: arguments are stored verbatim (scikit-learn convention) so that
-        ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
-        Per the scikit-learn convention, ``__init__`` does not validate or raise —
-        validation of ``learner``/``outcome_learner``/``effect_learner`` happens in ``fit()``.
+        ``get_params`` / ``clone`` work correctly. Model construction is deferred
+        to ``fit()``. Per the scikit-learn convention, ``__init__`` does not
+        validate or raise — validation of ``learner``/``outcome_learner``/
+        ``effect_learner`` happens in ``fit()``.
         """
         # Store verbatim — no deepcopy, no logic (scikit-learn convention).
         self.learner = learner
@@ -91,13 +91,6 @@ class BaseRLearner(BaseLearner):
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
-
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
-            sample_weight (np.array or pd.Series, optional): sample weights for `effect_learner`.
-            verbose (bool, optional): whether to output progress logs
         """
         X = collect_if_lazy(X)
         if (self.learner is None) and (
@@ -109,7 +102,6 @@ class BaseRLearner(BaseLearner):
             )
         if self.propensity_learner is None:
             raise ValueError("`propensity_learner` must be specified.")
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
@@ -172,11 +164,12 @@ class BaseRLearner(BaseLearner):
             diff_t = y_filt[w == 1] - yhat_filt[w == 1]
             if sample_weight is not None:
                 sample_weight_filt = sample_weight[mask]
-
-                sample_weight_filt_c = sample_weight_filt[w == 0]
-                sample_weight_filt_t = sample_weight_filt[w == 1]
-                self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
-                self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
+                self.vars_c[group] = get_weighted_variance(
+                    diff_c, sample_weight_filt[w == 0]
+                )
+                self.vars_t[group] = get_weighted_variance(
+                    diff_t, sample_weight_filt[w == 1]
+                )
                 weight *= sample_weight_filt
             else:
                 self.vars_c[group] = diff_c.var()
@@ -232,11 +225,6 @@ class BaseRLearner(BaseLearner):
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
-            sample_weight (np.array or pd.Series, optional): sample weights
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -306,11 +294,6 @@ class BaseRLearner(BaseLearner):
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): treatment vector (needed when pretrain=False)
-            y (np.array or pd.Series): outcome vector (needed when pretrain=False)
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
-            sample_weight (np.array or pd.Series, optional): sample weights
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -459,7 +442,7 @@ class BaseRClassifier(BaseRLearner):
         )
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
-        """Fit the treatment effect and outcome models of the R learner.
+        """Fit the R-learner classifier (uses predict_proba for outcome estimates).
 
         Args:
             X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
@@ -474,8 +457,6 @@ class BaseRClassifier(BaseRLearner):
             verbose (bool, optional): whether to output progress logs
         """
         X = collect_if_lazy(X)
-        """Fit the R-learner classifier (uses predict_proba for outcome estimates)."""
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
@@ -535,10 +516,6 @@ class BaseRClassifier(BaseRLearner):
                 self.vars_t[group] = get_weighted_variance(
                     diff_t, sample_weight_filt[w == 1]
                 )
-                sample_weight_filt_c = sample_weight_filt[w == 0]
-                sample_weight_filt_t = sample_weight_filt[w == 1]
-                self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
-                self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
                 weight *= sample_weight_filt
             else:
                 self.vars_c[group] = diff_c.var()
@@ -621,9 +598,6 @@ class XGBRRegressor(BaseRRegressor):
         assert isinstance(random_state, int), "random_state should be int."
 
         # Store verbatim — no transformation, no XGBRegressor construction here.
-        # xgb_kwargs=None is stored as-is; BaseEstimator.get_params surfaces it
-        # correctly since it is a named parameter.  The or {} coalesce happens in
-        # fit() so that clone(XGBRRegressor()) still round-trips None → None.
         self.early_stopping = early_stopping
         self.test_size = test_size
         self.early_stopping_rounds = early_stopping_rounds
@@ -642,11 +616,12 @@ class XGBRRegressor(BaseRRegressor):
         )
 
     def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
-        """Fit the treatment effect and outcome models of the R learner.
+        """Fit using early-stopping XGBoost R-learner.
 
         Args:
             X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
                 A pl.LazyFrame is collected once at the start of this method.
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
             y (np.array, pd.Series, or pl.Series): an outcome vector
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
@@ -661,9 +636,6 @@ class XGBRRegressor(BaseRRegressor):
         y_np = to_numpy(y)
 
         # initialize equal sample weight if it's not provided, for simplicity purpose
-        """Fit using early-stopping XGBoost R-learner."""
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
-        check_treatment_vector(treatment, self.control_name)
         sample_weight = (
             to_numpy(sample_weight) if sample_weight is not None else np.ones(len(y_np))
         )

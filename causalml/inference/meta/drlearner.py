@@ -16,7 +16,6 @@ from causalml.inference.meta.utils import (
     filter_index,
     n_rows,
     to_numpy,
-    convert_pd_to_np,
 )
 from causalml.metrics import regression_metrics, classification_metrics
 from causalml.propensity import compute_propensity_score
@@ -51,33 +50,11 @@ class BaseDRLearner(BaseLearner):
             treatment_effect_learner (optional): a model to estimate treatment effects in the treatment group
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
-        """
-        assert (learner is not None) or (
-            (control_outcome_learner is not None)
-            and (treatment_outcome_learner is not None)
-            and (treatment_effect_learner is not None)
-        )
 
-        self.model_mu_c = (
-            deepcopy(learner)
-            if control_outcome_learner is None
-            else control_outcome_learner
-        )
-        self.model_mu_t = (
-            deepcopy(learner)
-            if treatment_outcome_learner is None
-            else treatment_outcome_learner
-        )
-        self.model_tau = (
-            deepcopy(learner)
-            if treatment_effect_learner is None
-            else treatment_effect_learner
-        )
-        """
         Note: arguments are stored verbatim (scikit-learn convention) so that
-        ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
-        Per the scikit-learn convention, ``__init__`` does not validate or raise —
-        validation happens in ``fit()``.
+        ``get_params`` / ``clone`` work correctly. Model construction is deferred
+        to ``fit()``. Per the scikit-learn convention, ``__init__`` does not
+        validate or raise — validation happens in ``fit()``.
         """
         # Store verbatim — no deepcopy, no logic (scikit-learn convention).
         self.learner = learner
@@ -104,14 +81,8 @@ class BaseDRLearner(BaseLearner):
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             seed (int): random seed for cross-fitting
-
-        X = collect_if_lazy(X)
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
-            seed (int): random seed for cross-fitting
         """
+        X = collect_if_lazy(X)
         if (self.learner is None) and (
             (self.control_outcome_learner is None)
             or (self.treatment_outcome_learner is None)
@@ -122,7 +93,6 @@ class BaseDRLearner(BaseLearner):
                 "`treatment_outcome_learner`, and `treatment_effect_learner` "
                 "must be specified."
             )
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
@@ -305,8 +275,6 @@ class BaseDRLearner(BaseLearner):
         X = collect_if_lazy(X)
 
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
-        yhat_cs = {}
-
         yhat_ts = {}
 
         yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
@@ -352,12 +320,15 @@ class BaseDRLearner(BaseLearner):
         verbose=True,
         seed=None,
     ):
-        """
+        """Fit the treatment effect and outcome models of the DR learner and predict treatment effects.
+
         Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -451,10 +422,6 @@ class BaseDRLearner(BaseLearner):
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
                 float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -613,7 +580,7 @@ class BaseDRClassifier(BaseDRLearner):
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
-        """Predict treatment effects.
+        """Predict treatment effects (classifier variant — uses predict_proba for outcomes).
 
         Args:
             X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
@@ -637,10 +604,6 @@ class BaseDRClassifier(BaseDRLearner):
         X = collect_if_lazy(X)
 
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
-        yhat_cs = {}
-        """Predict treatment effects (classifier variant — uses predict_proba for outcomes)."""
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
-
         yhat_ts = {}
 
         yhat_c = np.r_[

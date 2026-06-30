@@ -21,7 +21,6 @@ from causalml.inference.meta.utils import (
     filter_mask,
     n_rows,
     to_numpy,
-    convert_pd_to_np,
 )
 from causalml.metrics import regression_metrics, classification_metrics
 
@@ -104,7 +103,6 @@ class BaseTLearner(BaseLearner):
                 "Either `learner` or both `control_learner` and `treatment_learner` "
                 "must be specified."
             )
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
         treatment_np = to_numpy(treatment)
         y_np = to_numpy(y)
@@ -112,10 +110,6 @@ class BaseTLearner(BaseLearner):
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
-
-        # model_c is trained on the control group, which is identical for every
-        # treatment group, so fit it once. Deepcopy from the unfitted template so
-        # re-calling fit() always starts from a clean state.
 
         # Resolve base models from stored constructor args (no templates needed).
         _control_learner = (
@@ -131,10 +125,11 @@ class BaseTLearner(BaseLearner):
 
         self.models_t = {group: deepcopy(_treatment_learner) for group in self.t_groups}
 
-        # model_c is trained on the control group, identical for every treatment group.
-        control_mask = treatment == self.control_name
+        # model_c is trained on the control group, which is identical for every
+        # treatment group, so fit it once.
+        control_mask = treatment_np == self.control_name
         self.model_c = deepcopy(_control_learner)
-        self.model_c.fit(X[control_mask], y[control_mask])
+        self.model_c.fit(filter_mask(X, control_mask), y_np[control_mask])
         # Expose as a shared-reference dict to preserve the public models_c API.
         self.models_c = {group: self.model_c for group in self.t_groups}
 
@@ -198,9 +193,6 @@ class BaseTLearner(BaseLearner):
             y (np.array, pd.Series, or pl.Series, optional): an outcome vector
             return_components (bool, optional): whether to return outcome for treatment and control seperately
             verbose (bool, optional): whether to output progress logs
-            return_ci (bool, optional): whether to return confidence intervals using
-                the stored bootstrap ensemble. Requires fit() to have been called
-                with store_bootstraps=True.
             return_ci (bool, optional): whether to return confidence intervals
                 using the stored bootstrap ensemble. Requires fit() to have been
                 called with store_bootstraps=True.
@@ -521,7 +513,6 @@ class BaseTClassifier(BaseTLearner):
                 yhat[w == 1] = yhat_ts[group][mask][w == 1]
 
                 logger.info("Error metrics for group {}".format(group))
-
                 classification_metrics(y_filt, yhat, w)
 
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
