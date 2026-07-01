@@ -14,3 +14,5 @@ from .synthetic import bar_plot_summary, bar_plot_summary_holdout
 from .synthetic import distr_plot_single_sim
 from .synthetic import scatter_plot_single_sim
 from .synthetic import get_synthetic_auuc
+
+from .mab_simulation import make_mab_data
