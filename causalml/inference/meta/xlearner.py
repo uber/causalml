@@ -159,7 +159,10 @@ class BaseXLearner(BaseLearner):
             y_filt_np = to_numpy(y_filt)
 
             # Train treatment outcome model
-            self.models_mu_t[group].fit(X_filt_t, filter_mask(y_filt, w == 1))
+            self.models_mu_t[group].fit(
+                X_filt_t,
+                y_filt_np[w == 1],
+            )
 
             var_t = (
                 y_filt_np[w == 1] - self.models_mu_t[group].predict(X_filt_t)
@@ -589,7 +592,10 @@ class BaseXClassifier(BaseXLearner):
             y_filt_np = to_numpy(y_filt)
 
             # Train treatment outcome model
-            self.models_mu_t[group].fit(X_filt_t, filter_mask(y_filt, w == 1))
+            self.models_mu_t[group].fit(
+                X_filt_t,
+                y_filt_np[w == 1],
+            )
 
             var_t = (
                 y_filt_np[w == 1]

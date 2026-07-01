@@ -126,6 +126,10 @@ class BaseSLearner(BaseLearner):
             (numpy.ndarray): Predictions of treatment effects.
         """
         X = collect_if_lazy(X)
+
+        X_new_c = prepend_column(0.0, X)
+        X_new_t = prepend_column(1.0, X)
+
         yhat_cs = {}
         yhat_ts = {}
 
@@ -135,8 +139,6 @@ class BaseSLearner(BaseLearner):
             # Build separate frames for control and treatment to avoid in-place
             # mutation, which fails when learners like CatBoost set the
             # writeable flag to False on arrays passed to predict().
-            X_new_c = prepend_column(0.0, X)
-            X_new_t = prepend_column(1.0, X)
             yhat_cs[group] = model.predict(X_new_c)
             yhat_ts[group] = model.predict(X_new_t)
 
@@ -373,6 +375,10 @@ class BaseSClassifier(BaseSLearner):
             (numpy.ndarray): Predictions of treatment effects.
         """
         X = collect_if_lazy(X)
+
+        X_new_c = prepend_column(0.0, X)
+        X_new_t = prepend_column(1.0, X)
+
         yhat_cs = {}
         yhat_ts = {}
 
@@ -382,8 +388,6 @@ class BaseSClassifier(BaseSLearner):
             # Build separate frames for control and treatment to avoid in-place
             # mutation, which fails when learners like CatBoost set the
             # writeable flag to False on arrays passed to predict().
-            X_new_c = prepend_column(0.0, X)
-            X_new_t = prepend_column(1.0, X)
             yhat_cs[group] = model.predict_proba(X_new_c)[:, 1]
             yhat_ts[group] = model.predict_proba(X_new_t)[:, 1]
 
