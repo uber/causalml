@@ -44,9 +44,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+polars = ["polars>=1.0.0"]
 test = [
     "pytest>=4.6",
-    "pytest-cov>=4.0"
+    "pytest-cov>=4.0",
+    "causalml[polars]"
 ]
 tf = [
     "tensorflow>=2.4.0"

@@ -38,8 +38,10 @@ class PropensityModel(metaclass=ABCMeta):
         Fit a propensity model.
 
         Args:
-            X (numpy.ndarray): a feature matrix
-            y (numpy.ndarray): a binary target vector
+            X (numpy.ndarray, pd.DataFrame, or pl.DataFrame): a feature matrix.
+                scikit-learn >= 1.6 accepts pandas and Polars DataFrames
+                natively, so no conversion is performed here.
+            y (numpy.ndarray, pd.Series, or pl.Series): a binary target vector
         """
         self.model.fit(X, y)
         if self.calibrate:
@@ -57,7 +59,7 @@ class PropensityModel(metaclass=ABCMeta):
         Predict propensity scores.
 
         Args:
-            X (numpy.ndarray): a feature matrix
+            X (numpy.ndarray, pd.DataFrame, or pl.DataFrame): a feature matrix
 
         Returns:
             (numpy.ndarray): Propensity scores between 0 and 1.
@@ -73,8 +75,8 @@ class PropensityModel(metaclass=ABCMeta):
         Fit a propensity model and predict propensity scores.
 
         Args:
-            X (numpy.ndarray): a feature matrix
-            y (numpy.ndarray): a binary target vector
+            X (numpy.ndarray, pd.DataFrame, or pl.DataFrame): a feature matrix
+            y (numpy.ndarray, pd.Series, or pl.Series): a binary target vector
 
         Returns:
             (numpy.ndarray): Propensity scores between 0 and 1.
@@ -159,10 +161,9 @@ class GradientBoostedPropensityModel(PropensityModel):
         Fit a propensity model.
 
         Args:
-            X (numpy.ndarray): a feature matrix
-            y (numpy.ndarray): a binary target vector
+            X (numpy.ndarray, pd.DataFrame, or pl.DataFrame): a feature matrix
+            y (numpy.ndarray, pd.Series, or pl.Series): a binary target vector
         """
-
         if self.early_stop:
             X_train, X_val, y_train, y_val = train_test_split(
                 X, y, test_size=stop_val_size
@@ -196,11 +197,11 @@ def compute_propensity_score(
     """Generate propensity score if user didn't provide and optionally calibrate.
 
     Args:
-        X (np.matrix): features for training
-        treatment (np.array or pd.Series): a treatment vector for training
+        X (np.matrix, pd.DataFrame, or pl.DataFrame): features for training
+        treatment (np.array, pd.Series, or pl.Series): a treatment vector for training
         p_model (model object, optional): a binary classifier with either a predict_proba or predict method
-        X_pred (np.matrix, optional): features for prediction
-        treatment_pred (np.array or pd.Series, optional): a treatment vector for prediciton
+        X_pred (np.matrix, pd.DataFrame, or pl.DataFrame, optional): features for prediction
+        treatment_pred (np.array, pd.Series, or pl.Series, optional): a treatment vector for prediction
         calibrate_p (bool, optional): whether calibrate the propensity score
         clip_bounds (tuple, optional): lower and upper bounds for clipping propensity scores. Bounds should be implemented
                     such that: 0 < lower < upper < 1, to avoid division by zero in BaseRLearner.fit_predict() step.
@@ -211,7 +212,8 @@ def compute_propensity_score(
             - p_model (PropensityModel): either the original p_model or a trained ElasticNetPropensityModel
     """
     if treatment_pred is None:
-        treatment_pred = treatment.copy()
+        treatment_pred = treatment.copy() if hasattr(treatment, "copy") else treatment
+
     if p_model is None:
         p_model = ElasticNetPropensityModel(
             clip_bounds=clip_bounds, calibrate=calibrate_p

@@ -11,7 +11,11 @@ from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
     check_treatment_vector,
     check_p_conditions,
-    convert_pd_to_np,
+    collect_if_lazy,
+    filter_mask,
+    filter_index,
+    n_rows,
+    to_numpy,
 )
 from causalml.metrics import regression_metrics, classification_metrics
 from causalml.propensity import compute_propensity_score
@@ -48,9 +52,9 @@ class BaseDRLearner(BaseLearner):
             control_name (str or int, optional): name of control group
 
         Note: arguments are stored verbatim (scikit-learn convention) so that
-        ``get_params`` / ``clone`` work correctly. Model construction is deferred to ``fit()``.
-        Per the scikit-learn convention, ``__init__`` does not validate or raise —
-        validation happens in ``fit()``.
+        ``get_params`` / ``clone`` work correctly. Model construction is deferred
+        to ``fit()``. Per the scikit-learn convention, ``__init__`` does not
+        validate or raise — validation happens in ``fit()``.
         """
         # Store verbatim — no deepcopy, no logic (scikit-learn convention).
         self.learner = learner
@@ -67,12 +71,18 @@ class BaseDRLearner(BaseLearner):
         """Fit the inference model.
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method; the
+                feature matrix is otherwise kept in its native format throughout,
+                including the KFold partitions (sliced via :func:`filter_index`).
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             seed (int): random seed for cross-fitting
         """
+        X = collect_if_lazy(X)
         if (self.learner is None) and (
             (self.control_outcome_learner is None)
             or (self.treatment_outcome_learner is None)
@@ -83,9 +93,11 @@ class BaseDRLearner(BaseLearner):
                 "`treatment_outcome_learner`, and `treatment_effect_learner` "
                 "must be specified."
             )
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
         check_treatment_vector(treatment, self.control_name)
-        self.t_groups = np.unique(treatment[treatment != self.control_name])
+        treatment_np = to_numpy(treatment)
+        y_np = to_numpy(y)
+
+        self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
@@ -110,7 +122,7 @@ class BaseDRLearner(BaseLearner):
         # the outcome regression, and the treatment regression on the doubly robust estimates. The use of
         # the partitions is rotated so we do not lose on the sample size.
         cv = KFold(n_splits=3, shuffle=True, random_state=seed)
-        split_indices = [index for _, index in cv.split(y)]
+        split_indices = [index for _, index in cv.split(y_np)]
 
         self.models_mu_c = [
             deepcopy(_control_outcome_learner),
@@ -134,33 +146,38 @@ class BaseDRLearner(BaseLearner):
             for group in self.t_groups
         }
         if p is None:
-            self.propensity = {group: np.zeros(y.shape[0]) for group in self.t_groups}
+            self.propensity = {
+                group: np.zeros(y_np.shape[0]) for group in self.t_groups
+            }
 
         for ifold in range(3):
             treatment_idx = split_indices[ifold]
             outcome_idx = split_indices[(ifold + 1) % 3]
             tau_idx = split_indices[(ifold + 2) % 3]
 
-            treatment_treat, treatment_out, treatment_tau = (
-                treatment[treatment_idx],
-                treatment[outcome_idx],
-                treatment[tau_idx],
-            )
-            y_out, y_tau = y[outcome_idx], y[tau_idx]
-            X_treat, X_out, X_tau = X[treatment_idx], X[outcome_idx], X[tau_idx]
+            treatment_treat = filter_index(treatment, treatment_idx)
+            treatment_out_np = treatment_np[outcome_idx]
+            treatment_tau_np = treatment_np[tau_idx]
+            treatment_treat_np = treatment_np[treatment_idx]
+
+            y_out = y_np[outcome_idx]
+            y_tau = y_np[tau_idx]
+
+            X_treat = filter_index(X, treatment_idx)
+            X_out = filter_index(X, outcome_idx)
+            X_tau = filter_index(X, tau_idx)
 
             if p is None:
                 logger.info("Generating propensity score")
                 cur_p = dict()
 
                 for group in self.t_groups:
-                    mask = (treatment_treat == group) | (
-                        treatment_treat == self.control_name
+                    mask = (treatment_treat_np == group) | (
+                        treatment_treat_np == self.control_name
                     )
-                    treatment_filt = treatment_treat[mask]
-                    X_filt = X_treat[mask]
-                    w_filt = (treatment_filt == group).astype(int)
-                    w = (treatment_tau == group).astype(int)
+                    X_filt = filter_mask(X_treat, mask)
+                    w_filt = (treatment_treat_np[mask] == group).astype(int)
+                    w = (treatment_tau_np == group).astype(int)
                     cur_p[group], _ = compute_propensity_score(
                         X=X_filt, treatment=w_filt, X_pred=X_tau, treatment_pred=w
                     )
@@ -168,29 +185,31 @@ class BaseDRLearner(BaseLearner):
             else:
                 cur_p = dict()
                 if isinstance(p, (np.ndarray, pd.Series)):
-                    cur_p = {self.t_groups[0]: convert_pd_to_np(p[tau_idx])}
+                    cur_p = {self.t_groups[0]: to_numpy(p)[tau_idx]}
                 else:
-                    cur_p = {g: prop[tau_idx] for g, prop in p.items()}
+                    cur_p = {g: to_numpy(prop)[tau_idx] for g, prop in p.items()}
                 check_p_conditions(cur_p, self.t_groups)
 
             logger.info("Generate outcome regressions")
             self.models_mu_c[ifold].fit(
-                X_out[treatment_out == self.control_name],
-                y_out[treatment_out == self.control_name],
+                filter_mask(X_out, treatment_out_np == self.control_name),
+                y_out[treatment_out_np == self.control_name],
             )
             for group in self.t_groups:
                 self.models_mu_t[group][ifold].fit(
-                    X_out[treatment_out == group], y_out[treatment_out == group]
+                    filter_mask(X_out, treatment_out_np == group),
+                    y_out[treatment_out_np == group],
                 )
 
             logger.info("Fit pseudo outcomes from the DR formula")
 
             for group in self.t_groups:
-                mask = (treatment_tau == group) | (treatment_tau == self.control_name)
-                treatment_filt = treatment_tau[mask]
-                X_filt = X_tau[mask]
+                mask = (treatment_tau_np == group) | (
+                    treatment_tau_np == self.control_name
+                )
+                X_filt = filter_mask(X_tau, mask)
                 y_filt = y_tau[mask]
-                w_filt = (treatment_filt == group).astype(int)
+                w_filt = (treatment_tau_np[mask] == group).astype(int)
                 p_filt = cur_p[group][mask]
                 mu_t = self.models_mu_t[group][ifold].predict(X_filt)
                 mu_c = self.models_mu_c[ifold].predict(X_filt)
@@ -206,12 +225,28 @@ class BaseDRLearner(BaseLearner):
         return self
 
     def bootstrap(self, X, treatment, y, p=None, size=10000, rng=None, seed=None):
-        """Runs a single bootstrap with optional deterministic cross-fit seed."""
+        """Runs a single bootstrap with optional deterministic cross-fit seed.
+
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, or pl.DataFrame): a feature matrix.
+                Resampled natively via :func:`filter_index`.
+            treatment (np.array): a treatment vector (numpy)
+            y (np.array): an outcome vector (numpy)
+            p (dict, optional): a dict of {treatment group: propensity scores (numpy)}
+            size (int, optional): number of samples to draw with replacement
+            rng (np.random.Generator, optional): random number generator for
+                deterministic resampling
+            seed (int, optional): random seed for cross-fitting within the
+                resampled fit() call
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects on the full X
+                from a model trained on the resampled subset.
+        """
         if rng is not None:
-            idxs = rng.choice(np.arange(0, X.shape[0]), size=size)
+            idxs = rng.choice(np.arange(0, n_rows(X)), size=size)
         else:
-            idxs = np.random.choice(np.arange(0, X.shape[0]), size=size)
-        X_b = X[idxs]
+            idxs = np.random.choice(np.arange(0, n_rows(X)), size=size)
+        X_b = filter_index(X, idxs)
 
         if p is not None:
             p_b = {group: _p[idxs] for group, _p in p.items()}
@@ -229,16 +264,17 @@ class BaseDRLearner(BaseLearner):
         """Predict treatment effects.
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series, optional): a treatment vector
-            y (np.array or pd.Series, optional): an outcome vector
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+            treatment (np.array, pd.Series, or pl.Series, optional): a treatment vector
+            y (np.array, pd.Series, or pl.Series, optional): an outcome vector
             verbose (bool, optional): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        X = collect_if_lazy(X)
 
-        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         yhat_ts = {}
 
         yhat_c = np.r_[[model.predict(X) for model in self.models_mu_c]].mean(axis=0)
@@ -253,10 +289,11 @@ class BaseDRLearner(BaseLearner):
             ].mean(axis=0)
 
             if (y is not None) and (treatment is not None) and verbose:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                y_filt = y[mask]
-                w = (treatment_filt == group).astype(int)
+                treatment_np = to_numpy(treatment)
+                mask = (treatment_np == group) | (treatment_np == self.control_name)
+                treatment_filt_np = treatment_np[mask]
+                y_filt = to_numpy(filter_mask(y, mask))
+                w = (treatment_filt_np == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
                 yhat[w == 0] = yhat_c[mask][w == 0]
@@ -283,13 +320,15 @@ class BaseDRLearner(BaseLearner):
         verbose=True,
         seed=None,
     ):
-        """Fit the DR-learner and predict treatment effects.
+        """Fit the treatment effect and outcome models of the DR learner and predict treatment effects.
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -299,7 +338,7 @@ class BaseDRLearner(BaseLearner):
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        X = collect_if_lazy(X)
         self.fit(X, treatment, y, p, seed)
 
         if p is None:
@@ -307,12 +346,9 @@ class BaseDRLearner(BaseLearner):
 
         check_p_conditions(p, self.t_groups)
         if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
+            p = {self.t_groups[0]: to_numpy(p)}
         elif isinstance(p, dict):
-            p = {
-                treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()
-            }
+            p = {k: to_numpy(v) for k, v in p.items()}
 
         te = self.predict(
             X, treatment=treatment, y=y, return_components=return_components
@@ -321,13 +357,16 @@ class BaseDRLearner(BaseLearner):
         if not return_ci:
             return te
         else:
+            treatment_np = to_numpy(treatment)
+            y_np = to_numpy(y)
+
             t_groups_global = self.t_groups
             _classes_global = self._classes
             models_mu_c_global = deepcopy(self.models_mu_c)
             models_mu_t_global = deepcopy(self.models_mu_t)
             models_tau_global = deepcopy(self.models_tau)
             te_bootstraps = np.zeros(
-                shape=(X.shape[0], self.t_groups.shape[0], n_bootstraps)
+                shape=(n_rows(X), self.t_groups.shape[0], n_bootstraps)
             )
             rng = np.random.default_rng(seed) if seed is not None else None
 
@@ -340,8 +379,8 @@ class BaseDRLearner(BaseLearner):
                 )
                 te_b = self.bootstrap(
                     X,
-                    treatment,
-                    y,
+                    treatment_np,
+                    y_np,
                     p,
                     size=bootstrap_size,
                     rng=rng,
@@ -377,10 +416,12 @@ class BaseDRLearner(BaseLearner):
         """Estimate the Average Treatment Effect (ATE).
 
         Args:
-            X (np.matrix or np.array or pd.Dataframe): a feature matrix
-            treatment (np.array or pd.Series): a treatment vector
-            y (np.array or pd.Series): an outcome vector
-            p (np.ndarray or pd.Series or dict, optional): propensity scores
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
+            treatment (np.array, pd.Series, or pl.Series): a treatment vector
+            y (np.array, pd.Series, or pl.Series): an outcome vector
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -389,6 +430,8 @@ class BaseDRLearner(BaseLearner):
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
+        X = collect_if_lazy(X)
+
         if pretrain:
             if not hasattr(self, "t_groups"):
                 raise ValueError(
@@ -401,19 +444,18 @@ class BaseDRLearner(BaseLearner):
             te, yhat_cs, yhat_ts = self.fit_predict(
                 X, treatment, y, p, return_components=True, seed=seed
             )
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+
+        treatment_np = to_numpy(treatment)
+        y_np = to_numpy(y)
 
         if p is None:
             p = self.propensity
         else:
             check_p_conditions(p, self.t_groups)
         if isinstance(p, (np.ndarray, pd.Series)):
-            treatment_name = self.t_groups[0]
-            p = {treatment_name: convert_pd_to_np(p)}
+            p = {self.t_groups[0]: to_numpy(p)}
         elif isinstance(p, dict):
-            p = {
-                treatment_name: convert_pd_to_np(_p) for treatment_name, _p in p.items()
-            }
+            p = {k: to_numpy(v) for k, v in p.items()}
 
         ate = np.zeros(self.t_groups.shape[0])
         ate_lb = np.zeros(self.t_groups.shape[0])
@@ -422,14 +464,14 @@ class BaseDRLearner(BaseLearner):
         for i, group in enumerate(self.t_groups):
             _ate = te[:, i].mean()
 
-            mask = (treatment == group) | (treatment == self.control_name)
-            treatment_filt = treatment[mask]
+            mask = (treatment_np == group) | (treatment_np == self.control_name)
+            treatment_filt = treatment_np[mask]
             w = (treatment_filt == group).astype(int)
             prob_treatment = float(sum(w)) / w.shape[0]
 
             yhat_c = yhat_cs[group][mask]
             yhat_t = yhat_ts[group][mask]
-            y_filt = y[mask]
+            y_filt = y_np[mask]
 
             se = np.sqrt(
                 (
@@ -468,8 +510,8 @@ class BaseDRLearner(BaseLearner):
                 )
                 cate_b = self.bootstrap(
                     X,
-                    treatment,
-                    y,
+                    treatment_np,
+                    y_np,
                     p,
                     size=bootstrap_size,
                     rng=rng,
@@ -493,9 +535,7 @@ class BaseDRLearner(BaseLearner):
 
 
 class BaseDRRegressor(BaseDRLearner):
-    """
-    A parent class for DR-learner regressor classes.
-    """
+    """A parent class for DR-learner regressor classes."""
 
     def __init__(
         self,
@@ -517,9 +557,7 @@ class BaseDRRegressor(BaseDRLearner):
 
 
 class BaseDRClassifier(BaseDRLearner):
-    """
-    A parent class for DR-learner classifier classes.
-    """
+    """A parent class for DR-learner classifier classes."""
 
     def __init__(
         self,
@@ -542,10 +580,30 @@ class BaseDRClassifier(BaseDRLearner):
     def predict(
         self, X, treatment=None, y=None, p=None, return_components=False, verbose=True
     ):
-        """Predict treatment effects (classifier variant — uses predict_proba for outcomes)."""
-        X, treatment, y = convert_pd_to_np(X, treatment, y)
+        """Predict treatment effects (classifier variant — uses predict_proba for outcomes).
 
-        te = np.zeros((X.shape[0], self.t_groups.shape[0]))
+        Args:
+            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
+                A pl.LazyFrame is collected once at the start of this method.
+            treatment (np.array, pd.Series, or pl.Series, optional): a treatment vector. Used for computing
+                classification metrics when y is also provided.
+            y (np.array, pd.Series, or pl.Series, optional): an outcome vector. Used for computing
+                classification metrics when treatment is also provided.
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
+                single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
+                float (0,1). Currently not used in prediction but kept for API consistency.
+            return_components (bool, optional): whether to return outcome probabilities for treatment and control
+                groups separately. Defaults to False.
+            verbose (bool, optional): whether to output progress logs. Defaults to True.
+        Returns:
+            (numpy.ndarray): Predictions of treatment effects.
+            If return_components is True, also returns:
+                - dict: Predicted probabilities for the control group (yhat_cs).
+                - dict: Predicted probabilities for the treatment group (yhat_ts).
+        """
+        X = collect_if_lazy(X)
+
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
         yhat_ts = {}
 
         yhat_c = np.r_[
@@ -562,10 +620,11 @@ class BaseDRClassifier(BaseDRLearner):
             ].mean(axis=0)
 
             if (y is not None) and (treatment is not None) and verbose:
-                mask = (treatment == group) | (treatment == self.control_name)
-                treatment_filt = treatment[mask]
-                y_filt = y[mask]
-                w = (treatment_filt == group).astype(int)
+                treatment_np = to_numpy(treatment)
+                mask = (treatment_np == group) | (treatment_np == self.control_name)
+                treatment_filt_np = treatment_np[mask]
+                y_filt = to_numpy(filter_mask(y, mask))
+                w = (treatment_filt_np == group).astype(int)
 
                 yhat = np.zeros_like(y_filt, dtype=float)
                 yhat[w == 0] = yhat_c[mask][w == 0]
