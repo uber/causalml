@@ -36,8 +36,9 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
         A fitted clone of learner_template trained on a bootstrap sample.
     """
     rng = np.random.RandomState(seed)
-    idxs = rng.choice(np.arange(X.shape[0]), size=bootstrap_size)
-    X_b = X[idxs]
+    idxs = rng.choice(np.arange(n_rows(X)), size=bootstrap_size)
+
+    X_b = filter_index(X, idxs)
     treatment_b = treatment[idxs]
     y_b = y[idxs]
     p_b = {group: _p[idxs] for group, _p in p.items()} if p is not None else None
