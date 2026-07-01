@@ -1,7 +1,24 @@
 """
-Filter feature selection methods for uplift modeling
+Filter feature selection methods for uplift modeling.
 
-- Currently only for classification problem: the outcome variable of uplift model is binary.
+These filters implement the bin-based and likelihood-based feature ranking
+described in Zhao et al. 2020 (https://arxiv.org/abs/2005.03447).
+
+.. note::
+    The current implementation only supports **binary** outcomes (values
+    coded as ``0`` and ``1``):
+
+    * ``filter_LR`` uses ``statsmodels`` ``Logit``, which assumes a binary
+      response.
+    * ``filter_D`` (KL / Chi / ED divergences) computes class probabilities
+      via ``_GetNodeSummary``, which only inspects ``y == 0`` and
+      ``y == 1`` counts and silently ignores other label values.
+
+    Passing a non-binary outcome used to fall through silently or behave
+    inconsistently per node. As of uber/causalml#349, ``filter_LR`` and
+    ``filter_D`` raise a clear ``ValueError`` if the outcome contains
+    values other than ``{0, 1}``. The ``filter_F`` (OLS) method tolerates
+    continuous outcomes and is unaffected.
 """
 
 import numpy as np
@@ -9,6 +26,41 @@ import pandas as pd
 import statsmodels.api as sm
 from scipy import stats
 from sklearn.impute import SimpleImputer
+
+
+def _check_binary_outcome(y, y_name="y"):
+    """Validate that an outcome vector contains only ``0`` and ``1``.
+
+    Used by ``filter_LR`` and ``filter_D`` to fail loudly when the user
+    passes a non-binary outcome — those filters silently mis-handle other
+    label sets (Logit assumes binary; ``_GetNodeSummary`` only counts
+    ``y == 0`` and ``y == 1``). See uber/causalml#349.
+
+    Args:
+        y (array-like): outcome values.
+        y_name (str): column name used in the error message.
+
+    Raises:
+        ValueError: if ``y`` contains any value other than ``0`` or ``1``.
+    """
+    arr = np.asarray(y)
+    # Drop NaNs from the validation set — they are handled separately
+    # (e.g. ``null_impute`` in ``_filter_D_one_feature``).
+    if arr.dtype.kind == "f":
+        arr = arr[~np.isnan(arr)]
+    unique = np.unique(arr)
+    # Allow either {0, 1}, {0}, or {1} — empty set is rejected too.
+    extra = set(np.atleast_1d(unique).tolist()) - {0, 1, 0.0, 1.0}
+    if extra or len(unique) == 0:
+        raise ValueError(
+            "Filter feature selection only supports binary outcomes "
+            "(values 0/1); column '{}' contains {}. See "
+            "uber/causalml#349 for the current limitation. Use "
+            "``filter_F`` (OLS) for continuous outcomes, or pre-process "
+            "your label (e.g. via ``pd.qcut``) into a binary indicator.".format(
+                y_name, sorted(unique.tolist())[:10]
+            )
+        )
 
 
 class FilterSelect:
@@ -241,6 +293,10 @@ class FilterSelect:
         """
         if order not in [1, 2, 3]:
             raise Exception("ValueError: order argument only takes value 1,2,3.")
+
+        # filter_LR uses statsmodels Logit which silently mis-handles
+        # non-binary outcomes; validate up-front per uber/causalml#349.
+        _check_binary_outcome(data[y_name], y_name=y_name)
 
         all_result = pd.DataFrame()
         for x_name_i in features:
@@ -549,6 +605,12 @@ class FilterSelect:
             all_result : pd.DataFrame
                 a data frame containing the feature importance statistics
         """
+
+        # The bin-based divergence filters (KL/ED/Chi) compute per-bin
+        # class probabilities via ``_GetNodeSummary``, which only counts
+        # ``y == 0`` and ``y == 1``. A non-binary outcome would silently
+        # produce nonsense scores. Validate up-front per uber/causalml#349.
+        _check_binary_outcome(data[y_name], y_name=y_name)
 
         all_result = pd.DataFrame()
 
