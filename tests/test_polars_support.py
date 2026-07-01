@@ -15,6 +15,7 @@ import polars as pl
 
 from sklearn.linear_model import LinearRegression
 
+
 from sklearn.linear_model import LogisticRegression
 from causalml.inference.meta.tlearner import BaseTClassifier
 from causalml.inference.meta.slearner import BaseSClassifier
@@ -23,20 +24,24 @@ from causalml.inference.meta.tlearner import BaseTRegressor
 from causalml.inference.meta.slearner import BaseSRegressor
 from causalml.inference.meta.xlearner import BaseXRegressor
 from causalml.inference.meta.rlearner import BaseRRegressor
-from causalml.inference.meta.drlearner import BaseDRRegressor
+from causalml.inference.meta.drlearner import (
+    BaseDRRegressor,
+    BaseDRClassifier,
+)
 from causalml.inference.meta.utils import convert_pd_to_np, check_p_conditions
+
+from tests.const import RANDOM_SEED
 
 # Fixtures
 
 N = 200
 N_FEATURES = 5
-RANDOM_STATE = 42
 
 
 @pytest.fixture(scope="module")
 def synthetic_data_numpy():
     """Return (X, treatment, y) as NumPy arrays — the baseline."""
-    rng = np.random.default_rng(RANDOM_STATE)
+    rng = np.random.default_rng(RANDOM_SEED)
     X = rng.standard_normal((N, N_FEATURES))
     treatment = rng.choice([0, 1], size=N)
     y = X[:, 0] * treatment + rng.standard_normal(N) * 0.1
@@ -73,7 +78,7 @@ def synthetic_data_polars_lazy(synthetic_data_polars):
 @pytest.fixture(scope="module")
 def synthetic_data_numpy_binary():
     """Return (X, treatment, y) with binary y for classifier tests."""
-    rng = np.random.default_rng(RANDOM_STATE)
+    rng = np.random.default_rng(RANDOM_SEED)
     X = rng.standard_normal((N, N_FEATURES))
     treatment = rng.choice([0, 1], size=N)
     y = rng.choice([0, 1], size=N)
@@ -212,6 +217,38 @@ class TestTLearnerPolars:
         te = self._fit_predict(*synthetic_data_polars)
         assert isinstance(te, np.ndarray)
 
+    @pytest.mark.parametrize(
+        "data_fixture",
+        [
+            "synthetic_data_pandas",
+            "synthetic_data_polars",
+        ],
+    )
+    def test_bootstrap_ci_dataframe(self, request, data_fixture):
+        X, treatment, y = request.getfixturevalue(data_fixture)
+
+        learner = BaseTRegressor(
+            learner=LinearRegression(),
+            control_name=0,
+        )
+
+        learner.fit(
+            X,
+            treatment,
+            y,
+            store_bootstraps=True,
+            n_bootstraps=5,
+            bootstrap_size=100,
+            random_state=RANDOM_SEED,
+        )
+
+        te, lb, ub = learner.predict(X, return_ci=True)
+
+        assert te.shape == (N, len(learner.t_groups))
+        assert lb.shape == te.shape
+        assert ub.shape == te.shape
+        assert np.all(lb <= ub)
+
     def test_estimate_ate_polars(self, synthetic_data_polars):
         X, treatment, y = synthetic_data_polars
         ate, lb, ub = self.learner.estimate_ate(X, treatment, y)
@@ -280,9 +317,9 @@ class TestXLearnerPolars:
 class TestRLearnerPolars:
     @pytest.fixture(autouse=True)
     def _learner(self):
-        # fixed random_state so KFold splits are identical across both runs
+        # fixed RANDOM_SEED so KFold splits are identical across both runs
         self.learner = BaseRRegressor(
-            learner=LinearRegression(), random_state=RANDOM_STATE
+            learner=LinearRegression(), random_state=RANDOM_SEED
         )
 
     def _fit_predict(self, X, treatment, y):
@@ -290,11 +327,11 @@ class TestRLearnerPolars:
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
-        # With a fixed random_state the KFold splits are deterministic,
+        # With a fixed RANDOM_SEED the KFold splits are deterministic,
         # so numpy and polars inputs must produce identical results.
         te_np = self._fit_predict(*synthetic_data_numpy)
         self.learner = BaseRRegressor(
-            learner=LinearRegression(), random_state=RANDOM_STATE
+            learner=LinearRegression(), random_state=RANDOM_SEED
         )
         te_pl = self._fit_predict(*synthetic_data_polars)
         _assert_te_close(te_np, te_pl)
@@ -319,9 +356,9 @@ class TestDRLearnerPolars:
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
         # DR-Learner uses KFold with a seed parameter passed to fit(); fix it
         # so both runs use the same splits.
-        te_np = self._fit_predict(*synthetic_data_numpy, seed=RANDOM_STATE)
+        te_np = self._fit_predict(*synthetic_data_numpy, seed=RANDOM_SEED)
         self.learner = BaseDRRegressor(learner=LinearRegression())
-        te_pl = self._fit_predict(*synthetic_data_polars, seed=RANDOM_STATE)
+        te_pl = self._fit_predict(*synthetic_data_polars, seed=RANDOM_SEED)
         _assert_te_close(te_np, te_pl)
 
     def test_fit_predict_returns_numpy(self, synthetic_data_polars):
@@ -461,3 +498,29 @@ class TestXClassifierPolars:
     def test_fit_predict_returns_numpy(self, synthetic_data_polars_binary):
         te = self._fit_predict(*synthetic_data_polars_binary)
         assert isinstance(te, np.ndarray)
+
+
+class TestDRClassifierPolars:
+    @pytest.fixture(autouse=True)
+    def _learner(self):
+        self.learner = BaseDRClassifier(
+            learner=LogisticRegression(),
+            treatment_effect_learner=LinearRegression(),
+        )
+
+    def _fit_predict(self, X, treatment, y):
+        self.learner.fit(
+            X=X,
+            treatment=treatment,
+            y=y,
+        )
+        return self.learner.predict(X)
+
+    def test_fit_predict_returns_numpy(
+        self,
+        synthetic_data_polars_binary,
+    ):
+        te = self._fit_predict(*synthetic_data_polars_binary)
+
+        assert isinstance(te, np.ndarray)
+        assert te.shape == (N, len(self.learner.t_groups))
