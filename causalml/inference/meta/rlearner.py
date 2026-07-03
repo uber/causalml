@@ -149,6 +149,9 @@ class BaseRLearner(BaseLearner):
         yhat = cross_val_predict(
             self.model_mu, X, y_np, cv=self.cv, n_jobs=self.cv_n_jobs
         )
+        # Fit the nuisance outcome model on the full data so it can be
+        # reused by predict(return_components=True).
+        self.model_mu.fit(X, y_np)
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -186,21 +189,49 @@ class BaseRLearner(BaseLearner):
             )
         return self
 
-    def predict(self, X, p=None):
+    def predict(
+        self,
+        X,
+        p=None,
+        return_components=False,
+        return_ci=False,
+    ):
         """Predict treatment effects.
 
         Args:
             X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
-                A pl.LazyFrame is collected once at the start of this method.
+            p (np.ndarray, pd.Series, pl.Series, or dict, optional): propensity scores.
+            return_components (bool): whether to return nuisance components.
+            return_ci (bool): included for API consistency with other meta-learners.
 
         Returns:
-            (numpy.ndarray): Predictions of treatment effects.
+            numpy.ndarray or tuple
         """
+
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
+
         X = collect_if_lazy(X)
+
+        if p is None:
+            p = {
+                group: self.propensity_model[group].predict(X)
+                for group in self.t_groups
+            }
+        else:
+            p = self._format_p(p, self.t_groups)
+
+        yhat = self.model_mu.predict(X)
+
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
+
         for i, group in enumerate(self.t_groups):
             te[:, i] = self.models_tau[group].predict(X)
-        return te
+
+        if not return_components:
+            return te
+
+        return te, yhat, p
 
     def fit_predict(
         self,
@@ -212,6 +243,7 @@ class BaseRLearner(BaseLearner):
         return_ci=False,
         n_bootstraps=1000,
         bootstrap_size=10000,
+        return_components=False,
         verbose=True,
     ):
         """Fit the R learner and predict treatment effects.
@@ -228,13 +260,28 @@ class BaseRLearner(BaseLearner):
             return_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
+            return_components (bool, optional): whether to return the nuisance
+            outcome prediction (yhat) and propensity estimates (p) in addition
+            to treatment effects.
             verbose (bool): whether to output progress logs
         Returns:
             (numpy.ndarray): Predictions of treatment effects.
         """
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
         X = collect_if_lazy(X)
         self.fit(X, treatment, y, p, sample_weight, verbose=verbose)
-        te = self.predict(X)
+
+        if p is None:
+            p = self.propensity
+        else:
+            p = self._format_p(p, self.t_groups)
+
+        te = self.predict(
+            X,
+            p=p,
+            return_components=return_components,
+        )
 
         if not return_ci:
             return te
@@ -495,6 +542,7 @@ class BaseRClassifier(BaseRLearner):
         yhat = cross_val_predict(
             self.model_mu, X, y_np, cv=self.cv, method="predict_proba", n_jobs=-1
         )[:, 1]
+        self.model_mu.fit(X, y_np)
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -532,21 +580,37 @@ class BaseRClassifier(BaseRLearner):
             )
         return self
 
-    def predict(self, X, p=None):
-        """Predict treatment effects.
+    def predict(
+        self,
+        X,
+        p=None,
+        return_components=False,
+        return_ci=False,
+    ):
+        if return_ci and return_components:
+            raise ValueError("return_ci and return_components cannot both be True.")
 
-        Args:
-            X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
-                A pl.LazyFrame is collected once at the start of this method.
-
-        Returns:
-            (numpy.ndarray): Predictions of treatment effects.
-        """
         X = collect_if_lazy(X)
+
+        if p is None:
+            p = {
+                group: self.propensity_model[group].predict(X)
+                for group in self.t_groups
+            }
+        else:
+            p = self._format_p(p, self.t_groups)
+
+        yhat = self.model_mu.predict_proba(X)[:, 1]
+
         te = np.zeros((n_rows(X), self.t_groups.shape[0]))
+
         for i, group in enumerate(self.t_groups):
             te[:, i] = self.models_tau[group].predict(X)
-        return te
+
+        if not return_components:
+            return te
+
+        return te, yhat, p
 
 
 class XGBRRegressor(BaseRRegressor):
@@ -691,6 +755,7 @@ class XGBRRegressor(BaseRRegressor):
         if verbose:
             logger.info("generating out-of-fold CV outcome estimates")
         yhat = cross_val_predict(self.model_mu, X, y_np, cv=self.cv, n_jobs=-1)
+        self.model_mu.fit(X, y_np)
 
         for group in self.t_groups:
             treatment_mask = (treatment_np == group) | (

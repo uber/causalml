@@ -1686,15 +1686,90 @@ def test_multi_treatment_learners():
         assert hasattr(rl, attr) and isinstance(getattr(rl, attr), dict)
         assert set(getattr(rl, attr).keys()) == set(rl.t_groups)
 
-    # R-learner: predict(X, p=...) returns CATE only (no return_components path).
+    # R-learner: predict(return_components=True) returns
+    # (te, yhat, propensity) where yhat and propensity are
+    # the nuisance components used by the R-learner.
     te = rl.predict(X=X, p=p_scores)
     _assert_te(te, name, "predict()")
 
-    fp_plain_r = rl.fit_predict(
-        X=X, treatment=treatment, y=y, p=p_scores, verbose=False
+    out_pc = rl.predict(X=X, p=p_scores, return_components=True)
+    assert isinstance(out_pc, tuple) and len(out_pc) == 3
+
+    te2, yhat, p = out_pc
+
+    np.testing.assert_array_equal(
+        te,
+        te2,
+        err_msg=f"{name}: predict inconsistency",
     )
+
+    assert isinstance(yhat, np.ndarray)
+    assert yhat.shape == (n,)
+    assert np.all(np.isfinite(yhat))
+
+    assert isinstance(p, dict)
+    assert set(p.keys()) == set(rl.t_groups)
+
+    for g in rl.t_groups:
+        assert isinstance(p[g], np.ndarray)
+        assert p[g].shape == (n,)
+        assert np.all(np.isfinite(p[g]))
+
+    fp_plain_r = rl.fit_predict(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=p_scores,
+        verbose=False,
+    )
+
     _assert_plain_fit_predict(fp_plain_r, name)
     _assert_te(fp_plain_r, name, "fit_predict()")
+
+    fp_components = rl.fit_predict(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=p_scores,
+        return_components=True,
+        verbose=False,
+    )
+
+    assert isinstance(fp_components, tuple)
+    assert len(fp_components) == 3
+
+    te_fp, yhat_fp, p_fp = fp_components
+
+    _assert_te(te_fp, name, "fit_predict(return_components=True)")
+
+    assert isinstance(yhat_fp, np.ndarray)
+    assert yhat_fp.shape == (n,)
+    assert np.all(np.isfinite(yhat_fp))
+
+    assert isinstance(p_fp, dict)
+    assert set(p_fp.keys()) == set(rl.t_groups)
+
+    for g in rl.t_groups:
+        assert isinstance(p_fp[g], np.ndarray)
+        assert p_fp[g].shape == (n,)
+        assert np.all(np.isfinite(p_fp[g]))
+    with pytest.raises(ValueError):
+        rl.fit_predict(
+            X=X,
+            treatment=treatment,
+            y=y,
+            p=p_scores,
+            return_ci=True,
+            return_components=True,
+            verbose=False,
+        )
+    with pytest.raises(ValueError):
+        rl.predict(
+            X=X,
+            p=p_scores,
+            return_ci=True,
+            return_components=True,
+        )
     _assert_ci_triple(
         rl.fit_predict(
             X=X,
