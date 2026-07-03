@@ -120,6 +120,7 @@ class BaseRLearner(BaseLearner):
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
+            self.propensity = p
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
@@ -214,10 +215,7 @@ class BaseRLearner(BaseLearner):
         X = collect_if_lazy(X)
 
         if p is None:
-            p = {
-                group: self.propensity_model[group].predict(X)
-                for group in self.t_groups
-            }
+            p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
 
@@ -522,6 +520,7 @@ class BaseRClassifier(BaseRLearner):
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
+            self.propensity = p
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
@@ -593,10 +592,7 @@ class BaseRClassifier(BaseRLearner):
         X = collect_if_lazy(X)
 
         if p is None:
-            p = {
-                group: self.propensity_model[group].predict(X)
-                for group in self.t_groups
-            }
+            p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
 
@@ -714,6 +710,7 @@ class XGBRRegressor(BaseRRegressor):
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
+            self.propensity = p
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
