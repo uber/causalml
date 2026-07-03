@@ -47,7 +47,7 @@ class Explainer:
             X (np.matrix): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             classes (dict): a mapping of treatment names to indices (used for indexing tau array)
-            model_tau (sklearn/lightgbm/xgboost model object): a model object
+            model_tau (sklearn/lightgbm/xgboost/catboost model object): a model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
             normalize (bool): normalize by sum of importances if method=auto (defaults to True)
             test_size (float/int): if float, represents the proportion of the dataset to include in the test split.
@@ -79,12 +79,33 @@ class Explainer:
             self.create_feature_names()
             self.build_new_tau_models()
 
+    def _get_feature_importances(self, model):
+        """
+        Returns feature importances for supported tree-based estimators.
+
+        Supports:
+            - feature_importances_ (scikit-learn, LightGBM, XGBoost)
+            - get_feature_importance() (CatBoost)
+        """
+        if hasattr(model, "feature_importances_"):
+            return model.feature_importances_
+
+        if hasattr(model, "get_feature_importance"):
+            return model.get_feature_importance()
+
+        raise AttributeError(
+            "model_tau must expose feature importances via "
+            "`feature_importances_` or `get_feature_importance()` "
+            "(after fitting)."
+        )
+
     def check_conditions(self):
         """
         Checks for multiple conditions:
             - method is valid
             - X, tau, and classes are specified
-            - model_tau has feature_importances_ attribute after fitting
+            - model_tau exposes feature importances via feature_importances_ or
+              get_feature_importance() after fitting
         """
         assert self.method in VALID_METHODS, "Current supported methods: {}".format(
             ", ".join(VALID_METHODS)
@@ -97,10 +118,9 @@ class Explainer:
         model_test = deepcopy(self.model_tau)
         model_test.fit(
             [[0], [1]], [0, 1]
-        )  # Fit w/ dummy data to check for feature_importances_ below
-        assert hasattr(
-            model_test, "feature_importances_"
-        ), "model_tau must have the feature_importances_ method (after fitting)"
+        )  # Fit w/ dummy data to ensure feature importances are available
+
+        self._get_feature_importances(model_test)
 
     def create_feature_names(self):
         """
@@ -157,7 +177,9 @@ class Explainer:
         if self.r_learners is not None:
             self.models_tau = deepcopy(self.r_learners)
         for group, idx in self.classes.items():
-            importance_dict[group] = self.models_tau[group].feature_importances_
+            importance_dict[group] = self._get_feature_importances(
+                self.models_tau[group]
+            )
             if self.normalize:
                 importance_dict[group] = (
                     importance_dict[group] / importance_dict[group].sum()
