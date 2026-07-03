@@ -19,6 +19,7 @@ from causalml.metrics.sensitivity import (
 from causalml.metrics.sensitivity import (
     SensitivityRandomReplace,
     SensitivitySelectionBias,
+    SensitivityMSM,
 )
 from causalml.metrics.sensitivity import (
     one_sided,
@@ -258,3 +259,35 @@ def test_alignment_att():
     adj = alignment_att(alpha, e, treatment)
 
     assert y.shape == adj.shape
+
+
+def test_SensitivityMSM():
+    y, X, treatment, tau, b, e = synthetic_data(
+        mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
+    )
+    INFERENCE_FEATURES = ["feature_" + str(i) for i in range(NUM_FEATURES)]
+    df = pd.DataFrame(X, columns=INFERENCE_FEATURES)
+    df[TREATMENT_COL] = treatment
+    df[OUTCOME_COL] = y
+    df[SCORE_COL] = e
+
+    learner = BaseXLearner(LinearRegression())
+    sens = SensitivityMSM(
+        df=df,
+        inference_features=INFERENCE_FEATURES,
+        p_col=SCORE_COL,
+        treatment_col=TREATMENT_COL,
+        outcome_col=OUTCOME_COL,
+        learner=learner,
+    )
+
+    bounds_df = sens.get_msm_bounds(gamma=[1.0, 1.5, 2.0, 3.0])
+    assert list(bounds_df.columns) == ["gamma", "ate_lower", "ate_upper"]
+
+    # Gamma=1 should collapse to a (near-)point estimate
+    row1 = bounds_df[bounds_df.gamma == 1.0].iloc[0]
+    assert abs(row1.ate_upper - row1.ate_lower) < 1e-6
+
+    # bounds should widen monotonically with Gamma
+    widths = (bounds_df.ate_upper - bounds_df.ate_lower).values
+    assert np.all(np.diff(widths) >= -1e-9)
