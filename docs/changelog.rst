@@ -5,6 +5,58 @@ Changelog
 
 You can find the latest changes in the `GitHub releases <https://github.com/uber/causalml/releases>`_
 
+0.17.0 (Jul 2026)
+-----------------
+* Adds **scikit-learn 1.9 support**, resolving an ``import causalml.dataset`` failure present on the 0.16.0 wheel (#926).
+* Adds **native Polars** ``DataFrame``/``Series``/``LazyFrame`` support across all meta-learners, and a **JAX/flax.nnx backend** for DragonNet.
+* Makes the meta-learners **scikit-learn compliant** (``BaseEstimator``), so ``clone()`` and ``get_params()`` work.
+* Adds the **RATE** evaluation metric and post-fit confidence intervals for ``BaseTLearner``, plus numerous bug fixes.
+
+New Features
+~~~~~~~~~~~~
+* Add native Polars DataFrame, Series, and LazyFrame support for all meta-learners by @aman-coder03 in https://github.com/uber/causalml/pull/901
+* Polish Polars support and add bootstrap CI test coverage by @aman-coder03 in https://github.com/uber/causalml/pull/921
+* Add JAX/flax.nnx backend for DragonNet by @xrhd in https://github.com/uber/causalml/pull/918
+* docs: document JAX backend for DragonNet by @xrhd in https://github.com/uber/causalml/pull/919
+* Make meta-learners scikit-learn compliant via BaseEstimator by @aman-coder03 in https://github.com/uber/causalml/pull/912
+* Add Rank-weighted Average Treatment Effect (RATE) metric by @aman-coder03 in https://github.com/uber/causalml/pull/887
+* Add ``rate_score()`` with bootstrap confidence intervals and p-values by @aman-coder03 in https://github.com/uber/causalml/pull/890
+* Add AIPW docstring warning to ``get_toc()`` and ``rate_score()`` by @jeongyoonlee in https://github.com/uber/causalml/pull/891
+* Add post-fit confidence intervals to ``BaseTLearner`` via ``store_bootstraps`` and ``return_ci`` by @aman-coder03 in https://github.com/uber/causalml/pull/886
+* Support NaN values in UpliftTree and UpliftRandomForest by @aman-coder03 in https://github.com/uber/causalml/pull/860
+
+scikit-learn 1.9 Support
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Fix for compatibility with sklearn v1.9.0 by @jakevdp in https://github.com/uber/causalml/pull/903
+* Fix CausalRandomForestRegressor.fit() on scikit-learn 1.9 by @jeongyoonlee in https://github.com/uber/causalml/pull/907
+* Support CausalRandomForestRegressor.calculate_error() on scikit-learn >= 1.9 by @jeongyoonlee in https://github.com/uber/causalml/pull/909
+
+Bug Fixes
+~~~~~~~~~
+* Fix #904: Prevent deepcopy of fitted templates in bootstrap and correct predict validation ordering by @Saurav-Gupta-9741 in https://github.com/uber/causalml/pull/910
+* Optimised training, inference and memory for metalearners in multitreatment settings by @Ic3fr0g in https://github.com/uber/causalml/pull/896
+* Fix UpliftRandomForest predict shape mismatch with multiple treatments by @jeongyoonlee in https://github.com/uber/causalml/pull/884
+* Fix uplift tree p-value NaN from division by zero by @jeongyoonlee in https://github.com/uber/causalml/pull/882
+* Fix CausalRandomForestRegressor predicting inf from division by zero by @jeongyoonlee in https://github.com/uber/causalml/pull/883
+* Fix SensitivityPlaceboTreatment ignoring actual treatment groups by @jeongyoonlee in https://github.com/uber/causalml/pull/880
+* Fix seed parameter TypeError in BaseDRLearner bootstrap CI by @mohsinm-dev in https://github.com/uber/causalml/pull/879
+* Fix ValueError on read-only arrays in BaseSLearner.predict() by @mohsinm-dev in https://github.com/uber/causalml/pull/878
+* Add input validation to auuc_score for missing model columns by @jeongyoonlee in https://github.com/uber/causalml/pull/881
+* Make xgboost optional in synthetic dataset generation by @Si-ra-kri in https://github.com/uber/causalml/pull/872
+* Bug Fix: use iloc to index pd.Series by @bekojuniranjan in https://github.com/uber/causalml/pull/877
+
+Build / CI
+~~~~~~~~~~
+* Make Cython line tracing opt-in to keep release wheels fast by @HSJung93 in https://github.com/uber/causalml/pull/914
+* Remove the PyPI token from GitHub Actions in favor of the Trusted Publishing by @jeongyoonlee in https://github.com/uber/causalml/pull/871
+* Upgrade GitHub Actions for Node 24 compatibility by @salmanmkc in https://github.com/uber/causalml/pull/874
+* Upgrade GitHub Actions to latest versions by @salmanmkc in https://github.com/uber/causalml/pull/875
+* ci: declare workflow-level ``contents: read`` on 4 workflows by @arpitjain099 in https://github.com/uber/causalml/pull/900
+
+Breaking Changes
+~~~~~~~~~~~~~~~~~
+* **Meta-learner** ``__init__`` **signatures (#912):** to become scikit-learn ``BaseEstimator`` s, each learner now stores its constructor arguments verbatim and builds models in ``fit()``. Most visibly, ``XGBRRegressor`` no longer accepts arbitrary ``**kwargs`` — pass XGBoost parameters via the explicit ``xgb_kwargs=<dict>`` argument.
+
 0.16.0 (Feb 2026)
 -----------------
 * **BREAKING CHANGE:** This release upgrades from manylinux2014 to manylinux_2_28 for Linux wheel distribution.
