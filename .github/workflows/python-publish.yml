@@ -58,6 +58,8 @@ jobs:
   upload_all:
     needs: [build_wheels, make_sdist]
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write  # required for PyPI trusted publishing (OIDC)
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - uses: actions/download-artifact@v7
