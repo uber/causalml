@@ -710,6 +710,54 @@ def test_BaseRLearner_without_p(generate_regression_data):
     assert auuc["cate_p"] > 0.5
 
 
+def test_BaseRLearner_predict_return_components_different_size(
+    generate_regression_data,
+):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(learner=LinearRegression())
+
+    learner.fit(
+        X=X[:200],
+        treatment=treatment[:200],
+        y=y[:200],
+        verbose=False,
+    )
+
+    te, yhat, p = learner.predict(
+        X=X[200:300],
+        return_components=True,
+    )
+
+    assert te.shape == (100, len(learner.t_groups))
+    assert yhat.shape == (100,)
+
+    for g in learner.t_groups:
+        assert p[g].shape == (100,)
+
+
+def test_BaseRLearner_predict_without_propensity_model_raises(
+    generate_regression_data,
+):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(learner=LinearRegression())
+
+    learner.fit(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        verbose=False,
+    )
+
+    with pytest.raises(ValueError):
+        learner.predict(
+            X=X,
+            return_components=True,
+        )
+
+
 def test_BaseRRegressor_without_p(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
@@ -945,6 +993,20 @@ def test_BaseRClassifier(generate_classification_data):
 
     tau_pred = uplift_model.predict(X=df_test[x_names].values)
 
+    te, yhat, p = uplift_model.predict(
+        X=df_test[x_names].values,
+        return_components=True,
+    )
+
+    assert te.shape == tau_pred.shape
+    assert yhat.shape == (len(df_test),)
+
+    assert isinstance(p, dict)
+    assert set(p.keys()) == set(uplift_model.t_groups)
+
+    for g in uplift_model.t_groups:
+        assert p[g].shape == (len(df_test),)
+
     auuc_metrics = pd.DataFrame(
         {
             "tau_pred": tau_pred.flatten(),
@@ -1025,6 +1087,20 @@ def test_XGBRegressor_with_sample_weights(generate_regression_data):
     uplift_model = XGBRRegressor()
     uplift_model.fit(X=X, p=e, treatment=treatment, y=y, sample_weight=weights)
     tau_pred = uplift_model.predict(X=X)
+
+    te, yhat, p = uplift_model.predict(
+        X=X,
+        return_components=True,
+    )
+
+    assert te.shape == tau_pred.shape
+    assert yhat.shape == (X.shape[0],)
+
+    assert isinstance(p, dict)
+
+    for g in uplift_model.t_groups:
+        assert p[g].shape == (X.shape[0],)
+
     assert len(tau_pred) == len(weights)
 
 
@@ -1762,13 +1838,6 @@ def test_multi_treatment_learners():
             return_ci=True,
             return_components=True,
             verbose=False,
-        )
-    with pytest.raises(ValueError):
-        rl.predict(
-            X=X,
-            p=p_scores,
-            return_ci=True,
-            return_components=True,
         )
     _assert_ci_triple(
         rl.fit_predict(

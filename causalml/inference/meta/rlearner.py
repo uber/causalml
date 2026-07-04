@@ -120,7 +120,6 @@ class BaseRLearner(BaseLearner):
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
-            self.propensity = p
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
@@ -195,7 +194,6 @@ class BaseRLearner(BaseLearner):
         X,
         p=None,
         return_components=False,
-        return_ci=False,
     ):
         """Predict treatment effects.
 
@@ -203,19 +201,22 @@ class BaseRLearner(BaseLearner):
             X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix.
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): propensity scores.
             return_components (bool): whether to return nuisance components.
-            return_ci (bool): included for API consistency with other meta-learners.
 
         Returns:
             numpy.ndarray or tuple
         """
 
-        if return_ci and return_components:
-            raise ValueError("return_ci and return_components cannot both be True.")
-
         X = collect_if_lazy(X)
 
         if p is None:
-            p = self.propensity
+            if not hasattr(self, "propensity_model"):
+                raise ValueError(
+                    "No propensity model is available. Please provide `p` or fit the learner with p=None."
+                )
+            p = {
+                group: self.propensity_model[group].predict(X)
+                for group in self.t_groups
+            }
         else:
             p = self._format_p(p, self.t_groups)
 
@@ -520,7 +521,6 @@ class BaseRClassifier(BaseRLearner):
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
-            self.propensity = p
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
@@ -584,15 +584,19 @@ class BaseRClassifier(BaseRLearner):
         X,
         p=None,
         return_components=False,
-        return_ci=False,
     ):
-        if return_ci and return_components:
-            raise ValueError("return_ci and return_components cannot both be True.")
 
         X = collect_if_lazy(X)
 
         if p is None:
-            p = self.propensity
+            if not hasattr(self, "propensity_model"):
+                raise ValueError(
+                    "No propensity model is available. Please provide `p` or fit the learner with p=None."
+                )
+            p = {
+                group: self.propensity_model[group].predict(X)
+                for group in self.t_groups
+            }
         else:
             p = self._format_p(p, self.t_groups)
 
@@ -710,7 +714,6 @@ class XGBRRegressor(BaseRRegressor):
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
-            self.propensity = p
 
         self._classes = {group: i for i, group in enumerate(self.t_groups)}
 
