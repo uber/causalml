@@ -194,6 +194,57 @@ with :math:`\{Y^3, X^3, W^3\}`
 
 Similar to the DR-Learner Repeat Stage 1 and Stage 2 again twice with different permutations of partitions for estimation. The final conditional LATE model is the average of the 3 conditional LATE models.
 
+CATE Model Evaluation
+----------------------
+
+Cross-validation cannot be used to select among fitted CATE models because the
+ground-truth treatment effect is never observed for any unit -- only one of the
+two potential outcomes is realized. The methods below are surrogate metrics that
+score fitted CATE models using only observed data, so that models such as the
+S/T/X/R/DR-learners above can be compared and selected among.
+
+These metrics evaluate *effect-magnitude accuracy* -- how close a model's CATE
+estimate is to the truth -- which is a distinct question from *targeting
+quality* -- whether a model correctly ranks units by benefit -- addressed by
+:ref:`RATE`.
+
+DR (Doubly Robust) pseudo-outcome loss
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Following :cite:`kennedy2020optimal`, we construct the same doubly-robust
+pseudo-outcome used in the DR-learner above,
+
+.. math::
+   \phi = \frac{W-\hat{e}(X)}{\hat{e}(X)(1-\hat{e}(X))}\left(Y-\hat{m}_W(X)\right)+\hat{m}_1(X)-\hat{m}_0(X)
+
+with :math:`\hat{e}(x)`, :math:`\hat{m}_0(x)`, and :math:`\hat{m}_1(x)` cross-fit
+so that :math:`\phi_i` never depends on a model that saw unit :math:`i` during
+training. Under either correct propensity or correct outcome-model
+specification, :math:`E[\phi \mid X]` is an unbiased estimate of the true CATE,
+which lets :math:`\phi` stand in for the unobserved ground truth when scoring a
+fitted CATE model :math:`\hat\tau(x)`:
+
+.. math::
+   \text{DR loss}(\hat\tau) = \frac{1}{n}\sum_i \left(\hat\tau(X_i) - \phi_i\right)^2
+
+Lower is better. :cite:`mahajan2024empirical` found DR-based metrics dominate
+across 78 benchmark datasets for CATE model selection.
+
+Plug-in T-learner loss
+~~~~~~~~~~~~~~~~~~~~~~
+
+A simpler, non-doubly-robust baseline: fit a cross-fit :ref:`T-learner`, and use
+its held-out estimate :math:`\hat\mu_1(x) - \hat\mu_0(x)` directly as a proxy
+for the true CATE:
+
+.. math::
+   \text{T-loss}(\hat\tau) = \frac{1}{n}\sum_i \left(\hat\tau(X_i) - (\hat\mu_1(X_i) - \hat\mu_0(X_i))\right)^2
+
+This is biased under a misspecified outcome model, unlike the DR loss above.
+Despite that, :cite:`mahajan2024empirical` found it is never dominated across
+their benchmark datasets, making it a useful complement to DR-based scoring
+rather than a replacement.
+
 Tree-Based Algorithms
 ---------------------
 

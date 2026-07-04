@@ -26,6 +26,12 @@ from .visualize import (
 )  # noqa
 from .visualize import auuc_score, qini_score  # noqa
 from .rate import get_toc, rate_score, plot_toc  # noqa
+from .cate_scoring import (
+    compute_dr_pseudo_outcomes,
+    dr_score,
+    plug_in_t_score,
+)  # noqa
+from .sensitivity import Sensitivity, SensitivityPlaceboTreatment  # noqa
 from .sensitivity import Sensitivity, SensitivityPlaceboTreatment  # noqa
 from .sensitivity import (
     SensitivityRandomCause,
