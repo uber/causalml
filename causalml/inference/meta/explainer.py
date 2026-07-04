@@ -79,33 +79,12 @@ class Explainer:
             self.create_feature_names()
             self.build_new_tau_models()
 
-    def _get_feature_importances(self, model):
-        """
-        Returns feature importances for supported tree-based estimators.
-
-        Supports:
-            - feature_importances_ (scikit-learn, LightGBM, XGBoost)
-            - get_feature_importance() (CatBoost)
-        """
-        if hasattr(model, "feature_importances_"):
-            return model.feature_importances_
-
-        if hasattr(model, "get_feature_importance"):
-            return model.get_feature_importance()
-
-        raise AttributeError(
-            "model_tau must expose feature importances via "
-            "`feature_importances_` or `get_feature_importance()` "
-            "(after fitting)."
-        )
-
     def check_conditions(self):
         """
         Checks for multiple conditions:
             - method is valid
             - X, tau, and classes are specified
-            - model_tau exposes feature importances via feature_importances_ or
-              get_feature_importance() after fitting
+            - model_tau has feature_importances_ after fitting
         """
         assert self.method in VALID_METHODS, "Current supported methods: {}".format(
             ", ".join(VALID_METHODS)
@@ -120,7 +99,9 @@ class Explainer:
             [[0], [1]], [0, 1]
         )  # Fit w/ dummy data to ensure feature importances are available
 
-        self._get_feature_importances(model_test)
+        assert hasattr(
+            model_test, "feature_importances_"
+        ), "model_tau must have the feature_importances_ method (after fitting)"
 
     def create_feature_names(self):
         """
@@ -177,9 +158,7 @@ class Explainer:
         if self.r_learners is not None:
             self.models_tau = deepcopy(self.r_learners)
         for group, idx in self.classes.items():
-            importance_dict[group] = self._get_feature_importances(
-                self.models_tau[group]
-            )
+            importance_dict[group] = self.models_tau[group].feature_importances_
             if self.normalize:
                 importance_dict[group] = (
                     importance_dict[group] / importance_dict[group].sum()
