@@ -991,10 +991,14 @@ def test_BaseRClassifier(generate_classification_data):
         y=df_train[CONVERSION].values,
     )
 
-    tau_pred = uplift_model.predict(X=df_test[x_names].values)
+    tau_pred = uplift_model.predict(
+        X=df_test[x_names].values,
+        p=df_test["propensity_score"].values,
+    )
 
     te, yhat, p = uplift_model.predict(
         X=df_test[x_names].values,
+        p=df_test["propensity_score"].values,
         return_components=True,
     )
 
@@ -1055,7 +1059,10 @@ def test_BaseRClassifier_with_sample_weights(generate_classification_data):
         sample_weight=df_train["sample_weights"],
     )
 
-    tau_pred = uplift_model.predict(X=df_test[x_names].values)
+    tau_pred = uplift_model.predict(
+        X=df_test[x_names].values,
+        p=df_test["propensity_score"].values,
+    )
 
     auuc_metrics = pd.DataFrame(
         {
@@ -1086,10 +1093,14 @@ def test_XGBRegressor_with_sample_weights(generate_regression_data):
     # when sample_weight is passed
     uplift_model = XGBRRegressor()
     uplift_model.fit(X=X, p=e, treatment=treatment, y=y, sample_weight=weights)
-    tau_pred = uplift_model.predict(X=X)
+    tau_pred = uplift_model.predict(
+        X=X,
+        p=e,
+    )
 
     te, yhat, p = uplift_model.predict(
         X=X,
+        p=e,
         return_components=True,
     )
 
