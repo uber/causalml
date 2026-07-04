@@ -255,23 +255,65 @@ class Sensitivity:
 
         return summary_df
 
+    # Learners whose fit_predict(return_components=True) does NOT return
+    # potential-outcome regressions (mu0, mu1). X-learner returns two CATE
+    # estimates from its tau models instead (xlearner.py); R-learner has no
+    # outcome-regression decomposition at all. Both are rejected explicitly
+    # rather than silently misinterpreted.
+    _UNSUPPORTED_POTENTIAL_OUTCOME_LEARNERS = (
+        "BaseXLearner",
+        "BaseXRegressor",
+        "BaseXClassifier",
+        "BaseRLearner",
+        "BaseRRegressor",
+        "BaseRClassifier",
+    )
+
     def get_potential_outcome_predictions(self, X, p, treatment, y):
         """Return separate potential-outcome predictions mu1_hat, mu0_hat.
+
+        Only supported for S/T/DR-learner-style objects, whose
+        fit_predict(..., return_components=True) returns the fitted
+        outcome regressions (mu0_hat, mu1_hat) directly. X-learner and
+        R-learner are explicitly unsupported: X-learner's "components"
+        are two CATE estimates from its second-stage tau models, not
+        potential outcomes, and R-learner has no outcome-regression
+        decomposition to extract.
 
         Args:
             X, p, treatment, y: same as get_prediction()
         Returns:
             (tuple of np.array): (mu1_hat, mu0_hat)
+        Raises:
+            NotImplementedError: if the learner does not expose
+                potential-outcome regressions via return_components.
         """
         learner = self.learner
+        learner_name = type(learner).__name__
+
+        if learner_name in self._UNSUPPORTED_POTENTIAL_OUTCOME_LEARNERS:
+            raise NotImplementedError(
+                "SensitivityMSM does not support {} yet: it needs potential-"
+                "outcome regressions (mu0_hat, mu1_hat), which this learner's "
+                "return_components does not expose. Use an S-learner, "
+                "T-learner, or DR-learner instead.".format(learner_name)
+            )
+
         try:
             _, yhat_cs, yhat_ts = learner.fit_predict(
                 X=X, p=p, treatment=treatment, y=y, return_components=True
             )
         except TypeError:
-            _, yhat_cs, yhat_ts = learner.fit_predict(
-                X=X, treatment=treatment, y=y, return_components=True
-            )
+            try:
+                _, yhat_cs, yhat_ts = learner.fit_predict(
+                    X=X, treatment=treatment, y=y, return_components=True
+                )
+            except TypeError:
+                raise NotImplementedError(
+                    "SensitivityMSM could not extract potential-outcome "
+                    "predictions from {}: fit_predict() does not support "
+                    "return_components=True.".format(learner_name)
+                )
         # yhat_cs/yhat_ts are dicts keyed by treatment group; binary case → one group
         group = list(yhat_cs.keys())[0]
         return yhat_ts[group], yhat_cs[group]
@@ -667,6 +709,11 @@ class SensitivityMSM(Sensitivity):
         As with the rest of this module, this is fragility-diagnostic
         tooling, not a license for observational causal inference; see
         causalml's HTE-for-experiments framing (issue #725).
+
+        Supported learners: S-learner, T-learner, DR-learner (any learner
+        whose fit_predict(return_components=True) returns potential-outcome
+        regressions mu0_hat, mu1_hat). X-learner and R-learner are not yet
+        supported and will raise NotImplementedError.
     """
 
     def __init__(self, *args, gamma=None, **kwargs):

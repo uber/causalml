@@ -271,7 +271,7 @@ def test_SensitivityMSM():
     df[OUTCOME_COL] = y
     df[SCORE_COL] = e
 
-    learner = BaseXLearner(LinearRegression())
+    learner = BaseTLearner(LinearRegression())
     sens = SensitivityMSM(
         df=df,
         inference_features=INFERENCE_FEATURES,
@@ -284,10 +284,37 @@ def test_SensitivityMSM():
     bounds_df = sens.get_msm_bounds(gamma=[1.0, 1.5, 2.0, 3.0])
     assert list(bounds_df.columns) == ["gamma", "ate_lower", "ate_upper"]
 
-    # Gamma=1 should collapse to a (near-)point estimate
+    # Gamma=1 should collapse to a (near-)point estimate, and that point
+    # estimate should be close to the true ATE (tau.mean()) — catches
+    # cases where mu0_hat/mu1_hat are misread and AIPW silently degenerates
+    # to something else that happens to still look plausible.
     row1 = bounds_df[bounds_df.gamma == 1.0].iloc[0]
     assert abs(row1.ate_upper - row1.ate_lower) < 1e-6
+    assert abs(row1.ate_lower - tau.mean()) < 0.05
 
     # bounds should widen monotonically with Gamma
     widths = (bounds_df.ate_upper - bounds_df.ate_lower).values
     assert np.all(np.diff(widths) >= -1e-9)
+
+
+def test_SensitivityMSM_unsupported_learner():
+    y, X, treatment, tau, b, e = synthetic_data(
+        mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
+    )
+    INFERENCE_FEATURES = ["feature_" + str(i) for i in range(NUM_FEATURES)]
+    df = pd.DataFrame(X, columns=INFERENCE_FEATURES)
+    df[TREATMENT_COL] = treatment
+    df[OUTCOME_COL] = y
+    df[SCORE_COL] = e
+
+    for learner in (BaseXLearner(LinearRegression()), BaseRLearner(LinearRegression())):
+        sens = SensitivityMSM(
+            df=df,
+            inference_features=INFERENCE_FEATURES,
+            p_col=SCORE_COL,
+            treatment_col=TREATMENT_COL,
+            outcome_col=OUTCOME_COL,
+            learner=learner,
+        )
+        with pytest.raises(NotImplementedError):
+            sens.get_msm_bounds(gamma=[1.0, 2.0])
