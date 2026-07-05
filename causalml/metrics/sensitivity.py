@@ -76,6 +76,25 @@ def alignment_att(alpha, p, treatment):
     return adj
 
 
+def msm_propensity_bounds(p, gamma):
+    """Clipped propensity bounds under the Marginal Sensitivity Model.
+
+    Reference: Tan, Z. (2006); Dorn, J. & Guo, K. (2023); closed-form
+    expressions in Dorn, J., Guo, K. & Kallus, N. (2024),
+    "Doubly-Valid/Doubly-Sharp Sensitivity Analysis..." arXiv:2112.11449.
+
+    Args:
+        p (np.array): estimated propensity score vector, in (0, 1)
+        gamma (float): sensitivity parameter, Gamma >= 1
+
+    Returns:
+        (tuple of np.array): (p_lower, p_upper) bounds on the true propensity
+    """
+    p_lower = p / (p + gamma * (1 - p))
+    p_upper = gamma * p / (gamma * p + (1 - p))
+    return p_lower, p_upper
+
+
 class Sensitivity:
     """A Sensitivity Check class to support Placebo Treatment, Irrelevant Additional Confounder
     and Subset validation refutation methods to verify causal inference.
@@ -168,6 +187,7 @@ class Sensitivity:
             "Subset Data",
             "Random Replace",
             "Selection Bias",
+            "MSM",
         ]
         class_name = "Sensitivity" + method_name.replace(" ", "")
 
@@ -234,6 +254,69 @@ class Sensitivity:
         summary_df = pd.DataFrame(summary, columns=SUMMARY_COLS)
 
         return summary_df
+
+    # Learners whose fit_predict(return_components=True) does NOT return
+    # potential-outcome regressions (mu0, mu1). X-learner returns two CATE
+    # estimates from its tau models instead (xlearner.py); R-learner has no
+    # outcome-regression decomposition at all. Both are rejected explicitly
+    # rather than silently misinterpreted.
+    _UNSUPPORTED_POTENTIAL_OUTCOME_LEARNERS = (
+        "BaseXLearner",
+        "BaseXRegressor",
+        "BaseXClassifier",
+        "BaseRLearner",
+        "BaseRRegressor",
+        "BaseRClassifier",
+    )
+
+    def get_potential_outcome_predictions(self, X, p, treatment, y):
+        """Return separate potential-outcome predictions mu1_hat, mu0_hat.
+
+        Only supported for S/T/DR-learner-style objects, whose
+        fit_predict(..., return_components=True) returns the fitted
+        outcome regressions (mu0_hat, mu1_hat) directly. X-learner and
+        R-learner are explicitly unsupported: X-learner's "components"
+        are two CATE estimates from its second-stage tau models, not
+        potential outcomes, and R-learner has no outcome-regression
+        decomposition to extract.
+
+        Args:
+            X, p, treatment, y: same as get_prediction()
+        Returns:
+            (tuple of np.array): (mu1_hat, mu0_hat)
+        Raises:
+            NotImplementedError: if the learner does not expose
+                potential-outcome regressions via return_components.
+        """
+        learner = self.learner
+        learner_name = type(learner).__name__
+
+        if learner_name in self._UNSUPPORTED_POTENTIAL_OUTCOME_LEARNERS:
+            raise NotImplementedError(
+                "SensitivityMSM does not support {} yet: it needs potential-"
+                "outcome regressions (mu0_hat, mu1_hat), which this learner's "
+                "return_components does not expose. Use an S-learner, "
+                "T-learner, or DR-learner instead.".format(learner_name)
+            )
+
+        try:
+            _, yhat_cs, yhat_ts = learner.fit_predict(
+                X=X, p=p, treatment=treatment, y=y, return_components=True
+            )
+        except TypeError:
+            try:
+                _, yhat_cs, yhat_ts = learner.fit_predict(
+                    X=X, treatment=treatment, y=y, return_components=True
+                )
+            except TypeError:
+                raise NotImplementedError(
+                    "SensitivityMSM could not extract potential-outcome "
+                    "predictions from {}: fit_predict() does not support "
+                    "return_components=True.".format(learner_name)
+                )
+        # yhat_cs/yhat_ts are dicts keyed by treatment group; binary case → one group
+        group = list(yhat_cs.keys())[0]
+        return yhat_ts[group], yhat_cs[group]
 
     def summary(self, method):
         """Summary report
@@ -604,3 +687,127 @@ class SensitivitySelectionBias(Sensitivity):
                 "Cannot find correponding rsquare value within the range for input, please edit confounding",
                 "values vector or use a larger range and try again",
             )
+
+
+class SensitivityMSM(Sensitivity):
+    """Sensitivity bounds for the ATE under the Marginal Sensitivity Model (MSM).
+
+    Reference:
+        Tan, Z. (2006). "A distributional approach for causal inference
+        using propensity scores."
+        Dorn, J. & Guo, K. (2023). "Sharp sensitivity analysis for inverse
+        propensity weighting via quantile balancing." JASA.
+        Dorn, J., Guo, K. & Kallus, N. (2024). "Doubly-valid/doubly-sharp
+        sensitivity analysis for causal inference with unmeasured
+        confounding." arXiv:2112.11449.
+
+    Note:
+        This reports a Gamma (propensity odds-ratio) bound, which is a
+        different quantity from the partial-R^2 robustness value used by
+        EconML/DoWhy — the two are not directly comparable.
+
+        As with the rest of this module, this is fragility-diagnostic
+        tooling, not a license for observational causal inference; see
+        causalml's HTE-for-experiments framing (issue #725).
+
+        Supported learners: S-learner, T-learner, DR-learner (any learner
+        whose fit_predict(return_components=True) returns potential-outcome
+        regressions mu0_hat, mu1_hat). X-learner and R-learner are not yet
+        supported and will raise NotImplementedError.
+    """
+
+    def __init__(self, *args, gamma=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.gamma = gamma if gamma is not None else [1.0, 1.5, 2.0, 3.0]
+
+    @staticmethod
+    def _treatment_indicator(treatment, control_name):
+        """Coerce a (possibly string-labeled) treatment vector to a 0/1 float array."""
+        return (treatment != control_name).astype(float)
+
+    def _bounds_for_gamma(self, mu1_hat, mu0_hat, p, t, y, gamma):
+        """Sharp elementwise MSM bound for a single Gamma, given precomputed
+        potential-outcome predictions.
+
+        Each unit's propensity is clipped toward whichever extreme
+        (p_lower or p_upper) makes that unit's residual push the bound in
+        the requested direction, per Dorn & Guo (2023) / Dorn, Guo & Kallus
+        (2024).
+
+        Args:
+            mu1_hat, mu0_hat (np.array): fitted potential-outcome predictions
+            p (np.array): propensity score vector
+            t (np.array): 0/1 treatment indicator
+            y (np.array): outcome vector
+            gamma (float): sensitivity parameter, >= 1.0
+        Returns:
+            (tuple of float): (ate_lower, ate_upper)
+        """
+        p_lower, p_upper = msm_propensity_bounds(p, gamma)
+        resid_t = y - mu1_hat
+        resid_c = y - mu0_hat
+
+        # Upper bound: every unit's propensity is clipped toward whichever
+        # extreme maximizes that unit's own contribution to the AIPW sum
+        # (treated and control arms use the same directional rule, since
+        # the sign convention already differs via the (1 - pi) denominator).
+        w_t_ub = np.where(resid_t >= 0, p_lower, p_upper)
+        w_c_ub = np.where(resid_c >= 0, p_lower, p_upper)
+        ub = np.mean(
+            (mu1_hat - mu0_hat)
+            + t * resid_t / w_t_ub
+            - (1 - t) * resid_c / (1 - w_c_ub)
+        )
+
+        # Lower bound: the mirrored (minimizing) choice for every unit.
+        w_t_lb = np.where(resid_t >= 0, p_upper, p_lower)
+        w_c_lb = np.where(resid_c >= 0, p_upper, p_lower)
+        lb = np.mean(
+            (mu1_hat - mu0_hat)
+            + t * resid_t / w_t_lb
+            - (1 - t) * resid_c / (1 - w_c_lb)
+        )
+
+        return lb, ub
+
+    def get_msm_bounds(self, gamma=None):
+        """Return ATE bounds for a range of Gamma values.
+
+        Args:
+            gamma (list of float, optional): sensitivity parameters, each >= 1
+
+        Returns:
+            (pd.DataFrame): columns ["gamma", "ate_lower", "ate_upper"]
+        """
+        gamma_list = gamma if gamma is not None else self.gamma
+        if any(g < 1.0 for g in gamma_list):
+            raise ValueError("All gamma values must be >= 1.0")
+
+        X = self.df[self.inference_features].values
+        p = self.df[self.p_col].values
+        treatment_raw = self.df[self.treatment_col].values
+        y = self.df[self.outcome_col].values
+
+        control_name = getattr(self.learner, "control_name", 0)
+        t = self._treatment_indicator(treatment_raw, control_name)
+
+        # Fit once — mu1_hat/mu0_hat don't depend on gamma.
+        mu1_hat, mu0_hat = self.get_potential_outcome_predictions(
+            X, p, treatment_raw, y
+        )
+
+        rows = []
+        for g in sorted(set(gamma_list)):
+            lb, ub = self._bounds_for_gamma(mu1_hat, mu0_hat, p, t, y, g)
+            rows.append([g, lb, ub])
+        return pd.DataFrame(rows, columns=["gamma", "ate_lower", "ate_upper"])
+
+    def sensitivity_estimate(self):
+        """Satisfies the base class interface: returns the point estimate
+        (Gamma=1) and bounds at the largest requested Gamma."""
+        gamma_list = sorted(set([1.0] + list(self.gamma)))
+        bounds_df = self.get_msm_bounds(gamma=gamma_list)
+        ate = bounds_df.loc[bounds_df.gamma == 1.0, "ate_lower"].values[0]
+        ate_lower = bounds_df["ate_lower"].min()
+        ate_upper = bounds_df["ate_upper"].max()
+        return ate, ate_lower, ate_upper
