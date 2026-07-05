@@ -36,6 +36,7 @@ from causalml.inference.meta import TMLELearner
 from causalml.inference.meta import BaseDRLearner
 from causalml.inference.meta import BaseDRRegressor
 from causalml.inference.meta import BaseDRClassifier
+from causalml.inference.meta.explainer import Explainer
 from causalml.metrics import ape, auuc_score
 
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
@@ -638,6 +639,34 @@ def test_BaseRRegressor(generate_regression_data):
         normalize=True,
     )
     assert auuc["cate_p"] > 0.5
+
+
+def test_explainer_auto_importance_catboost(generate_regression_data):
+    catboost = pytest.importorskip("catboost")
+
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    model_tau = catboost.CatBoostRegressor(
+        iterations=10,
+        verbose=False,
+        random_seed=RANDOM_SEED,
+    )
+
+    explainer = Explainer(
+        method="auto",
+        control_name=CONTROL_NAME,
+        X=X,
+        tau=tau,
+        classes={CONTROL_NAME: 0},
+        model_tau=model_tau,
+    )
+
+    importance = explainer.get_importance()
+
+    assert len(importance) == 1
+    assert CONTROL_NAME in importance
+    assert isinstance(importance[CONTROL_NAME], pd.Series)
+    assert len(importance[CONTROL_NAME]) == X.shape[1]
 
 
 def test_BaseRLearner_without_p(generate_regression_data):

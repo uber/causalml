@@ -47,7 +47,7 @@ class Explainer:
             X (np.matrix): a feature matrix
             tau (np.array): a treatment effect vector (estimated/actual)
             classes (dict): a mapping of treatment names to indices (used for indexing tau array)
-            model_tau (sklearn/lightgbm/xgboost model object): a model object
+            model_tau (sklearn/lightgbm/xgboost/catboost model object): a model object
             features (np.array): list/array of feature names. If None, an enumerated list will be used.
             normalize (bool): normalize by sum of importances if method=auto (defaults to True)
             test_size (float/int): if float, represents the proportion of the dataset to include in the test split.
@@ -84,7 +84,7 @@ class Explainer:
         Checks for multiple conditions:
             - method is valid
             - X, tau, and classes are specified
-            - model_tau has feature_importances_ attribute after fitting
+            - model_tau has feature_importances_ after fitting
         """
         assert self.method in VALID_METHODS, "Current supported methods: {}".format(
             ", ".join(VALID_METHODS)
@@ -97,7 +97,8 @@ class Explainer:
         model_test = deepcopy(self.model_tau)
         model_test.fit(
             [[0], [1]], [0, 1]
-        )  # Fit w/ dummy data to check for feature_importances_ below
+        )  # Fit w/ dummy data to ensure feature importances are available
+
         assert hasattr(
             model_test, "feature_importances_"
         ), "model_tau must have the feature_importances_ method (after fitting)"
