@@ -409,9 +409,11 @@ def get_synthetic_preds_holdout(
             else:
                 learner = base_learner(model())
                 learner.fit(X=X_train, p=p_hat_train, treatment=w_train, y=y_train)
+
                 preds_dict_train["{} Learner ({})".format(label_l, label_m)] = (
                     learner.predict(X=X_train).flatten()
                 )
+
                 preds_dict_valid["{} Learner ({})".format(label_l, label_m)] = (
                     learner.predict(X=X_val).flatten()
                 )

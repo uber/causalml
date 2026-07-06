@@ -710,6 +710,54 @@ def test_BaseRLearner_without_p(generate_regression_data):
     assert auuc["cate_p"] > 0.5
 
 
+def test_BaseRLearner_predict_return_components_different_size(
+    generate_regression_data,
+):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(learner=LinearRegression())
+
+    learner.fit(
+        X=X[:200],
+        treatment=treatment[:200],
+        y=y[:200],
+        verbose=False,
+    )
+
+    te, yhat, p = learner.predict(
+        X=X[200:300],
+        return_components=True,
+    )
+
+    assert te.shape == (100, len(learner.t_groups))
+    assert yhat.shape == (100,)
+
+    for g in learner.t_groups:
+        assert p[g].shape == (100,)
+
+
+def test_BaseRLearner_predict_without_propensity_model_raises(
+    generate_regression_data,
+):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(learner=LinearRegression())
+
+    learner.fit(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        verbose=False,
+    )
+
+    with pytest.raises(ValueError):
+        learner.predict(
+            X=X,
+            return_components=True,
+        )
+
+
 def test_BaseRRegressor_without_p(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
@@ -943,7 +991,25 @@ def test_BaseRClassifier(generate_classification_data):
         y=df_train[CONVERSION].values,
     )
 
-    tau_pred = uplift_model.predict(X=df_test[x_names].values)
+    tau_pred = uplift_model.predict(
+        X=df_test[x_names].values,
+        p=df_test["propensity_score"].values,
+    )
+
+    te, yhat, p = uplift_model.predict(
+        X=df_test[x_names].values,
+        p=df_test["propensity_score"].values,
+        return_components=True,
+    )
+
+    assert te.shape == tau_pred.shape
+    assert yhat.shape == (len(df_test),)
+
+    assert isinstance(p, dict)
+    assert set(p.keys()) == set(uplift_model.t_groups)
+
+    for g in uplift_model.t_groups:
+        assert p[g].shape == (len(df_test),)
 
     auuc_metrics = pd.DataFrame(
         {
@@ -993,7 +1059,10 @@ def test_BaseRClassifier_with_sample_weights(generate_classification_data):
         sample_weight=df_train["sample_weights"],
     )
 
-    tau_pred = uplift_model.predict(X=df_test[x_names].values)
+    tau_pred = uplift_model.predict(
+        X=df_test[x_names].values,
+        p=df_test["propensity_score"].values,
+    )
 
     auuc_metrics = pd.DataFrame(
         {
@@ -1024,7 +1093,24 @@ def test_XGBRegressor_with_sample_weights(generate_regression_data):
     # when sample_weight is passed
     uplift_model = XGBRRegressor()
     uplift_model.fit(X=X, p=e, treatment=treatment, y=y, sample_weight=weights)
-    tau_pred = uplift_model.predict(X=X)
+    tau_pred = uplift_model.predict(
+        X=X,
+    )
+
+    te, yhat, p = uplift_model.predict(
+        X=X,
+        p=e,
+        return_components=True,
+    )
+
+    assert te.shape == tau_pred.shape
+    assert yhat.shape == (X.shape[0],)
+
+    assert isinstance(p, dict)
+
+    for g in uplift_model.t_groups:
+        assert p[g].shape == (X.shape[0],)
+
     assert len(tau_pred) == len(weights)
 
 
@@ -1686,15 +1772,83 @@ def test_multi_treatment_learners():
         assert hasattr(rl, attr) and isinstance(getattr(rl, attr), dict)
         assert set(getattr(rl, attr).keys()) == set(rl.t_groups)
 
-    # R-learner: predict(X, p=...) returns CATE only (no return_components path).
+    # R-learner: predict(return_components=True) returns
+    # (te, yhat, propensity) where yhat and propensity are
+    # the nuisance components used by the R-learner.
     te = rl.predict(X=X, p=p_scores)
     _assert_te(te, name, "predict()")
 
-    fp_plain_r = rl.fit_predict(
-        X=X, treatment=treatment, y=y, p=p_scores, verbose=False
+    out_pc = rl.predict(X=X, p=p_scores, return_components=True)
+    assert isinstance(out_pc, tuple) and len(out_pc) == 3
+
+    te2, yhat, p = out_pc
+
+    np.testing.assert_array_equal(
+        te,
+        te2,
+        err_msg=f"{name}: predict inconsistency",
     )
+
+    assert isinstance(yhat, np.ndarray)
+    assert yhat.shape == (n,)
+    assert np.all(np.isfinite(yhat))
+
+    assert isinstance(p, dict)
+    assert set(p.keys()) == set(rl.t_groups)
+
+    for g in rl.t_groups:
+        assert isinstance(p[g], np.ndarray)
+        assert p[g].shape == (n,)
+        assert np.all(np.isfinite(p[g]))
+
+    fp_plain_r = rl.fit_predict(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=p_scores,
+        verbose=False,
+    )
+
     _assert_plain_fit_predict(fp_plain_r, name)
     _assert_te(fp_plain_r, name, "fit_predict()")
+
+    fp_components = rl.fit_predict(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=p_scores,
+        return_components=True,
+        verbose=False,
+    )
+
+    assert isinstance(fp_components, tuple)
+    assert len(fp_components) == 3
+
+    te_fp, yhat_fp, p_fp = fp_components
+
+    _assert_te(te_fp, name, "fit_predict(return_components=True)")
+
+    assert isinstance(yhat_fp, np.ndarray)
+    assert yhat_fp.shape == (n,)
+    assert np.all(np.isfinite(yhat_fp))
+
+    assert isinstance(p_fp, dict)
+    assert set(p_fp.keys()) == set(rl.t_groups)
+
+    for g in rl.t_groups:
+        assert isinstance(p_fp[g], np.ndarray)
+        assert p_fp[g].shape == (n,)
+        assert np.all(np.isfinite(p_fp[g]))
+    with pytest.raises(ValueError):
+        rl.fit_predict(
+            X=X,
+            treatment=treatment,
+            y=y,
+            p=p_scores,
+            return_ci=True,
+            return_components=True,
+            verbose=False,
+        )
     _assert_ci_triple(
         rl.fit_predict(
             X=X,
