@@ -95,9 +95,7 @@ class TestCausalTreeRoundTrip:
 
     def test_round_trip_predictions_match(self, causal_tree_data, tmp_path_file):
         X, treatment, y = causal_tree_data
-        tree = CausalTreeRegressor(
-            control_name=CONTROL_NAME, random_state=RANDOM_SEED
-        )
+        tree = CausalTreeRegressor(control_name=CONTROL_NAME, random_state=RANDOM_SEED)
         tree.fit(X=X, treatment=treatment, y=y)
         preds_before = tree.predict(X)
 
@@ -109,9 +107,7 @@ class TestCausalTreeRoundTrip:
 
     def test_generic_load_learner(self, causal_tree_data, tmp_path_file):
         X, treatment, y = causal_tree_data
-        tree = CausalTreeRegressor(
-            control_name=CONTROL_NAME, random_state=RANDOM_SEED
-        )
+        tree = CausalTreeRegressor(control_name=CONTROL_NAME, random_state=RANDOM_SEED)
         tree.fit(X=X, treatment=treatment, y=y)
         tree.save(tmp_path_file)
 
@@ -125,9 +121,7 @@ class TestCausalTreeRoundTrip:
 
     def test_class_mismatch_raises(self, causal_tree_data, tmp_path_file):
         X, treatment, y = causal_tree_data
-        tree = CausalTreeRegressor(
-            control_name=CONTROL_NAME, random_state=RANDOM_SEED
-        )
+        tree = CausalTreeRegressor(control_name=CONTROL_NAME, random_state=RANDOM_SEED)
         tree.fit(X=X, treatment=treatment, y=y)
         tree.save(tmp_path_file)
 
@@ -153,9 +147,7 @@ class TestCausalForestRoundTrip:
         np.testing.assert_array_almost_equal(preds_before, preds_after)
 
     def test_unfitted_save_raises(self, tmp_path_file):
-        forest = CausalRandomForestRegressor(
-            n_estimators=5, control_name=CONTROL_NAME
-        )
+        forest = CausalRandomForestRegressor(n_estimators=5, control_name=CONTROL_NAME)
         with pytest.raises(ValueError, match="Cannot save an unfitted model"):
             forest.save(tmp_path_file)
 
@@ -248,9 +240,7 @@ class TestUpliftForestRoundTrip:
         np.testing.assert_array_almost_equal(preds_before, preds_after)
 
     def test_unfitted_save_raises(self, tmp_path_file):
-        forest = UpliftRandomForestClassifier(
-            control_name="control", n_estimators=5
-        )
+        forest = UpliftRandomForestClassifier(control_name="control", n_estimators=5)
         with pytest.raises(ValueError, match="Cannot save an unfitted model"):
             forest.save(tmp_path_file)
 
@@ -309,9 +299,7 @@ class TestCrossFamilyEdgeCases:
     def test_load_tree_as_forest_raises(self, causal_tree_data, tmp_path_file):
         """Loading a CausalTree file as CausalForest should fail."""
         X, treatment, y = causal_tree_data
-        tree = CausalTreeRegressor(
-            control_name=CONTROL_NAME, random_state=RANDOM_SEED
-        )
+        tree = CausalTreeRegressor(control_name=CONTROL_NAME, random_state=RANDOM_SEED)
         tree.fit(X=X, treatment=treatment, y=y)
         tree.save(tmp_path_file)
 
@@ -331,9 +319,7 @@ class TestCrossFamilyEdgeCases:
     def test_version_mismatch_warning(self, causal_tree_data, tmp_path_file):
         """Version mismatch should produce a warning, not an error."""
         X, treatment, y = causal_tree_data
-        tree = CausalTreeRegressor(
-            control_name=CONTROL_NAME, random_state=RANDOM_SEED
-        )
+        tree = CausalTreeRegressor(control_name=CONTROL_NAME, random_state=RANDOM_SEED)
         tree.fit(X=X, treatment=treatment, y=y)
         tree.save(tmp_path_file)
 

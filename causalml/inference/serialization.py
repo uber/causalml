@@ -76,9 +76,7 @@ class SerializableLearner:
             ValueError: if the learner has not been fitted yet.
         """
         if not self._is_fitted():
-            raise ValueError(
-                "Cannot save an unfitted model. Call fit() first."
-            )
+            raise ValueError("Cannot save an unfitted model. Call fit() first.")
 
         metadata = {
             "causalml_version": _get_causalml_version(),

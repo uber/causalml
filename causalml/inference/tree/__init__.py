@@ -13,7 +13,6 @@ from .utils import (
 
 from causalml.inference.serialization import SerializableLearner
 
-
 # Inject serialization into the Cython uplift classes.
 # These are regular Python classes defined in a .pyx file, so we can
 # add methods at import time without recompiling.
@@ -37,6 +36,4 @@ UpliftTreeClassifier.load = classmethod(SerializableLearner.load.__func__)
 # Patch UpliftRandomForestClassifier
 UpliftRandomForestClassifier._is_fitted = _uplift_forest_is_fitted
 UpliftRandomForestClassifier.save = SerializableLearner.save
-UpliftRandomForestClassifier.load = classmethod(
-    SerializableLearner.load.__func__
-)
+UpliftRandomForestClassifier.load = classmethod(SerializableLearner.load.__func__)
