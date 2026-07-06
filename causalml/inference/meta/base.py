@@ -7,6 +7,7 @@ from sklearn.base import BaseEstimator, clone
 from tqdm import tqdm
 
 from causalml.inference.meta.explainer import Explainer
+from causalml.inference.meta.serialization import SerializableLearner
 from causalml.inference.meta.utils import (
     check_p_conditions,
     filter_mask,
@@ -47,7 +48,7 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
     return learner_b
 
 
-class BaseLearner(BaseEstimator, metaclass=ABCMeta):
+class BaseLearner(SerializableLearner, BaseEstimator, metaclass=ABCMeta):
     """Base class for all causalml meta-learners.
 
     Inheriting ``sklearn.base.BaseEstimator`` gives every subclass:
