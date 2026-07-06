@@ -1,15 +1,20 @@
 import numpy as np
 
 from causalml.inference.meta.utils import convert_pd_to_np
+from causalml.inference.serialization import SerializableLearner
 import statsmodels.api as sm
 from statsmodels.sandbox.regression.gmm import IV2SLS
 
 
-class IVRegressor:
+class IVRegressor(SerializableLearner):
     """A wrapper class that uses IV2SLS from statsmodel
 
     A linear 2SLS model that estimates the average treatment effect with endogenous treatment variable.
     """
+
+    def _is_fitted(self):
+        """IVRegressor is fitted once iv_fit is set."""
+        return hasattr(self, "iv_fit")
 
     def __init__(self):
         """

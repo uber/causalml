@@ -68,6 +68,10 @@ class BaseLearner(SerializableLearner, BaseEstimator, metaclass=ABCMeta):
     * ``__repr__`` is inherited from ``BaseEstimator`` and reflects constructor params.
     """
 
+    def _is_fitted(self):
+        """Meta-learners are fitted once t_groups is set during fit()."""
+        return hasattr(self, "t_groups")
+
     @classmethod
     @abstractmethod
     def fit(self, X, treatment, y, p=None):

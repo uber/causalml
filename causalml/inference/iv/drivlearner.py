@@ -16,10 +16,12 @@ from sklearn.model_selection import KFold
 from tqdm import tqdm
 from xgboost import XGBRegressor
 
+from causalml.inference.serialization import SerializableLearner
+
 logger = logging.getLogger("causalml")
 
 
-class BaseDRIVLearner:
+class BaseDRIVLearner(SerializableLearner):
     """A parent class for DRIV-learner regressor classes.
 
     A DRIV-learner estimates endogenous treatment effects for compliers with machine learning models.
@@ -28,6 +30,10 @@ class BaseDRIVLearner:
     The DR moment condition for LATE comes from
     `Chernozhukov et al (2018) <https://academic.oup.com/ectj/article/21/1/C1/5056401>`_.
     """
+
+    def _is_fitted(self):
+        """DRIV learners set t_groups during fit()."""
+        return hasattr(self, "t_groups")
 
     def __init__(
         self,
