@@ -1099,6 +1099,7 @@ def test_XGBRegressor_with_sample_weights(generate_regression_data):
 
     te, yhat, p = uplift_model.predict(
         X=X,
+        p=e,
         return_components=True,
     )
 
