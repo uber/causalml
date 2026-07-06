@@ -234,6 +234,64 @@ def test_plug_in_t_score_missing_columns_raises(synthetic_data):
         plug_in_t_score(df.drop(columns=["w"]), X, treatment_col="w", outcome_col="y")
 
 
+def test_compute_dr_pseudo_outcomes_handles_imbalanced_treatment():
+    rng = np.random.default_rng(RANDOM_SEED)
+
+    n, p = 200, 5
+    X = rng.normal(size=(n, p))
+
+    w = np.zeros(n, dtype=int)
+    w[rng.choice(n, 10, replace=False)] = 1
+
+    y = rng.normal(size=n)
+
+    phi = compute_dr_pseudo_outcomes(
+        X,
+        w,
+        y,
+        learner=LinearRegression(),
+        n_folds=5,
+        random_state=RANDOM_SEED,
+    )
+
+    assert phi.shape == (n,)
+    assert np.isfinite(phi).all()
+
+
+def test_plug_in_t_score_handles_imbalanced_treatment():
+    rng = np.random.default_rng(RANDOM_SEED)
+
+    n, p = 200, 5
+    X = rng.normal(size=(n, p))
+
+    w = np.zeros(n, dtype=int)
+    w[rng.choice(n, 10, replace=False)] = 1
+
+    y = rng.normal(size=n)
+
+    df = pd.DataFrame(
+        {
+            "y": y,
+            "w": w,
+            "model_1": rng.normal(size=n),
+            "model_2": rng.normal(size=n),
+        }
+    )
+
+    scores = plug_in_t_score(
+        df,
+        X,
+        treatment_col="w",
+        outcome_col="y",
+        learner=LinearRegression(),
+        n_folds=5,
+        random_state=RANDOM_SEED,
+    )
+
+    assert isinstance(scores, pd.Series)
+    assert np.isfinite(scores.values).all()
+
+
 def test_dr_score_and_plug_in_t_score_all_finite(synthetic_data):
     df, X = synthetic_data
     dr = dr_score(

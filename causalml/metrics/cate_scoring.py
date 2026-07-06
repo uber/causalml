@@ -4,7 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 from scipy import stats
-from sklearn.model_selection import KFold
+from sklearn.model_selection import StratifiedKFold
 
 from causalml.propensity import compute_propensity_score
 
@@ -128,8 +128,13 @@ def compute_dr_pseudo_outcomes(
     n = X.shape[0]
     phi = np.empty(n, dtype=float)
 
-    cv = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
-    for train_idx, test_idx in cv.split(X):
+    cv = StratifiedKFold(
+        n_splits=n_folds,
+        shuffle=True,
+        random_state=random_state,
+    )
+
+    for train_idx, test_idx in cv.split(X, treatment):
         w_train = treatment[train_idx]
         w_test = treatment[test_idx]
 
@@ -446,8 +451,13 @@ def plug_in_t_score(
     n = X_arr.shape[0]
     tau_proxy = np.empty(n, dtype=float)
 
-    cv = KFold(n_splits=n_folds, shuffle=True, random_state=random_state)
-    for train_idx, test_idx in cv.split(X_arr):
+    cv = StratifiedKFold(
+        n_splits=n_folds,
+        shuffle=True,
+        random_state=random_state,
+    )
+
+    for train_idx, test_idx in cv.split(X_arr, treatment):
         w_train = treatment[train_idx]
 
         mu_c = deepcopy(_control_outcome_learner)
