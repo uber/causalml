@@ -208,6 +208,14 @@ class BaseRLearner(BaseLearner):
 
         X = collect_if_lazy(X)
 
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
+
+        for i, group in enumerate(self.t_groups):
+            te[:, i] = self.models_tau[group].predict(X)
+
+        if not return_components:
+            return te
+
         if p is None:
             if not hasattr(self, "propensity_model"):
                 raise ValueError(
@@ -221,14 +229,6 @@ class BaseRLearner(BaseLearner):
             p = self._format_p(p, self.t_groups)
 
         yhat = self.model_mu.predict(X)
-
-        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
-
-        for i, group in enumerate(self.t_groups):
-            te[:, i] = self.models_tau[group].predict(X)
-
-        if not return_components:
-            return te
 
         return te, yhat, p
 
@@ -588,6 +588,14 @@ class BaseRClassifier(BaseRLearner):
 
         X = collect_if_lazy(X)
 
+        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
+
+        for i, group in enumerate(self.t_groups):
+            te[:, i] = self.models_tau[group].predict(X)
+
+        if not return_components:
+            return te
+
         if p is None:
             if not hasattr(self, "propensity_model"):
                 raise ValueError(
@@ -601,14 +609,6 @@ class BaseRClassifier(BaseRLearner):
             p = self._format_p(p, self.t_groups)
 
         yhat = self.model_mu.predict_proba(X)[:, 1]
-
-        te = np.zeros((n_rows(X), self.t_groups.shape[0]))
-
-        for i, group in enumerate(self.t_groups):
-            te[:, i] = self.models_tau[group].predict(X)
-
-        if not return_components:
-            return te
 
         return te, yhat, p
 

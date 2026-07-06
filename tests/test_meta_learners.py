@@ -1095,12 +1095,10 @@ def test_XGBRegressor_with_sample_weights(generate_regression_data):
     uplift_model.fit(X=X, p=e, treatment=treatment, y=y, sample_weight=weights)
     tau_pred = uplift_model.predict(
         X=X,
-        p=e,
     )
 
     te, yhat, p = uplift_model.predict(
         X=X,
-        p=e,
         return_components=True,
     )
 
