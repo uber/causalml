@@ -22,6 +22,9 @@ from causalml.inference.tree import (
     UpliftRandomForestClassifier,
 )
 from causalml.inference.iv.iv_regression import IVRegressor
+from causalml.inference.iv import BaseDRIVLearner
+from sklearn.linear_model import LinearRegression
+from xgboost import XGBRegressor
 
 RANDOM_SEED = 42
 N_SAMPLE = 300
@@ -286,6 +289,96 @@ class TestIVRegressorRoundTrip:
         assert "causalml_version" in metadata
         assert "python_version" in metadata
         assert metadata["learner_class"] == "IVRegressor"
+
+
+# ---------------------------------------------------------------------------
+# Round-trip tests for DRIV learners
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def driv_data():
+    """Generate data for BaseDRIVLearner (instrument + binary treatment)."""
+    np.random.seed(RANDOM_SEED)
+    n = N_SAMPLE
+    X = np.random.randn(n, 5)
+    # Binary instrument (assignment)
+    assignment = (np.random.uniform(size=n) > 0.5).astype(int)
+    # Propensity of treatment given assignment
+    eta = 0.1
+    e_raw = np.maximum(
+        np.repeat(eta, n),
+        np.minimum(np.sin(np.pi * X[:, 0] * X[:, 1]), np.repeat(1 - eta, n)),
+    )
+    e = e_raw.copy()
+    e[assignment == 0] = 0
+    # Binary treatment influenced by assignment
+    treatment = np.random.binomial(1, e, size=n)
+    # Outcome
+    tau = (X[:, 0] + X[:, 1]) / 2
+    y = X[:, 0] + (treatment - 0.5) * tau + np.random.randn(n) * 0.5
+    # Propensity tuple: (p_unassigned, p_assigned)
+    p = (np.ones(n) * 1e-6, e_raw)
+    return X, assignment, treatment, y, p
+
+
+class TestDRIVLearnerRoundTrip:
+    """Save/load round-trip for BaseDRIVLearner."""
+
+    def test_round_trip_predictions_match(self, driv_data, tmp_path_file):
+        X, assignment, treatment, y, p = driv_data
+        learner = BaseDRIVLearner(
+            learner=XGBRegressor(random_state=RANDOM_SEED),
+            treatment_effect_learner=LinearRegression(),
+        )
+        learner.fit(
+            X=X, assignment=assignment, treatment=treatment, y=y, p=p, seed=RANDOM_SEED
+        )
+        preds_before = learner.predict(X)
+
+        learner.save(tmp_path_file)
+        loaded = BaseDRIVLearner.load(tmp_path_file)
+        preds_after = loaded.predict(X)
+
+        np.testing.assert_array_almost_equal(preds_before, preds_after)
+
+    def test_unfitted_save_raises(self, tmp_path_file):
+        learner = BaseDRIVLearner(
+            learner=XGBRegressor(), treatment_effect_learner=LinearRegression()
+        )
+        with pytest.raises(ValueError, match="Cannot save an unfitted model"):
+            learner.save(tmp_path_file)
+
+    def test_generic_load_learner(self, driv_data, tmp_path_file):
+        X, assignment, treatment, y, p = driv_data
+        learner = BaseDRIVLearner(
+            learner=XGBRegressor(random_state=RANDOM_SEED),
+            treatment_effect_learner=LinearRegression(),
+        )
+        learner.fit(
+            X=X, assignment=assignment, treatment=treatment, y=y, p=p, seed=RANDOM_SEED
+        )
+        learner.save(tmp_path_file)
+
+        loaded = load_learner(tmp_path_file)
+        assert isinstance(loaded, BaseDRIVLearner)
+
+    def test_metadata_fields_present(self, driv_data, tmp_path_file):
+        X, assignment, treatment, y, p = driv_data
+        learner = BaseDRIVLearner(
+            learner=XGBRegressor(random_state=RANDOM_SEED),
+            treatment_effect_learner=LinearRegression(),
+        )
+        learner.fit(
+            X=X, assignment=assignment, treatment=treatment, y=y, p=p, seed=RANDOM_SEED
+        )
+        learner.save(tmp_path_file)
+
+        payload = joblib.load(tmp_path_file)
+        metadata = payload["metadata"]
+        assert "causalml_version" in metadata
+        assert "python_version" in metadata
+        assert metadata["learner_class"] == "BaseDRIVLearner"
 
 
 # ---------------------------------------------------------------------------
