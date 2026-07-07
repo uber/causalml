@@ -255,18 +255,19 @@ class Sensitivity:
 
         return summary_df
 
-    # Learners whose fit_predict(return_components=True) does NOT return
-    # potential-outcome regressions (mu0, mu1). X-learner returns two CATE
-    # estimates from its tau models instead (xlearner.py); R-learner has no
-    # outcome-regression decomposition at all. Both are rejected explicitly
-    # rather than silently misinterpreted.
-    _UNSUPPORTED_POTENTIAL_OUTCOME_LEARNERS = (
-        "BaseXLearner",
-        "BaseXRegressor",
-        "BaseXClassifier",
-        "BaseRLearner",
-        "BaseRRegressor",
-        "BaseRClassifier",
+    # Learner families whose fit_predict(return_components=True)
+    # exposes potential-outcome regressions (mu0_hat, mu1_hat).
+    # Unknown learner types are rejected rather than assumed compatible.
+    _SUPPORTED_POTENTIAL_OUTCOME_LEARNERS = (
+        "BaseSLearner",
+        "BaseSRegressor",
+        "BaseSClassifier",
+        "BaseTLearner",
+        "BaseTRegressor",
+        "BaseTClassifier",
+        "BaseDRLearner",
+        "BaseDRRegressor",
+        "BaseDRClassifier",
     )
 
     def get_potential_outcome_predictions(self, X, p, treatment, y):
@@ -291,7 +292,7 @@ class Sensitivity:
         learner = self.learner
         learner_name = type(learner).__name__
 
-        if learner_name in self._UNSUPPORTED_POTENTIAL_OUTCOME_LEARNERS:
+        if learner_name not in self._SUPPORTED_POTENTIAL_OUTCOME_LEARNERS:
             raise NotImplementedError(
                 "SensitivityMSM does not support {} yet: it needs potential-"
                 "outcome regressions (mu0_hat, mu1_hat), which this learner's "
@@ -744,6 +745,11 @@ class SensitivityMSM(Sensitivity):
             (tuple of float): (ate_lower, ate_upper)
         """
         p_lower, p_upper = msm_propensity_bounds(p, gamma)
+
+        eps = np.finfo(float).eps
+        p_lower = np.clip(p_lower, eps, 1.0 - eps)
+        p_upper = np.clip(p_upper, eps, 1.0 - eps)
+
         resid_t = y - mu1_hat
         resid_c = y - mu0_hat
 

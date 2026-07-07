@@ -7,6 +7,7 @@ from causalml.dataset import synthetic_data
 from causalml.inference.meta import (
     BaseSLearner,
     BaseTLearner,
+    BaseDRLearner,
     XGBTRegressor,
     BaseXLearner,
     BaseRLearner,
@@ -28,7 +29,13 @@ from causalml.metrics.sensitivity import (
     alignment_att,
 )
 
-from .const import TREATMENT_COL, SCORE_COL, OUTCOME_COL, NUM_FEATURES
+from .const import (
+    TREATMENT_COL,
+    SCORE_COL,
+    OUTCOME_COL,
+    NUM_FEATURES,
+    RANDOM_SEED,
+)
 
 
 @pytest.mark.parametrize(
@@ -261,7 +268,16 @@ def test_alignment_att():
     assert y.shape == adj.shape
 
 
-def test_SensitivityMSM():
+@pytest.mark.parametrize(
+    "learner",
+    [
+        BaseSLearner(LinearRegression()),
+        BaseTLearner(LinearRegression()),
+        BaseDRLearner(LinearRegression()),
+    ],
+)
+def test_SensitivityMSM(learner):
+    np.random.seed(RANDOM_SEED)
     y, X, treatment, tau, b, e = synthetic_data(
         mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
     )
@@ -271,7 +287,6 @@ def test_SensitivityMSM():
     df[OUTCOME_COL] = y
     df[SCORE_COL] = e
 
-    learner = BaseTLearner(LinearRegression())
     sens = SensitivityMSM(
         df=df,
         inference_features=INFERENCE_FEATURES,
@@ -298,6 +313,8 @@ def test_SensitivityMSM():
 
 
 def test_SensitivityMSM_unsupported_learner():
+    np.random.seed(RANDOM_SEED)
+
     y, X, treatment, tau, b, e = synthetic_data(
         mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
     )
