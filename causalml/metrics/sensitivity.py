@@ -4,6 +4,12 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from importlib import import_module
 
+from causalml.inference.meta import (
+    BaseSLearner,
+    BaseTLearner,
+    BaseDRLearner,
+)
+
 logger = logging.getLogger("sensitivity")
 
 SUMMARY_COLS = ["Method", "ATE", "New ATE", "New ATE LB", "New ATE UB"]
@@ -258,17 +264,6 @@ class Sensitivity:
     # Learner families whose fit_predict(return_components=True)
     # exposes potential-outcome regressions (mu0_hat, mu1_hat).
     # Unknown learner types are rejected rather than assumed compatible.
-    _SUPPORTED_POTENTIAL_OUTCOME_LEARNERS = (
-        "BaseSLearner",
-        "BaseSRegressor",
-        "BaseSClassifier",
-        "BaseTLearner",
-        "BaseTRegressor",
-        "BaseTClassifier",
-        "BaseDRLearner",
-        "BaseDRRegressor",
-        "BaseDRClassifier",
-    )
 
     def get_potential_outcome_predictions(self, X, p, treatment, y):
         """Return separate potential-outcome predictions mu1_hat, mu0_hat.
@@ -292,7 +287,14 @@ class Sensitivity:
         learner = self.learner
         learner_name = type(learner).__name__
 
-        if learner_name not in self._SUPPORTED_POTENTIAL_OUTCOME_LEARNERS:
+        if not isinstance(
+            learner,
+            (
+                BaseSLearner,
+                BaseTLearner,
+                BaseDRLearner,
+            ),
+        ):
             raise NotImplementedError(
                 "SensitivityMSM does not support {} yet: it needs potential-"
                 "outcome regressions (mu0_hat, mu1_hat), which this learner's "

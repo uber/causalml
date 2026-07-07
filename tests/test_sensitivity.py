@@ -274,6 +274,7 @@ def test_alignment_att():
         BaseSLearner(LinearRegression()),
         BaseTLearner(LinearRegression()),
         BaseDRLearner(LinearRegression()),
+        XGBTRegressor(),
     ],
 )
 def test_SensitivityMSM(learner):
