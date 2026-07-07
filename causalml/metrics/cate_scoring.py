@@ -181,13 +181,13 @@ def _score_against_pseudo_outcome(
     alpha,
     random_state,
 ):
-    """Shared MSE-against-pseudo-outcome scorer with half-sample bootstrap CIs.
+    """Shared MSE-against-pseudo-outcome scorer with half-sample bootstrap confidence intervals.
 
-    This mirrors the half-sample bootstrap CI/p-value pattern in ``rate.py``'s
-    ``rate_score()``, but resamples the already-computed (model prediction,
-    pseudo-outcome) pairs rather than re-fitting any nuisance models -- nuisance
-    fitting happens once, upstream, in ``compute_dr_pseudo_outcomes()`` or the
-    plug-in T-learner cross-fit.
+    This mirrors the half-sample bootstrap confidence interval pattern in
+    ``rate.py``'s ``rate_score()`, but resamples the already-computed (model
+    prediction, pseudo-outcome) pairs rather than re-fitting any nuisance models
+    -- nuisance fitting happens once, upstream, in ``compute_dr_pseudo_outcomes()``
+    or the plug-in T-learner cross-fit.
 
     Lower scores are better: this is a loss (mean squared error against a CATE
     proxy), not a similarity score.
@@ -198,15 +198,16 @@ def _score_against_pseudo_outcome(
             one value per row of ``df``
         model_cols (list): the columns of ``df`` holding model CATE estimates
         score_name (str): name used for the returned Series/column (e.g. ``"dr_loss"``)
-        return_ci (bool): whether to return bootstrap confidence intervals and p-values
+        return_ci (bool): whether to return bootstrap confidence intervals
         n_bootstrap (int): number of half-sample bootstrap iterations
         alpha (float): significance level for confidence intervals
         random_state (int or None): random seed for the bootstrap sampler
 
     Returns:
         If return_ci=False: (pandas.Series): loss for each model column
-        If return_ci=True: (pandas.DataFrame): loss, standard error, CI bounds,
-            and p-value (H0: loss = 0) for each model column
+        If return_ci=True:
+            (pandas.DataFrame): loss, standard error, and confidence interval
+                bounds for each model column
     """
     sq_err = (df[model_cols].sub(pseudo_outcome, axis=0)) ** 2
     loss = sq_err.mean(axis=0)
@@ -312,7 +313,7 @@ def dr_score(
             propensity model's own internal clipping. Ignored if
             ``pseudo_outcome_col`` is provided. Default (0.02, 0.98)
         return_ci (bool, optional): whether to return bootstrap confidence
-            intervals and p-values. Default False
+            intervals. Default False
         n_bootstrap (int, optional): number of half-sample bootstrap iterations.
             Only used when return_ci=True. Default 200
         alpha (float, optional): significance level for confidence intervals.
@@ -324,8 +325,8 @@ def dr_score(
         If return_ci=False:
             (pandas.Series): DR loss for each model column (lower is better)
         If return_ci=True:
-            (pandas.DataFrame): DR loss, standard error, CI bounds, and p-value
-                (H0: loss = 0) for each model column
+            (pandas.DataFrame): DR loss, standard error, and confidence
+                interval bounds for each model column
     """
     have_pseudo_outcome = (
         pseudo_outcome_col is not None and pseudo_outcome_col in df.columns
@@ -418,7 +419,7 @@ def plug_in_t_score(
             in the treatment group
         n_folds (int, optional): number of cross-fitting folds. Default 5
         return_ci (bool, optional): whether to return bootstrap confidence
-            intervals and p-values. Default False
+            intervals. Default False
         n_bootstrap (int, optional): number of half-sample bootstrap iterations.
             Only used when return_ci=True. Default 200
         alpha (float, optional): significance level for confidence intervals.
@@ -430,8 +431,8 @@ def plug_in_t_score(
         If return_ci=False:
             (pandas.Series): plug-in T-learner loss for each model column (lower is better)
         If return_ci=True:
-            (pandas.DataFrame): loss, standard error, CI bounds, and p-value
-                (H0: loss = 0) for each model column
+            (pandas.DataFrame): loss, standard error, and confidence
+                interval bounds for each model column
     """
     assert (
         outcome_col in df.columns and treatment_col in df.columns
