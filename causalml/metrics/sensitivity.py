@@ -4,12 +4,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from importlib import import_module
 
-from causalml.inference.meta import (
-    BaseSLearner,
-    BaseTLearner,
-    BaseDRLearner,
-)
-
 logger = logging.getLogger("sensitivity")
 
 SUMMARY_COLS = ["Method", "ATE", "New ATE", "New ATE LB", "New ATE UB"]
@@ -286,14 +280,12 @@ class Sensitivity:
         """
         learner = self.learner
         learner_name = type(learner).__name__
+        mro_names = {cls.__name__ for cls in type(learner).__mro__}
 
-        if not isinstance(
-            learner,
-            (
-                BaseSLearner,
-                BaseTLearner,
-                BaseDRLearner,
-            ),
+        if not (
+            "BaseSLearner" in mro_names
+            or "BaseTLearner" in mro_names
+            or "BaseDRLearner" in mro_names
         ):
             raise NotImplementedError(
                 "SensitivityMSM does not support {} yet: it needs potential-"
