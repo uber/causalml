@@ -12,6 +12,7 @@ from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 from causalml.inference.meta.utils import check_treatment_vector
+from causalml.inference.serialization import SerializableLearner
 
 from ._tree import BaseCausalDecisionTree
 from ..utils import get_tree_leaves_mask, timeit
@@ -19,7 +20,7 @@ from ..utils import get_tree_leaves_mask, timeit
 logger = logging.getLogger("causalml")
 
 
-class CausalTreeRegressor(RegressorMixin, BaseCausalDecisionTree):
+class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisionTree):
     """A Causal Tree regressor class.
     The Causal Tree is a decision tree regressor with a split criteria for treatment effects.
     Details are available at `Athey and Imbens (2015) <https://arxiv.org/abs/1504.01132)>`_.

@@ -21,6 +21,7 @@ from sklearn.ensemble._forest import _generate_sample_indices, _get_n_samples_bo
 
 from .causaltree import CausalTreeRegressor
 from ._tree import get_check_y_params
+from causalml.inference.serialization import SerializableLearner
 
 try:
     from packaging.version import parse as Version
@@ -153,7 +154,7 @@ def _parallel_build_trees(
     return tree
 
 
-class CausalRandomForestRegressor(ForestRegressor):
+class CausalRandomForestRegressor(SerializableLearner, ForestRegressor):
     def __init__(
         self,
         n_estimators: int = 100,
