@@ -233,8 +233,6 @@ def _score_against_pseudo_outcome(
         se = np.std(boot, ddof=1)
         ci_lower = point - z_crit * se
         ci_upper = point + z_crit * se
-        z_stat = point / se if se > 0 else np.inf
-        p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))
         results.append(
             {
                 "model": model,
@@ -242,7 +240,6 @@ def _score_against_pseudo_outcome(
                 "se": se,
                 "ci_lower": ci_lower,
                 "ci_upper": ci_upper,
-                "p_value": p_value,
             }
         )
 

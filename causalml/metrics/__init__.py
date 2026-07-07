@@ -32,7 +32,6 @@ from .cate_scoring import (
     plug_in_t_score,
 )  # noqa
 from .sensitivity import Sensitivity, SensitivityPlaceboTreatment  # noqa
-from .sensitivity import Sensitivity, SensitivityPlaceboTreatment  # noqa
 from .sensitivity import (
     SensitivityRandomCause,
     SensitivityRandomReplace,

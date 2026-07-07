@@ -160,7 +160,7 @@ def test_dr_score_return_ci_returns_dataframe(synthetic_data):
         random_state=RANDOM_SEED,
     )
     assert isinstance(result, pd.DataFrame)
-    assert set(result.columns) == {"dr_loss", "se", "ci_lower", "ci_upper", "p_value"}
+    assert set(result.columns) == {"dr_loss", "se", "ci_lower", "ci_upper"}
 
 
 def test_dr_score_ci_bounds_ordered(synthetic_data):
@@ -224,7 +224,6 @@ def test_plug_in_t_score_return_ci_returns_dataframe(synthetic_data):
         "se",
         "ci_lower",
         "ci_upper",
-        "p_value",
     }
 
 
