@@ -30,6 +30,7 @@ from .cate_scoring import (
     compute_dr_pseudo_outcomes,
     dr_score,
     plug_in_t_score,
+    rlearner_score,
 )  # noqa
 from .sensitivity import Sensitivity, SensitivityPlaceboTreatment  # noqa
 from .sensitivity import (
