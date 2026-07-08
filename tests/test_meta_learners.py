@@ -42,6 +42,18 @@ from causalml.metrics import ape, auuc_score
 from .const import RANDOM_SEED, N_SAMPLE, ERROR_THRESHOLD, CONTROL_NAME, CONVERSION
 
 
+class _CountingRegressor(LinearRegression):
+    """LinearRegression that counts calls to fit(), to verify laziness."""
+
+    def __init__(self):
+        super().__init__()
+        self.fit_calls = 0
+
+    def fit(self, X, y, sample_weight=None):
+        self.fit_calls += 1
+        return super().fit(X, y, sample_weight=sample_weight)
+
+
 class ReadOnlyLinearRegression:
     """Minimal regressor that marks input arrays read-only like CatBoost."""
 
@@ -756,6 +768,96 @@ def test_BaseRLearner_predict_without_propensity_model_raises(
             X=X,
             return_components=True,
         )
+
+
+def test_BaseRLearner_model_mu_lazy_fit(generate_regression_data):
+    """model_mu must not be fit on the full data during fit(); only the first
+    predict(return_components=True) call should trigger it, and it should be
+    cached (not re-fit) on subsequent calls."""
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    outcome_learner = _CountingRegressor()
+    learner = BaseRLearner(
+        outcome_learner=outcome_learner,
+        effect_learner=LinearRegression(),
+    )
+    learner.fit(X=X, treatment=treatment, y=y, p=e, verbose=False)
+
+    # fit() alone must not eagerly fit model_mu on the full data.
+    assert outcome_learner.fit_calls == 0
+
+    te, yhat, p = learner.predict(X=X, p=e, return_components=True)
+    assert outcome_learner.fit_calls == 1
+
+    # A second return_components=True call must reuse the cached fit.
+    te2, yhat2, p2 = learner.predict(X=X, p=e, return_components=True)
+    assert outcome_learner.fit_calls == 1
+    np.testing.assert_array_equal(yhat, yhat2)
+
+    # Plain predict() (no components requested) must never trigger the fit.
+    fresh_outcome_learner = _CountingRegressor()
+    fresh_learner = BaseRLearner(
+        outcome_learner=fresh_outcome_learner,
+        effect_learner=LinearRegression(),
+    )
+    fresh_learner.fit(X=X, treatment=treatment, y=y, p=e, verbose=False)
+    fresh_learner.predict(X=X, p=e)
+    assert fresh_outcome_learner.fit_calls == 0
+
+
+def test_BaseRLearner_fit_predict_ci_then_predict_components(generate_regression_data):
+    """Regression test: fit_predict(return_ci=True) runs a bootstrap loop that
+    repeatedly re-fits model_mu on resampled data. Once it's done, the cached
+    training data used by predict(return_components=True) must be restored to
+    the ORIGINAL training set, not left pointing at the last bootstrap resample."""
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(learner=LinearRegression())
+
+    learner.fit_predict(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        return_ci=True,
+        n_bootstraps=5,
+        bootstrap_size=200,
+        verbose=False,
+    )
+
+    te, yhat, p = learner.predict(X=X, p=e, return_components=True)
+
+    expected_yhat = LinearRegression().fit(X, y).predict(X)
+
+    assert yhat.shape == (X.shape[0],)
+    np.testing.assert_allclose(yhat, expected_yhat, rtol=1e-6, atol=1e-8)
+
+
+def test_BaseRLearner_estimate_ate_bootstrap_then_predict_components(
+    generate_regression_data,
+):
+    """Same regression as above, but for the bootstrap_ci=True path in
+    estimate_ate() rather than fit_predict(return_ci=True)."""
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(learner=LinearRegression())
+
+    learner.estimate_ate(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=e,
+        bootstrap_ci=True,
+        n_bootstraps=5,
+        bootstrap_size=200,
+    )
+
+    te, yhat, p = learner.predict(X=X, p=e, return_components=True)
+
+    expected_yhat = LinearRegression().fit(X, y).predict(X)
+
+    assert yhat.shape == (X.shape[0],)
+    np.testing.assert_allclose(yhat, expected_yhat, rtol=1e-6, atol=1e-8)
 
 
 def test_BaseRRegressor_without_p(generate_regression_data):

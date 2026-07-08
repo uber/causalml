@@ -149,9 +149,11 @@ class BaseRLearner(BaseLearner):
         yhat = cross_val_predict(
             self.model_mu, X, y_np, cv=self.cv, n_jobs=self.cv_n_jobs
         )
-        # Fit the nuisance outcome model on the full data so it can be
-        # reused by predict(return_components=True).
-        self.model_mu.fit(X, y_np)
+        # Defer fitting the nuisance outcome model on the full data until
+        # predict(return_components=True) actually needs it.
+        self._model_mu_fitted = False
+        self._mu_fit_X = X
+        self._mu_fit_y = y_np
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -215,6 +217,10 @@ class BaseRLearner(BaseLearner):
 
         if not return_components:
             return te
+
+        if not self._model_mu_fitted:
+            self.model_mu.fit(self._mu_fit_X, self._mu_fit_y)
+            self._model_mu_fitted = True
 
         if p is None:
             if not hasattr(self, "propensity_model"):
@@ -292,6 +298,9 @@ class BaseRLearner(BaseLearner):
             _classes_global = self._classes
             model_mu_global = deepcopy(self.model_mu)
             models_tau_global = deepcopy(self.models_tau)
+            model_mu_fitted_global = self._model_mu_fitted
+            mu_fit_X_global = self._mu_fit_X
+            mu_fit_y_global = self._mu_fit_y
             te_bootstraps = np.zeros(
                 shape=(n_rows(X), self.t_groups.shape[0], n_bootstraps)
             )
@@ -314,6 +323,9 @@ class BaseRLearner(BaseLearner):
             self._classes = _classes_global
             self.model_mu = deepcopy(model_mu_global)
             self.models_tau = deepcopy(models_tau_global)
+            self._model_mu_fitted = model_mu_fitted_global
+            self._mu_fit_X = mu_fit_X_global
+            self._mu_fit_y = mu_fit_y_global
 
             return (te, te_lower, te_upper)
 
@@ -395,8 +407,12 @@ class BaseRLearner(BaseLearner):
             _classes_global = self._classes
             model_mu_global = deepcopy(self.model_mu)
             models_tau_global = deepcopy(self.models_tau)
+            model_mu_fitted_global = self._model_mu_fitted
+            mu_fit_X_global = self._mu_fit_X
+            mu_fit_y_global = self._mu_fit_y
 
             logger.info("Bootstrap Confidence Intervals for ATE")
+
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
             for n in tqdm(range(n_bootstraps)):
@@ -418,6 +434,9 @@ class BaseRLearner(BaseLearner):
             self._classes = _classes_global
             self.model_mu = deepcopy(model_mu_global)
             self.models_tau = deepcopy(models_tau_global)
+            self._model_mu_fitted = model_mu_fitted_global
+            self._mu_fit_X = mu_fit_X_global
+            self._mu_fit_y = mu_fit_y_global
             return ate, ate_lower, ate_upper
 
 
@@ -541,7 +560,11 @@ class BaseRClassifier(BaseRLearner):
         yhat = cross_val_predict(
             self.model_mu, X, y_np, cv=self.cv, method="predict_proba", n_jobs=-1
         )[:, 1]
-        self.model_mu.fit(X, y_np)
+        # Defer fitting the nuisance outcome model on the full data until
+        # predict(return_components=True) actually needs it.
+        self._model_mu_fitted = False
+        self._mu_fit_X = X
+        self._mu_fit_y = y_np
 
         for group in self.t_groups:
             mask = (treatment_np == group) | (treatment_np == self.control_name)
@@ -595,6 +618,10 @@ class BaseRClassifier(BaseRLearner):
 
         if not return_components:
             return te
+
+        if not self._model_mu_fitted:
+            self.model_mu.fit(self._mu_fit_X, self._mu_fit_y)
+            self._model_mu_fitted = True
 
         if p is None:
             if not hasattr(self, "propensity_model"):
@@ -755,7 +782,11 @@ class XGBRRegressor(BaseRRegressor):
         if verbose:
             logger.info("generating out-of-fold CV outcome estimates")
         yhat = cross_val_predict(self.model_mu, X, y_np, cv=self.cv, n_jobs=-1)
-        self.model_mu.fit(X, y_np)
+        # Defer fitting the nuisance outcome model on the full data until
+        # predict(return_components=True) actually needs it.
+        self._model_mu_fitted = False
+        self._mu_fit_X = X
+        self._mu_fit_y = y_np
 
         for group in self.t_groups:
             treatment_mask = (treatment_np == group) | (
