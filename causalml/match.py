@@ -206,8 +206,17 @@ class NearestNeighborMatch:
                     match_to.loc[match_to.unmatched, score_col]
                     - match_from.loc[from_idx, score_col]
                 )
-                # Gets self.ratio lowest dists
-                to_np_idx_list = np.argpartition(dist, self.ratio)[: self.ratio]
+                # Stop early once the control pool is exhausted; otherwise
+                # np.argpartition below would be called on an empty array.
+                if len(dist) == 0:
+                    break
+                # Gets up to self.ratio lowest dists. Cap the partition index at
+                # the last available position so argpartition does not raise
+                # "kth out of bounds" when fewer than self.ratio controls remain
+                # (e.g. balanced 1:1 matching, where the final treatment unit
+                # sees a single unmatched control).
+                kth = min(self.ratio, len(dist) - 1)
+                to_np_idx_list = np.argpartition(dist, kth)[: self.ratio]
                 to_idx_list = dist.index[to_np_idx_list]
                 for i, to_idx in enumerate(to_idx_list):
                     if dist[to_idx] <= sdcal:
