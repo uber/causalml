@@ -78,6 +78,44 @@ def test_nearest_neighbor_match_control_to_treatment(generate_unmatched_data):
     assert 2 * sum(matched[TREATMENT_COL] == 0) == sum(matched[TREATMENT_COL] != 0)
 
 
+def test_nearest_neighbor_match_exhausts_control_pool():
+    """Matching without replacement should not crash when the pool of
+    unmatched controls shrinks below `ratio` during the loop.
+
+    With a balanced 1:1 dataset the last treatment unit sees a single
+    remaining control, which previously made np.argpartition raise
+    "kth out of bounds". See match.py::NearestNeighborMatch.match.
+    """
+    df = pd.DataFrame(
+        {
+            SCORE_COL: [0.10, 0.40, 0.80, 0.12, 0.42, 0.83],
+            TREATMENT_COL: [1, 1, 1, 0, 0, 0],
+        }
+    )
+
+    psm = NearestNeighborMatch(
+        replace=False, ratio=1, shuffle=False, random_state=RANDOM_SEED
+    )
+    matched = psm.match(data=df, treatment_col=TREATMENT_COL, score_cols=[SCORE_COL])
+
+    # All three balanced pairs are recovered.
+    assert sum(matched[TREATMENT_COL] == 1) == 3
+    assert sum(matched[TREATMENT_COL] == 0) == 3
+
+    # More treatment than control: matching stops once controls run out
+    # instead of raising.
+    df_scarce = pd.DataFrame(
+        {
+            SCORE_COL: [0.10, 0.40, 0.80, 0.90, 0.12, 0.42],
+            TREATMENT_COL: [1, 1, 1, 1, 0, 0],
+        }
+    )
+    matched_scarce = psm.match(
+        data=df_scarce, treatment_col=TREATMENT_COL, score_cols=[SCORE_COL]
+    )
+    assert sum(matched_scarce[TREATMENT_COL] == 0) == 2
+
+
 def test_match_optimizer(generate_unmatched_data):
     df, features = generate_unmatched_data()
 
