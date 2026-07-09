@@ -115,6 +115,12 @@ class BaseRLearner(BaseLearner):
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
 
+        # Resolve model_p before fitting propensity models so a user-supplied
+        # propensity_learner is honored on the first fit. _set_propensity_models
+        # reads self.model_p, so setting it afterwards meant the first fit of a
+        # fresh object silently fell back to the default ElasticNet.
+        self.model_p = self.propensity_learner
+
         if p is None:
             self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
             p = self.propensity
@@ -134,7 +140,6 @@ class BaseRLearner(BaseLearner):
             if self.effect_learner is not None
             else deepcopy(self.learner)
         )
-        self.model_p = self.propensity_learner
         # Build CV splitter from stored n_fold / random_state.
         self.cv = KFold(
             n_splits=self.n_fold, shuffle=True, random_state=self.random_state
@@ -516,6 +521,10 @@ class BaseRClassifier(BaseRLearner):
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
 
+        # Set model_p before _set_propensity_models runs so a custom
+        # propensity_learner is used on the first fit (see BaseRLearner.fit).
+        self.model_p = self.propensity_learner
+
         if p is None:
             self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
             p = self.propensity
@@ -527,7 +536,6 @@ class BaseRClassifier(BaseRLearner):
         # Resolve base models from stored constructor args.
         self.model_mu = self.outcome_learner
         self.model_tau = self.effect_learner
-        self.model_p = self.propensity_learner
         self.cv = KFold(
             n_splits=self.n_fold, shuffle=True, random_state=self.random_state
         )
@@ -709,6 +717,10 @@ class XGBRRegressor(BaseRRegressor):
         self.t_groups = np.unique(treatment_np[treatment_np != self.control_name])
         self.t_groups.sort()
 
+        # Set model_p before _set_propensity_models runs so a custom
+        # propensity_learner is used on the first fit (see BaseRLearner.fit).
+        self.model_p = self.propensity_learner
+
         if p is None:
             self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
             p = self.propensity
@@ -743,7 +755,6 @@ class XGBRRegressor(BaseRRegressor):
 
         self.model_mu = outcome_learner
         self.model_tau = effect_learner
-        self.model_p = self.propensity_learner
         self.cv = KFold(
             n_splits=self.n_fold, shuffle=True, random_state=self.random_state
         )

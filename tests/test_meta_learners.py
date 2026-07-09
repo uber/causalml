@@ -600,6 +600,30 @@ def test_BaseRLearner(generate_regression_data):
     )  # might need to look into higher ape
 
 
+def test_BaseRLearner_uses_custom_propensity_learner_on_first_fit(
+    generate_regression_data,
+):
+    # Regression test: a user-supplied propensity_learner must be used on the
+    # very first fit of a fresh object. Previously model_p was assigned after
+    # _set_propensity_models ran, so the first fit silently fell back to the
+    # default ElasticNet and only a second fit of the same object honored it.
+    from causalml.propensity import ElasticNetPropensityModel
+
+    class MarkerPropensityModel(ElasticNetPropensityModel):
+        pass
+
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(
+        learner=XGBRegressor(),
+        propensity_learner=MarkerPropensityModel(),
+    )
+    learner.fit(X=X, treatment=treatment, y=y, p=None)
+
+    for group in learner.t_groups:
+        assert isinstance(learner.propensity_model[group], MarkerPropensityModel)
+
+
 def test_BaseRRegressor(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 
