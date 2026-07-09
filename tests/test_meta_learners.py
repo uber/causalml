@@ -892,7 +892,6 @@ def test_BaseRClassifier_model_mu_lazy_fit(generate_classification_data):
 
     te, yhat, p = learner.predict(
         X=df[x_names].values,
-        treatment=df["treatment_group_key"].values,
         return_components=True,
         p=np.full(len(df), 0.5),
     )
