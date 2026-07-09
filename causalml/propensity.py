@@ -244,6 +244,7 @@ def compute_r_residuals(
     n_folds=5,
     random_state=None,
     n_jobs=-1,
+    compute_w_residual=True,
 ):
     """Cross-fitted outcome/treatment residuals for the R-loss (Nie & Wager, 2021).
 
@@ -281,12 +282,20 @@ def compute_r_residuals(
         random_state (int or None, optional): random seed for the fold splitter
         n_jobs (int, optional): parallel jobs forwarded to cross_val_predict
             for the outcome model. Default -1
+        compute_w_residual (bool, optional): whether to compute and return
+            w_residual. If False, skips propensity estimation entirely (no
+            in-fold propensity model is fit) and returns w_residual=None.
+            Set False when only the outcome residual is needed -- e.g.
+            BaseRLearner.fit(), which already has propensity scores from
+            elsewhere and would otherwise pay for a redundant per-fold
+            propensity fit whose output is discarded. Default True.
 
     Returns:
         (tuple):
             - y_residual (numpy.ndarray): y - m_hat(X), out-of-fold
-            - w_residual (numpy.ndarray): w - e_hat(X), out-of-fold (or w - p
-              directly if `p` was supplied)
+            - w_residual (numpy.ndarray or None): w - e_hat(X), out-of-fold
+              (or w - p directly if `p` was supplied), or None if
+              compute_w_residual=False
     """
     X = np.asarray(X)
     treatment = np.asarray(treatment)
@@ -304,6 +313,11 @@ def compute_r_residuals(
         )[:, 1]
     else:
         yhat = cross_val_predict(outcome_learner, X, y, cv=splits, n_jobs=n_jobs)
+
+    y_residual = y - yhat
+
+    if not compute_w_residual:
+        return y_residual, None
 
     if p is not None:
         w_residual = treatment - np.asarray(p, dtype=float)
@@ -323,5 +337,4 @@ def compute_r_residuals(
             )
             w_residual[test_idx] = treatment[test_idx] - p_test
 
-    y_residual = y - yhat
     return y_residual, w_residual

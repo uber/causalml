@@ -505,3 +505,21 @@ def test_dr_plug_in_t_and_rlearner_score_all_finite(synthetic_data):
     assert np.isfinite(dr.values).all()
     assert np.isfinite(t.values).all()
     assert np.isfinite(r.values).all()
+
+
+def test_compute_r_residuals_skips_propensity_when_w_residual_not_needed(
+    synthetic_data,
+):
+    df, X = synthetic_data
+    y_residual, w_residual = compute_r_residuals(
+        X,
+        df["w"],
+        df["y"],
+        outcome_learner=LinearRegression(),
+        n_folds=5,
+        random_state=RANDOM_SEED,
+        compute_w_residual=False,
+    )
+    assert y_residual.shape == (len(df),)
+    assert np.isfinite(y_residual).all()
+    assert w_residual is None

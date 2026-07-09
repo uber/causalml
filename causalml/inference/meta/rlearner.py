@@ -150,6 +150,7 @@ class BaseRLearner(BaseLearner):
             n_folds=self.n_fold,
             random_state=self.random_state,
             n_jobs=self.cv_n_jobs,
+            compute_w_residual=False,
         )
         yhat = y_np - y_residual
         # Fit the nuisance outcome model on the full data so it can be
