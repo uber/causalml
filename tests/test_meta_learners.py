@@ -860,6 +860,104 @@ def test_BaseRLearner_estimate_ate_bootstrap_then_predict_components(
     np.testing.assert_allclose(yhat, expected_yhat, rtol=1e-6, atol=1e-8)
 
 
+def test_BaseRClassifier_model_mu_lazy_fit(generate_classification_data):
+    """Same laziness contract as BaseRLearner, but for BaseRClassifier
+    (predict_proba-based outcome model)."""
+    np.random.seed(RANDOM_SEED)
+    df, x_names = generate_classification_data()
+    df["treatment_group_key"] = np.where(
+        df["treatment_group_key"] == CONTROL_NAME, 0, 1
+    )
+
+    class _CountingClassifier(LogisticRegression):
+        def __init__(self):
+            super().__init__()
+            self.fit_calls = 0
+
+        def fit(self, X, y, sample_weight=None):
+            self.fit_calls += 1
+            return super().fit(X, y, sample_weight=sample_weight)
+
+    outcome_learner = _CountingClassifier()
+    learner = BaseRClassifier(
+        outcome_learner=outcome_learner, effect_learner=XGBRegressor()
+    )
+    learner.fit(
+        X=df[x_names].values,
+        treatment=df["treatment_group_key"].values,
+        y=df[CONVERSION].values,
+        verbose=False,
+    )
+    assert outcome_learner.fit_calls == 0
+
+    te, yhat, p = learner.predict(
+        X=df[x_names].values,
+        treatment=df["treatment_group_key"].values,
+        return_components=True,
+        p=np.full(len(df), 0.5),
+    )
+    assert outcome_learner.fit_calls == 1
+
+    learner.predict(
+        X=df[x_names].values,
+        return_components=True,
+        p=np.full(len(df), 0.5),
+    )
+    assert outcome_learner.fit_calls == 1
+
+
+def test_XGBRRegressor_model_mu_lazy_fit(generate_regression_data):
+    """Same laziness contract as BaseRLearner, but for XGBRRegressor."""
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = XGBRRegressor(effect_learner_n_estimators=20, random_state=0)
+    learner.fit(X=X, treatment=treatment, y=y, p=e, verbose=False)
+
+    assert learner._model_mu_fitted is False
+
+    te, yhat, p = learner.predict(X=X, p=e, return_components=True)
+    assert learner._model_mu_fitted is True
+    assert yhat.shape == (X.shape[0],)
+
+
+def test_BaseRLearner_save_load_excludes_training_data(
+    generate_regression_data, tmp_path
+):
+    """save()/load() must not balloon in size by carrying the cached
+    training data used only for the lazy model_mu fit."""
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    learner = BaseRLearner(learner=LinearRegression())
+    learner.fit(X=X, treatment=treatment, y=y, p=e, verbose=False)
+
+    path = tmp_path / "rlearner.causalml"
+    learner.save(str(path))
+
+    loaded = BaseRLearner.load(str(path))
+    assert not hasattr(loaded, "_mu_fit_X") or loaded._mu_fit_X is None
+    assert not hasattr(loaded, "_mu_fit_y") or loaded._mu_fit_y is None
+
+    # Loaded model still predicts CATE fine (doesn't need model_mu).
+    te = loaded.predict(X=X)
+    assert te.shape == (X.shape[0], len(loaded.t_groups))
+
+    # But return_components=True raises a clear error post-load, since
+    # model_mu was never lazily fit before saving.
+    with pytest.raises(ValueError, match="not fit before this learner was saved"):
+        loaded.predict(X=X, p=e, return_components=True)
+
+    # If return_components=True was called BEFORE saving, model_mu is
+    # already fitted, and reload works fine for components too.
+    learner2 = BaseRLearner(learner=LinearRegression())
+    learner2.fit(X=X, treatment=treatment, y=y, p=e, verbose=False)
+    learner2.predict(X=X, p=e, return_components=True)  # triggers lazy fit
+    path2 = tmp_path / "rlearner_prefit.causalml"
+    learner2.save(str(path2))
+    loaded2 = BaseRLearner.load(str(path2))
+    te2, yhat2, p2 = loaded2.predict(X=X, p=e, return_components=True)
+    assert yhat2.shape == (X.shape[0],)
+
+
 def test_BaseRRegressor_without_p(generate_regression_data):
     y, X, treatment, tau, b, e = generate_regression_data()
 

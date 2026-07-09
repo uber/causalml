@@ -191,6 +191,25 @@ class BaseRLearner(BaseLearner):
             )
         return self
 
+    def __getstate__(self):
+        """Exclude the cached training data used only for the lazy
+        model_mu fit from pickling — keeping it would balloon save() size
+        (e.g. 2.7 KiB -> 4.8 MiB at n=20k/p=30). See PR #936 review."""
+        state = self.__dict__.copy()
+        state.pop("_mu_fit_X", None)
+        state.pop("_mu_fit_y", None)
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        # If model_mu was never lazily fit before saving, there's no cached
+        # training data to fit it with after loading, predict()'s
+        # return_components path will raise a clear error rather than an
+        # AttributeError if this case is hit.
+        if not getattr(self, "_model_mu_fitted", True):
+            self._mu_fit_X = None
+            self._mu_fit_y = None
+
     def predict(
         self,
         X,
@@ -219,6 +238,13 @@ class BaseRLearner(BaseLearner):
             return te
 
         if not self._model_mu_fitted:
+            if self._mu_fit_X is None:
+                raise ValueError(
+                    "model_mu was not fit before this learner was saved, so "
+                    "return_components=True is unavailable after loading. "
+                    "Call predict(..., return_components=True) once before "
+                    "saving, or refit the learner."
+                )
             self.model_mu.fit(self._mu_fit_X, self._mu_fit_y)
             self._model_mu_fitted = True
 
@@ -620,6 +646,13 @@ class BaseRClassifier(BaseRLearner):
             return te
 
         if not self._model_mu_fitted:
+            if self._mu_fit_X is None:
+                raise ValueError(
+                    "model_mu was not fit before this learner was saved, so "
+                    "return_components=True is unavailable after loading. "
+                    "Call predict(..., return_components=True) once before "
+                    "saving, or refit the learner."
+                )
             self.model_mu.fit(self._mu_fit_X, self._mu_fit_y)
             self._model_mu_fitted = True
 
