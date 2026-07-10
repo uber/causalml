@@ -140,7 +140,6 @@ class BaseRLearner(BaseLearner):
             if self.effect_learner is not None
             else deepcopy(self.learner)
         )
-        self.model_p = self.propensity_learner
 
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
         self.vars_c = {}
