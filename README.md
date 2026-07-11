@@ -130,3 +130,7 @@ Bibtex:
 * [rlearner](https://github.com/xnie/rlearner): A R package that implements R-Learner
 * [DoWhy](https://github.com/Microsoft/dowhy):  Causal inference in Python based on Judea Pearl's do-calculus
 * [EconML](https://github.com/microsoft/EconML): A Python package that implements heterogeneous treatment effect estimators from econometrics and machine learning methods
+
+---
+
+*[Mukller](https://github.com/Mukller)*
