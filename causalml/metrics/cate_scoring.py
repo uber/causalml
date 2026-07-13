@@ -6,7 +6,7 @@ import pandas as pd
 from scipy import stats
 from sklearn.model_selection import StratifiedKFold
 
-from causalml.propensity import compute_propensity_score
+from causalml.propensity import compute_propensity_score, compute_r_residuals
 
 logger = logging.getLogger("causalml")
 
@@ -171,33 +171,19 @@ def compute_dr_pseudo_outcomes(
     return phi
 
 
-def _score_against_pseudo_outcome(
-    df,
-    pseudo_outcome,
-    model_cols,
-    score_name,
-    return_ci,
-    n_bootstrap,
-    alpha,
-    random_state,
-):
-    """Shared MSE-against-pseudo-outcome scorer with half-sample bootstrap confidence intervals.
+def _bootstrap_loss_ci(sq_err, score_name, return_ci, n_bootstrap, alpha, random_state):
+    """Half-sample bootstrap confidence intervals over a precomputed squared-error frame.
 
-    This mirrors the half-sample bootstrap confidence interval pattern in
-    ``rate.py``'s ``rate_score()`, but resamples the already-computed (model
-    prediction, pseudo-outcome) pairs rather than re-fitting any nuisance models
-    -- nuisance fitting happens once, upstream, in ``compute_dr_pseudo_outcomes()``
-    or the plug-in T-learner cross-fit.
+    Shared by dr_score/plug_in_t_score (sq_err = (tau_hat - pseudo_outcome) ** 2)
+    and rlearner_score (sq_err = (y_residual - w_residual * tau_hat) ** 2) -- the
+    loss formula differs per metric, but once reduced to a per-model squared
+    error the bootstrap procedure is identical.
 
-    Lower scores are better: this is a loss (mean squared error against a CATE
-    proxy), not a similarity score.
+    Lower scores are better in all cases: this is a loss, not a similarity score.
 
     Args:
-        df (pandas.DataFrame): a data frame with model CATE estimates as columns
-        pseudo_outcome (numpy.ndarray): the CATE proxy to score models against,
-            one value per row of ``df``
-        model_cols (list): the columns of ``df`` holding model CATE estimates
-        score_name (str): name used for the returned Series/column (e.g. ``"dr_loss"``)
+        sq_err (pandas.DataFrame): per-row, per-model squared error
+        score_name (str): name used for the returned Series/column
         return_ci (bool): whether to return bootstrap confidence intervals
         n_bootstrap (int): number of half-sample bootstrap iterations
         alpha (float): significance level for confidence intervals
@@ -205,18 +191,16 @@ def _score_against_pseudo_outcome(
 
     Returns:
         If return_ci=False: (pandas.Series): loss for each model column
-        If return_ci=True:
-            (pandas.DataFrame): loss, standard error, and confidence interval
-                bounds for each model column
+        If return_ci=True: (pandas.DataFrame): loss, se, and CI bounds per model column
     """
-    sq_err = (df[model_cols].sub(pseudo_outcome, axis=0)) ** 2
+    model_cols = list(sq_err.columns)
     loss = sq_err.mean(axis=0)
     loss.name = score_name
 
     if not return_ci:
         return loss
 
-    n = len(df)
+    n = len(sq_err)
     m = n // 2
     rng = np.random.default_rng(random_state)
     boot_losses = {model: [] for model in model_cols}
@@ -232,19 +216,47 @@ def _score_against_pseudo_outcome(
         point = loss[model]
         boot = np.array(boot_losses[model])
         se = np.std(boot, ddof=1)
-        ci_lower = point - z_crit * se
-        ci_upper = point + z_crit * se
         results.append(
             {
                 "model": model,
                 score_name: point,
                 "se": se,
-                "ci_lower": ci_lower,
-                "ci_upper": ci_upper,
+                "ci_lower": point - z_crit * se,
+                "ci_upper": point + z_crit * se,
             }
         )
 
     return pd.DataFrame(results).set_index("model")
+
+
+def _score_against_pseudo_outcome(
+    df,
+    pseudo_outcome,
+    model_cols,
+    score_name,
+    return_ci,
+    n_bootstrap,
+    alpha,
+    random_state,
+):
+    """MSE-against-pseudo-outcome loss, for dr_score / plug_in_t_score.
+
+    See _bootstrap_loss_ci for the shared bootstrap-CI mechanics.
+
+    Args:
+        df (pandas.DataFrame): a data frame with model CATE estimates as columns
+        pseudo_outcome (numpy.ndarray): the CATE proxy to score models against
+        model_cols (list): the columns of df holding model CATE estimates
+        score_name, return_ci, n_bootstrap, alpha, random_state: see
+            _bootstrap_loss_ci
+
+    Returns:
+        See _bootstrap_loss_ci.
+    """
+    sq_err = (df[model_cols].sub(pseudo_outcome, axis=0)) ** 2
+    return _bootstrap_loss_ci(
+        sq_err, score_name, return_ci, n_bootstrap, alpha, random_state
+    )
 
 
 def dr_score(
@@ -478,4 +490,108 @@ def plug_in_t_score(
         n_bootstrap=n_bootstrap,
         alpha=alpha,
         random_state=random_state,
+    )
+
+
+def rlearner_score(
+    df,
+    X=None,
+    treatment_col="w",
+    outcome_col="y",
+    y_residual_col=None,
+    w_residual_col=None,
+    outcome_learner=None,
+    propensity_learner=None,
+    n_folds=5,
+    return_ci=False,
+    n_bootstrap=200,
+    alpha=0.05,
+    random_state=None,
+):
+    """Score fitted CATE models via the R-loss (Nie & Wager, 2021).
+
+    R-loss(tau_hat) = mean[((y - m(X)) - (w - e(X)) * tau_hat(X)) ** 2]
+
+    where m(X) = E[Y|X] and e(X) = E[W|X] are cross-fitted nuisance regressions
+    (see causalml.propensity.compute_r_residuals()). This is the loss
+    BaseRLearner.fit() already minimizes internally to train its own effect
+    model; exposing it standalone gives R-loss-based comparison across
+    arbitrary fitted CATE models -- EconML RScorer parity. Lower is better.
+
+    R-score complements dr_score() and plug_in_t_score() on the CATE-accuracy
+    axis (as opposed to rate_score()'s targeting/ranking axis); Mahajan et al.
+    (2024) found DR-loss dominates and plug-in-T is never dominated, with
+    R-loss not the standout of the three -- useful as a third opinion,
+    particularly for parity with EconML workflows already using RScorer.
+
+    Residuals can be supplied directly (e.g. precomputed once with
+    compute_r_residuals() and reused across scoring calls) via
+    y_residual_col / w_residual_col, or computed internally from X,
+    treatment_col, and outcome_col.
+
+    Args:
+        df (pandas.DataFrame): a data frame with fitted CATE model estimates as
+            columns, plus either y_residual_col/w_residual_col or both
+            outcome_col and treatment_col
+        X (numpy.ndarray or pandas.DataFrame, optional): feature matrix for the
+            R-loss nuisance models. Required unless residual columns are given
+        treatment_col (str, optional): treatment indicator column (0 or 1).
+            Ignored if residual columns are provided
+        outcome_col (str, optional): outcome column. Ignored if residual
+            columns are provided
+        y_residual_col (str, optional): precomputed y - m_hat(X) column
+        w_residual_col (str, optional): precomputed w - e_hat(X) column
+        outcome_learner (model, optional): model for E[Y|X]. Required unless
+            residual columns are provided
+        propensity_learner (PropensityModel, optional): passed to
+            compute_r_residuals(). Defaults to ElasticNetPropensityModel
+        n_folds (int, optional): cross-fitting folds. Default 5
+        return_ci (bool, optional): whether to return bootstrap CIs. Default False
+        n_bootstrap (int, optional): half-sample bootstrap iterations. Default 200
+        alpha (float, optional): CI significance level. Default 0.05
+        random_state (int or None, optional): random seed. Default None
+
+    Returns:
+        If return_ci=False: (pandas.Series): R-loss for each model column (lower is better)
+        If return_ci=True: (pandas.DataFrame): R-loss, se, and CI bounds per model column
+    """
+    have_residuals = (
+        y_residual_col is not None
+        and y_residual_col in df.columns
+        and w_residual_col is not None
+        and w_residual_col in df.columns
+    )
+    assert have_residuals or (X is not None and outcome_learner is not None), (
+        "Either `y_residual_col`/`w_residual_col` (present in df) or `X` and "
+        "`outcome_learner` (to compute residuals internally) must be provided."
+    )
+
+    model_cols = [
+        c
+        for c in df.columns
+        if c not in (outcome_col, treatment_col, y_residual_col, w_residual_col)
+    ]
+
+    if have_residuals:
+        y_residual = df[y_residual_col].to_numpy()
+        w_residual = df[w_residual_col].to_numpy()
+    else:
+        assert (
+            outcome_col in df.columns and treatment_col in df.columns
+        ), "{} and {} must be present in df to compute R-loss residuals.".format(
+            outcome_col, treatment_col
+        )
+        y_residual, w_residual = compute_r_residuals(
+            X=X,
+            treatment=df[treatment_col],
+            y=df[outcome_col],
+            outcome_learner=outcome_learner,
+            propensity_learner=propensity_learner,
+            n_folds=n_folds,
+            random_state=random_state,
+        )
+
+    sq_err = (df[model_cols].mul(w_residual, axis=0).sub(y_residual, axis=0)) ** 2
+    return _bootstrap_loss_ci(
+        sq_err, "r_loss", return_ci, n_bootstrap, alpha, random_state
     )

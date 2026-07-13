@@ -16,7 +16,7 @@ from causalml.inference.meta.utils import (
     get_xgboost_objective_metric,
     get_weighted_variance,
 )
-from causalml.propensity import ElasticNetPropensityModel
+from causalml.propensity import ElasticNetPropensityModel, compute_r_residuals
 
 logger = logging.getLogger("causalml")
 
@@ -140,10 +140,6 @@ class BaseRLearner(BaseLearner):
             if self.effect_learner is not None
             else deepcopy(self.learner)
         )
-        # Build CV splitter from stored n_fold / random_state.
-        self.cv = KFold(
-            n_splits=self.n_fold, shuffle=True, random_state=self.random_state
-        )
 
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
         self.vars_c = {}
@@ -151,9 +147,17 @@ class BaseRLearner(BaseLearner):
 
         if verbose:
             logger.info("generating out-of-fold CV outcome estimates")
-        yhat = cross_val_predict(
-            self.model_mu, X, y_np, cv=self.cv, n_jobs=self.cv_n_jobs
+        y_residual, _ = compute_r_residuals(
+            X,
+            treatment_np,
+            y_np,
+            outcome_learner=self.model_mu,
+            n_folds=self.n_fold,
+            random_state=self.random_state,
+            n_jobs=self.cv_n_jobs,
+            compute_w_residual=False,
         )
+        yhat = y_np - y_residual
         # Fit the nuisance outcome model on the full data so it can be
         # reused by predict(return_components=True).
         self.model_mu.fit(X, y_np)

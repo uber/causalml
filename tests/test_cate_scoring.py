@@ -7,7 +7,9 @@ from causalml.metrics.cate_scoring import (
     compute_dr_pseudo_outcomes,
     dr_score,
     plug_in_t_score,
+    rlearner_score,
 )
+from causalml.propensity import compute_r_residuals
 from causalml.metrics.rate import rate_score
 
 try:
@@ -311,3 +313,213 @@ def test_dr_score_and_plug_in_t_score_all_finite(synthetic_data):
     )
     assert np.isfinite(dr.values).all()
     assert np.isfinite(t.values).all()
+
+
+def test_compute_r_residuals_shape(synthetic_data):
+    df, X = synthetic_data
+    y_residual, w_residual = compute_r_residuals(
+        X,
+        df["w"],
+        df["y"],
+        outcome_learner=LinearRegression(),
+        n_folds=5,
+        random_state=RANDOM_SEED,
+    )
+    assert y_residual.shape == (len(df),)
+    assert w_residual.shape == (len(df),)
+    assert np.isfinite(y_residual).all()
+    assert np.isfinite(w_residual).all()
+
+
+def test_rlearner_score_returns_series(synthetic_data):
+    df, X = synthetic_data
+    scores = rlearner_score(
+        df,
+        X=X,
+        treatment_col="w",
+        outcome_col="y",
+        outcome_learner=LinearRegression(),
+        random_state=RANDOM_SEED,
+    )
+    assert isinstance(scores, pd.Series)
+    assert set(scores.index) == {"perfect_model", "noisy_model", "bad_model"}
+
+
+def test_rlearner_score_ranks_perfect_model_lowest(synthetic_data):
+    df, X = synthetic_data
+    scores = rlearner_score(
+        df,
+        X=X,
+        treatment_col="w",
+        outcome_col="y",
+        outcome_learner=LinearRegression(),
+        random_state=RANDOM_SEED,
+    )
+    assert scores["perfect_model"] < scores["noisy_model"] < scores["bad_model"]
+
+
+def test_rlearner_score_with_precomputed_residuals(synthetic_data):
+    df, X = synthetic_data
+    y_residual, w_residual = compute_r_residuals(
+        X,
+        df["w"],
+        df["y"],
+        outcome_learner=LinearRegression(),
+        n_folds=5,
+        random_state=RANDOM_SEED,
+    )
+    df_with_residuals = df.assign(y_resid=y_residual, w_resid=w_residual)
+    scores = rlearner_score(
+        df_with_residuals,
+        y_residual_col="y_resid",
+        w_residual_col="w_resid",
+        random_state=RANDOM_SEED,
+    )
+    assert scores["perfect_model"] < scores["bad_model"]
+
+
+def test_rlearner_score_missing_X_and_residuals_raises(synthetic_data):
+    df, _ = synthetic_data
+    with pytest.raises(AssertionError):
+        rlearner_score(df, treatment_col="w", outcome_col="y")
+
+
+def test_rlearner_score_return_ci_returns_dataframe(synthetic_data):
+    df, X = synthetic_data
+    result = rlearner_score(
+        df,
+        X=X,
+        treatment_col="w",
+        outcome_col="y",
+        outcome_learner=LinearRegression(),
+        return_ci=True,
+        n_bootstrap=50,
+        random_state=RANDOM_SEED,
+    )
+    assert isinstance(result, pd.DataFrame)
+    assert set(result.columns) == {"r_loss", "se", "ci_lower", "ci_upper"}
+
+
+def test_rlearner_score_ci_bounds_ordered(synthetic_data):
+    df, X = synthetic_data
+    result = rlearner_score(
+        df,
+        X=X,
+        treatment_col="w",
+        outcome_col="y",
+        outcome_learner=LinearRegression(),
+        return_ci=True,
+        n_bootstrap=50,
+        random_state=RANDOM_SEED,
+    )
+    assert (result["ci_lower"] < result["r_loss"]).all()
+    assert (result["ci_upper"] > result["r_loss"]).all()
+
+
+def test_compute_r_residuals_handles_imbalanced_treatment():
+    rng = np.random.default_rng(RANDOM_SEED)
+
+    n, p = 200, 5
+    X = rng.normal(size=(n, p))
+
+    w = np.zeros(n, dtype=int)
+    w[rng.choice(n, 10, replace=False)] = 1
+
+    y = rng.normal(size=n)
+
+    y_residual, w_residual = compute_r_residuals(
+        X,
+        w,
+        y,
+        outcome_learner=LinearRegression(),
+        n_folds=5,
+        random_state=RANDOM_SEED,
+    )
+
+    assert y_residual.shape == (n,)
+    assert w_residual.shape == (n,)
+    assert np.isfinite(y_residual).all()
+    assert np.isfinite(w_residual).all()
+
+
+def test_rlearner_score_handles_imbalanced_treatment():
+    rng = np.random.default_rng(RANDOM_SEED)
+
+    n, p = 200, 5
+    X = rng.normal(size=(n, p))
+
+    w = np.zeros(n, dtype=int)
+    w[rng.choice(n, 10, replace=False)] = 1
+
+    y = rng.normal(size=n)
+
+    df = pd.DataFrame(
+        {
+            "y": y,
+            "w": w,
+            "model_1": rng.normal(size=n),
+            "model_2": rng.normal(size=n),
+        }
+    )
+
+    scores = rlearner_score(
+        df,
+        X=X,
+        treatment_col="w",
+        outcome_col="y",
+        outcome_learner=LinearRegression(),
+        n_folds=5,
+        random_state=RANDOM_SEED,
+    )
+
+    assert isinstance(scores, pd.Series)
+    assert np.isfinite(scores.values).all()
+
+
+def test_dr_plug_in_t_and_rlearner_score_all_finite(synthetic_data):
+    df, X = synthetic_data
+    dr = dr_score(
+        df,
+        X=X,
+        treatment_col="w",
+        outcome_col="y",
+        learner=LinearRegression(),
+        random_state=RANDOM_SEED,
+    )
+    t = plug_in_t_score(
+        df,
+        X,
+        treatment_col="w",
+        outcome_col="y",
+        learner=LinearRegression(),
+        random_state=RANDOM_SEED,
+    )
+    r = rlearner_score(
+        df,
+        X=X,
+        treatment_col="w",
+        outcome_col="y",
+        outcome_learner=LinearRegression(),
+        random_state=RANDOM_SEED,
+    )
+    assert np.isfinite(dr.values).all()
+    assert np.isfinite(t.values).all()
+    assert np.isfinite(r.values).all()
+
+
+def test_compute_r_residuals_skips_propensity_when_w_residual_not_needed(
+    synthetic_data,
+):
+    df, X = synthetic_data
+    y_residual, w_residual = compute_r_residuals(
+        X,
+        df["w"],
+        df["y"],
+        outcome_learner=LinearRegression(),
+        n_folds=5,
+        random_state=RANDOM_SEED,
+        compute_w_residual=False,
+    )
+    assert y_residual.shape == (len(df),)
+    assert np.isfinite(y_residual).all()
+    assert w_residual is None
