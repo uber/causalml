@@ -4,7 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
-from xgboost import XGBRegressor
+from xgboost import XGBRegressor, XGBClassifier
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
@@ -847,3 +847,69 @@ class XGBRRegressor(BaseRRegressor):
             self.vars_c[group] = get_weighted_variance(diff_c, sample_weight_filt_c)
             self.vars_t[group] = get_weighted_variance(diff_t, sample_weight_filt_t)
         return self
+
+
+class XGBRClassifier(BaseRClassifier):
+    """An R-learner classifier using XGBoost models.
+
+    The outcome model is an ``XGBClassifier`` (its ``predict_proba`` drives the
+    outcome cross-fit) and the effect model is an ``XGBRegressor``. Every
+    constructor argument is stored verbatim (scikit-learn convention) so that
+    ``get_params()`` / ``clone()`` work correctly; the XGBoost models are
+    constructed in ``fit()``.
+    """
+
+    def __init__(
+        self,
+        propensity_learner=ElasticNetPropensityModel(),
+        ate_alpha=0.05,
+        control_name=0,
+        n_fold=5,
+        random_state=None,
+        outcome_xgb_kwargs=None,
+        effect_xgb_kwargs=None,
+    ):
+        """Initialize an R-learner classifier with XGBoost models.
+
+        Args:
+            propensity_learner (optional): a propensity model. Defaults to
+                ``ElasticNetPropensityModel()``.
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+            n_fold (int, optional): CV folds for the outcome learner
+            random_state (int or RandomState, optional): random seed
+            outcome_xgb_kwargs (dict, optional): keyword arguments forwarded verbatim
+                to the ``XGBClassifier`` outcome model, e.g. ``{'max_depth': 4}``.
+            effect_xgb_kwargs (dict, optional): keyword arguments forwarded verbatim
+                to the ``XGBRegressor`` effect model.
+
+        Note: all arguments are stored verbatim (scikit-learn convention) so that
+        ``get_params`` / ``clone`` work correctly. XGBoost model construction is
+        deferred to ``fit()``.
+        """
+        # Store verbatim — no XGBoost construction here.
+        self.outcome_xgb_kwargs = outcome_xgb_kwargs
+        self.effect_xgb_kwargs = effect_xgb_kwargs
+
+        # BaseRClassifier.__init__ rejects both learners being None; bypass it by
+        # initializing through the grandparent, since the learners are built in
+        # fit() rather than passed in.
+        BaseRLearner.__init__(
+            self,
+            learner=None,
+            outcome_learner=None,
+            effect_learner=None,
+            propensity_learner=propensity_learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+            n_fold=n_fold,
+            random_state=random_state,
+        )
+
+    def fit(self, X, treatment, y, p=None, sample_weight=None, verbose=True):
+        """Build the XGBoost models, then fit as an R-learner classifier."""
+        self.outcome_learner = XGBClassifier(**(self.outcome_xgb_kwargs or {}))
+        self.effect_learner = XGBRegressor(**(self.effect_xgb_kwargs or {}))
+        return BaseRClassifier.fit(
+            self, X, treatment, y, p=p, sample_weight=sample_weight, verbose=verbose
+        )
