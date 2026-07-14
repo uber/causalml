@@ -97,6 +97,19 @@ class NearestNeighborMatch:
             seed
         n_jobs (int): The number of parallel jobs to run for neighbors search.
             None means 1 unless in a joblib.parallel_backend context. -1 means using all processors
+
+    Fitted attributes (populated after :meth:`match`):
+        matched_indexes_ (pandas.DataFrame): two-column dataframe with the
+            ``(from, to)`` pairs of original data indices produced by the most
+            recent :meth:`match` call. ``from`` corresponds to the matching
+            source group (treatment if ``treatment_to_control`` else control);
+            ``to`` is the matched counterpart from the opposite group. Each row
+            is one matched pair, so with ``ratio > 1`` a single ``from`` index
+            can appear multiple times against distinct ``to`` indices. Useful
+            for joining matched pairs back to upstream metadata or auditing the
+            matching outcome (see uber/causalml#621). ``match_by_group`` calls
+            :meth:`match` once per group, so the attribute reflects the last
+            group processed.
     """
 
     def __init__(
@@ -179,10 +192,15 @@ class NearestNeighborMatch:
             match_from_scaled = pd.concat([match_from_scaled] * self.ratio, axis=0)
 
             cond = (distances / np.sqrt(len(score_cols))) < sdcal
+            # Capture the full (from, to) pair mapping before deduplicating the
+            # from-side, so ``matched_indexes_`` (set below) can expose every
+            # matched pair -- not just the unique from-indices.
+            from_pairs = np.array(match_from_scaled.loc[cond].index)
+            to_pairs = np.array(match_to_scaled.iloc[indices[cond]].index)
             # Deduplicate the indices of the treatment group
-            from_idx_matched = np.unique(match_from_scaled.loc[cond].index)
+            from_idx_matched = np.unique(from_pairs)
             # XXX: Should we deduplicate the indices of the control group too?
-            to_idx_matched = np.array(match_to_scaled.iloc[indices[cond]].index)
+            to_idx_matched = to_pairs
         else:
             assert len(score_cols) == 1, (
                 "Matching on multiple columns is only supported using the "
@@ -199,6 +217,12 @@ class NearestNeighborMatch:
 
             from_idx_matched = []
             to_idx_matched = []
+            # Track each accepted (from, to) pair so ``matched_indexes_`` can
+            # report the actual row-aligned pairing: ``from_idx_matched`` only
+            # records a from-index the first time it is accepted (``i == 0``),
+            # so it cannot be repeated to recover pairs under ``ratio > 1``.
+            from_pairs_list = []
+            to_pairs_list = []
             match_to["unmatched"] = True
 
             for from_idx in from_indices:
@@ -223,7 +247,22 @@ class NearestNeighborMatch:
                         if i == 0:
                             from_idx_matched.append(from_idx)
                         to_idx_matched.append(to_idx)
+                        from_pairs_list.append(from_idx)
+                        to_pairs_list.append(to_idx)
                         match_to.loc[to_idx, "unmatched"] = False
+
+        # Persist the (from, to) pair mapping so callers can join matched pairs
+        # back onto the original data without re-running the matching. See
+        # uber/causalml#621.
+        if self.replace:
+            self.matched_indexes_ = pd.DataFrame({"from": from_pairs, "to": to_pairs})
+        else:
+            self.matched_indexes_ = pd.DataFrame(
+                {
+                    "from": np.array(from_pairs_list),
+                    "to": np.array(to_pairs_list),
+                }
+            )
 
         return data.loc[
             np.concatenate([np.array(from_idx_matched), np.array(to_idx_matched)])
