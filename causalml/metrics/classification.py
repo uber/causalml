@@ -1,4 +1,5 @@
 import logging
+import numpy as np
 from sklearn.metrics import log_loss, roc_auc_score
 
 from .const import EPS
@@ -16,8 +17,7 @@ def logloss(y, p):
         bounded log loss error
     """
 
-    p[p < EPS] = EPS
-    p[p > 1 - EPS] = 1 - EPS
+    p = np.clip(p, EPS, 1 - EPS)
     return log_loss(y, p)
 
 

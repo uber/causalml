@@ -1,5 +1,7 @@
+import numpy as np
 import pandas as pd
 from numpy import isclose
+from causalml.metrics.classification import logloss
 from causalml.metrics.visualize import qini_score
 
 
@@ -26,3 +28,21 @@ def test_qini_score():
     # for each learner, its qini score should stay same no matter calling with another model or calling separately
     assert isclose(full_result["learner_1"], learner_1_result["learner_1"])
     assert isclose(full_result["learner_2"], learner_2_result["learner_2"])
+
+
+def test_logloss_does_not_modify_prediction():
+    y = np.array([0, 1, 0, 1, 1])
+    p = np.array([0.0, 1.0, 0.2, 0.8, 0.9])
+    p_before = p.copy()
+
+    logloss(y, p)
+
+    # logloss clips p into (0, 1) and must do so on a copy, not on the caller's array
+    assert np.array_equal(p, p_before)
+
+
+def test_logloss_clips_degenerate_predictions():
+    y = np.array([0, 1])
+    p = np.array([0.0, 1.0])
+
+    assert np.isfinite(logloss(y, p))
