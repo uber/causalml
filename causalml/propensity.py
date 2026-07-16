@@ -97,7 +97,7 @@ class LogisticRegressionPropensityModel(PropensityModel):
         kwargs = {
             "penalty": "elasticnet",
             "solver": "saga",
-            "Cs": np.logspace(1e-3, 1 - 1e-3, 4),
+            "Cs": 4,
             "l1_ratios": np.linspace(1e-3, 1 - 1e-3, 4),
             "cv": StratifiedKFold(
                 n_splits=(
