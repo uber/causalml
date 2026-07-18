@@ -74,7 +74,6 @@ def test_cevae_jax_fit_predict_shapes():
         n=1000, p=5, sigma=1.0, adj=0.0
     )
     cevae = CEVAEJax(
-        outcome_dist="normal",
         latent_dim=8,
         hidden_dim=32,
         num_layers=2,

@@ -62,7 +62,6 @@ jax = [
     "flax>=0.11.0",
     "optax>=0.1.4",
     "orbax-checkpoint>=0.10.0",
-    "distrax>=0.1.5",
 ]
 
 [build-system]

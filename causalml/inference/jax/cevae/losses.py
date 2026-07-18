@@ -18,6 +18,7 @@ from __future__ import annotations
 import jax
 
 
+@jax.jit
 def cevae_loss(model, guide, key, x, t, y):
     """CEVAE training loss (to minimize).
 

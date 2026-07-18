@@ -35,8 +35,9 @@ ate = ite.mean()
 ```
 
 The API matches `causalml.inference.torch.CEVAE`; see
-`docs/examples/dragonnet_example.py` for a benchmark against the pyro
-implementation on IHDP + synthetic data.
+`docs/examples/cevae_example.ipynb` for a benchmark against the pyro
+implementation on IHDP + synthetic data. For a side-by-side benchmark of the
+JAX and PyTorch backends, see `docs/examples/cevae_jax_vs_torch.ipynb`.
 
 ## References
 

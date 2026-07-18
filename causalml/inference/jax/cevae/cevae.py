@@ -4,7 +4,9 @@ Provides a scikit-learn style :class:`CEVAE` wrapper whose public API mirrors
 :class:`causalml.inference.torch.cevae.CEVAE`. Training uses ``optax.adamw``
 with an exponential learning-rate decay matching the pyro
 :class:`~pyro.optim.ClippedAdam` schedule (``learning_rate * lrd ** step``,
-where ``lrd = learning_rate_decay ** (1 / num_steps)``).
+where ``lrd = learning_rate_decay ** (1 / num_steps)``). Weight decay follows
+the decoupled AdamW formulation, which differs slightly from the
+L2-in-gradient coupling of pyro's ``ClippedAdam``.
 
 References:
     [1] C. Louizos, U. Shalit, J. Mooij, D. Sontag, R. Zemel, M. Welling
@@ -95,7 +97,7 @@ class CEVAE:
         learning_rate_decay: Overall LR decay across training; per-step decay
             is ``learning_rate_decay ** (1 / num_steps)``.
         num_samples: Number of Monte Carlo samples used by :meth:`predict`.
-        weight_decay: L2 weight decay coefficient.
+        weight_decay: Decoupled (AdamW-style) weight decay coefficient.
         seed: PRNG seed for parameter initialization and mini-batch shuffling.
     """
 
@@ -167,7 +169,8 @@ class CEVAE:
         # (Re)fit the whitener from data.
         self._net.whiten = PreWhitener(X)
 
-        n_batches = max(1, n // self.batch_size)
+        # The batch loop below runs ceil(n / batch_size) batches per epoch.
+        n_batches = max(1, -(-n // self.batch_size))
         num_steps = max(1, self.num_epochs * n_batches)
         per_step_decay = self.learning_rate_decay ** (1.0 / num_steps)
         schedule = optax.exponential_decay(
@@ -200,6 +203,10 @@ class CEVAE:
                 xb_w = self._net.whiten(xb)
                 key, subkey = jax.random.split(key)
                 loss_val = train_step(self._net, optimizer, subkey, xb_w, tb, yb)
+                if not np.isfinite(loss_val):
+                    raise FloatingPointError(
+                        f"CEVAE training diverged: non-finite loss at epoch {epoch + 1}."
+                    )
                 epoch_loss += float(loss_val)
             losses.append(epoch_loss / n)
             if logger.isEnabledFor(logging.DEBUG):
@@ -275,6 +282,10 @@ class CEVAE:
         if self._net is None:
             raise RuntimeError("Call fit() before predict().")
         X = np.asarray(X, dtype=np.float32)
+        if X.shape[-1] != self._feature_dim:
+            raise ValueError(
+                f"X has {X.shape[-1]} features, expected {self._feature_dim}."
+            )
         n = X.shape[0]
         batch_size = self.batch_size if self.batch_size else n
         key = jax.random.PRNGKey(self.seed + 1)
