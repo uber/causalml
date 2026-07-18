@@ -23,6 +23,7 @@ Follow the below links for an approximate ordering of example tutorials from int
     examples/feature_selection
     examples/binary_policy_learner_example
     examples/cevae_example
+    examples/cevae_jax_vs_torch
     examples/dr_learner_with_synthetic_data
     examples/benchmark_simulation_studies
     examples/necessity_sufficiency_example
