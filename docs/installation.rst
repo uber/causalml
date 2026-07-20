@@ -67,8 +67,8 @@ Install ``causalml`` with ``torch`` for ``CEVAE`` from ``PyPI``
 
     pip install causalml[torch]
 
-Install ``causalml`` with ``jax`` for ``DragonNet`` from ``PyPI``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Install ``causalml`` with ``jax`` for ``DragonNet`` or ``CEVAE`` from ``PyPI``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -97,8 +97,8 @@ Install ``causalml`` with ``torch`` for ``CEVAE`` using `uv <https://github.com/
 
     uv add "causalml[torch]"
 
-Install ``causalml`` with ``jax`` for ``DragonNet`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Install ``causalml`` with ``jax`` for ``DragonNet`` or ``CEVAE`` using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -140,7 +140,7 @@ with ``torch`` for ``CEVAE``:
 
     pip install -e ".[torch]"
 
-with ``jax`` for ``DragonNet``:
+with ``jax`` for ``DragonNet`` or ``CEVAE``:
 
 .. code-block:: bash
 
