@@ -228,6 +228,50 @@ def test_SensitivitySelectionBias():
     sens.plot(lls_bias_alignment, ci=True)
 
 
+def test_SensitivitySelectionBias_summary_ate():
+    # summary() used to assign the alpha == 0 "New ATE" as a Series, so pandas
+    # aligned it on index and every row other than alpha == 0 came back NaN.
+    np.random.seed(RANDOM_SEED)
+
+    y, X, treatment, tau, b, e = synthetic_data(
+        mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
+    )
+
+    INFERENCE_FEATURES = ["feature_" + str(i) for i in range(NUM_FEATURES)]
+    df = pd.DataFrame(X, columns=INFERENCE_FEATURES)
+    df[TREATMENT_COL] = treatment
+    df[OUTCOME_COL] = y
+    df[SCORE_COL] = e
+
+    learner = BaseXLearner(LinearRegression())
+    sens = SensitivitySelectionBias(
+        df,
+        INFERENCE_FEATURES,
+        p_col=SCORE_COL,
+        treatment_col=TREATMENT_COL,
+        outcome_col=OUTCOME_COL,
+        learner=learner,
+        confound="alignment",
+        alpha_range=None,
+    )
+
+    summary = sens.summary()
+
+    assert not summary["ATE"].isna().any()
+
+    # summary() drops the alpha column, but Method carries the alpha it was
+    # built from, so the alpha == 0 row is still identifiable.
+    alphas = (
+        summary["Method"]
+        .str.extract(r"alpha@(-?[\d.eE+-]+),", expand=False)
+        .astype(float)
+    )
+    baseline = summary.loc[alphas == 0, "New ATE"]
+    assert len(baseline) == 1
+
+    assert np.allclose(summary["ATE"], baseline.values[0])
+
+
 def test_one_sided():
     y, X, treatment, tau, b, e = synthetic_data(
         mode=1, n=100000, p=NUM_FEATURES, sigma=1.0
