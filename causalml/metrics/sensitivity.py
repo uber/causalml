@@ -565,9 +565,9 @@ class SensitivitySelectionBias(Sensitivity):
         sensitivity_summary["Method"] = sensitivity_summary[
             "Method"
         ] + sensitivity_summary["rsqs"].round(5).astype(str)
-        sensitivity_summary["ATE"] = sensitivity_summary[
-            sensitivity_summary.alpha == 0
-        ]["New ATE"]
+        sensitivity_summary["ATE"] = sensitivity_summary.loc[
+            sensitivity_summary.alpha == 0, "New ATE"
+        ].values[0]
         return sensitivity_summary[SUMMARY_COLS]
 
     @staticmethod
