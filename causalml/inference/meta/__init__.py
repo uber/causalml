@@ -5,9 +5,16 @@ from .tlearner import (
     BaseTLearner,
     BaseTRegressor,
     BaseTClassifier,
+    XGBTClassifier,
 )
 from .xlearner import BaseXLearner, BaseXRegressor, BaseXClassifier
-from .rlearner import BaseRLearner, BaseRRegressor, BaseRClassifier, XGBRRegressor
+from .rlearner import (
+    BaseRLearner,
+    BaseRRegressor,
+    BaseRClassifier,
+    XGBRRegressor,
+    XGBRClassifier,
+)
 from .tmle import TMLELearner
 from .drlearner import BaseDRLearner, BaseDRRegressor, BaseDRClassifier, XGBDRRegressor
 from .serialization import load_learner, CausalMLVersionMismatchWarning

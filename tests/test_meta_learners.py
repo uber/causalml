@@ -24,6 +24,7 @@ from causalml.inference.meta import (
     BaseTClassifier,
     XGBTRegressor,
     MLPTRegressor,
+    XGBTClassifier,
 )
 from causalml.inference.meta import BaseXLearner, BaseXClassifier, BaseXRegressor
 from causalml.inference.meta import (
@@ -31,6 +32,7 @@ from causalml.inference.meta import (
     BaseRClassifier,
     BaseRRegressor,
     XGBRRegressor,
+    XGBRClassifier,
 )
 from causalml.inference.meta import TMLELearner
 from causalml.inference.meta import BaseDRLearner
@@ -1988,6 +1990,8 @@ _CLASSIFIER_CONFIGS = [
     (BaseSClassifier, {"learner": _DT_CLF}),
     (BaseTClassifier, {"learner": _DT_CLF}),
     (BaseXClassifier, {"outcome_learner": _DT_CLF, "effect_learner": _DT_REG}),
+    (XGBTClassifier, {"xgb_kwargs": {"n_estimators": 5}}),
+    (XGBRClassifier, {"outcome_xgb_kwargs": {"n_estimators": 5}}),
 ]
 
 
@@ -2048,6 +2052,132 @@ def test_xgb_rregressor_clone_with_kwargs():
     r2 = clone(r)
     assert r2.xgb_kwargs == {"max_depth": 3, "learning_rate": 0.05}
     assert _params_repr_equal(r2.get_params(), r.get_params())
+
+
+def test_XGBTClassifier(generate_classification_data):
+    np.random.seed(RANDOM_SEED)
+
+    df, x_names = generate_classification_data()
+    df["treatment_group_key"] = np.where(
+        df["treatment_group_key"] == CONTROL_NAME, 0, 1
+    )
+
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
+
+    uplift_model = XGBTClassifier(xgb_kwargs={"n_estimators": 50})
+    uplift_model.fit(
+        X=df_train[x_names].values,
+        treatment=df_train["treatment_group_key"].values,
+        y=df_train[CONVERSION].values,
+    )
+
+    # The outcome models are XGBClassifiers built in fit(), with xgb_kwargs forwarded.
+    assert isinstance(uplift_model.model_c, XGBClassifier)
+    assert uplift_model.model_c.n_estimators == 50
+    for g in uplift_model.t_groups:
+        assert isinstance(uplift_model.models_t[g], XGBClassifier)
+
+    tau_pred = uplift_model.predict(
+        X=df_test[x_names].values, treatment=df_test["treatment_group_key"].values
+    )
+
+    auuc_metrics = pd.DataFrame(
+        {
+            "tau_pred": tau_pred.flatten(),
+            "W": df_test["treatment_group_key"].values,
+            CONVERSION: df_test[CONVERSION].values,
+            "treatment_effect_col": df_test["treatment_effect"].values,
+        }
+    )
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col=CONVERSION,
+        treatment_col="W",
+        treatment_effect_col="treatment_effect_col",
+        normalize=True,
+    )
+    assert auuc["tau_pred"] > 0.5
+
+
+def test_XGBRClassifier(generate_classification_data):
+    np.random.seed(RANDOM_SEED)
+
+    df, x_names = generate_classification_data()
+    df["treatment_group_key"] = np.where(
+        df["treatment_group_key"] == CONTROL_NAME, 0, 1
+    )
+
+    propensity_model = LogisticRegression()
+    propensity_model.fit(X=df[x_names].values, y=df["treatment_group_key"].values)
+    df["propensity_score"] = propensity_model.predict_proba(df[x_names].values)[:, 1]
+
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
+
+    uplift_model = XGBRClassifier(
+        outcome_xgb_kwargs={"n_estimators": 50},
+        effect_xgb_kwargs={"n_estimators": 50},
+    )
+    uplift_model.fit(
+        X=df_train[x_names].values,
+        p=df_train["propensity_score"].values,
+        treatment=df_train["treatment_group_key"].values,
+        y=df_train[CONVERSION].values,
+    )
+
+    # Outcome model is an XGBClassifier, effect model an XGBRegressor; kwargs forwarded.
+    assert isinstance(uplift_model.model_mu, XGBClassifier)
+    assert isinstance(uplift_model.model_tau, XGBRegressor)
+    assert uplift_model.model_mu.n_estimators == 50
+    assert uplift_model.model_tau.n_estimators == 50
+
+    tau_pred = uplift_model.predict(
+        X=df_test[x_names].values, p=df_test["propensity_score"].values
+    )
+
+    auuc_metrics = pd.DataFrame(
+        {
+            "tau_pred": tau_pred.flatten(),
+            "W": df_test["treatment_group_key"].values,
+            CONVERSION: df_test[CONVERSION].values,
+            "treatment_effect_col": df_test["treatment_effect"].values,
+        }
+    )
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col=CONVERSION,
+        treatment_col="W",
+        treatment_effect_col="treatment_effect_col",
+        normalize=True,
+    )
+    assert auuc["tau_pred"] > 0.5
+
+
+def test_xgbt_classifier_clone():
+    """XGBTClassifier round-trips through clone() / get_params() (unfitted)."""
+    m = XGBTClassifier(xgb_kwargs={"max_depth": 3, "n_estimators": 5})
+    assert m.get_params()["xgb_kwargs"] == {"max_depth": 3, "n_estimators": 5}
+    m2 = clone(m)
+    assert type(m2) is XGBTClassifier
+    assert m2.xgb_kwargs == {"max_depth": 3, "n_estimators": 5}
+    assert _params_repr_equal(m2.get_params(), m.get_params())
+    assert not hasattr(m2, "t_groups")
+
+
+def test_xgbr_classifier_clone():
+    """XGBRClassifier round-trips through clone() / get_params() (unfitted)."""
+    m = XGBRClassifier(
+        outcome_xgb_kwargs={"max_depth": 3},
+        effect_xgb_kwargs={"n_estimators": 5},
+    )
+    params = m.get_params()
+    assert params["outcome_xgb_kwargs"] == {"max_depth": 3}
+    assert params["effect_xgb_kwargs"] == {"n_estimators": 5}
+    m2 = clone(m)
+    assert type(m2) is XGBRClassifier
+    assert m2.outcome_xgb_kwargs == {"max_depth": 3}
+    assert m2.effect_xgb_kwargs == {"n_estimators": 5}
+    assert _params_repr_equal(m2.get_params(), m.get_params())
+    assert not hasattr(m2, "t_groups")
 
 
 def test_xgb_rregressor_fit_predict_return_ci():

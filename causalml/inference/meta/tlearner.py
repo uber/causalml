@@ -12,7 +12,7 @@ if version.parse(sklearn.__version__) >= version.parse("0.22.0"):
 else:
     from sklearn.utils.testing import ignore_warnings
 from tqdm import tqdm
-from xgboost import XGBRegressor
+from xgboost import XGBRegressor, XGBClassifier
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (
@@ -547,3 +547,34 @@ class MLPTRegressor(BaseTRegressor):
             ate_alpha=ate_alpha,
             control_name=control_name,
         )
+
+
+class XGBTClassifier(BaseTClassifier):
+    """A T-learner classifier using XGBoost models.
+
+    Stores XGBoost hyperparameters verbatim (scikit-learn convention) so that
+    ``get_params()`` / ``clone()`` work correctly; the ``XGBClassifier`` models
+    are constructed in ``fit()``.
+    """
+
+    def __init__(self, ate_alpha=0.05, control_name=0, xgb_kwargs=None):
+        """Initialize a T-learner classifier with two XGBoost models.
+
+        Args:
+            ate_alpha (float, optional): the confidence level alpha of the ATE estimate
+            control_name (str or int, optional): name of control group
+            xgb_kwargs (dict, optional): keyword arguments forwarded verbatim to each
+                ``XGBClassifier``, e.g. ``xgb_kwargs={'max_depth': 4, 'learning_rate': 0.05}``.
+
+        Note: all arguments are stored verbatim (scikit-learn convention) so that
+        ``get_params`` / ``clone`` work correctly. ``XGBClassifier`` construction
+        is deferred to ``fit()``.
+        """
+        # Store verbatim — no XGBClassifier construction here.
+        self.xgb_kwargs = xgb_kwargs
+        super().__init__(ate_alpha=ate_alpha, control_name=control_name)
+
+    def fit(self, X, treatment, y, *args, **kwargs):
+        """Build the XGBoost outcome model, then fit as a T-learner classifier."""
+        self.learner = XGBClassifier(**(self.xgb_kwargs or {}))
+        return super().fit(X, treatment, y, *args, **kwargs)
