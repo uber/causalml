@@ -1,7 +1,11 @@
-"""
-Filter feature selection methods for uplift modeling
+"""Filter feature selection methods for uplift modeling.
 
-- Currently only for classification problem: the outcome variable of uplift model is binary.
+.. note::
+    The likelihood-ratio filter (:func:`FilterSelect.filter_LR`) and the
+    divergence-based filters (:func:`FilterSelect.filter_D` -- ``KL``, ``ED``,
+    ``Chi``) require a **binary** outcome (values in ``{0, 1}``) and raise
+    ``ValueError`` otherwise. Use the F-test filter
+    (:func:`FilterSelect.filter_F`) for a continuous outcome.
 """
 
 import numpy as np
@@ -9,6 +13,34 @@ import pandas as pd
 import statsmodels.api as sm
 from scipy import stats
 from sklearn.impute import SimpleImputer
+
+
+def _check_binary_outcome(y, y_name="y"):
+    """Validate that an outcome column is binary (values in ``{0, 1}``).
+
+    The likelihood-ratio (``filter_LR``) and divergence-based (``filter_D``:
+    KL / ED / Chi) filters model a binary conversion outcome. A continuous or
+    multi-class outcome silently yields meaningless statistics, so fail fast
+    with a clear message. Use ``filter_F`` (OLS F-test) for continuous outcomes.
+
+    Args:
+        y (array-like): outcome values.
+        y_name (str): outcome column name, used in the error message.
+
+    Raises:
+        ValueError: if ``y`` is empty or contains any value other than 0 or 1.
+    """
+    y = np.asarray(y)
+    if np.issubdtype(y.dtype, np.floating):
+        y = y[~np.isnan(y)]
+    unique_values = set(np.unique(y).tolist())
+    if not unique_values or not unique_values.issubset({0, 1}):
+        raise ValueError(
+            "Outcome column '{}' must be binary (values in {{0, 1}}) for this "
+            "filter, but found {}. Use filter_F for a continuous outcome.".format(
+                y_name, sorted(unique_values)[:10]
+            )
+        )
 
 
 class FilterSelect:
@@ -241,6 +273,8 @@ class FilterSelect:
         """
         if order not in [1, 2, 3]:
             raise Exception("ValueError: order argument only takes value 1,2,3.")
+
+        _check_binary_outcome(data[y_name], y_name)
 
         all_result = pd.DataFrame()
         for x_name_i in features:
@@ -549,6 +583,8 @@ class FilterSelect:
             all_result : pd.DataFrame
                 a data frame containing the feature importance statistics
         """
+
+        _check_binary_outcome(data[y_name], y_name)
 
         all_result = pd.DataFrame()
 
