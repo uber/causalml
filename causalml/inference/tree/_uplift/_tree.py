@@ -25,14 +25,29 @@ from .._tree._classes import Tree, BaseDecisionTree
 from .._tree._splitter import Splitter
 
 from ._builder import DepthFirstUpliftTreeBuilder, BestFirstUpliftTreeBuilder
-from ._criterion import KLCriterion, EDCriterion, ChiCriterion, CTSCriterion
+from ._criterion import (
+    KLCriterion,
+    EDCriterion,
+    ChiCriterion,
+    CTSCriterion,
+    DDPCriterion,
+    ITCriterion,
+    CITCriterion,
+)
 
 UPLIFT_TREE_CRITERIA = {
     "KL": KLCriterion,
     "ED": EDCriterion,
     "Chi": ChiCriterion,
     "CTS": CTSCriterion,
+    "DDP": DDPCriterion,
+    "IT": ITCriterion,
+    "CIT": CITCriterion,
 }
+
+# Criteria that contrast a single treatment against control and cannot handle
+# more than one treatment group (legacy ``uplift.pyx`` ~533-536).
+TWO_CLASS_ONLY_CRITERIA = {"DDP", "IT", "CIT"}
 
 
 def get_check_y_params() -> dict:
@@ -87,6 +102,19 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
 
         # n_outputs_ is the number of groups [control, treatment_1, ..., treatment_{n-1}]
         self.n_outputs_ = y.shape[1]
+
+        # DDP/IT/CIT contrast a single treatment against control; reject
+        # multi-treatment inputs, matching legacy uplift.pyx (~533-536).
+        if (
+            isinstance(self.criterion, str)
+            and self.criterion in TWO_CLASS_ONLY_CRITERIA
+            and self.n_outputs_ > 2
+        ):
+            raise ValueError(
+                f"The {self.criterion} criterion can only cope with two-class "
+                "problems (control vs. a single treatment); got "
+                f"{self.n_outputs_ - 1} treatment groups."
+            )
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
