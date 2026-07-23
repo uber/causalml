@@ -18,6 +18,11 @@ cdef class UpliftClassificationCriterion(CausalRegressionCriterion):
     cdef public float64_t n_reg
     cdef public intp_t min_samples_treatment
 
+    # Rzepakowski et al. (2012) normalization: when set, the split gain is divided
+    # by the treatment-vs-control distribution divergence ``_norm_factor`` (issue
+    # #948). Not applied by criteria whose ``_normalizable`` returns 0 (e.g. CTS).
+    cdef public bint normalization
+
     # Regularized positive-outcome probabilities of the *parent* node, threaded
     # down by the builder before each ``node_split`` (control at index 0). Only
     # valid when ``has_parent`` is non-zero (the root has no parent).
@@ -33,6 +38,14 @@ cdef class UpliftClassificationCriterion(CausalRegressionCriterion):
     cdef float64_t _pair_divergence(self, float64_t p_t, float64_t p_c) noexcept nogil
     # Sum of pair divergences over all treatment groups for a probability vector.
     cdef float64_t _divergence_of(self, float64_t* p) noexcept nogil
+    # Per-node split metric: gain = p*M(left) + (1-p)*M(right) - M(node). Defaults
+    # to ``_divergence_of``; CTS overrides it with the max over groups.
+    cdef float64_t _node_metric(self, float64_t* p) noexcept nogil
+    # Whether ``_norm_factor`` normalization applies (0 for CTS).
+    cdef bint _normalizable(self) noexcept nogil
+    # Rzepakowski normalization factor from the raw node / one-child group counts
+    # (the child matching legacy ``arr_normI``'s asymmetric "left" = X >= value).
+    cdef float64_t _norm_factor(self) noexcept nogil
     # Regularized P(Y=1|T=g) of ``node``, shrunk toward ``target_p`` (when
     # ``has_target``), written into ``dest``.
     cdef void _reg_summary(self, NodeState node, float64_t* target_p, bint has_target, float64_t* dest) noexcept nogil
