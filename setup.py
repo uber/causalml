@@ -27,6 +27,7 @@ cython_modules = [
     ("causalml.inference.tree.causal._criterion", "causalml/inference/tree/causal/_criterion.pyx"),
     ("causalml.inference.tree.causal._builder", "causalml/inference/tree/causal/_builder.pyx"),
     ("causalml.inference.tree._uplift._criterion", "causalml/inference/tree/_uplift/_criterion.pyx"),
+    ("causalml.inference.tree._uplift._builder", "causalml/inference/tree/_uplift/_builder.pyx"),
     ("causalml.inference.tree.uplift", "causalml/inference/tree/uplift.pyx"),
 ]
 # fmt: on

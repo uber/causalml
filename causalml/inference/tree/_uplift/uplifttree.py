@@ -2,8 +2,9 @@
 
 Not part of the public API -- this exists to prove numerical parity of the
 kernel-backed KL / ED / Chi criteria against the legacy ``UpliftTreeClassifier``
-before the public classes are switched over. Regularization, normalization,
-honesty, pruning, and the forest are handled in later issues of the epic.
+before the public classes are switched over. It supports the Rzepakowski
+``n_reg`` / ``min_samples_treatment`` regularization; normalization, honesty,
+pruning, and the forest are handled in later issues of the epic.
 """
 
 from typing import Union
@@ -28,11 +29,15 @@ class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
         max_depth: int = 3,
         min_samples_leaf: int = 100,
         min_samples_split: Union[int, float] = 2,
+        min_samples_treatment: int = 10,
+        n_reg: int = 100,
         max_features: Union[int, float, str, None] = None,
         min_weight_fraction_leaf: float = 0.0,
         random_state: int = None,
     ):
         self.control_name = control_name
+        self.min_samples_treatment = min_samples_treatment
+        self.n_reg = n_reg
         super().__init__(
             criterion=criterion,
             splitter="best",

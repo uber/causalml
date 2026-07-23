@@ -54,13 +54,29 @@ def _make_binary_feature_data(
     return X, treatment, y
 
 
-def _fit_pair(X, treatment, y, criterion, kernel_max_depth, min_samples_leaf=100):
-    """Fit the kernel-backed tree and the parity-configured legacy tree."""
+def _fit_pair(
+    X,
+    treatment,
+    y,
+    criterion,
+    kernel_max_depth,
+    min_samples_leaf=100,
+    n_reg=0,
+    min_samples_treatment=0,
+):
+    """Fit the kernel-backed tree and the parity-configured legacy tree.
+
+    ``n_reg`` / ``min_samples_treatment`` are passed identically to both trees so
+    the Rzepakowski parent-shrinkage regularization (issue #947) can be exercised;
+    the defaults (0, 0) disable it for the no-regularization parity cases.
+    """
     kern = _KernelUpliftTreeClassifier(
         criterion=criterion,
         control_name=CONTROL_NAME,
         max_depth=kernel_max_depth,
         min_samples_leaf=min_samples_leaf,
+        min_samples_treatment=min_samples_treatment,
+        n_reg=n_reg,
         random_state=RANDOM_SEED,
     )
     kern.fit(X, treatment, y)
@@ -70,8 +86,8 @@ def _fit_pair(X, treatment, y, criterion, kernel_max_depth, min_samples_leaf=100
         evaluationFunction=criterion,
         max_depth=kernel_max_depth + LEGACY_DEPTH_OFFSET,
         min_samples_leaf=min_samples_leaf,
-        min_samples_treatment=0,
-        n_reg=0,
+        min_samples_treatment=min_samples_treatment,
+        n_reg=n_reg,
         normalization=False,
         honesty=False,
         random_state=RANDOM_SEED,
@@ -155,3 +171,90 @@ def test_kernel_uplift_zero_divergence_root_still_splits():
     )
     kern.fit(X, treatment, y)
     assert kern.tree_.node_count > 1  # root actually split
+
+
+# --- Regularization parity (issue #947) -------------------------------------
+# Legacy public defaults: n_reg=100, min_samples_treatment=10.
+LEGACY_N_REG = 100
+LEGACY_MIN_SAMPLES_TREATMENT = 10
+
+
+@pytest.mark.parametrize("criterion", KERNEL_UPLIFT_CRITERIA)
+@pytest.mark.parametrize("kernel_max_depth", [1, 2, 3])
+def test_kernel_uplift_parity_regularized(criterion, kernel_max_depth):
+    """Whole-tree parity with Rzepakowski parent-shrinkage regularization on."""
+    X, treatment, y = _make_binary_feature_data()
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+    )
+
+    kernel_proba = kern.predict_proba_by_group(X)
+    legacy_proba = legacy.predict(X)
+
+    assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+@pytest.mark.parametrize("criterion", KERNEL_UPLIFT_CRITERIA)
+def test_kernel_uplift_parity_regularized_multi_treatment(criterion):
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=4500,
+        n_features=6,
+        treatment_names=("treatment1", "treatment2"),
+        seed=7,
+    )
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth=2,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+    )
+
+    kernel_proba = kern.predict_proba_by_group(X)
+    legacy_proba = legacy.predict(X)
+
+    assert kernel_proba.shape[1] == 3  # control + 2 treatments
+    assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+def test_kernel_uplift_min_samples_treatment_gates_splits():
+    """``min_samples_treatment`` rejects splits whose child groups are too small.
+
+    With the floor set above any achievable per-group child size, no candidate
+    split is admissible and the tree collapses to its root; dropping the floor to
+    zero (same data / depth / leaf size) lets it grow -- proving the gate, not some
+    other stopping rule, is what prevented growth.
+    """
+    X, treatment, y = _make_binary_feature_data()
+
+    gated = _KernelUpliftTreeClassifier(
+        criterion="ED",
+        control_name=CONTROL_NAME,
+        max_depth=3,
+        min_samples_leaf=1,
+        min_samples_treatment=X.shape[0],
+        n_reg=0,
+        random_state=RANDOM_SEED,
+    )
+    gated.fit(X, treatment, y)
+    assert gated.tree_.node_count == 1
+
+    ungated = _KernelUpliftTreeClassifier(
+        criterion="ED",
+        control_name=CONTROL_NAME,
+        max_depth=3,
+        min_samples_leaf=1,
+        min_samples_treatment=0,
+        n_reg=0,
+        random_state=RANDOM_SEED,
+    )
+    ungated.fit(X, treatment, y)
+    assert ungated.tree_.node_count > 1
