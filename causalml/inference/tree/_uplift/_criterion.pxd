@@ -30,8 +30,11 @@ cdef class UpliftClassificationCriterion(CausalRegressionCriterion):
     cdef vector[float64_t] parent_summary_p
 
     # Scratch buffers (size n_outputs) for the regularized node / child summaries.
+    # ``_buf_left`` and ``_buf_right`` coexist so criteria that need both children
+    # at once (IT / CIT) can read them together.
     cdef vector[float64_t] _buf_node
-    cdef vector[float64_t] _buf_child
+    cdef vector[float64_t] _buf_left
+    cdef vector[float64_t] _buf_right
 
     # Divergence contribution of a single treatment-vs-control pair. Overridden
     # by each concrete criterion (KL / ED / Chi).
@@ -41,7 +44,11 @@ cdef class UpliftClassificationCriterion(CausalRegressionCriterion):
     # Per-node split metric: gain = p*M(left) + (1-p)*M(right) - M(node). Defaults
     # to ``_divergence_of``; CTS overrides it with the max over groups.
     cdef float64_t _node_metric(self, float64_t* p) noexcept nogil
-    # Whether ``_norm_factor`` normalization applies (0 for CTS).
+    # Split gain from the regularized node / left / right summaries and the left
+    # fraction ``p``. Defaults to ``p*M(left)+(1-p)*M(right)-M(node)`` (KL/ED/Chi/
+    # CTS); DDP/IT/CIT override it with their own two-class gain forms.
+    cdef float64_t _split_gain(self, float64_t* s_node, float64_t* s_left, float64_t* s_right, float64_t p) noexcept nogil
+    # Whether ``_norm_factor`` normalization applies (0 for CTS/DDP/IT/CIT).
     cdef bint _normalizable(self) noexcept nogil
     # Rzepakowski normalization factor from the raw node / one-child group counts
     # (the child matching legacy ``arr_normI``'s asymmetric "left" = X >= value).

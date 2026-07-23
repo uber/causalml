@@ -421,3 +421,52 @@ def test_kernel_uplift_parity_cts_multi_treatment():
 
     assert kernel_proba.shape[1] == 3  # control + 2 treatments
     assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+# --- Two-class / variance criteria: DDP, IT, CIT (issue #949) ----------------
+# These contrast a single treatment against control (two-class only) and are
+# never normalized. (IDDP is deferred to the honesty issue #950, since legacy
+# forces honesty=True for IDDP and the kernel has no honesty pass yet.)
+TWO_CLASS_CRITERIA = ["DDP", "IT", "CIT"]
+
+
+@pytest.mark.parametrize("criterion", TWO_CLASS_CRITERIA)
+@pytest.mark.parametrize("kernel_max_depth", [1, 2, 3])
+def test_kernel_uplift_parity_two_class(criterion, kernel_max_depth):
+    """DDP/IT/CIT parity with legacy defaults (n_reg=100, mst=10), single treatment."""
+    X, treatment, y = _make_binary_feature_data()
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,  # ignored by these criteria; matches legacy defaults
+    )
+
+    kernel_proba = kern.predict_proba_by_group(X)
+    legacy_proba = legacy.predict(X)
+
+    assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+@pytest.mark.parametrize("criterion", TWO_CLASS_CRITERIA)
+def test_kernel_uplift_two_class_guard_rejects_multi_treatment(criterion):
+    """DDP/IT/CIT must reject more than one treatment group (legacy uplift.pyx)."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=3000,
+        n_features=6,
+        treatment_names=("treatment1", "treatment2"),
+        seed=7,
+    )
+    kern = _KernelUpliftTreeClassifier(
+        criterion=criterion,
+        control_name=CONTROL_NAME,
+        max_depth=2,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    with pytest.raises(ValueError, match="two-class"):
+        kern.fit(X, treatment, y)
