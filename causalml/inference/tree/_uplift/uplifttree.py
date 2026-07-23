@@ -1,11 +1,12 @@
 """Experimental kernel-backed uplift tree classifier.
 
 Not part of the public API -- this exists to prove numerical parity of the
-kernel-backed KL / ED / Chi / CTS criteria against the legacy
+kernel-backed KL / ED / Chi / CTS / DDP / IT / CIT criteria against the legacy
 ``UpliftTreeClassifier`` before the public classes are switched over. It supports
 the Rzepakowski ``n_reg`` / ``min_samples_treatment`` regularization and
-``normalization``; honesty, pruning, and the forest are handled in later issues of
-the epic.
+``normalization``; the two-class criteria (DDP/IT/CIT) reject multi-treatment
+input. IDDP, honesty, pruning, and the forest are handled in later issues of the
+epic.
 """
 
 from typing import Union
