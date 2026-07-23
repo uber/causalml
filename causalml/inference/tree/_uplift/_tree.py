@@ -33,6 +33,7 @@ from ._criterion import (
     DDPCriterion,
     ITCriterion,
     CITCriterion,
+    IDDPCriterion,
 )
 
 UPLIFT_TREE_CRITERIA = {
@@ -43,11 +44,12 @@ UPLIFT_TREE_CRITERIA = {
     "DDP": DDPCriterion,
     "IT": ITCriterion,
     "CIT": CITCriterion,
+    "IDDP": IDDPCriterion,
 }
 
 # Criteria that contrast a single treatment against control and cannot handle
 # more than one treatment group (legacy ``uplift.pyx`` ~533-536).
-TWO_CLASS_ONLY_CRITERIA = {"DDP", "IT", "CIT"}
+TWO_CLASS_ONLY_CRITERIA = {"DDP", "IT", "CIT", "IDDP"}
 
 
 def get_check_y_params() -> dict:
