@@ -1,10 +1,12 @@
 """Kernel-backed base class for uplift decision trees (experimental).
 
 Mirrors ``causal/_tree.py`` but wires the shared ``_tree`` kernel to the uplift
-criteria and the *stock* kernel builders/splitters -- no uplift-specific
-regularization yet (``min_samples_treatment`` / ``n_reg`` land in a follow-up
-issue). This module is internal; it is not exported from ``tree/__init__.py``
-and the legacy ``UpliftTreeClassifier`` remains the public default.
+criteria and the uplift builders (``_uplift/_builder.py``), which thread the
+Rzepakowski ``n_reg`` / ``min_samples_treatment`` parent-shrinkage regularization
+down the tree. This module is internal; it is not exported from
+``tree/__init__.py`` and the legacy ``UpliftTreeClassifier`` remains the public
+default. Normalization, honesty, and the forest are handled in later issues of the
+epic.
 """
 
 import numbers
@@ -21,8 +23,8 @@ from .._tree._classes import DTYPE, DOUBLE
 from .._tree._classes import SPARSE_SPLITTERS, DENSE_SPLITTERS
 from .._tree._classes import Tree, BaseDecisionTree
 from .._tree._splitter import Splitter
-from .._tree._tree import DepthFirstTreeBuilder, BestFirstTreeBuilder
 
+from ._builder import DepthFirstUpliftTreeBuilder, BestFirstUpliftTreeBuilder
 from ._criterion import KLCriterion, EDCriterion, ChiCriterion
 
 UPLIFT_TREE_CRITERIA = {
@@ -182,6 +184,9 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
         criterion = self.criterion
         if isinstance(criterion, str):
             criterion = UPLIFT_TREE_CRITERIA[criterion](self.n_outputs_, n_samples)
+            # Rzepakowski parent-shrinkage regularization (issue #947).
+            criterion.n_reg = getattr(self, "n_reg", 0)
+            criterion.min_samples_treatment = getattr(self, "min_samples_treatment", 0)
 
         SPLITTERS = SPARSE_SPLITTERS if issparse(X) else DENSE_SPLITTERS
 
@@ -203,7 +208,7 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
 
         # Use BestFirst if max_leaf_nodes given; use DepthFirst otherwise
         if max_leaf_nodes < 0:
-            builder = DepthFirstTreeBuilder(
+            builder = DepthFirstUpliftTreeBuilder(
                 splitter,
                 min_samples_split,
                 min_samples_leaf,
@@ -212,7 +217,7 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
                 self.min_impurity_decrease,
             )
         else:
-            builder = BestFirstTreeBuilder(
+            builder = BestFirstUpliftTreeBuilder(
                 splitter,
                 min_samples_split,
                 min_samples_leaf,
