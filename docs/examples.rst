@@ -12,6 +12,7 @@ Follow the below links for an approximate ordering of example tutorials from int
     examples/uplift_trees_with_synthetic_data
     examples/meta_learners_with_synthetic_data_multiple_treatment
     examples/uplift_tree_visualization
+    examples/uplift_tree_kernel_parity
     examples/feature_interpretations_example
     examples/validation_with_tmle
     examples/dragonnet_example
