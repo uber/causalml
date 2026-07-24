@@ -5,7 +5,9 @@ uplift tree on the shared ``_tree`` Cython kernel via the new
 ``UpliftClassificationCriterion`` -- reproduces the legacy ``UpliftTreeClassifier``
 predictions exactly for the KL / ED / Chi / CTS / DDP / IT / CIT / IDDP criteria,
 with or without regularization, normalization, and the honest approach (pruning is
-handled in a later issue of the epic).
+handled in a later issue of the epic). A final section bags the kernel tree into
+``_KernelUpliftRandomForestClassifier`` (issue #952) and checks the same
+whole-forest parity against the legacy ``UpliftRandomForestClassifier``.
 
 Design notes
 ------------
@@ -22,13 +24,23 @@ Design notes
 """
 
 import numpy as np
+import pandas as pd
 import pytest
+from joblib import parallel_backend
 from numpy.testing import assert_array_almost_equal
+from sklearn.model_selection import train_test_split
 
-from causalml.inference.tree.uplift import UpliftTreeClassifier
+from causalml.inference.tree.uplift import (
+    UpliftTreeClassifier,
+    UpliftRandomForestClassifier,
+)
 from causalml.inference.tree._uplift.uplifttree import _KernelUpliftTreeClassifier
+from causalml.inference.tree._uplift.upliftforest import (
+    _KernelUpliftRandomForestClassifier,
+)
+from causalml.metrics import auuc_score
 
-from .const import RANDOM_SEED, CONTROL_NAME
+from .const import RANDOM_SEED, CONTROL_NAME, TREATMENT_NAMES, CONVERSION
 
 KERNEL_UPLIFT_CRITERIA = ["KL", "ED", "Chi"]
 
@@ -820,3 +832,252 @@ def test_kernel_uplift_prune_invalid_rule_raises():
     kern = _fit_prunable_tree(X, t, y)
     with pytest.raises(ValueError, match="maxAbsDiff"):
         kern.prune(X, t, y, rule="bogus")
+
+
+# ---------------------------------------------------------------------------
+# Forest (issue #952): _KernelUpliftRandomForestClassifier bags the kernel tree
+# on sklearn's ForestRegressor scaffolding, replacing the legacy joblib forest.
+# ---------------------------------------------------------------------------
+
+FOREST_CRITERIA = ["KL", "ED", "Chi"]
+
+
+def _fit_forest_pair(
+    X,
+    treatment,
+    y,
+    criterion,
+    kernel_max_depth,
+    n_estimators=5,
+    normalization=False,
+    honesty=False,
+    random_state=RANDOM_SEED,
+):
+    """Fit the kernel forest and a structurally-identical legacy forest.
+
+    Both forests draw per-tree seeds from the same parent RNG and bootstrap the
+    same rows, so with binary features (identical split candidates), all features
+    considered, and ``legacy_max_depth = kernel_max_depth + 1`` every tree -- and
+    therefore the averaged forest -- matches to full precision.
+    """
+    n_features = X.shape[1]
+    kern = _KernelUpliftRandomForestClassifier(
+        control_name=CONTROL_NAME,
+        n_estimators=n_estimators,
+        criterion=criterion,
+        max_depth=kernel_max_depth,
+        min_samples_leaf=100,
+        min_samples_treatment=0,
+        n_reg=0,
+        normalization=normalization,
+        honesty=honesty,
+        max_features=None,
+        random_state=random_state,
+    )
+    kern.fit(X, treatment, y)
+
+    legacy = UpliftRandomForestClassifier(
+        control_name=CONTROL_NAME,
+        n_estimators=n_estimators,
+        evaluationFunction=criterion,
+        max_depth=kernel_max_depth + LEGACY_DEPTH_OFFSET,
+        min_samples_leaf=100,
+        min_samples_treatment=0,
+        n_reg=0,
+        normalization=normalization,
+        honesty=honesty,
+        max_features=n_features,
+        random_state=random_state,
+    )
+    legacy.fit(X, treatment, y)
+    return kern, legacy
+
+
+@pytest.mark.parametrize("criterion", FOREST_CRITERIA)
+@pytest.mark.parametrize("normalization", [False, True])
+def test_kernel_uplift_forest_parity(criterion, normalization):
+    """The kernel forest reproduces the legacy forest's uplift deltas exactly."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=3000,
+        n_features=6,
+        treatment_names=("treatment1", "treatment2"),
+        seed=RANDOM_SEED,
+    )
+    kern, legacy = _fit_forest_pair(
+        X, treatment, y, criterion, kernel_max_depth=3, normalization=normalization
+    )
+    assert kern.classes_ == legacy.classes_
+    assert_array_almost_equal(kern.predict(X), legacy.predict(X), decimal=8)
+
+
+def test_kernel_uplift_forest_honest_parity():
+    """Honest re-estimation carries through to whole-forest parity."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=4000,
+        n_features=6,
+        treatment_names=("treatment1",),
+        seed=RANDOM_SEED,
+    )
+    kern, legacy = _fit_forest_pair(
+        X, treatment, y, "KL", kernel_max_depth=2, honesty=True
+    )
+    assert_array_almost_equal(kern.predict(X), legacy.predict(X), decimal=8)
+
+
+def test_kernel_uplift_forest_predict_shape_with_sparse_groups():
+    """#569: row-bootstrap can miss whole treatment groups; predict stays well-shaped.
+
+    Minority groups with a single sample are excluded from most bootstraps, so
+    some trees see a strict subset of the forest's classes (and some collapse to
+    control-only and are dropped). ``_align_tree_predict`` must still yield a
+    full-width, NaN-free prediction, identically in serial and parallel.
+    """
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 102
+    X = rng.randn(n, 3).astype(np.float32)
+    treatment = np.array(
+        [CONTROL_NAME] * 100 + [TREATMENT_NAMES[1]] + [TREATMENT_NAMES[2]]
+    )
+    y = rng.randint(0, 2, n)
+
+    model = _KernelUpliftRandomForestClassifier(
+        control_name=CONTROL_NAME,
+        n_estimators=10,
+        min_samples_leaf=1,
+        min_samples_treatment=0,
+        max_features=None,
+        random_state=RANDOM_SEED,
+        n_jobs=2,
+    )
+    model.fit(X, treatment, y)
+
+    # At least one surviving tree missed a group (the condition _align handles).
+    assert any(len(t.classes_) < len(model.classes_) for t in model.estimators_)
+
+    preds = model.predict(X)
+    assert preds.shape == (n, len(model.classes_) - 1)
+    assert not np.any(np.isnan(preds))
+
+    with parallel_backend("loky", n_jobs=2):
+        preds_par = model.predict(X)
+    assert np.allclose(preds, preds_par)
+
+
+@pytest.mark.parametrize("backend", ["loky", "threading", "multiprocessing"])
+@pytest.mark.parametrize("joblib_prefer", ["threads", "processes"])
+def test_kernel_uplift_forest_backend_determinism_and_auuc(
+    generate_classification_data, backend, joblib_prefer
+):
+    """Predictions are backend-invariant and beat random on AUUC.
+
+    Mirrors the legacy 12-case forest test (backends x joblib_prefer); the
+    early_stopping axis is dropped because the kernel tree has no validation-set
+    early stopping.
+    """
+    df, x_names = generate_classification_data()
+    df_train, df_test = train_test_split(df, test_size=0.2, random_state=RANDOM_SEED)
+
+    with parallel_backend(backend):
+        model = _KernelUpliftRandomForestClassifier(
+            control_name=CONTROL_NAME,
+            min_samples_leaf=50,
+            random_state=RANDOM_SEED,
+            joblib_prefer=joblib_prefer,
+        )
+        model.fit(
+            df_train[x_names].values,
+            df_train["treatment_group_key"].values,
+            df_train[CONVERSION].values,
+        )
+
+        predictions = {"single": model.predict(df_test[x_names].values)}
+        for name, be in [
+            ("loky", "loky"),
+            ("threading", "threading"),
+            ("mp", "multiprocessing"),
+        ]:
+            with parallel_backend(be, n_jobs=2):
+                predictions[name] = model.predict(df_test[x_names].values)
+
+    values = list(predictions.values())
+    assert all(np.array_equal(values[0], rest) for rest in values[1:])
+
+    result = pd.DataFrame(values[0], columns=model.classes_[1:])
+    best_treatment = np.where(
+        (result < 0).all(axis=1), CONTROL_NAME, result.idxmax(axis=1)
+    )
+    actual_is_best = np.where(df_test["treatment_group_key"] == best_treatment, 1, 0)
+    actual_is_control = np.where(df_test["treatment_group_key"] == CONTROL_NAME, 1, 0)
+    synthetic = (actual_is_best == 1) | (actual_is_control == 1)
+    synth = result[synthetic]
+    auuc_metrics = synth.assign(
+        is_treated=1 - actual_is_control[synthetic],
+        conversion=df_test.loc[synthetic, CONVERSION].values,
+        treatment_effect=df_test.loc[synthetic, "treatment_effect"].values,
+        uplift_tree=synth.max(axis=1),
+    ).drop(columns=list(model.classes_[1:]))
+    auuc = auuc_score(
+        auuc_metrics,
+        outcome_col=CONVERSION,
+        treatment_col="is_treated",
+        treatment_effect_col="treatment_effect",
+        normalize=True,
+    )
+    assert auuc["uplift_tree"] > 0.5
+
+
+def test_kernel_uplift_forest_full_output():
+    """full_output returns the per-group / recommendation / delta frame."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=2000,
+        n_features=6,
+        treatment_names=("treatment1", "treatment2"),
+        seed=RANDOM_SEED,
+    )
+    model = _KernelUpliftRandomForestClassifier(
+        control_name=CONTROL_NAME,
+        n_estimators=5,
+        max_depth=3,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X, treatment, y)
+
+    delta = model.predict(X)
+    full = model.predict(X, full_output=True)
+    expected_cols = (
+        list(model.classes_)
+        + ["recommended_treatment"]
+        + [f"delta_{g}" for g in model.classes_[1:]]
+        + ["max_delta"]
+    )
+    assert list(full.columns) == expected_cols
+    assert full.shape[0] == X.shape[0]
+    # The bare-array predict is exactly the delta columns of the full frame.
+    assert_array_almost_equal(
+        delta, full[[f"delta_{g}" for g in model.classes_[1:]]].values
+    )
+
+
+def test_kernel_uplift_forest_feature_importances():
+    """feature_importances_ averages the trees and is a normalized distribution."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=2000,
+        n_features=6,
+        treatment_names=("treatment1",),
+        seed=RANDOM_SEED,
+    )
+    model = _KernelUpliftRandomForestClassifier(
+        control_name=CONTROL_NAME,
+        n_estimators=5,
+        max_depth=3,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X, treatment, y)
+    fi = model.feature_importances_
+    assert fi.shape == (X.shape[1],)
+    assert np.isclose(fi.sum(), 1.0)
+    # Uplift split gains are not a monotone impurity decrease, so per-feature
+    # importances can be signed; they just have to be finite and averaged.
+    assert np.isfinite(fi).all()
