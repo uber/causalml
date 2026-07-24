@@ -3,10 +3,10 @@
 Mirrors ``causal/_tree.py`` but wires the shared ``_tree`` kernel to the uplift
 criteria and the uplift builders (``_uplift/_builder.py``), which thread the
 Rzepakowski ``n_reg`` / ``min_samples_treatment`` parent-shrinkage regularization
-down the tree. This module is internal; it is not exported from
-``tree/__init__.py`` and the legacy ``UpliftTreeClassifier`` remains the public
-default. Normalization, honesty, and the forest are handled in later issues of the
-epic.
+down the tree. The criteria also support Rzepakowski ``normalization``. This
+module is internal; it is not exported from ``tree/__init__.py`` and the legacy
+``UpliftTreeClassifier`` remains the public default. Honesty and the forest are
+handled in later issues of the epic.
 """
 
 import numbers
@@ -25,13 +25,29 @@ from .._tree._classes import Tree, BaseDecisionTree
 from .._tree._splitter import Splitter
 
 from ._builder import DepthFirstUpliftTreeBuilder, BestFirstUpliftTreeBuilder
-from ._criterion import KLCriterion, EDCriterion, ChiCriterion
+from ._criterion import (
+    KLCriterion,
+    EDCriterion,
+    ChiCriterion,
+    CTSCriterion,
+    DDPCriterion,
+    ITCriterion,
+    CITCriterion,
+)
 
 UPLIFT_TREE_CRITERIA = {
     "KL": KLCriterion,
     "ED": EDCriterion,
     "Chi": ChiCriterion,
+    "CTS": CTSCriterion,
+    "DDP": DDPCriterion,
+    "IT": ITCriterion,
+    "CIT": CITCriterion,
 }
+
+# Criteria that contrast a single treatment against control and cannot handle
+# more than one treatment group (legacy ``uplift.pyx`` ~533-536).
+TWO_CLASS_ONLY_CRITERIA = {"DDP", "IT", "CIT"}
 
 
 def get_check_y_params() -> dict:
@@ -86,6 +102,19 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
 
         # n_outputs_ is the number of groups [control, treatment_1, ..., treatment_{n-1}]
         self.n_outputs_ = y.shape[1]
+
+        # DDP/IT/CIT contrast a single treatment against control; reject
+        # multi-treatment inputs, matching legacy uplift.pyx (~533-536).
+        if (
+            isinstance(self.criterion, str)
+            and self.criterion in TWO_CLASS_ONLY_CRITERIA
+            and self.n_outputs_ > 2
+        ):
+            raise ValueError(
+                f"The {self.criterion} criterion can only cope with two-class "
+                "problems (control vs. a single treatment); got "
+                f"{self.n_outputs_ - 1} treatment groups."
+            )
 
         if getattr(y, "dtype", None) != DOUBLE or not y.flags.contiguous:
             y = np.ascontiguousarray(y, dtype=DOUBLE)
@@ -187,6 +216,8 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
             # Rzepakowski parent-shrinkage regularization (issue #947).
             criterion.n_reg = getattr(self, "n_reg", 0)
             criterion.min_samples_treatment = getattr(self, "min_samples_treatment", 0)
+            # Rzepakowski normalization (issue #948).
+            criterion.normalization = getattr(self, "normalization", False)
 
         SPLITTERS = SPARSE_SPLITTERS if issparse(X) else DENSE_SPLITTERS
 

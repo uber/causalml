@@ -54,6 +54,29 @@ def _make_binary_feature_data(
     return X, treatment, y
 
 
+def _make_normalization_sensitive_data(n_samples=2000, n_features=6, seed=1):
+    """Binary-feature uplift data on which Rzepakowski normalization re-ranks splits.
+
+    Unlike :func:`_make_binary_feature_data` (balanced 50/50 assignment, so every
+    candidate split has a near-constant normalization factor and normalization is
+    effectively a no-op), here treatment assignment is *correlated with* ``X[:, 0]``.
+    The treatment/control balance -- and hence the per-split normalization factor
+    ``arr_normI`` -- then varies across candidate splits, so ``normalization=True``
+    genuinely changes the chosen splits. This is what exercises ``_norm_factor``
+    (and would catch it reading the wrong child).
+    """
+    rng = np.random.RandomState(seed)
+    X = rng.randint(0, 2, size=(n_samples, n_features)).astype(np.float32)
+    ptreat = np.where(X[:, 0] > 0, 0.75, 0.30)
+    treatment = np.where(rng.rand(n_samples) < ptreat, "treatment1", CONTROL_NAME)
+    is_t = treatment == "treatment1"
+    base = 0.35 + 0.08 * X[:, 1] - 0.04 * X[:, 2] + 0.05 * X[:, 3]
+    lift = 0.12 * X[:, 0] + 0.08 * X[:, 4] - 0.05 * X[:, 5]
+    p = np.where(is_t, base + lift, base)
+    y = (rng.rand(n_samples) < np.clip(p, 0.0, 1.0)).astype(int)
+    return X, treatment, y
+
+
 def _fit_pair(
     X,
     treatment,
@@ -63,12 +86,14 @@ def _fit_pair(
     min_samples_leaf=100,
     n_reg=0,
     min_samples_treatment=0,
+    normalization=False,
 ):
     """Fit the kernel-backed tree and the parity-configured legacy tree.
 
-    ``n_reg`` / ``min_samples_treatment`` are passed identically to both trees so
-    the Rzepakowski parent-shrinkage regularization (issue #947) can be exercised;
-    the defaults (0, 0) disable it for the no-regularization parity cases.
+    ``n_reg`` / ``min_samples_treatment`` (issue #947) and ``normalization``
+    (issue #948) are passed identically to both trees so the regularization and
+    normalization can be exercised; the defaults disable them for the plain parity
+    cases.
     """
     kern = _KernelUpliftTreeClassifier(
         criterion=criterion,
@@ -77,6 +102,7 @@ def _fit_pair(
         min_samples_leaf=min_samples_leaf,
         min_samples_treatment=min_samples_treatment,
         n_reg=n_reg,
+        normalization=normalization,
         random_state=RANDOM_SEED,
     )
     kern.fit(X, treatment, y)
@@ -88,7 +114,7 @@ def _fit_pair(
         min_samples_leaf=min_samples_leaf,
         min_samples_treatment=min_samples_treatment,
         n_reg=n_reg,
-        normalization=False,
+        normalization=normalization,
         honesty=False,
         random_state=RANDOM_SEED,
     )
@@ -258,3 +284,189 @@ def test_kernel_uplift_min_samples_treatment_gates_splits():
     )
     ungated.fit(X, treatment, y)
     assert ungated.tree_.node_count > 1
+
+
+# --- Normalization + CTS parity (issue #948) --------------------------------
+
+
+@pytest.mark.parametrize("criterion", KERNEL_UPLIFT_CRITERIA)
+@pytest.mark.parametrize("kernel_max_depth", [1, 2, 3])
+def test_kernel_uplift_parity_normalized(criterion, kernel_max_depth):
+    """Whole-tree parity with Rzepakowski normalization on (KL/ED/Chi)."""
+    X, treatment, y = _make_binary_feature_data()
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,
+    )
+
+    kernel_proba = kern.predict_proba_by_group(X)
+    legacy_proba = legacy.predict(X)
+
+    assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+@pytest.mark.parametrize("criterion", KERNEL_UPLIFT_CRITERIA)
+def test_kernel_uplift_parity_normalized_multi_treatment(criterion):
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=4500,
+        n_features=6,
+        treatment_names=("treatment1", "treatment2"),
+        seed=7,
+    )
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth=2,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,
+    )
+
+    kernel_proba = kern.predict_proba_by_group(X)
+    legacy_proba = legacy.predict(X)
+
+    assert kernel_proba.shape[1] == 3  # control + 2 treatments
+    assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+@pytest.mark.parametrize("criterion", KERNEL_UPLIFT_CRITERIA)
+def test_kernel_uplift_parity_normalization_effective(criterion):
+    """Normalized parity on data where normalization actually re-ranks splits.
+
+    The balanced-assignment parity tests above run on data where normalization
+    never changes the chosen split, so they cannot detect a wrong
+    ``_norm_factor`` (e.g. one built from the wrong child). Here treatment is
+    correlated with ``X[:, 0]`` so normalization flips the tree; the kernel must
+    (a) still match the legacy tree exactly *and* (b) differ from the
+    unnormalized tree -- otherwise the flag is a silent no-op.
+    """
+    X, treatment, y = _make_normalization_sensitive_data()
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth=3,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,
+    )
+    plain, _ = _fit_pair(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth=3,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=False,
+    )
+    kern_proba = kern.predict_proba_by_group(X)
+
+    # (a) exact parity with the legacy normalized tree.
+    assert_array_almost_equal(kern_proba, legacy.predict(X), decimal=8)
+    # (b) normalization is not silently ignored: it changes the fitted tree here.
+    assert not np.allclose(kern_proba, plain.predict_proba_by_group(X))
+
+
+@pytest.mark.parametrize("kernel_max_depth", [1, 2, 3])
+def test_kernel_uplift_parity_cts_single_treatment(kernel_max_depth):
+    """CTS parity with legacy defaults (n_reg=100, mst=10). CTS ignores normalization."""
+    X, treatment, y = _make_binary_feature_data()
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        "CTS",
+        kernel_max_depth,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,
+    )
+
+    kernel_proba = kern.predict_proba_by_group(X)
+    legacy_proba = legacy.predict(X)
+
+    assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+def test_kernel_uplift_parity_cts_multi_treatment():
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=4500,
+        n_features=6,
+        treatment_names=("treatment1", "treatment2"),
+        seed=7,
+    )
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        "CTS",
+        kernel_max_depth=2,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,
+    )
+
+    kernel_proba = kern.predict_proba_by_group(X)
+    legacy_proba = legacy.predict(X)
+
+    assert kernel_proba.shape[1] == 3  # control + 2 treatments
+    assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+# --- Two-class / variance criteria: DDP, IT, CIT (issue #949) ----------------
+# These contrast a single treatment against control (two-class only) and are
+# never normalized. (IDDP is deferred to the honesty issue #950, since legacy
+# forces honesty=True for IDDP and the kernel has no honesty pass yet.)
+TWO_CLASS_CRITERIA = ["DDP", "IT", "CIT"]
+
+
+@pytest.mark.parametrize("criterion", TWO_CLASS_CRITERIA)
+@pytest.mark.parametrize("kernel_max_depth", [1, 2, 3])
+def test_kernel_uplift_parity_two_class(criterion, kernel_max_depth):
+    """DDP/IT/CIT parity with legacy defaults (n_reg=100, mst=10), single treatment."""
+    X, treatment, y = _make_binary_feature_data()
+    kern, legacy = _fit_pair(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,  # ignored by these criteria; matches legacy defaults
+    )
+
+    kernel_proba = kern.predict_proba_by_group(X)
+    legacy_proba = legacy.predict(X)
+
+    assert_array_almost_equal(kernel_proba, legacy_proba, decimal=8)
+
+
+@pytest.mark.parametrize("criterion", TWO_CLASS_CRITERIA)
+def test_kernel_uplift_two_class_guard_rejects_multi_treatment(criterion):
+    """DDP/IT/CIT must reject more than one treatment group (legacy uplift.pyx)."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=3000,
+        n_features=6,
+        treatment_names=("treatment1", "treatment2"),
+        seed=7,
+    )
+    kern = _KernelUpliftTreeClassifier(
+        criterion=criterion,
+        control_name=CONTROL_NAME,
+        max_depth=2,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    with pytest.raises(ValueError, match="two-class"):
+        kern.fit(X, treatment, y)

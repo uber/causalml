@@ -1,10 +1,12 @@
 """Experimental kernel-backed uplift tree classifier.
 
 Not part of the public API -- this exists to prove numerical parity of the
-kernel-backed KL / ED / Chi criteria against the legacy ``UpliftTreeClassifier``
-before the public classes are switched over. It supports the Rzepakowski
-``n_reg`` / ``min_samples_treatment`` regularization; normalization, honesty,
-pruning, and the forest are handled in later issues of the epic.
+kernel-backed KL / ED / Chi / CTS / DDP / IT / CIT criteria against the legacy
+``UpliftTreeClassifier`` before the public classes are switched over. It supports
+the Rzepakowski ``n_reg`` / ``min_samples_treatment`` regularization and
+``normalization``; the two-class criteria (DDP/IT/CIT) reject multi-treatment
+input. IDDP, honesty, pruning, and the forest are handled in later issues of the
+epic.
 """
 
 from typing import Union
@@ -31,6 +33,7 @@ class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
         min_samples_split: Union[int, float] = 2,
         min_samples_treatment: int = 10,
         n_reg: int = 100,
+        normalization: bool = True,
         max_features: Union[int, float, str, None] = None,
         min_weight_fraction_leaf: float = 0.0,
         random_state: int = None,
@@ -38,6 +41,7 @@ class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
         self.control_name = control_name
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
+        self.normalization = normalization
         super().__init__(
             criterion=criterion,
             splitter="best",
