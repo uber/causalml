@@ -25,6 +25,8 @@ import numpy as np
 import pytest
 from numpy.testing import assert_array_almost_equal
 
+from causalml.dataset import make_uplift_classification
+from causalml.inference.tree import uplift_tree_plot, uplift_tree_string
 from causalml.inference.tree.uplift import UpliftTreeClassifier
 from causalml.inference.tree._uplift.uplifttree import _KernelUpliftTreeClassifier
 
@@ -686,3 +688,95 @@ def test_kernel_uplift_iddp_guard_rejects_multi_treatment():
     )
     with pytest.raises(ValueError, match="two-class"):
         kern.fit(X, treatment, y)
+
+
+# ---------------------------------------------------------------------------
+# Plot compatibility (issue #953): the kernel tree exposes a legacy-shaped
+# `fitted_uplift_tree`, so plot.py's helpers render it unchanged.
+# ---------------------------------------------------------------------------
+
+
+def _assert_plot_node_tree(root, classes_, node_count):
+    """Walk the adapter tree, checking the fields plot.py duck-types."""
+
+    def walk(node):
+        if node.results is not None:  # leaf
+            assert node.col == -1 and node.value is None
+            assert node.trueBranch is None and node.falseBranch is None
+            assert len(node.results) == len(classes_)
+            return 1
+        assert node.results is None
+        assert isinstance(node.col, int) and isinstance(node.value, float)
+        assert node.trueBranch is not None and node.falseBranch is not None
+        return 1 + walk(node.trueBranch) + walk(node.falseBranch)
+
+    assert walk(root) == node_count
+    for node in (root,):
+        for key in ("impurity", "samples", "group_size", "upliftScore", "matchScore"):
+            assert key in node.summary
+        assert len(node.summary["upliftScore"]) == 2
+
+
+@pytest.mark.parametrize("honesty", [False, True])
+def test_kernel_uplift_tree_visualization(honesty):
+    """`uplift_tree_plot(...).create_png()` renders the kernel tree (mirrors the
+    legacy `test_uplift_tree_visualization`)."""
+    df, x_names = make_uplift_classification(random_seed=RANDOM_SEED)
+    df = df[df["treatment_group_key"].isin([CONTROL_NAME, "treatment1"])]
+
+    model = _KernelUpliftTreeClassifier(
+        criterion="KL",
+        control_name=CONTROL_NAME,
+        max_depth=4,
+        min_samples_leaf=200,
+        min_samples_treatment=50,
+        n_reg=100,
+        honesty=honesty,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(
+        df[x_names].values,
+        df["treatment_group_key"].values,
+        df["conversion"].values,
+    )
+    root = model.fitted_uplift_tree
+
+    # Renders to a PNG without raising (the legacy smoke assertion).
+    png = uplift_tree_plot(root, x_names).create_png()
+    assert len(png) > 0
+    uplift_tree_string(root, x_names)  # text renderer smoke
+
+    _assert_plot_node_tree(root, model.classes_, model.tree_.node_count)
+    # group_size lists every group; root sample count is the fit-split size.
+    assert root.summary["group_size"].count(":") == len(model.classes_)
+    assert int(root.summary["samples"]) == model.tree_.n_node_samples[0]
+
+
+def test_kernel_uplift_tree_plot_multi_treatment():
+    """The adapter and plot handle more than one treatment group."""
+    df, x_names = make_uplift_classification(random_seed=RANDOM_SEED)  # 4 groups
+
+    model = _KernelUpliftTreeClassifier(
+        criterion="KL",
+        control_name=CONTROL_NAME,
+        max_depth=3,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(
+        df[x_names].values,
+        df["treatment_group_key"].values,
+        df["conversion"].values,
+    )
+    root = model.fitted_uplift_tree
+
+    assert len(model.classes_) == 4
+    _assert_plot_node_tree(root, model.classes_, model.tree_.node_count)
+    assert len(uplift_tree_plot(root, x_names).create_png()) > 0
+
+
+def test_kernel_uplift_tree_fitted_tree_requires_fit():
+    """`fitted_uplift_tree` on an unfitted estimator raises, not returns junk."""
+    model = _KernelUpliftTreeClassifier(control_name=CONTROL_NAME)
+    with pytest.raises(Exception):
+        _ = model.fitted_uplift_tree

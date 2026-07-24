@@ -6,20 +6,53 @@ legacy ``UpliftTreeClassifier`` before the public classes are switched over. It
 supports the Rzepakowski ``n_reg`` / ``min_samples_treatment`` regularization,
 ``normalization``, and the honest approach (held-out leaf re-estimation, Athey &
 Imbens 2016); the two-class criteria (DDP/IT/CIT/IDDP) reject multi-treatment
-input and IDDP forces honesty on. Pruning and the forest are handled in later
-issues of the epic.
+input and IDDP forces honesty on. It also exposes a legacy-shaped
+``fitted_uplift_tree`` so ``plot.py`` renders it unchanged (issue #953). Pruning
+and the forest are handled in other issues of the epic.
 """
 
 from typing import Union
 
 import numpy as np
 from numpy import float32 as DTYPE
+from scipy.stats import norm
 from sklearn.model_selection import train_test_split
 from sklearn.utils import check_array
+from sklearn.utils.validation import check_is_fitted
 
 from causalml.inference.meta.utils import check_treatment_vector
 
 from ._tree import BaseUpliftDecisionTree
+
+
+class _UpliftTreeNode:
+    """A minimal ``DecisionTree``-shaped node for ``plot.py``.
+
+    ``plot.py``'s ``uplift_tree_string`` / ``uplift_tree_plot`` duck-type the
+    legacy pure-Python ``DecisionTree`` node. This exposes exactly the fields
+    they read (``classes_``, ``col``, ``value``, ``trueBranch``, ``falseBranch``,
+    ``results``, ``summary``) so the plot helpers work unchanged against the
+    kernel tree; it does not depend on the legacy node (which is removed at the
+    epic switchover).
+    """
+
+    def __init__(
+        self,
+        classes_,
+        col=-1,
+        value=None,
+        trueBranch=None,
+        falseBranch=None,
+        results=None,
+        summary=None,
+    ):
+        self.classes_ = classes_
+        self.col = col
+        self.value = value
+        self.trueBranch = trueBranch
+        self.falseBranch = falseBranch
+        self.results = results  # per-group P(Y=1|T) on a leaf, None on a split
+        self.summary = summary
 
 
 class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
@@ -90,6 +123,7 @@ class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
             super().fit(
                 X=X_enc, y=y_2dim, sample_weight=sample_weight, check_input=check_input
             )
+            self._node_group_counts = self._compute_node_group_counts(X_enc, y_2dim)
             return self
 
         # Honest approach (Athey & Imbens 2016): grow the tree on one split and
@@ -127,6 +161,8 @@ class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
 
         super().fit(X=X_tr, y=y_tr, sample_weight=sw_tr, check_input=check_input)
         self._honest_reestimate(X_est, y_est)
+        # Per-group counts for plotting come from the structure (train) split.
+        self._node_group_counts = self._compute_node_group_counts(X_tr, y_tr)
         return self
 
     def _honest_reestimate(self, X_est: np.ndarray, y_est: np.ndarray) -> None:
@@ -153,6 +189,95 @@ class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
             n_pos = np.bincount(leaves, weights=col[valid], minlength=n_nodes)
             p = np.divide(n_pos, n, out=np.zeros_like(n), where=n > 0)
             value[is_leaf, g, 0] = p[is_leaf]
+
+    def _compute_node_group_counts(self, X_enc: np.ndarray, y_2dim: np.ndarray):
+        """Per-node, per-group sample counts N(T=g) reaching each node.
+
+        The kernel ``Tree`` stores only total ``n_node_samples`` per node, but the
+        plot's ``group_size`` line and the uplift-score p-value need per-group
+        counts. Route the fit rows through the tree once (``decision_path``) and
+        tally each group by its non-NaN column in ``y_2dim`` -- the same routing
+        the honest re-estimation uses. Returns an ``(n_nodes, n_groups)`` array.
+        """
+        dpath = self.tree_.decision_path(np.ascontiguousarray(X_enc, dtype=DTYPE))
+        counts = np.zeros((self.tree_.node_count, self.n_outputs_), dtype=np.int64)
+        for g in range(self.n_outputs_):
+            mask = ~np.isnan(y_2dim[:, g])
+            counts[:, g] = np.asarray(dpath[mask].sum(axis=0)).ravel()
+        return counts
+
+    @staticmethod
+    def _uplift_score(p: np.ndarray, n: np.ndarray) -> tuple:
+        """Legacy node uplift score ``[maxDiff, p_value]`` from per-group P and N.
+
+        ``maxDiff`` is the largest ``P(Y=1|T=t) - P(Y=1|control)`` over treatments;
+        ``p_value`` is the legacy two-proportion z-test between control and the
+        best (or, if none beat control, least-bad) treatment (uplift.pyx ~2109).
+        """
+        p_c, n_c = p[0], n[0]
+        max_diff, best, subopt = -1.0, 0, 0
+        for i in range(1, len(p)):
+            diff = p[i] - p_c
+            if diff >= max_diff:
+                max_diff, subopt = diff, i
+                if diff > 0:
+                    best = i
+        idx = best if max_diff > 0 else subopt
+        p_t, n_t = p[idx], n[idx]
+        if n_t > 0 and n_c > 0:
+            variance = p_t * (1 - p_t) / n_t + p_c * (1 - p_c) / n_c
+            p_value = (
+                (1.0 - norm.cdf(abs(p_c - p_t) / np.sqrt(variance))) * 2
+                if variance > 0
+                else 1.0
+            )
+        else:
+            p_value = 1.0
+        return max_diff, p_value
+
+    @property
+    def fitted_uplift_tree(self) -> "_UpliftTreeNode":
+        """The fitted tree as a legacy-``DecisionTree``-shaped node, for plotting.
+
+        Mirrors the legacy ``UpliftTreeClassifier.fitted_uplift_tree`` attribute
+        so ``uplift_tree_plot`` / ``uplift_tree_string`` render the kernel tree
+        unchanged. Built lazily from the kernel ``Tree`` node arrays and the
+        per-group counts recorded at fit.
+        """
+        check_is_fitted(self, "tree_")
+        return self._build_plot_node(0)
+
+    def _build_plot_node(self, node_id: int) -> "_UpliftTreeNode":
+        """Recursively build the plot node for ``node_id`` and its subtree."""
+        tree = self.tree_
+        p = tree.value[node_id, :, 0]  # per-group P(Y=1|T=g)
+        n = self._node_group_counts[node_id]  # per-group N(T=g)
+        max_diff, p_value = self._uplift_score(p, n)
+        summary = {
+            "impurity": "%.3f" % tree.impurity[node_id],
+            "samples": "%d" % tree.n_node_samples[node_id],
+            "group_size": "".join(
+                " %s: %d" % (cls, cnt) for cls, cnt in zip(self.classes_, n)
+            ),
+            "upliftScore": [round(float(max_diff), 4), round(float(p_value), 4)],
+            "matchScore": round(float(max_diff), 4),
+        }
+
+        left, right = tree.children_left[node_id], tree.children_right[node_id]
+        if left == -1:  # leaf
+            return _UpliftTreeNode(
+                classes_=self.classes_, results=list(p), summary=summary
+            )
+        # Legacy renders "col >= value? yes -> trueBranch"; the kernel sends
+        # X[col] > threshold to the right child, so right is the "yes" branch.
+        return _UpliftTreeNode(
+            classes_=self.classes_,
+            col=int(tree.feature[node_id]),
+            value=float(tree.threshold[node_id]),
+            trueBranch=self._build_plot_node(right),
+            falseBranch=self._build_plot_node(left),
+            summary=summary,
+        )
 
     def predict_proba_by_group(
         self, X: np.ndarray, check_input: bool = True
