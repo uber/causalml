@@ -3,8 +3,9 @@
 These assert that the experimental ``_KernelUpliftTreeClassifier`` -- which grows an
 uplift tree on the shared ``_tree`` Cython kernel via the new
 ``UpliftClassificationCriterion`` -- reproduces the legacy ``UpliftTreeClassifier``
-predictions exactly for the KL / ED / Chi criteria, with regularization,
-normalization, honesty, and pruning all disabled.
+predictions exactly for the KL / ED / Chi / CTS / DDP / IT / CIT / IDDP criteria,
+with or without regularization, normalization, and the honest approach (pruning is
+handled in a later issue of the epic).
 
 Design notes
 ------------
@@ -463,6 +464,221 @@ def test_kernel_uplift_two_class_guard_rejects_multi_treatment(criterion):
     )
     kern = _KernelUpliftTreeClassifier(
         criterion=criterion,
+        control_name=CONTROL_NAME,
+        max_depth=2,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    with pytest.raises(ValueError, match="two-class"):
+        kern.fit(X, treatment, y)
+
+
+# --- Honest approach + IDDP (issue #950) -------------------------------------
+# Honesty grows the tree on a training split and re-estimates each leaf's
+# per-group P(Y=1|T=g) on a held-out estimation split (Athey & Imbens 2016). The
+# kernel mirrors the legacy split exactly -- same stratify=(treatment, y),
+# test_size, shuffle, random_state -- so the two trees partition the data
+# identically and the re-estimated leaves match to machine precision. IDDP is
+# grown here because legacy forces honesty=True for it.
+HONEST_CRITERIA = ["KL", "ED", "Chi", "CTS", "DDP", "IT", "CIT"]
+
+
+def _fit_pair_honest(
+    X,
+    treatment,
+    y,
+    criterion,
+    kernel_max_depth,
+    min_samples_leaf=100,
+    n_reg=0,
+    min_samples_treatment=0,
+    normalization=False,
+    estimation_sample_size=0.5,
+):
+    """Fit kernel + legacy trees with the honest approach enabled on both.
+
+    Both take the same ``random_state`` / ``estimation_sample_size`` so their
+    train/estimation splits -- and hence their re-estimated leaves -- coincide.
+    """
+    kern = _KernelUpliftTreeClassifier(
+        criterion=criterion,
+        control_name=CONTROL_NAME,
+        max_depth=kernel_max_depth,
+        min_samples_leaf=min_samples_leaf,
+        min_samples_treatment=min_samples_treatment,
+        n_reg=n_reg,
+        normalization=normalization,
+        honesty=True,
+        estimation_sample_size=estimation_sample_size,
+        random_state=RANDOM_SEED,
+    )
+    kern.fit(X, treatment, y)
+
+    legacy = UpliftTreeClassifier(
+        control_name=CONTROL_NAME,
+        evaluationFunction=criterion,
+        max_depth=kernel_max_depth + LEGACY_DEPTH_OFFSET,
+        min_samples_leaf=min_samples_leaf,
+        min_samples_treatment=min_samples_treatment,
+        n_reg=n_reg,
+        normalization=normalization,
+        honesty=True,
+        estimation_sample_size=estimation_sample_size,
+        random_state=RANDOM_SEED,
+    )
+    legacy.fit(X, treatment, y)
+    return kern, legacy
+
+
+def _make_iddp_normalization_sensitive_data(n_samples=3000, n_features=5, seed=11):
+    """Binary-feature two-class data on which IDDP normalization re-ranks splits.
+
+    IDDP is only ever grown honestly, and its normalization branch (a distinct
+    ``arr_normI`` variant whose factor depends on the raw gain) is a no-op on the
+    balanced-assignment data. As with :func:`_make_normalization_sensitive_data`,
+    correlating treatment with ``X[:, 0]`` makes the per-split factor vary so
+    ``normalization=True`` genuinely flips the IDDP tree -- the only setup that can
+    catch ``_norm_factor`` reading the wrong (asymmetric) child.
+    """
+    rng = np.random.RandomState(seed)
+    X = (rng.rand(n_samples, n_features) > 0.5).astype(np.float32)
+    ptreat = np.where(X[:, 0] > 0, 0.9, 0.1)
+    treat = rng.rand(n_samples) < ptreat
+    treatment = np.where(treat, "treatment1", CONTROL_NAME)
+    base = 0.2 + 0.3 * X[:, 1]
+    lift = np.where(X[:, 2] > 0, 0.3, -0.1) * treat
+    y = (rng.rand(n_samples) < np.clip(base + lift, 0.0, 1.0)).astype(int)
+    return X, treatment, y
+
+
+@pytest.mark.parametrize("criterion", HONEST_CRITERIA)
+@pytest.mark.parametrize("kernel_max_depth", [1, 2, 3])
+def test_kernel_uplift_parity_honest(criterion, kernel_max_depth):
+    """Honest-tree parity with legacy defaults (n_reg=100, mst=10), single treatment."""
+    X, treatment, y = _make_binary_feature_data()
+    kern, legacy = _fit_pair_honest(
+        X,
+        treatment,
+        y,
+        criterion,
+        kernel_max_depth,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,  # ignored by CTS/DDP/IT/CIT; matches legacy defaults
+    )
+
+    assert_array_almost_equal(
+        kern.predict_proba_by_group(X), legacy.predict(X), decimal=8
+    )
+
+
+def test_kernel_uplift_honesty_changes_leaves():
+    """Honesty is not a silent no-op: re-estimated leaves differ from the plain tree.
+
+    The honest tree grows on the training half and re-estimates leaves on the
+    held-out half, so its leaf probabilities must differ from a non-honest tree
+    fit on the full data.
+    """
+    X, treatment, y = _make_binary_feature_data()
+    honest, _ = _fit_pair_honest(
+        X,
+        treatment,
+        y,
+        "KL",
+        kernel_max_depth=3,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+    )
+    plain, _ = _fit_pair(
+        X,
+        treatment,
+        y,
+        "KL",
+        kernel_max_depth=3,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+    )
+    assert not np.allclose(
+        honest.predict_proba_by_group(X), plain.predict_proba_by_group(X)
+    )
+
+
+@pytest.mark.parametrize("kernel_max_depth", [1, 2, 3])
+def test_kernel_uplift_parity_iddp(kernel_max_depth):
+    """IDDP parity (honesty forced) with legacy defaults, single treatment."""
+    X, treatment, y = _make_binary_feature_data()
+    kern, legacy = _fit_pair_honest(
+        X,
+        treatment,
+        y,
+        "IDDP",
+        kernel_max_depth,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,
+    )
+
+    assert_array_almost_equal(
+        kern.predict_proba_by_group(X), legacy.predict(X), decimal=8
+    )
+
+
+def test_kernel_uplift_parity_iddp_normalization_effective():
+    """IDDP normalized parity on data where its ``arr_normI`` branch re-ranks splits.
+
+    IDDP normalization is a no-op on balanced-assignment data, so this uses
+    treatment correlated with ``X[:, 0]`` (like the KL/ED/Chi normalization test)
+    to force the tree to flip. The kernel must (a) still match the legacy honest
+    tree exactly *and* (b) differ from the unnormalized IDDP tree -- which is what
+    exercises the gain-dependent ``_norm_factor`` and its asymmetric child.
+    """
+    X, treatment, y = _make_iddp_normalization_sensitive_data()
+    kern, legacy = _fit_pair_honest(
+        X,
+        treatment,
+        y,
+        "IDDP",
+        kernel_max_depth=3,
+        min_samples_leaf=50,
+        n_reg=LEGACY_N_REG,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        normalization=True,
+    )
+    plain = _KernelUpliftTreeClassifier(
+        criterion="IDDP",
+        control_name=CONTROL_NAME,
+        max_depth=3,
+        min_samples_leaf=50,
+        min_samples_treatment=LEGACY_MIN_SAMPLES_TREATMENT,
+        n_reg=LEGACY_N_REG,
+        normalization=False,
+        random_state=RANDOM_SEED,
+    )
+    plain.fit(X, treatment, y)
+
+    kern_proba = kern.predict_proba_by_group(X)
+    # (a) exact parity with the legacy normalized honest tree.
+    assert_array_almost_equal(kern_proba, legacy.predict(X), decimal=8)
+    # (b) normalization is not silently ignored: it changes the fitted IDDP tree.
+    assert not np.allclose(kern_proba, plain.predict_proba_by_group(X))
+
+
+def test_kernel_uplift_iddp_forces_honesty():
+    """IDDP forces the honest approach on, even when honesty=False is requested."""
+    kern = _KernelUpliftTreeClassifier(criterion="IDDP", honesty=False)
+    assert kern.honesty is True
+
+
+def test_kernel_uplift_iddp_guard_rejects_multi_treatment():
+    """IDDP is two-class only and must reject more than one treatment group."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=3000,
+        n_features=6,
+        treatment_names=("treatment1", "treatment2"),
+        seed=7,
+    )
+    kern = _KernelUpliftTreeClassifier(
+        criterion="IDDP",
         control_name=CONTROL_NAME,
         max_depth=2,
         min_samples_leaf=100,

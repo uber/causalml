@@ -52,7 +52,9 @@ cdef class UpliftClassificationCriterion(CausalRegressionCriterion):
     cdef bint _normalizable(self) noexcept nogil
     # Rzepakowski normalization factor from the raw node / one-child group counts
     # (the child matching legacy ``arr_normI``'s asymmetric "left" = X >= value).
-    cdef float64_t _norm_factor(self) noexcept nogil
+    # ``gain`` is the raw (pre-normalization) split gain; the KL/ED/Chi factor
+    # ignores it, IDDP uses it (``currentDivergence = 2*(gain+1)/3``).
+    cdef float64_t _norm_factor(self, float64_t gain) noexcept nogil
     # Regularized P(Y=1|T=g) of ``node``, shrunk toward ``target_p`` (when
     # ``has_target``), written into ``dest``.
     cdef void _reg_summary(self, NodeState node, float64_t* target_p, bint has_target, float64_t* dest) noexcept nogil

@@ -167,7 +167,7 @@ cdef class UpliftClassificationCriterion(CausalRegressionCriterion):
         """Whether Rzepakowski normalization applies to this criterion."""
         return 1
 
-    cdef float64_t _norm_factor(self) noexcept nogil:
+    cdef float64_t _norm_factor(self, float64_t gain) noexcept nogil:
         """Rzepakowski normalization factor (legacy ``arr_normI`` else-branch).
 
         Computed from the *raw* group counts of the current node and one child
@@ -177,7 +177,8 @@ cdef class UpliftClassificationCriterion(CausalRegressionCriterion):
         the complementary ``X <= threshold`` side, so legacy-left is the kernel's
         ``state.right``; the factor must be built from ``state.right``. Always
         >= 0.5, so dividing the gain by it preserves the gain's sign while
-        re-ranking splits.
+        re-ranking splits. ``gain`` (the raw split gain) is unused here; IDDP
+        overrides this method and uses it.
         """
         cdef int32_t i
         cdef float64_t n_c = self.state.node.count_1d[0]
@@ -308,7 +309,7 @@ cdef class UpliftClassificationCriterion(CausalRegressionCriterion):
         p = self.weighted_n_left / self.weighted_n_node_samples
         gain = self._split_gain(s_node, s_left, s_right, p)
         if self.normalization and self._normalizable():
-            gain = gain / self._norm_factor()
+            gain = gain / self._norm_factor(gain)
 
         impurity_left[0] = self._node_metric(s_left)
         impurity_right[0] = self._node_metric(s_right)
@@ -519,3 +520,69 @@ cdef class CITCriterion(UpliftClassificationCriterion):
 
     cdef bint _normalizable(self) noexcept nogil:
         return 0
+
+
+cdef class IDDPCriterion(UpliftClassificationCriterion):
+    """Investment-DDP (legacy ``evaluate_IDDP`` / ``arr_evaluate_IDDP``).
+
+    Two-class only; legacy forces the honest approach for IDDP. The raw gain is
+    ``|DDP(left) - DDP(right)| - |DDP(node)|`` (``DDP(s) = Σ_t (s[t] - s[0])``),
+    which -- unlike DDP -- IS normalized, but by the IDDP-specific ``arr_normI``
+    branch whose factor depends on the raw gain via
+    ``currentDivergence = 2*(gain + 1)/3`` (legacy ``growDecisionTreeFrom`` ~2295-
+    2306). ``children_impurity`` divides the raw gain by :meth:`_norm_factor`.
+    """
+
+    cdef float64_t _split_gain(
+        self,
+        float64_t* s_node,
+        float64_t* s_left,
+        float64_t* s_right,
+        float64_t p,
+    ) noexcept nogil:
+        cdef float64_t d_node = 0.0
+        cdef float64_t d_left = 0.0
+        cdef float64_t d_right = 0.0
+        cdef int32_t t
+        for t in range(1, self.n_outputs):
+            d_node += s_node[t] - s_node[0]
+            d_left += s_left[t] - s_left[0]
+            d_right += s_right[t] - s_right[0]
+        return fabs(d_left - d_right) - fabs(d_node)
+
+    cdef bint _normalizable(self) noexcept nogil:
+        return 1
+
+    cdef float64_t _norm_factor(self, float64_t gain) noexcept nogil:
+        """IDDP branch of legacy ``arr_normI`` (``uplift.pyx`` ~1715-1732).
+
+        Simpler than the KL/ED/Chi branch: no per-class loop and no
+        ``kl_divergence``; instead it scales by ``currentDivergence`` derived from
+        the raw gain. Reads the same asymmetric child as the base factor
+        (``state.right`` == legacy-left; see :meth:`UpliftClassificationCriterion.
+        _norm_factor`).
+        """
+        cdef int32_t i
+        cdef float64_t n_c = self.state.node.count_1d[0]
+        cdef float64_t n_c_gt = self.state.right.count_1d[0]
+        cdef float64_t sum_n_t = 0.0
+        cdef float64_t sum_n_t_gt = 0.0
+        cdef float64_t pt_a, pc_a, current_divergence
+        cdef float64_t norm_res = 0.0
+
+        for i in range(1, self.n_outputs):
+            sum_n_t += self.state.node.count_1d[i]
+            sum_n_t_gt += self.state.right.count_1d[i]
+
+        pt_a = sum_n_t_gt / (sum_n_t + 0.1)
+        pc_a = n_c_gt / (n_c + 0.1)
+        current_divergence = 2.0 * (gain + 1.0) / 3.0
+
+        norm_res += (
+            _entropy_h(sum_n_t / (sum_n_t + n_c), n_c / (sum_n_t + n_c))
+            * current_divergence
+        )
+        norm_res += sum_n_t / (sum_n_t + n_c) * _entropy_h(pt_a, -1.0)
+        norm_res += n_c / (sum_n_t + n_c) * _entropy_h(pc_a, -1.0)
+        norm_res += 0.5
+        return norm_res
