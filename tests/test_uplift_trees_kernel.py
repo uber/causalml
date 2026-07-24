@@ -686,3 +686,137 @@ def test_kernel_uplift_iddp_guard_rejects_multi_treatment():
     )
     with pytest.raises(ValueError, match="two-class"):
         kern.fit(X, treatment, y)
+
+
+# --- Validation-based pruning (issue #951) -----------------------------------
+# The kernel ``prune`` collapses an internal node whose two children are leaves
+# into a leaf when the split does not improve the treatment effect on a held-out
+# validation set, cascading upward, then rebuilds a compact tree. Legacy
+# ``UpliftTreeClassifier.prune`` is a no-op (its recursion never descends past
+# the root), so these are behavioral checks, not legacy bit-parity.
+PRUNE_RULES = ["maxAbsDiff", "bestUplift"]
+
+
+def _make_prune_signal_data(n_samples=4000, n_features=6, seed=RANDOM_SEED):
+    """Feature 0 drives a strong, generalizing uplift sign flip; the rest noise.
+
+    A deep tree over-splits on the noise features; only the feature-0 split
+    reproduces on an independent validation draw, so pruning should drop the
+    noise splits and keep the feature-0 split.
+    """
+    rng = np.random.RandomState(seed)
+    X = rng.randint(0, 2, size=(n_samples, n_features)).astype(np.float32)
+    treatment = np.where(rng.rand(n_samples) < 0.5, "treatment1", CONTROL_NAME)
+    lift = np.where(X[:, 0] > 0, 0.30, -0.30)
+    p = np.where(treatment == "treatment1", 0.4 + lift, 0.4)
+    y = (rng.rand(n_samples) < np.clip(p, 0.0, 1.0)).astype(int)
+    return X, treatment, y
+
+
+def _fit_prunable_tree(X, treatment, y, max_depth=4):
+    """A deep, unregularized tree that over-splits (so there is something to prune)."""
+    kern = _KernelUpliftTreeClassifier(
+        criterion="KL",
+        control_name=CONTROL_NAME,
+        max_depth=max_depth,
+        min_samples_leaf=50,
+        n_reg=0,
+        min_samples_treatment=0,
+        normalization=False,
+        random_state=RANDOM_SEED,
+    )
+    kern.fit(X, treatment, y)
+    return kern
+
+
+def _reachable_node_ids(tree):
+    """Node ids reachable from the root by following children_left/right."""
+    left, right = tree.children_left, tree.children_right
+    seen, stack = set(), [0]
+    while stack:
+        node = stack.pop()
+        if node == -1 or node in seen:
+            continue
+        seen.add(node)
+        stack.extend((left[node], right[node]))
+    return seen
+
+
+@pytest.mark.parametrize("rule", PRUNE_RULES)
+def test_kernel_uplift_prune_reduces_and_stays_compact(rule):
+    X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
+    Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
+    kern = _fit_prunable_tree(X, t, y)
+    before = kern.tree_.node_count
+    kern.prune(Xv, tv, yv, minGain=0.005, rule=rule)
+    after = kern.tree_.node_count
+
+    assert after < before  # pruning removed nodes
+    # Compact rebuild: every id < node_count is reachable, no orphans.
+    assert _reachable_node_ids(kern.tree_) == set(range(after))
+    left, right = kern.tree_.children_left, kern.tree_.children_right
+    assert ((left == -1) == (right == -1)).all()  # leaf iff no children
+
+
+@pytest.mark.parametrize("rule", PRUNE_RULES)
+def test_kernel_uplift_prune_idempotent(rule):
+    X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
+    Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
+    kern = _fit_prunable_tree(X, t, y)
+    kern.prune(Xv, tv, yv, minGain=0.005, rule=rule)
+    once = kern.tree_.node_count
+    proba_once = kern.predict_proba_by_group(X)
+
+    kern.prune(Xv, tv, yv, minGain=0.005, rule=rule)
+    assert kern.tree_.node_count == once
+    assert_array_almost_equal(kern.predict_proba_by_group(X), proba_once, decimal=12)
+
+
+@pytest.mark.parametrize("rule", PRUNE_RULES)
+def test_kernel_uplift_prune_mingain_monotonic(rule):
+    X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
+    Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
+    counts = []
+    for min_gain in (0.0, 0.001, 0.01, 0.05, 0.2):
+        kern = _fit_prunable_tree(X, t, y)
+        kern.prune(Xv, tv, yv, minGain=min_gain, rule=rule)
+        counts.append(kern.tree_.node_count)
+    # Higher minGain prunes at least as aggressively.
+    assert all(a >= b for a, b in zip(counts, counts[1:]))
+
+
+@pytest.mark.parametrize("rule", PRUNE_RULES)
+def test_kernel_uplift_prune_keeps_generalizing_split(rule):
+    """The one generalizing split survives aggressive pruning; noise is dropped."""
+    X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
+    Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
+    kern = _fit_prunable_tree(X, t, y)
+    kern.prune(Xv, tv, yv, minGain=0.05, rule=rule)
+
+    # Collapses to the single feature-0 split: root + two leaves.
+    assert kern.tree_.node_count == 3
+    assert kern.tree_.feature[0] == 0
+    # Predictions still recover the feature-0 uplift sign flip.
+    uplift = kern.predict(X)[:, 0]
+    assert uplift[X[:, 0] == 1].mean() > 0.1
+    assert uplift[X[:, 0] == 0].mean() < -0.1
+
+
+@pytest.mark.parametrize("rule", PRUNE_RULES)
+def test_kernel_uplift_prune_predictions_valid(rule):
+    X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
+    Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
+    kern = _fit_prunable_tree(X, t, y)
+    kern.prune(Xv, tv, yv, minGain=0.01, rule=rule)
+
+    proba = kern.predict_proba_by_group(X)
+    assert proba.shape == (X.shape[0], kern.n_outputs_)
+    assert np.isfinite(proba).all()
+    assert (proba >= 0).all() and (proba <= 1).all()
+
+
+def test_kernel_uplift_prune_invalid_rule_raises():
+    X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
+    kern = _fit_prunable_tree(X, t, y)
+    with pytest.raises(ValueError, match="maxAbsDiff"):
+        kern.prune(X, t, y, rule="bogus")

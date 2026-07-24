@@ -1820,6 +1820,31 @@ def _build_pruned_tree_ccp(
                        pruning_controller.capacity)
 
 
+def build_pruned_tree_from_mask(
+    Tree tree,  # OUT
+    Tree orig_tree,
+    const unsigned char[:] leaves_in_subtree,
+):
+    """Build a pruned tree from an explicit leaf mask.
+
+    Like :func:`_build_pruned_tree_ccp`, but the nodes to collapse into leaves
+    are supplied directly via ``leaves_in_subtree`` instead of being derived by
+    cost-complexity pruning. Used by the uplift validation-based pruner (issue
+    #951).
+
+    Parameters
+    ----------
+    tree : Tree
+        Location to place the pruned tree.
+    orig_tree : Tree
+        Original tree.
+    leaves_in_subtree : unsigned char memoryview, shape=(node_count,)
+        1 for every node that must be a leaf in the pruned tree -- both the
+        collapsed internal nodes and the surviving original leaves.
+    """
+    _build_pruned_tree(tree, orig_tree, leaves_in_subtree, orig_tree.node_count)
+
+
 def ccp_pruning_path(Tree orig_tree):
     """Computes the cost complexity pruning path.
 
