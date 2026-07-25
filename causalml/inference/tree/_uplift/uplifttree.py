@@ -21,6 +21,7 @@ from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
 from causalml.inference.meta.utils import check_treatment_vector
+from causalml.inference.serialization import SerializableLearner
 
 from ._tree import BaseUpliftDecisionTree
 from .._tree._tree import Tree, build_pruned_tree_from_mask
@@ -56,8 +57,16 @@ class _UpliftTreeNode:
         self.summary = summary
 
 
-class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
-    """A single uplift tree grown on the shared ``_tree`` Cython kernel."""
+class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
+    """A single uplift tree grown on the shared ``_tree`` Cython kernel.
+
+    Inherits :class:`~causalml.inference.serialization.SerializableLearner` for
+    ``save`` / ``load`` and is a scikit-learn ``BaseEstimator`` via
+    ``BaseDecisionTree`` (``get_params`` / ``clone`` round-trip). ``__init__``
+    stores its arguments verbatim per the sklearn convention. Full
+    ``check_estimator`` is not applicable: the supervised-uplift ``fit`` takes
+    ``(X, treatment, y)``, so sklearn's ``fit(X, y)``-shaped checks cannot run.
+    """
 
     def __init__(
         self,
@@ -80,9 +89,6 @@ class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
         self.min_samples_treatment = min_samples_treatment
         self.n_reg = n_reg
         self.normalization = normalization
-        # IDDP requires the honest approach (legacy uplift.pyx ~468-469).
-        if criterion == "IDDP" and not honesty:
-            honesty = True
         self.honesty = honesty
         self.estimation_sample_size = estimation_sample_size
         super().__init__(
@@ -120,7 +126,11 @@ class _KernelUpliftTreeClassifier(BaseUpliftDecisionTree):
         """
         X_enc, y_2dim = self._prepare_data(X=X, treatment=treatment, y=y)
 
-        if not self.honesty:
+        # IDDP requires the honest approach (legacy uplift.pyx ~468-469). Resolved
+        # here rather than in __init__ so the constructor stores its arguments
+        # verbatim (sklearn get_params / clone round-trip).
+        honest = self.honesty or self.criterion == "IDDP"
+        if not honest:
             super().fit(
                 X=X_enc, y=y_2dim, sample_weight=sample_weight, check_input=check_input
             )

@@ -23,6 +23,8 @@ from numpy import float32 as DTYPE
 from sklearn.ensemble._forest import ForestRegressor, MAX_INT
 from sklearn.utils import check_array, check_random_state
 
+from causalml.inference.serialization import SerializableLearner
+
 from .uplifttree import _KernelUpliftTreeClassifier
 
 
@@ -71,7 +73,7 @@ def _parallel_build_tree(tree, X, treatment, y, control_name, sample_weight):
     return tree
 
 
-class _KernelUpliftRandomForestClassifier(ForestRegressor):
+class _KernelUpliftRandomForestClassifier(SerializableLearner, ForestRegressor):
     """A random forest of kernel-backed uplift trees.
 
     Bags ``_KernelUpliftTreeClassifier`` on sklearn's ``ForestRegressor``
@@ -79,6 +81,11 @@ class _KernelUpliftRandomForestClassifier(ForestRegressor):
     ``P(Y=1|T=t) - P(Y=1|control)``; ``predict(..., full_output=True)`` returns
     the full frame (per-group probabilities, recommended treatment, deltas,
     ``max_delta``).
+
+    Inherits :class:`~causalml.inference.serialization.SerializableLearner` for
+    ``save`` / ``load`` and is a scikit-learn ``BaseEstimator`` via
+    ``ForestRegressor`` (``get_params`` / ``clone`` round-trip). Full
+    ``check_estimator`` does not apply -- ``fit`` takes ``(X, treatment, y)``.
     """
 
     def __init__(

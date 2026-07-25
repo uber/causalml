@@ -28,6 +28,7 @@ import pandas as pd
 import pytest
 from joblib import parallel_backend
 from numpy.testing import assert_array_almost_equal
+from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 
 from causalml.dataset import make_uplift_classification
@@ -678,9 +679,25 @@ def test_kernel_uplift_parity_iddp_normalization_effective():
 
 
 def test_kernel_uplift_iddp_forces_honesty():
-    """IDDP forces the honest approach on, even when honesty=False is requested."""
-    kern = _KernelUpliftTreeClassifier(criterion="IDDP", honesty=False)
-    assert kern.honesty is True
+    """IDDP forces the honest approach at fit, without mutating stored honesty."""
+    X, treatment, y = _make_binary_feature_data()
+    common = dict(
+        criterion="IDDP",
+        control_name=CONTROL_NAME,
+        max_depth=3,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    forced = _KernelUpliftTreeClassifier(honesty=False, **common).fit(X, treatment, y)
+    explicit = _KernelUpliftTreeClassifier(honesty=True, **common).fit(X, treatment, y)
+    # honesty=False is forced onto the honest path in fit, matching honesty=True,
+    # while the constructor keeps the argument verbatim (sklearn clone/get_params).
+    assert forced.get_params()["honesty"] is False
+    assert_array_almost_equal(
+        forced.predict_proba_by_group(X),
+        explicit.predict_proba_by_group(X),
+        decimal=12,
+    )
 
 
 def test_kernel_uplift_iddp_guard_rejects_multi_treatment():
@@ -1175,3 +1192,100 @@ def test_kernel_uplift_forest_feature_importances():
     # Uplift split gains are not a monotone impurity decrease, so per-feature
     # importances can be signed; they just have to be finite and averaged.
     assert np.isfinite(fi).all()
+
+
+# ---------------------------------------------------------------------------
+# Serialization + BaseEstimator conformance (issue #954)
+# ---------------------------------------------------------------------------
+# The kernel classes inherit SerializableLearner (save/load) and are sklearn
+# BaseEstimators (get_params / clone) via BaseDecisionTree / ForestRegressor.
+# Full check_estimator does not apply: fit takes (X, treatment, y), so sklearn's
+# fit(X, y)-shaped checks cannot run. These cover the achievable conformance.
+
+
+def _make_serialization_estimator(kind, **overrides):
+    """Construct an unfitted kernel tree or forest with test-friendly defaults."""
+    if kind == "tree":
+        params = dict(
+            criterion="KL",
+            control_name=CONTROL_NAME,
+            max_depth=3,
+            min_samples_leaf=100,
+            random_state=RANDOM_SEED,
+        )
+        params.update(overrides)
+        return _KernelUpliftTreeClassifier(**params)
+    params = dict(
+        control_name=CONTROL_NAME,
+        n_estimators=5,
+        criterion="KL",
+        max_depth=3,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    params.update(overrides)
+    return _KernelUpliftRandomForestClassifier(**params)
+
+
+@pytest.mark.parametrize("kind", ["tree", "forest"])
+def test_kernel_uplift_save_load_round_trip(kind, tmp_path):
+    """save() then load() restores an estimator with identical predictions."""
+    X, treatment, y = _make_binary_feature_data()
+    est = _make_serialization_estimator(kind).fit(X, treatment, y)
+    path = str(tmp_path / f"{kind}.causalml")
+    est.save(path)
+
+    loaded = type(est).load(path)
+    assert type(loaded) is type(est)
+    assert_array_almost_equal(
+        np.asarray(loaded.predict(X)), np.asarray(est.predict(X)), decimal=12
+    )
+
+
+@pytest.mark.parametrize("kind", ["tree", "forest"])
+def test_kernel_uplift_unfitted_save_raises(kind, tmp_path):
+    """Saving before fit is rejected."""
+    est = _make_serialization_estimator(kind)
+    with pytest.raises(ValueError):
+        est.save(str(tmp_path / "unfitted.causalml"))
+
+
+@pytest.mark.parametrize("kind", ["tree", "forest"])
+def test_kernel_uplift_get_params_clone_round_trip(kind):
+    """clone() reproduces the constructor params exactly (BaseEstimator)."""
+    est = _make_serialization_estimator(kind)
+    assert clone(est).get_params() == est.get_params()
+
+
+def test_kernel_uplift_load_class_mismatch_raises(tmp_path):
+    """Loading a saved tree as the forest class is rejected."""
+    X, treatment, y = _make_binary_feature_data()
+    tree = _make_serialization_estimator("tree").fit(X, treatment, y)
+    path = str(tmp_path / "tree.causalml")
+    tree.save(path)
+    with pytest.raises(ValueError):
+        _KernelUpliftRandomForestClassifier.load(path)
+
+
+def test_kernel_uplift_init_stores_args_verbatim():
+    """__init__ stores its arguments unchanged (sklearn get_params / clone contract).
+
+    In particular ``criterion="IDDP"`` must not mutate the stored ``honesty`` --
+    IDDP forces the honest approach in fit(), not in the constructor (see
+    ``test_kernel_uplift_iddp_forces_honesty``).
+    """
+    args = dict(
+        criterion="IDDP",
+        control_name="ctrl",
+        max_depth=7,
+        min_samples_leaf=42,
+        min_samples_treatment=3,
+        n_reg=5,
+        normalization=False,
+        honesty=False,
+        estimation_sample_size=0.3,
+        random_state=123,
+    )
+    params = _KernelUpliftTreeClassifier(**args).get_params()
+    for name, value in args.items():
+        assert params[name] == value
