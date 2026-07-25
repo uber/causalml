@@ -400,7 +400,12 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
             **{treatment: i + 1 for i, treatment in enumerate(self.unique_treatments)},
         }
 
-        X = check_array(X, dtype=DTYPE, accept_sparse="csc")
+        # Missing (NaN) feature values are handled natively by the kernel
+        # splitter; finiteness is enforced (support-gated) by the base fit's
+        # ``_compute_missing_values_in_feature_mask``.
+        X = check_array(
+            X, dtype=DTYPE, accept_sparse="csc", ensure_all_finite="allow-nan"
+        )
         y = check_array(y, ensure_2d=False, dtype=None)
         self.n_samples, self.n_features = X.shape
 

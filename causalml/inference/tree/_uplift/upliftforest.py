@@ -175,7 +175,11 @@ class _KernelUpliftRandomForestClassifier(SerializableLearner, ForestRegressor):
         Returns:
             self
         """
-        X = check_array(X, accept_sparse=False, dtype=DTYPE)
+        # NaNs are handled natively by the kernel trees (see
+        # ``_KernelUpliftTreeClassifier``); keep them through forest validation.
+        X = check_array(
+            X, accept_sparse=False, dtype=DTYPE, ensure_all_finite="allow-nan"
+        )
         treatment = np.asarray(treatment)
         y = np.asarray(y)
         self.n_features_in_ = X.shape[1]

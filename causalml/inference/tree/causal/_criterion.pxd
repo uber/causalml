@@ -44,6 +44,7 @@ cdef class NodeState:
     cdef int32_t reset(self, intp_t n_outputs) except -1 nogil
     cdef int32_t update_counters(self) except -1 nogil
     cdef int32_t copy_from_state(self, NodeState state) except -1 nogil
+    cdef int32_t set_difference(self, NodeState a, NodeState b) except -1 nogil
     cdef int32_t increment_count(self, int32_t group_idx, float64_t value) except -1 nogil
     cdef int32_t increment_y_sum(self, int32_t group_idx, float64_t value) except -1 nogil
     cdef int32_t increment_y_sq_sum(self, int32_t group_idx, float64_t value) except -1 nogil
@@ -56,6 +57,7 @@ cdef class NodeSplitState:
     cdef public NodeState node
     cdef public NodeState right
     cdef public NodeState left
+    cdef public NodeState missing
 
     """
     NodeSplitState cython class tracks statistics for the current node and potential left and right splits.
@@ -63,6 +65,8 @@ cdef class NodeSplitState:
     node:    NodeState,    current node statistics
     right:   NodeState,    right split statistics
     left:    NodeState,    left split statistics
+    missing: NodeState,    statistics of samples with a missing value for the
+                           feature currently being split on
     """
 
     cdef int32_t reset_nodes(self, intp_t n_outputs) except -1 nogil

@@ -52,12 +52,24 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         self.min_group_samples = min_group_samples
 
     def _support_missing_values(self, X) -> bool:
+        """Whether native missing-value (NaN) splitting is available for ``X``.
+
+        Mirrors scikit-learn's ``BaseDecisionTree._support_missing_values``. The
+        causal criterion implements scikit-learn's per-feature missing-value
+        accumulation, which the dense best splitter threads through (see
+        ``__sklearn_tags__``); NaNs are rejected for sparse input or a non-default
+        splitter.
         """
-        TODO: Add support for missing values
-        See sklearn PR: ENH Adds missing value support for trees (#23595)
-        https://github.com/scikit-learn/scikit-learn/commit/6392148d80e9f14a9524c137ac5cfa04f2274d48
-        """
-        return False
+        return (
+            not issparse(X)
+            and self.__sklearn_tags__().input_tags.allow_nan
+            and self.monotonic_cst is None
+        )
+
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        tags.input_tags.allow_nan = self.splitter == "best"
+        return tags
 
     def fit(
         self,
@@ -72,13 +84,22 @@ class BaseCausalDecisionTree(BaseDecisionTree):
         if self.ccp_alpha < 0.0:
             raise ValueError("ccp_alpha must be greater than or equal to 0")
 
+        missing_values_in_feature_mask = None
         if check_input:
             # Need to validate separately here.
             # We can't pass multi_ouput=True because that would allow y to be csr.
-            check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
+            check_X_params = dict(
+                dtype=DTYPE, accept_sparse="csc", ensure_all_finite=False
+            )
             check_y_params = get_check_y_params()
             X, y = validate_data(
                 self, X, y, validate_separately=(check_X_params, check_y_params)
+            )
+            # Native missing-value support (scikit-learn convention): rejects inf
+            # and, when NaNs are not supported, rejects them too; otherwise returns
+            # the per-feature missing mask threaded to the builder.
+            missing_values_in_feature_mask = (
+                self._compute_missing_values_in_feature_mask(X)
             )
             if issparse(X):
                 X.sort_indices()
@@ -266,7 +287,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
                 self.min_group_samples,
             )
         # Treatment column is described via y cols. The first column is always a control group.
-        builder.build(self.tree_, X, y, sample_weight)
+        builder.build(self.tree_, X, y, sample_weight, missing_values_in_feature_mask)
 
         self._prune_tree()
 

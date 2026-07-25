@@ -65,7 +65,26 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
     """
 
     def _support_missing_values(self, X) -> bool:
-        return False
+        """Whether native missing-value (NaN) splitting is available for ``X``.
+
+        Mirrors scikit-learn's ``BaseDecisionTree._support_missing_values``: the
+        kernel splitter carries the missing-value machinery for the dense
+        best-first splitter only (see ``__sklearn_tags__``), so NaNs are rejected
+        for sparse input or a non-default splitter.
+        """
+        return (
+            not issparse(X)
+            and self.__sklearn_tags__().input_tags.allow_nan
+            and self.monotonic_cst is None
+        )
+
+    def __sklearn_tags__(self):
+        tags = super().__sklearn_tags__()
+        # The uplift/causal criterion implements scikit-learn's per-feature
+        # missing-value accumulation, which the dense best splitter threads
+        # through; the random and sparse splitters do not.
+        tags.input_tags.allow_nan = self.splitter == "best"
+        return tags
 
     def fit(
         self,
@@ -79,11 +98,20 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
         if self.ccp_alpha < 0.0:
             raise ValueError("ccp_alpha must be greater than or equal to 0")
 
+        missing_values_in_feature_mask = None
         if check_input:
-            check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
+            check_X_params = dict(
+                dtype=DTYPE, accept_sparse="csc", ensure_all_finite=False
+            )
             check_y_params = get_check_y_params()
             X, y = validate_data(
                 self, X, y, validate_separately=(check_X_params, check_y_params)
+            )
+            # Native missing-value support (scikit-learn convention): rejects inf
+            # and, when NaNs are not supported, rejects them too; otherwise returns
+            # the per-feature missing mask threaded to the builder.
+            missing_values_in_feature_mask = (
+                self._compute_missing_values_in_feature_mask(X)
             )
             if issparse(X):
                 X.sort_indices()
@@ -260,7 +288,7 @@ class BaseUpliftDecisionTree(BaseDecisionTree):
                 self.min_impurity_decrease,
             )
         # First column of y is always the control group.
-        builder.build(self.tree_, X, y, sample_weight)
+        builder.build(self.tree_, X, y, sample_weight, missing_values_in_feature_mask)
 
         self._prune_tree()
 

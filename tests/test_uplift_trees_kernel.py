@@ -1289,3 +1289,137 @@ def test_kernel_uplift_init_stores_args_verbatim():
     params = _KernelUpliftTreeClassifier(**args).get_params()
     for name, value in args.items():
         assert params[name] == value
+
+
+# ---------------------------------------------------------------------------
+# Native missing-value (NaN) support (prerequisite for issue #955)
+#
+# The uplift/causal criterion implements scikit-learn's per-feature missing-value
+# accumulation (``init_missing`` / ``sum_missing`` folded into the child chosen by
+# ``missing_go_to_left``), which the dense best splitter threads through. These
+# tests assert NaNs in X are accepted, routed, and learned -- and that non-NaN
+# non-finite values (inf) are still rejected.
+# ---------------------------------------------------------------------------
+
+
+def _inject_nan(X, cols, frac=0.15, seed=RANDOM_SEED):
+    """Return a float64 copy of ``X`` with ``frac`` of each of ``cols`` set to NaN."""
+    rng = np.random.RandomState(seed)
+    Xn = np.asarray(X, dtype=np.float64).copy()
+    for c in cols:
+        idx = rng.choice(len(Xn), size=int(frac * len(Xn)), replace=False)
+        Xn[idx, c] = np.nan
+    return Xn
+
+
+def test_kernel_uplift_reports_missing_value_support():
+    """The estimator advertises native NaN support for the dense best splitter."""
+    from scipy.sparse import csr_matrix
+
+    est = _KernelUpliftTreeClassifier(criterion="KL")
+    X, _, _ = _make_binary_feature_data(n_samples=200, seed=RANDOM_SEED)
+    assert est.__sklearn_tags__().input_tags.allow_nan is True
+    assert est._support_missing_values(X) is True
+    # Sparse input is not covered by the missing-value machinery.
+    assert est._support_missing_values(csr_matrix(X)) is False
+
+
+@pytest.mark.parametrize("criterion", KERNEL_UPLIFT_CRITERIA)
+def test_kernel_uplift_fit_predict_with_nan(criterion):
+    """Fitting and predicting with NaNs in X yields valid probabilities."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=3000, n_features=6, seed=RANDOM_SEED
+    )
+    Xn = _inject_nan(X, cols=(0, 2, 4), frac=0.15)
+    est = _KernelUpliftTreeClassifier(
+        criterion=criterion, max_depth=4, min_samples_leaf=100, random_state=RANDOM_SEED
+    )
+    est.fit(Xn, treatment, y)
+    proba = est.predict_proba_by_group(Xn)
+    assert proba.shape == (len(Xn), 2)
+    assert np.isfinite(proba).all()
+    assert ((proba >= 0.0) & (proba <= 1.0)).all()
+    # The NaNs did not prevent the tree from growing.
+    assert est.tree_.max_depth >= 1
+
+
+def test_kernel_uplift_all_nan_column_and_row():
+    """An entirely-missing feature and an all-NaN prediction row are handled."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=2000, n_features=5, seed=RANDOM_SEED
+    )
+    Xn = np.asarray(X, dtype=np.float64).copy()
+    Xn[:, 2] = np.nan  # a fully-missing feature must not break the fit
+    est = _KernelUpliftTreeClassifier(
+        criterion="KL", max_depth=3, min_samples_leaf=100, random_state=RANDOM_SEED
+    ).fit(Xn, treatment, y)
+    all_nan = np.full((1, X.shape[1]), np.nan)
+    proba = est.predict_proba_by_group(all_nan)
+    assert proba.shape == (1, 2)
+    assert np.isfinite(proba).all()
+
+
+def test_kernel_uplift_learns_missing_routing():
+    """The tree routes NaN to isolate a treatment effect carried by missingness.
+
+    The uplift is concentrated in the rows whose informative feature is missing;
+    a missing-aware tree must send those NaN rows to a high-uplift leaf and the
+    observed rows to a near-zero-uplift leaf.
+    """
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 4000
+    treatment = np.array([CONTROL_NAME, "treatment1"])[rng.randint(0, 2, n)]
+    missing = rng.rand(n) < 0.5
+    # Informative feature: missing for half the rows, otherwise a varied value so
+    # the splitter does not discard it as constant.
+    informative = np.where(missing, np.nan, rng.normal(size=n))
+    noise = rng.normal(size=n)
+    X = np.column_stack([informative, noise]).astype(np.float64)
+    is_t = treatment == "treatment1"
+    p = np.where(is_t & missing, 0.7, 0.2)  # uplift only where the feature is missing
+    y = (rng.rand(n) < p).astype(int)
+
+    est = _KernelUpliftTreeClassifier(
+        criterion="KL",
+        max_depth=3,
+        min_samples_leaf=100,
+        min_samples_treatment=10,
+        normalization=False,
+        n_reg=0,
+        random_state=RANDOM_SEED,
+    ).fit(X, treatment, y)
+
+    uplift_missing = est.predict(np.array([[np.nan, 0.0]]))[0, 0]
+    uplift_observed = est.predict(np.array([[0.0, 0.0]]))[0, 0]
+    assert uplift_missing > 0.3
+    assert uplift_missing - uplift_observed > 0.25
+
+
+def test_kernel_uplift_rejects_inf():
+    """Non-NaN, non-finite values (inf) are still rejected."""
+    X, treatment, y = _make_binary_feature_data(n_samples=500, seed=RANDOM_SEED)
+    Xinf = np.asarray(X, dtype=np.float64).copy()
+    Xinf[0, 0] = np.inf
+    est = _KernelUpliftTreeClassifier(criterion="KL", random_state=RANDOM_SEED)
+    with pytest.raises(ValueError, match="infinity"):
+        est.fit(Xinf, treatment, y)
+
+
+def test_kernel_uplift_forest_with_nan():
+    """The forest fits and predicts with NaNs and advertises NaN support."""
+    X, treatment, y = _make_binary_feature_data(
+        n_samples=3000, n_features=6, seed=RANDOM_SEED
+    )
+    Xn = _inject_nan(X, cols=(1, 3, 5), frac=0.12)
+    model = _KernelUpliftRandomForestClassifier(
+        control_name=CONTROL_NAME,
+        n_estimators=6,
+        max_depth=4,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    assert model.__sklearn_tags__().input_tags.allow_nan is True
+    model.fit(Xn, treatment, y)
+    delta = model.predict(Xn)
+    assert delta.shape == (len(Xn), 1)
+    assert np.isfinite(delta).all()

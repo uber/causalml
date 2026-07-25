@@ -321,3 +321,117 @@ def test_CausalRandomForestRegressor_no_inf_predictions_ttest():
     preds = model.predict(X=X)
 
     assert np.all(np.isfinite(preds)), "Predictions contain inf or NaN values"
+
+
+# ---------------------------------------------------------------------------
+# Native missing-value (NaN) support (prerequisite for issue #955)
+#
+# The shared causal criterion implements scikit-learn's per-feature
+# missing-value accumulation, threaded through the dense best splitter, so the
+# causal tree and forest accept NaNs in X natively (inf is still rejected).
+# ---------------------------------------------------------------------------
+
+
+def _make_missing_effect_data(n=4000, seed=RANDOM_SEED):
+    """Regression uplift data whose treatment effect is carried by missingness.
+
+    The informative feature is NaN for half the rows and a varied value
+    otherwise; the treatment effect is 2.0 exactly on the missing rows and 0.0
+    on the observed rows. A missing-aware tree must route NaN accordingly.
+    """
+    rng = np.random.RandomState(seed)
+    treatment = rng.randint(0, 2, n)
+    missing = rng.rand(n) < 0.5
+    informative = np.where(missing, np.nan, rng.normal(size=n))
+    noise = rng.normal(size=n)
+    X = np.column_stack([informative, noise]).astype(np.float64)
+    tau = np.where(missing, 2.0, 0.0)
+    y = 0.3 * noise + treatment * tau + rng.normal(scale=0.1, size=n)
+    return X, treatment, y
+
+
+def test_causal_tree_reports_missing_value_support():
+    """The causal tree advertises native NaN support for the dense best splitter."""
+    from scipy.sparse import csr_matrix
+
+    est = CausalTreeRegressor(criterion="causal_mse", control_name=0)
+    X = np.random.RandomState(RANDOM_SEED).randn(100, 4)
+    assert est.__sklearn_tags__().input_tags.allow_nan is True
+    assert est._support_missing_values(X) is True
+    assert est._support_missing_values(csr_matrix(X)) is False
+
+
+@pytest.mark.parametrize("criterion", ["causal_mse", "standard_mse", "t_test"])
+def test_causal_tree_fit_predict_with_nan(criterion):
+    """The causal tree fits and predicts finite effects with NaNs in X."""
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 2000
+    X = rng.randn(n, 5)
+    treatment = rng.randint(0, 2, n)
+    y = X[:, 1] * 0.3 + treatment * (X[:, 0] > 0) * 0.5 + rng.normal(scale=0.1, size=n)
+    Xn = X.copy()
+    for c in (0, 2, 4):
+        idx = rng.choice(n, size=int(0.15 * n), replace=False)
+        Xn[idx, c] = np.nan
+
+    model = CausalTreeRegressor(
+        criterion=criterion,
+        control_name=0,
+        max_depth=4,
+        min_samples_leaf=50,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=Xn, treatment=treatment, y=y)
+    te = np.ravel(model.predict(Xn))
+    assert te.shape == (n,)
+    assert np.isfinite(te).all()
+
+
+def test_causal_tree_learns_missing_routing():
+    """The tree routes NaN to isolate a treatment effect carried by missingness."""
+    X, treatment, y = _make_missing_effect_data(seed=RANDOM_SEED)
+    model = CausalTreeRegressor(
+        criterion="causal_mse",
+        control_name=0,
+        max_depth=3,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+    te_missing = float(np.ravel(model.predict(np.array([[np.nan, 0.0]])))[0])
+    te_observed = float(np.ravel(model.predict(np.array([[0.0, 0.0]])))[0])
+    assert te_missing > 1.0
+    assert te_missing - te_observed > 0.8
+
+
+def test_causal_forest_fit_predict_with_nan():
+    """The causal forest fits and predicts finite effects with NaNs and reports the tag."""
+    X, treatment, y = _make_missing_effect_data(n=3000, seed=RANDOM_SEED)
+    model = CausalRandomForestRegressor(
+        criterion="causal_mse",
+        control_name=0,
+        n_estimators=10,
+        max_depth=4,
+        min_samples_leaf=50,
+        random_state=RANDOM_SEED,
+    )
+    assert model.__sklearn_tags__().input_tags.allow_nan is True
+    model.fit(X=X, treatment=treatment, y=y)
+    te = np.ravel(model.predict(X))
+    assert np.isfinite(te).all()
+    # The effect is concentrated on the missing rows, so their mean estimated
+    # effect must clearly exceed the observed rows'.
+    missing_rows = np.isnan(X[:, 0])
+    assert np.mean(te[missing_rows]) - np.mean(te[~missing_rows]) > 0.5
+
+
+def test_causal_tree_rejects_inf():
+    """Non-NaN, non-finite values (inf) are still rejected by the causal tree."""
+    rng = np.random.RandomState(RANDOM_SEED)
+    X = rng.randn(200, 4)
+    treatment = rng.randint(0, 2, 200)
+    y = rng.randn(200)
+    X[0, 0] = np.inf
+    model = CausalTreeRegressor(criterion="causal_mse", control_name=0)
+    with pytest.raises(ValueError, match="infinity"):
+        model.fit(X=X, treatment=treatment, y=y)

@@ -335,7 +335,12 @@ class CausalRandomForestRegressor(SerializableLearner, ForestRegressor):
         # Validate or convert input data
         if issparse(y):
             raise ValueError("sparse multilabel-indicator for y is not supported.")
-        check_X_params = dict(dtype=DTYPE, accept_sparse="csc")
+        # NaNs are handled natively by the kernel trees (each fit with
+        # ``check_input=True`` computes its own missing mask); keep them through
+        # the forest-level validation. Non-NaN non-finite values are still rejected.
+        check_X_params = dict(
+            dtype=DTYPE, accept_sparse="csc", ensure_all_finite="allow-nan"
+        )
         check_y_params = get_check_y_params()
         X, y = validate_data(
             self,
