@@ -1,5 +1,8 @@
 from abc import ABCMeta, abstractmethod
+import functools
 import logging
+import warnings
+
 import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
@@ -48,6 +51,56 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
     return learner_b
 
 
+# --- #854: scikit-learn `fit(X, y, ...)` argument-order migration ------------
+# CausalML meta-learners historically take ``fit(X, treatment, y, ...)``, which
+# puts ``y`` third and breaks ``sklearn.pipeline.Pipeline`` (it calls the final
+# estimator's ``fit(X, y)`` positionally). In v1.0 the positional order becomes
+# ``fit(X, y, treatment, ...)``. This is a two-step deprecation: for now the
+# positional order is UNCHANGED (no silent breakage), but passing ``treatment``
+# or ``y`` positionally emits a ``FutureWarning`` steering callers to keyword
+# arguments -- ``fit(X, y=y, treatment=treatment)`` -- which are order-independent
+# and therefore safe across the v1.0 flip. Remove this shim when the signatures
+# are reordered for v1.0.
+_FIT_ARG_ORDER_MSG = (
+    "Passing `treatment` and/or `y` to {method}() by position is deprecated and "
+    "will change in causalml v1.0: the positional argument order will switch from "
+    "(X, treatment, y, ...) to (X, y, treatment, ...) for scikit-learn Pipeline "
+    "compatibility (see https://github.com/uber/causalml/issues/854). To be safe "
+    "across the change, pass them as keyword arguments, e.g. "
+    "{method}(X, y=y, treatment=treatment)."
+)
+
+
+def _deprecate_positional_treatment_y(method):
+    """Warn when ``treatment``/``y`` are passed positionally to a fit-family method.
+
+    Only the outermost fit-family call on a given instance warns, so internal
+    delegations (``fit_predict`` -> ``fit``, a subclass ``fit`` -> ``super().fit``,
+    ``estimate_ate`` -> ``fit_predict`` -> ``fit``) never double-count and callers
+    see at most one warning per top-level call. The wrapped method keeps its real
+    signature via :func:`functools.wraps`, so introspection is unaffected.
+    """
+
+    @functools.wraps(method)
+    def wrapper(self, X, *args, **kwargs):
+        if getattr(self, "_in_fit_family_call", False):
+            return method(self, X, *args, **kwargs)
+        if args:
+            warnings.warn(
+                _FIT_ARG_ORDER_MSG.format(method=method.__name__),
+                FutureWarning,
+                stacklevel=2,
+            )
+        self._in_fit_family_call = True
+        try:
+            return method(self, X, *args, **kwargs)
+        finally:
+            self._in_fit_family_call = False
+
+    wrapper._treatment_y_shimmed = True
+    return wrapper
+
+
 class BaseLearner(SerializableLearner, BaseEstimator, metaclass=ABCMeta):
     """Base class for all causalml meta-learners.
 
@@ -68,6 +121,19 @@ class BaseLearner(SerializableLearner, BaseEstimator, metaclass=ABCMeta):
     * ``__repr__`` is inherited from ``BaseEstimator`` and reflects constructor params.
     """
 
+    def __init_subclass__(cls, **kwargs):
+        """Wrap each subclass's own fit-family methods with the #854 arg-order shim.
+
+        Only methods defined directly on ``cls`` are wrapped (inherited ones are
+        already wrapped on the parent), and already-wrapped methods are skipped,
+        so no method is double-wrapped.
+        """
+        super().__init_subclass__(**kwargs)
+        for name in ("fit", "fit_predict", "estimate_ate"):
+            method = cls.__dict__.get(name)
+            if callable(method) and not getattr(method, "_treatment_y_shimmed", False):
+                setattr(cls, name, _deprecate_positional_treatment_y(method))
+
     def _is_fitted(self):
         """Meta-learners are fitted once t_groups is set during fit()."""
         return hasattr(self, "t_groups")
@@ -84,6 +150,7 @@ class BaseLearner(SerializableLearner, BaseEstimator, metaclass=ABCMeta):
     ):
         pass
 
+    @_deprecate_positional_treatment_y
     def fit_predict(
         self,
         X,
