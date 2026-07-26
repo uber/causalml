@@ -1,10 +1,10 @@
-"""Experimental kernel-backed uplift random forest classifier.
+"""Kernel-backed uplift random forest classifier.
 
-Not part of the public API -- this bags the experimental
+Hosts the private ``_KernelUpliftRandomForestClassifier`` (bags
 ``_KernelUpliftTreeClassifier`` on scikit-learn's ``ForestRegressor``
-scaffolding (mirroring ``CausalRandomForestRegressor``) to prove parity with
-the legacy joblib-bagging ``UpliftRandomForestClassifier`` before the public
-class is switched over.
+scaffolding, mirroring ``CausalRandomForestRegressor``) and the public
+:class:`UpliftRandomForestClassifier`, a thin backward-compatible subclass of it
+(issue #955 switchover).
 
 Like the legacy forest it bootstraps by resampling rows (so a tree can miss a
 treatment group entirely -- the #569 sparse-group case handled by
@@ -14,6 +14,7 @@ stopping on a validation set -- a legacy tree feature -- is not supported here
 because the kernel tree does not implement it.
 """
 
+import warnings
 from typing import Union
 
 import numpy as np
@@ -241,3 +242,104 @@ class _KernelUpliftRandomForestClassifier(SerializableLearner, ForestRegressor):
         if full_output:
             return df_res
         return df_res[delta_cols].values
+
+
+class UpliftRandomForestClassifier(_KernelUpliftRandomForestClassifier):
+    """Uplift random forest classifier.
+
+    Kernel-backed drop-in for the historical Cython
+    ``UpliftRandomForestClassifier`` (issue #955 switchover). The legacy
+    constructor names and defaults are preserved: ``evaluationFunction`` selects
+    the split criterion, ``max_features`` defaults to ``10`` (clamped to the
+    feature count, as the legacy forest did), and the fitted trees are exposed as
+    ``uplift_forest``. ``predict`` returns the per-treatment uplift deltas
+    (``full_output=True`` returns the full frame). Bags kernel-backed uplift
+    trees on scikit-learn's ``ForestRegressor`` (see
+    :class:`_KernelUpliftRandomForestClassifier`).
+
+    ``early_stopping_eval_diff_scale`` and ``fit``'s ``X_val`` / ``treatment_val``
+    / ``y_val`` are accepted for backward compatibility but ignored: validation-set
+    early stopping is not implemented on the kernel trees.
+    """
+
+    def __init__(
+        self,
+        control_name,
+        n_estimators=10,
+        max_features=10,
+        random_state=None,
+        max_depth=5,
+        min_samples_leaf=100,
+        min_samples_treatment=10,
+        n_reg=10,
+        early_stopping_eval_diff_scale=1,
+        evaluationFunction="KL",
+        normalization=True,
+        honesty=False,
+        estimation_sample_size=0.5,
+        n_jobs=-1,
+        joblib_prefer: str = "threads",
+    ):
+        # Retained verbatim for the sklearn get_params / clone contract on the
+        # legacy signature (mapped to the kernel ``criterion`` below).
+        self.evaluationFunction = evaluationFunction
+        # Legacy validation-set early stopping is not implemented on the kernel
+        # trees; kept for backward-compatible construction only.
+        self.early_stopping_eval_diff_scale = early_stopping_eval_diff_scale
+        super().__init__(
+            control_name=control_name,
+            n_estimators=n_estimators,
+            criterion=evaluationFunction,
+            max_depth=max_depth,
+            min_samples_leaf=min_samples_leaf,
+            min_samples_treatment=min_samples_treatment,
+            n_reg=n_reg,
+            normalization=normalization,
+            honesty=honesty,
+            estimation_sample_size=estimation_sample_size,
+            max_features=max_features,
+            n_jobs=n_jobs,
+            random_state=random_state,
+            joblib_prefer=joblib_prefer,
+        )
+
+    @property
+    def uplift_forest(self):
+        """The fitted trees (legacy attribute name; aliases ``estimators_``)."""
+        return self.estimators_
+
+    def fit(
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+        X_val: np.ndarray = None,
+        treatment_val: np.ndarray = None,
+        y_val: np.ndarray = None,
+        sample_weight: np.ndarray = None,
+    ):
+        """Fit the forest. ``X_val`` / ``treatment_val`` / ``y_val`` (legacy early
+        stopping) are accepted for backward compatibility but ignored."""
+        if X_val is not None or treatment_val is not None or y_val is not None:
+            warnings.warn(
+                "Validation-set early stopping (X_val / treatment_val / y_val, "
+                "early_stopping_eval_diff_scale) is not supported by the "
+                "kernel-backed UpliftRandomForestClassifier and is ignored.",
+                UserWarning,
+            )
+        # The legacy forest clamps max_features to the feature count; the kernel
+        # tree validates 0 < max_features <= n_features strictly. Clamp for the
+        # tree build, then restore so get_params / clone report the original.
+        n_features = np.asarray(X).shape[1]
+        orig_max_features = self.max_features
+        if (
+            isinstance(self.max_features, (int, np.integer))
+            and not isinstance(self.max_features, bool)
+            and self.max_features > n_features
+        ):
+            self.max_features = int(n_features)
+        try:
+            super().fit(X, treatment, y, sample_weight=sample_weight)
+        finally:
+            self.max_features = orig_max_features
+        return self

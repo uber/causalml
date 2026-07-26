@@ -1,16 +1,17 @@
-"""Experimental kernel-backed uplift tree classifier.
+"""Kernel-backed uplift tree classifier.
 
-Not part of the public API -- this exists to prove numerical parity of the
-kernel-backed KL / ED / Chi / CTS / DDP / IT / CIT / IDDP criteria against the
-legacy ``UpliftTreeClassifier`` before the public classes are switched over. It
-supports the Rzepakowski ``n_reg`` / ``min_samples_treatment`` regularization,
-``normalization``, the honest approach (held-out leaf re-estimation, Athey &
-Imbens 2016), and validation-based pruning; the two-class criteria
-(DDP/IT/CIT/IDDP) reject multi-treatment input and IDDP forces honesty on. It
-also exposes a legacy-shaped ``fitted_uplift_tree`` so ``plot.py`` renders it
-unchanged (issue #953). The forest is handled in a later issue of the epic.
+Hosts the private ``_KernelUpliftTreeClassifier`` (grown on the shared ``_tree``
+Cython kernel) and the public :class:`UpliftTreeClassifier`, a thin
+backward-compatible subclass of it (issue #955 switchover). The kernel-backed
+KL / ED / Chi / CTS / DDP / IT / CIT / IDDP criteria support the Rzepakowski
+``n_reg`` / ``min_samples_treatment`` regularization, ``normalization``, the
+honest approach (held-out leaf re-estimation, Athey & Imbens 2016), and
+validation-based pruning; the two-class criteria (DDP/IT/CIT/IDDP) reject
+multi-treatment input and IDDP forces honesty on. A legacy-shaped
+``fitted_uplift_tree`` lets ``plot.py`` render the tree unchanged (issue #953).
 """
 
+import warnings
 from typing import Union
 
 import numpy as np
@@ -486,3 +487,128 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
             y_2dim[:, group_index] = np.where(treatment == group, y, np.nan)
 
         return X, y_2dim
+
+
+class UpliftTreeClassifier(_KernelUpliftTreeClassifier):
+    """Uplift tree classifier.
+
+    Kernel-backed drop-in for the historical Cython ``UpliftTreeClassifier``
+    (issue #955 switchover). The legacy constructor names, defaults, and
+    ``predict`` semantics are preserved: ``evaluationFunction`` selects the split
+    criterion (``KL`` / ``ED`` / ``Chi`` / ``CTS`` / ``DDP`` / ``IT`` / ``CIT`` /
+    ``IDDP``); ``predict`` returns per-group ``P(Y=1|T=g)`` including the control
+    column; ``fill`` re-annotates the fitted tree with new data. The tree is
+    grown on the shared ``_tree`` Cython kernel (see
+    :class:`_KernelUpliftTreeClassifier`).
+
+    ``early_stopping_eval_diff_scale`` and ``fit``'s ``X_val`` / ``treatment_val``
+    / ``y_val`` are accepted for backward compatibility but ignored: validation-set
+    early stopping is not implemented on the kernel tree.
+    """
+
+    def __init__(
+        self,
+        control_name,
+        max_features=None,
+        max_depth=3,
+        min_samples_leaf=100,
+        min_samples_treatment=10,
+        n_reg=100,
+        early_stopping_eval_diff_scale=1,
+        evaluationFunction="KL",
+        normalization=True,
+        honesty=False,
+        estimation_sample_size=0.5,
+        random_state=None,
+    ):
+        # Retained verbatim for the sklearn get_params / clone contract on the
+        # legacy signature (mapped to the kernel ``criterion`` below).
+        self.evaluationFunction = evaluationFunction
+        # Legacy validation-set early stopping is not implemented on the kernel
+        # tree; kept for backward-compatible construction only.
+        self.early_stopping_eval_diff_scale = early_stopping_eval_diff_scale
+        # IDDP requires the honest approach (legacy uplift.pyx ~468-469).
+        if evaluationFunction == "IDDP":
+            honesty = True
+        super().__init__(
+            criterion=evaluationFunction,
+            control_name=control_name,
+            max_depth=max_depth,
+            min_samples_leaf=min_samples_leaf,
+            min_samples_treatment=min_samples_treatment,
+            n_reg=n_reg,
+            normalization=normalization,
+            honesty=honesty,
+            estimation_sample_size=estimation_sample_size,
+            max_features=max_features,
+            random_state=random_state,
+        )
+
+    def fit(
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+        X_val: np.ndarray = None,
+        treatment_val: np.ndarray = None,
+        y_val: np.ndarray = None,
+        sample_weight: Union[np.ndarray, None] = None,
+        check_input: bool = True,
+    ):
+        """Fit the uplift tree. ``X_val`` / ``treatment_val`` / ``y_val`` (legacy
+        early stopping) are accepted for backward compatibility but ignored."""
+        if X_val is not None or treatment_val is not None or y_val is not None:
+            warnings.warn(
+                "Validation-set early stopping (X_val / treatment_val / y_val, "
+                "early_stopping_eval_diff_scale) is not supported by the "
+                "kernel-backed UpliftTreeClassifier and is ignored.",
+                UserWarning,
+            )
+        return super().fit(
+            X, treatment, y, sample_weight=sample_weight, check_input=check_input
+        )
+
+    def predict(self, X: np.ndarray, check_input: bool = True) -> np.ndarray:
+        """Per-group ``P(Y=1|T=g)`` for each row (control in column 0).
+
+        Preserves the historical ``UpliftTreeClassifier.predict`` return shape
+        ``(n_samples, n_groups)``; a leaf with no samples of an otherwise-present
+        group yields a NaN rate under ``min_samples_treatment=0``, which is
+        zero-filled to match the legacy ``uplift_classification_results``.
+        """
+        proba = self.predict_proba_by_group(X, check_input=check_input)
+        return np.nan_to_num(proba, nan=0.0)
+
+    @property
+    def feature_importances_(self) -> np.ndarray:
+        """Non-negative normalized feature importances (sum to 1).
+
+        The kernel's raw importances can be signed (an uplift split gain is not a
+        monotone impurity decrease); the legacy contract exposes non-negative
+        importances, so magnitudes are taken and renormalized.
+        """
+        fi = np.abs(super().feature_importances_)
+        total = fi.sum()
+        return fi / total if total > 0 else fi
+
+    def fill(self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray):
+        """Re-estimate leaf probabilities and node counts on new data.
+
+        Routes ``(X, treatment, y)`` through the fitted tree and overwrites each
+        leaf's per-group ``P(Y=1|T=g)`` and every node's per-group counts from
+        the supplied data (typically a validation set) using the existing group
+        encoding -- mirroring the legacy ``UpliftTreeClassifier.fill`` used to
+        re-annotate the plotted tree. Returns ``self``.
+        """
+        check_is_fitted(self, "tree_")
+        X = check_array(
+            X, dtype=DTYPE, accept_sparse="csc", ensure_all_finite="allow-nan"
+        )
+        treatment = np.asarray(treatment)
+        y = (np.asarray(y).ravel() > 0).astype(np.float64)
+        y_2dim = np.full((X.shape[0], self.n_outputs_), np.nan)
+        for group, group_index in self._group2index.items():
+            y_2dim[:, group_index] = np.where(treatment == group, y, np.nan)
+        self._honest_reestimate(X, y_2dim)
+        self._node_group_counts = self._compute_node_group_counts(X, y_2dim)
+        return self

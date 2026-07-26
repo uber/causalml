@@ -197,18 +197,21 @@ def UpliftTreeClassifierTesting(df, x_names, evaluation_function):
     assert auuc["uplift_tree"] > 0.5
 
     # Check if the total count is split correctly, at least for control group in the first level
-    def validate_cnt(cur_tree):
-        parent_control_cnt = cur_tree.nodeSummary[0][1]
-        next_level_control_cnt = 0
-        # assume the depth is at least 2
-        assert cur_tree.trueBranch or cur_tree.falseBranch
-        if cur_tree.trueBranch:
-            next_level_control_cnt += cur_tree.trueBranch.nodeSummary[0][1]
-        if cur_tree.falseBranch:
-            next_level_control_cnt += cur_tree.falseBranch.nodeSummary[0][1]
+    # The kernel tree records per-node, per-group counts in ``_node_group_counts``
+    # (control is column 0) rather than the legacy node ``nodeSummary``; ``fill``
+    # refreshes them. The invariant is the same: the root's control count equals
+    # the sum of its two children's control counts.
+    def validate_cnt(model):
+        counts = model._node_group_counts
+        tree = model.tree_
+        left, right = tree.children_left[0], tree.children_right[0]
+        # assume the tree splits at the root (depth is at least 2)
+        assert left != -1 and right != -1
+        parent_control_cnt = counts[0, 0]
+        next_level_control_cnt = counts[left, 0] + counts[right, 0]
         return [parent_control_cnt, next_level_control_cnt]
 
-    counts = validate_cnt(uplift_model.fitted_uplift_tree)
+    counts = validate_cnt(uplift_model)
     assert counts[0] > 0 and counts[0] == counts[1]
 
     # Check if it works as expected after filling with validation data
@@ -217,7 +220,7 @@ def UpliftTreeClassifierTesting(df, x_names, evaluation_function):
         treatment=df_test["treatment_group_key"].values,
         y=df_test[CONVERSION].values,
     )
-    counts = validate_cnt(uplift_model.fitted_uplift_tree)
+    counts = validate_cnt(uplift_model)
     assert counts[0] > 0 and counts[0] == counts[1]
 
 
