@@ -7,7 +7,7 @@
 from libcpp.vector cimport vector
 
 from .._tree._typedefs cimport intp_t, float64_t
-from ..causal._criterion cimport CausalRegressionCriterion, NodeState
+from .._tree._group_criterion cimport CausalRegressionCriterion, NodeState
 
 
 cdef class UpliftClassificationCriterion(CausalRegressionCriterion):

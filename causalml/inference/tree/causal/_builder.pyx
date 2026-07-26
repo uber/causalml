@@ -12,7 +12,7 @@ from libcpp.vector cimport vector
 from libcpp.algorithm cimport pop_heap
 from libcpp.algorithm cimport push_heap
 
-from ._criterion cimport CausalRegressionCriterion
+from .._tree._group_criterion cimport CausalRegressionCriterion
 
 import numpy as np
 cimport numpy as np
