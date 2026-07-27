@@ -623,3 +623,46 @@ def test_causal_tree_node_pvalues_small_group():
     # Actually with only 1 treated sample, root should also be None
     assert model._node_pvalues[0][1] is None
     assert has_none
+
+
+def test_plot_causal_tree_pvalue_nan_handling():
+    """Test that zero-variance nodes (p-value nan) are rendered as N/A."""
+    from causalml.inference.tree.plot import _MPLCTreeExporter
+
+    # Create data where one group has zero variance
+    X = np.array([[1], [2], [3], [4], [5], [6]])
+    treatment = np.array([0, 0, 0, 1, 1, 1])
+    # Control and Treatment both have zero variance and SAME mean
+    # This will result in nan p-value from ttest_ind
+    y = np.array([1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+
+    tree = CausalTreeRegressor(
+        control_name=0,
+        min_samples_leaf=2,
+        node_pvalues=True,
+        groups_cnt=True,
+        random_state=42,
+    )
+    tree.fit(X, treatment, y)
+
+    # In the root node, ttest_ind will return nan because variances are 0.
+    exporter = _MPLCTreeExporter(
+        causal_tree=tree,
+        max_depth=None,
+        feature_names=["X0"],
+        class_names=None,
+        label="all",
+        filled=False,
+        impurity=True,
+        groups_count=True,
+        treatment_groups=(0, 1),
+        node_ids=False,
+        proportion=False,
+        rounded=False,
+        precision=3,
+        fontsize=10,
+        pvalue=True,
+    )
+
+    node_str = exporter.node_to_str(tree.tree_, 0, "causal_mse")
+    assert "p_value(1) = N/A" in node_str

@@ -482,7 +482,7 @@ class _MPLCTreeExporter(_MPLTreeExporter):
         if self.pvalue and self.causal_tree._node_pvalues:
             pvals = self.causal_tree._node_pvalues.get(node_id, {})
             for group, p in pvals.items():
-                if p is not None:
+                if p is not None and not np.isnan(p):
                     node_string += f"p_value({group}) = {p}" + characters[4]
                 else:
                     node_string += f"p_value({group}) = N/A" + characters[4]
@@ -637,6 +637,7 @@ def plot_causal_tree(
         pvalue: bool, default=False
                 When set to ``True``, show the treatment effect p-value at each node.
                 Requires the tree to be fitted with ``node_pvalues=True``.
+                Note: These p-values are descriptive and not valid for inference.
         node_ids: bool, default=False
                 When set to ``True``, show the ID number on each node.
         proportion: bool, default=False

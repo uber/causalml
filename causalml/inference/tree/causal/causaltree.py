@@ -117,7 +117,10 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
                 See :term:`Glossary <random_state>` for details.
             groups_cnt: (bool), count treatment and control groups for each node/leaf
             groups_cnt_mode: (str, 'nodes', 'leaves'), mode for samples counting
-            node_pvalues: (bool), compute treatment effect p-values for each node
+            node_pvalues: (bool), compute treatment effect p-values for each node.
+                Note: These are naive in-sample t-tests and do not account for the tree
+                structure or multiple testing. They should be used for descriptive
+                purposes only and are not valid for post-selection inference.
         """
 
         self.criterion = criterion
@@ -464,6 +467,9 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
     ) -> dict:
         """
         Compute treatment effect p-values for each tree node using Welch's t-test.
+
+        Note: These p-values are descriptive and do not account for the search
+        process used to find the splits (no honesty or multiple-testing correction).
 
         Args:
             X: (np.ndarray), feature matrix
