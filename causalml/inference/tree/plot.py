@@ -340,6 +340,7 @@ class _MPLCTreeExporter(_MPLTreeExporter):
         rounded: bool,
         precision: int,
         fontsize: int,
+        pvalue: bool = False,
     ):
         """
         Causal Tree exporter for matplotlib
@@ -368,6 +369,8 @@ class _MPLCTreeExporter(_MPLTreeExporter):
                 Add the number of treatment and control groups
             treatment_groups: tuple, default=(0, 1)
                     Treatment and control groups labels
+            pvalue: bool, default=False
+                When set to ``True``, show the treatment effect p-value at each node.
             node_ids: bool, default=False
                     When set to ``True``, show the ID number on each node.
             proportion: bool, default=False
@@ -398,6 +401,7 @@ class _MPLCTreeExporter(_MPLTreeExporter):
         self.causal_tree = causal_tree
         self.groups_count = groups_count
         self.treatment_groups = treatment_groups
+        self.pvalue = pvalue
 
     def node_to_str(
         self, tree: _tree.Tree, node_id: int, criterion: Union[str, object]
@@ -472,7 +476,18 @@ class _MPLCTreeExporter(_MPLTreeExporter):
                 node_string += (
                     f"Group {group} = {self.causal_tree._groups_cnt[node_id][group]} "
                 )
-        node_string += characters[4]
+            node_string += characters[4]
+
+        # Write treatment effect p-values
+        if self.pvalue and self.causal_tree._node_pvalues:
+            pvals = self.causal_tree._node_pvalues.get(node_id, {})
+            for group, p in pvals.items():
+                if p is not None:
+                    node_string += f"p_value({group}) = {p}" + characters[4]
+                else:
+                    node_string += f"p_value({group}) = N/A" + characters[4]
+        elif not self.groups_count:
+            node_string += characters[4]
 
         # Write node class distribution / regression value
         if self.proportion and tree.n_classes[0] != 1:
@@ -590,6 +605,7 @@ def plot_causal_tree(
     precision: int = 3,
     ax: plt.Axes = None,
     fontsize: int = None,
+    pvalue: bool = False,
 ):
     """
     Plot a Causal Tree.
@@ -618,6 +634,9 @@ def plot_causal_tree(
                 Add the number of treatment and control groups
         treatment_groups: tuple, default=(0, 1)
                 Treatment and control groups labels
+        pvalue: bool, default=False
+                When set to ``True``, show the treatment effect p-value at each node.
+                Requires the tree to be fitted with ``node_pvalues=True``.
         node_ids: bool, default=False
                 When set to ``True``, show the ID number on each node.
         proportion: bool, default=False
@@ -654,5 +673,6 @@ def plot_causal_tree(
         rounded=rounded,
         precision=precision,
         fontsize=fontsize,
+        pvalue=pvalue,
     )
     exporter.export(causal_tree, ax=ax)

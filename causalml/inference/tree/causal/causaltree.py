@@ -6,7 +6,7 @@ import numpy as np
 from numpy import float32 as DTYPE
 
 from pathos.pools import ProcessPool as PPool
-from scipy.stats import norm
+from scipy.stats import norm, ttest_ind
 from sklearn.base import RegressorMixin
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
@@ -46,6 +46,7 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         random_state: int = None,
         groups_cnt: bool = False,
         groups_cnt_mode: str = "nodes",
+        node_pvalues: bool = False,
     ):
         """
         Initialize a Causal Tree
@@ -116,6 +117,7 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
                 See :term:`Glossary <random_state>` for details.
             groups_cnt: (bool), count treatment and control groups for each node/leaf
             groups_cnt_mode: (str, 'nodes', 'leaves'), mode for samples counting
+            node_pvalues: (bool), compute treatment effect p-values for each node
         """
 
         self.criterion = criterion
@@ -137,8 +139,10 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         self._classes = {}
         self.groups_cnt = groups_cnt
         self.groups_cnt_mode = groups_cnt_mode
+        self.node_pvalues = node_pvalues
         self._with_outcomes = False
         self._groups_cnt = {}
+        self._node_pvalues = {}
 
         super().__init__(
             criterion=criterion,
@@ -184,6 +188,9 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
                 "min_impurity_decrease must be set to -inf for causal_mse criterion"
             )
 
+        # Keep original 1d outcomes for post-fit computations
+        y_orig = y.copy()
+
         if prepare_data:
             X, y = self._prepare_data(X=X, y=y, treatment=treatment)
 
@@ -191,6 +198,10 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
 
         if self.groups_cnt:
             self._groups_cnt = self._count_groups_distribution(X=X, treatment=treatment)
+        if self.node_pvalues:
+            self._node_pvalues = self._compute_node_pvalues(
+                X=X, treatment=treatment, y=y_orig
+            )
         return self
 
     def predict(
@@ -447,3 +458,58 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
                 for node_id in nodes_path:
                     groups_cnt[node_id][treatment[sample_id]] += 1
         return groups_cnt
+
+    def _compute_node_pvalues(
+        self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray
+    ) -> dict:
+        """
+        Compute treatment effect p-values for each tree node using Welch's t-test.
+
+        Args:
+            X: (np.ndarray), feature matrix
+            treatment: (np.ndarray), treatment vector
+            y: (np.ndarray), outcome vector (1d, original outcomes)
+
+        Returns:
+            dict: {node_id: {treatment_group: p_value}} for each node
+        """
+        check_is_fitted(self)
+
+        groups = sorted(set(treatment))
+        control = self.control_name
+        treatments = [g for g in groups if g != control]
+
+        # Collect outcomes per group per node
+        node_outcomes = {
+            idx: {group: [] for group in groups} for idx in range(self.tree_.node_count)
+        }
+
+        node_indicators = self.tree_.decision_path(X.astype(np.float32))
+        for sample_id in range(X.shape[0]):
+            nodes_path = node_indicators.indices[
+                node_indicators.indptr[sample_id] : node_indicators.indptr[
+                    sample_id + 1
+                ]
+            ]
+            group = treatment[sample_id]
+            outcome = y[sample_id]
+            for node_id in nodes_path:
+                node_outcomes[node_id][group].append(outcome)
+
+        # Compute p-values via Welch's t-test (treatment vs control)
+        node_pvalues = {}
+        for node_id in range(self.tree_.node_count):
+            control_outcomes = node_outcomes[node_id][control]
+            pvals = {}
+            for t in treatments:
+                treatment_outcomes = node_outcomes[node_id][t]
+                if len(control_outcomes) >= 2 and len(treatment_outcomes) >= 2:
+                    _, p = ttest_ind(
+                        treatment_outcomes, control_outcomes, equal_var=False
+                    )
+                    pvals[t] = round(float(p), 4)
+                else:
+                    pvals[t] = None
+            node_pvalues[node_id] = pvals
+
+        return node_pvalues

@@ -435,3 +435,191 @@ def test_causal_tree_rejects_inf():
     model = CausalTreeRegressor(criterion="causal_mse", control_name=0)
     with pytest.raises(ValueError, match="infinity"):
         model.fit(X=X, treatment=treatment, y=y)
+
+
+def test_causal_tree_node_pvalues_computed():
+    """Node p-values are computed for each node when node_pvalues=True."""
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 500
+    X = rng.randn(n, 4)
+    treatment = rng.randint(0, 2, n)
+    # Strong treatment effect so p-values should be small
+    y = X[:, 0] + treatment * 2.0 + rng.randn(n) * 0.1
+
+    model = CausalTreeRegressor(
+        control_name=0,
+        groups_cnt=True,
+        node_pvalues=True,
+        max_depth=2,
+        min_samples_leaf=50,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+
+    assert model._node_pvalues
+    # Root node should have a p-value for treatment group 1
+    assert 0 in model._node_pvalues
+    assert 1 in model._node_pvalues[0]
+    # With a strong effect, root p-value should be small
+    assert model._node_pvalues[0][1] < 0.05
+
+
+def test_causal_tree_node_pvalues_not_computed_by_default():
+    """Node p-values are not computed when node_pvalues=False (default)."""
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 200
+    X = rng.randn(n, 4)
+    treatment = rng.randint(0, 2, n)
+    y = rng.randn(n)
+
+    model = CausalTreeRegressor(
+        control_name=0, max_depth=2, min_samples_leaf=50, random_state=RANDOM_SEED
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+
+    assert model._node_pvalues == {}
+
+
+def test_causal_tree_node_pvalues_multi_treatment():
+    """Node p-values are computed per treatment group with multiple treatments."""
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 600
+    X = rng.randn(n, 4)
+    treatment = rng.choice([0, 1, 2], size=n)
+    y = X[:, 0] + (treatment == 1) * 2.0 + (treatment == 2) * 0.01 + rng.randn(n) * 0.1
+
+    model = CausalTreeRegressor(
+        control_name=0,
+        node_pvalues=True,
+        max_depth=2,
+        min_samples_leaf=50,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+
+    # Root node should have p-values for both treatment groups
+    root_pvals = model._node_pvalues[0]
+    assert 1 in root_pvals
+    assert 2 in root_pvals
+    # Treatment 1 has strong effect, treatment 2 does not
+    assert root_pvals[1] < 0.05
+    assert root_pvals[2] > 0.05
+
+
+def test_causal_tree_node_pvalues_no_effect():
+    """When there is no treatment effect, p-values should be large."""
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 400
+    X = rng.randn(n, 4)
+    treatment = rng.randint(0, 2, n)
+    # No treatment effect
+    y = X[:, 0] + rng.randn(n) * 0.5
+
+    model = CausalTreeRegressor(
+        control_name=0,
+        node_pvalues=True,
+        max_depth=2,
+        min_samples_leaf=50,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+
+    # Root p-value should not be significant
+    assert model._node_pvalues[0][1] > 0.05
+
+
+def test_plot_causal_tree_with_pvalue():
+    """plot_causal_tree renders p-value text when pvalue=True."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from causalml.inference.tree.plot import plot_causal_tree
+
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 300
+    X = rng.randn(n, 4)
+    treatment = rng.randint(0, 2, n)
+    y = X[:, 0] + treatment * 2.0 + rng.randn(n) * 0.1
+
+    model = CausalTreeRegressor(
+        control_name=0,
+        groups_cnt=True,
+        node_pvalues=True,
+        max_depth=2,
+        min_samples_leaf=50,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+
+    fig, ax = plt.subplots(figsize=(20, 10))
+    plot_causal_tree(model, ax=ax, pvalue=True)
+
+    # Check that at least one text artist contains "p_value"
+    texts = [t.get_text() for t in ax.texts]
+    all_text = " ".join(texts)
+    assert "p_value" in all_text
+    plt.close(fig)
+
+
+def test_plot_causal_tree_without_pvalue():
+    """plot_causal_tree does not render p-value text when pvalue=False."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from causalml.inference.tree.plot import plot_causal_tree
+
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 300
+    X = rng.randn(n, 4)
+    treatment = rng.randint(0, 2, n)
+    y = X[:, 0] + treatment * 2.0 + rng.randn(n) * 0.1
+
+    model = CausalTreeRegressor(
+        control_name=0,
+        groups_cnt=True,
+        node_pvalues=True,
+        max_depth=2,
+        min_samples_leaf=50,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+
+    fig, ax = plt.subplots(figsize=(20, 10))
+    plot_causal_tree(model, ax=ax, pvalue=False)
+
+    texts = [t.get_text() for t in ax.texts]
+    all_text = " ".join(texts)
+    assert "p_value" not in all_text
+    plt.close(fig)
+
+
+def test_causal_tree_node_pvalues_small_group():
+    """Nodes with fewer than 2 samples in a group get p_value=None."""
+    rng = np.random.RandomState(RANDOM_SEED)
+    # Create data where one leaf will have very few treatment samples
+    n = 100
+    X = rng.randn(n, 2)
+    treatment = np.zeros(n, dtype=int)
+    # Only 1 treated sample
+    treatment[0] = 1
+    y = rng.randn(n)
+
+    model = CausalTreeRegressor(
+        control_name=0,
+        node_pvalues=True,
+        max_depth=1,
+        min_samples_leaf=1,
+        min_samples_split=2,
+        min_group_samples=1,
+        random_state=RANDOM_SEED,
+    )
+    model.fit(X=X, treatment=treatment, y=y)
+
+    # At least one leaf should have None p-value due to insufficient samples
+    has_none = any(pvals.get(1) is None for pvals in model._node_pvalues.values())
+    # Root has all samples so it should have a valid p-value (n_control >= 2, n_treatment = 1)
+    # Actually with only 1 treated sample, root should also be None
+    assert model._node_pvalues[0][1] is None
+    assert has_none
