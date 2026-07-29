@@ -1,0 +1,69 @@
+name: Optional backend tests
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: optional-backends-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.backend }} (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+        backend: [tensorflow, pytorch, jax, jax-pytorch-parity]
+        include:
+          - backend: tensorflow
+            extras: tf
+            test-path: tests/
+            marker: tf
+            pytest-flags: --runtf
+          - backend: pytorch
+            extras: torch
+            test-path: tests/
+            marker: torch and not jax
+            pytest-flags: --runtorch
+          - backend: jax
+            extras: jax
+            test-path: tests/
+            marker: jax and not torch
+            pytest-flags: --runjax
+          - backend: jax-pytorch-parity
+            extras: torch,jax
+            test-path: tests/test_jax_cevae.py
+            marker: jax and torch
+            pytest-flags: --runjax --runtorch
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Upgrade packaging tools
+        run: python -m pip install --upgrade pip setuptools
+      - name: Install CPU-only PyTorch
+        if: contains(matrix.extras, 'torch')
+        run: python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+      - name: Install dependencies
+        run: python -m pip install -e ".[test,${{ matrix.extras }}]"
+      - name: Run ${{ matrix.backend }} tests
+        env:
+          OMP_NUM_THREADS: "1"
+        run: >-
+          python -m pytest -vs ${{ matrix.test-path }}
+          -m "${{ matrix.marker }}"
+          ${{ matrix.pytest-flags }}
