@@ -24,11 +24,7 @@ import numpy as np
 import pytest
 from sklearn.linear_model import LinearRegression
 
-from causalml.inference._arg_order import (
-    SHIMMED_METHODS,
-    _positional_params,
-    v1_order,
-)
+from causalml.inference._arg_order import _positional_params, v1_order
 from causalml.inference.iv import BaseDRIVRegressor, IVRegressor
 from causalml.inference.meta import (
     BaseSRegressor,
@@ -42,7 +38,8 @@ from causalml.inference.meta import (
     BaseXClassifier,
     BaseRClassifier,
 )
-from causalml.inference.tree import CausalTreeRegressor
+from causalml.inference.tree import CausalTreeRegressor, UpliftTreeClassifier
+from causalml.metrics.sensitivity import Sensitivity
 
 from .const import RANDOM_SEED
 
@@ -168,8 +165,21 @@ def test_fit_signature_is_preserved(learner_cls):
             ["X", "assignment", "treatment", "y", "p", "pZ"],
             ["X", "y", "treatment", "assignment", "p", "pZ"],
         ),
+        # UpliftTreeClassifier: the validation triple is reordered in place too,
+        # so it stays consistent with the main one (#980 open question 1).
+        (
+            ["X", "treatment", "y", "X_val", "treatment_val", "y_val", "sample_weight"],
+            ["X", "y", "treatment", "X_val", "y_val", "treatment_val", "sample_weight"],
+        ),
+        # Sensitivity helpers are in scope, and `p` shifts right (#980 q2).
+        (["X", "p", "treatment", "y"], ["X", "y", "treatment", "p"]),
         # A signature with neither is left completely alone.
         (["X", "sample_weight"], ["X", "sample_weight"]),
+        # Only `y`, no `treatment`: not this deprecation, so untouched. Keeps the
+        # rule off the vendored sklearn tree builders, where hoisting `y` would
+        # put it ahead of `X`.
+        (["tree", "X", "y", "sample_weight"], ["tree", "X", "y", "sample_weight"]),
+        (["X", "w", "y", "initial_taus"], ["X", "w", "y", "initial_taus"]),
     ],
 )
 def test_v1_order(current, expected):
@@ -181,7 +191,13 @@ def test_v1_order(current, expected):
 
 
 def _shimmable_methods():
-    """Yield (qualname, method) for every learner method taking treatment and y.
+    """Yield (qualname, method) for every public method whose order changes at v1.0.
+
+    Scans by **signature**, not by method name. An earlier name-based allowlist
+    silently missed eleven public methods (#981) — `bootstrap`,
+    `fit_bootstrap_ensemble`, `bootstrap_pool`, `prune`, `fill` and the three
+    `Sensitivity.get_*` helpers — so this guard must not be narrowed back to a
+    fixed set of names.
 
     Walks the installed package so a newly added learner is picked up
     automatically. Modules whose optional backend (tf/torch/jax) is missing are
@@ -197,23 +213,28 @@ def _shimmable_methods():
         for _, cls in inspect.getmembers(module, inspect.isclass):
             if not cls.__module__.startswith("causalml."):
                 continue
-            for name in SHIMMED_METHODS:
-                method = cls.__dict__.get(name)
-                if not callable(method) or getattr(
-                    method, "__isabstractmethod__", False
+            for name, method in vars(cls).items():
+                if (
+                    name.startswith("_")
+                    or isinstance(method, (classmethod, staticmethod))
+                    or not callable(method)
+                    or getattr(method, "__isabstractmethod__", False)
                 ):
                     continue
-                params = _positional_params(getattr(method, "__wrapped__", method))
-                if "treatment" in params and "y" in params:
+                try:
+                    params = _positional_params(getattr(method, "__wrapped__", method))
+                except (TypeError, ValueError):  # not introspectable
+                    continue
+                if v1_order(params) != params:
                     yield f"{cls.__module__}.{cls.__qualname__}.{name}", method
 
 
-def test_every_treatment_y_method_is_shimmed():
+def test_every_reordered_method_is_shimmed():
     """Completeness guard for the deprecation window.
 
     A deprecation window is one-shot: anything whose positional order changes at
-    v1.0 must warn in this release or it needs a second cycle. This fails if a
-    learner method takes ``treatment`` and ``y`` positionally without the shim.
+    v1.0 must warn in this release or it needs a second cycle. This fails if any
+    public method's order would change without the shim.
     """
     unshimmed = [
         qualname
@@ -221,6 +242,12 @@ def test_every_treatment_y_method_is_shimmed():
         if not getattr(method, "_arg_order_shimmed", False)
     ]
     assert unshimmed == [], f"missing #854 shim on: {unshimmed}"
+
+
+def test_shim_reaches_past_the_fit_family():
+    """#981: the shim must not regress to a fixed list of method names."""
+    names = {qualname.rsplit(".", 1)[1] for qualname, _ in _shimmable_methods()}
+    assert {"bootstrap", "fit_bootstrap_ensemble", "get_prediction"} <= names, names
 
 
 def test_shim_covers_more_than_the_meta_learners():
@@ -310,3 +337,45 @@ def test_classifier_fit_is_shimmed(learner_cls):
     """The classifier variants define their own fit, so each is wrapped separately."""
     assert getattr(learner_cls.fit, "_arg_order_shimmed", False)
     assert _positional_params(learner_cls.fit)[:3] == ["X", "treatment", "y"]
+
+
+# --- #981: coverage beyond the fit family -----------------------------------
+
+
+def test_bootstrap_warns_positionally(generate_regression_data):
+    """`bootstrap` is public API on the most-used learners and changes at v1.0."""
+    y, X, treatment, _, _, _ = generate_regression_data()
+    learner = BaseTRegressor(learner=LinearRegression())
+    learner.fit(X=X, y=y, treatment=treatment)
+    with pytest.warns(FutureWarning, match="argument order"):
+        learner.bootstrap(X, treatment, y, None, 200)
+
+
+def test_sensitivity_get_prediction_message_moves_p_right():
+    """Sensitivity takes (X, p, treatment, y) — a third shape (#980 q2)."""
+    params = _positional_params(Sensitivity.get_prediction.__wrapped__)
+    assert params == ["X", "p", "treatment", "y"]
+    assert v1_order(params) == ["X", "y", "treatment", "p"]
+
+
+def test_uplift_tree_validation_triple_is_reordered():
+    """#980 q1: X_val/y_val/treatment_val stays consistent with the main triple."""
+    params = _positional_params(UpliftTreeClassifier.fit.__wrapped__)
+    assert v1_order(params) == [
+        "X",
+        "y",
+        "treatment",
+        "X_val",
+        "y_val",
+        "treatment_val",
+        "sample_weight",
+        "check_input",
+    ]
+
+
+def test_timeit_preserves_signature():
+    """`bootstrap_pool` is behind @timeit; without functools.wraps its signature
+    reads (*args, **kw), which hid it from the signature-based shim."""
+    assert CausalTreeRegressor.bootstrap_pool.__name__ == "bootstrap_pool"
+    params = _positional_params(CausalTreeRegressor.bootstrap_pool.__wrapped__)
+    assert params[:3] == ["X", "treatment", "y"]

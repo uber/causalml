@@ -4,6 +4,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from importlib import import_module
 
+from causalml.inference._arg_order import shim_arg_order
+
 logger = logging.getLogger("sensitivity")
 
 SUMMARY_COLS = ["Method", "ATE", "New ATE", "New ATE LB", "New ATE UB"]
@@ -95,6 +97,7 @@ def msm_propensity_bounds(p, gamma):
     return p_lower, p_upper
 
 
+@shim_arg_order
 class Sensitivity:
     """A Sensitivity Check class to support Placebo Treatment, Irrelevant Additional Confounder
     and Subset validation refutation methods to verify causal inference.
