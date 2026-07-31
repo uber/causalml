@@ -135,8 +135,8 @@ def _parallel_build_trees(
 
         tree.fit(
             X,
-            treatment,
-            y,
+            y=y,
+            treatment=treatment,
             sample_weight=curr_sample_weight,
             check_input=True,
             prepare_data=False,
@@ -144,8 +144,8 @@ def _parallel_build_trees(
     else:
         tree.fit(
             X,
-            treatment,
-            y,
+            y=y,
+            treatment=treatment,
             sample_weight=sample_weight,
             check_input=True,
             prepare_data=False,

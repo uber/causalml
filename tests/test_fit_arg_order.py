@@ -38,10 +38,15 @@ from causalml.inference.meta import (
     BaseXClassifier,
     BaseRClassifier,
 )
-from causalml.inference.tree import CausalTreeRegressor, UpliftTreeClassifier
+from causalml.inference.tree import (
+    CausalRandomForestRegressor,
+    CausalTreeRegressor,
+    UpliftRandomForestClassifier,
+    UpliftTreeClassifier,
+)
 from causalml.metrics.sensitivity import Sensitivity
 
-from .const import RANDOM_SEED
+from .const import RANDOM_SEED, CONTROL_NAME, CONVERSION, TREATMENT_NAMES
 
 # One representative regressor per meta-learner family; all default to
 # ``control_name=0`` which matches the 0/1 treatment from ``synthetic_data``.
@@ -371,6 +376,59 @@ def test_uplift_tree_validation_triple_is_reordered():
         "sample_weight",
         "check_input",
     ]
+
+
+# --- the library's own internal calls must not warn the caller --------------
+
+
+def _arg_order_warnings(record):
+    """The shim's warnings only — not unrelated FutureWarnings from deps."""
+    return [
+        w
+        for w in record
+        if issubclass(w.category, FutureWarning) and "argument order" in str(w.message)
+    ]
+
+
+def test_causal_forest_keyword_fit_does_not_warn(generate_regression_data):
+    """A forest fits each of its trees internally, and that must stay invisible.
+
+    The shim's re-entrancy guard (``_in_arg_order_call``) is stored on the
+    instance, so it does not span the forest -> tree hop: the flag is set on the
+    forest while the warning fires on each tree. Until the internal calls were
+    made keyword, an all-keyword ``fit`` emitted one FutureWarning per tree
+    (default ``n_estimators=100``) telling the caller to do what they had
+    already done, with no way to silence it.
+    """
+    y, X, treatment, _, _, _ = generate_regression_data()
+    forest = CausalRandomForestRegressor(n_estimators=3, random_state=RANDOM_SEED)
+
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        forest.fit(X=X, y=y, treatment=treatment)
+
+    assert _arg_order_warnings(record) == []
+
+
+def test_uplift_forest_keyword_fit_does_not_warn(generate_classification_data):
+    """Same forest -> tree hop in the uplift ensemble (default n_estimators=10)."""
+    df, x_names = generate_classification_data()
+    forest = UpliftRandomForestClassifier(
+        n_estimators=3,
+        min_samples_leaf=50,
+        control_name=CONTROL_NAME,
+        random_state=RANDOM_SEED,
+    )
+
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        forest.fit(
+            X=df[x_names].values,
+            y=df[CONVERSION].values,
+            treatment=df["treatment_group_key"].values,
+        )
+
+    assert _arg_order_warnings(record) == []
 
 
 def test_timeit_preserves_signature():

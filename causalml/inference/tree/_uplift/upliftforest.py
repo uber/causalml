@@ -70,7 +70,7 @@ def _parallel_build_tree(tree, X, treatment, y, control_name, sample_weight):
     if control_name not in groups or len(groups) < 2:
         return None
     sw = None if sample_weight is None else sample_weight[idx]
-    tree.fit(X[idx], t_sub, y[idx], sample_weight=sw, check_input=True)
+    tree.fit(X[idx], y=y[idx], treatment=t_sub, sample_weight=sw, check_input=True)
     return tree
 
 
