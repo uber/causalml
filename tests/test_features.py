@@ -38,8 +38,29 @@ def test_load_data_all_numeric_features():
 
     features = load_data(df, df.columns)
 
+    assert isinstance(features, np.ndarray) and not isinstance(features, np.matrix)
     assert features.shape == (3, 2)
     np.testing.assert_array_equal(features, df.values)
+
+
+def test_load_data_categorical_column_that_encodes_to_nothing():
+    # A single-valued categorical column maps entirely to label 0, which
+    # _transform_col drops, so the encoder produces nothing and used to assert.
+    df = pd.DataFrame({"const_cat": ["x"] * 7, "num1": [1, 2, 1, 2, 1, 1, 1]})
+
+    features = load_data(df, ["const_cat", "num1"])
+
+    assert isinstance(features, np.ndarray) and not isinstance(features, np.matrix)
+    assert features.shape == (7, 1)
+    np.testing.assert_array_equal(features, df[["num1"]].values)
+
+
+def test_load_data_returns_ndarray_with_categorical_features(generate_categorical_data):
+    df = generate_categorical_data()
+
+    features = load_data(df, df.columns)
+
+    assert isinstance(features, np.ndarray) and not isinstance(features, np.matrix)
 
 
 def test_LabelEncoder(generate_categorical_data):
