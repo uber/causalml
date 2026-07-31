@@ -24,6 +24,7 @@ from flax import nnx
 import optax
 
 from causalml.inference.meta.utils import convert_pd_to_np
+from causalml.inference._arg_order import shim_arg_order
 from causalml.inference.jax.cevae.losses import cevae_loss
 from causalml.inference.jax.cevae.modeling import Guide, Model, PreWhitener
 
@@ -80,6 +81,7 @@ def _make_train_step(loss_fn):
     return train_step
 
 
+@shim_arg_order
 class CEVAE:
     """JAX/flax.nnx CEVAE for treatment-effect estimation.
 

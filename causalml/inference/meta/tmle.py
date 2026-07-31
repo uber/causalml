@@ -11,6 +11,7 @@ from causalml.inference.meta.utils import (
     check_p_conditions,
     convert_pd_to_np,
 )
+from causalml.inference._arg_order import shim_arg_order
 
 logger = logging.getLogger("causalml")
 
@@ -91,6 +92,7 @@ def simple_tmle(y, w, q0w, q1w, p, alpha=0.0001):
     return np.mean(q1star - q0star), np.sqrt(np.var(ic) / np.size(y))
 
 
+@shim_arg_order
 class TMLELearner:
     """Targeted maximum likelihood estimation.
 

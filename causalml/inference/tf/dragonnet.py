@@ -33,8 +33,10 @@ from causalml.inference.tf.utils import (
     make_tarreg_loss,
 )
 from causalml.inference.meta.utils import convert_pd_to_np
+from causalml.inference._arg_order import shim_arg_order
 
 
+@shim_arg_order
 class DragonNet:
     def __init__(
         self,

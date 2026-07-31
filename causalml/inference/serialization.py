@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 
 import joblib
 
+from causalml.inference._arg_order import shim_arg_order
+
 logger = logging.getLogger("causalml")
 
 
@@ -43,6 +45,17 @@ class SerializableLearner:
     Subclasses should override _is_fitted() if the default sklearn-based
     check does not apply (e.g. for non-sklearn learners).
     """
+
+    def __init_subclass__(cls, **kwargs):
+        """Apply the #854 argument-order shim to each subclass.
+
+        Hosting this on the shared mixin rather than on a single learner base
+        covers the meta-learners, the causal/uplift trees and forests, and the
+        IV learners in one place. See :func:`~causalml.inference._arg_order.
+        shim_arg_order` for what gets wrapped.
+        """
+        super().__init_subclass__(**kwargs)
+        shim_arg_order(cls)
 
     def _is_fitted(self):
         """Check whether this learner has been fitted.

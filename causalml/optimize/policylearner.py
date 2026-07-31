@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 from causalml.propensity import compute_propensity_score
+from causalml.inference._arg_order import shim_arg_order
 from sklearn.ensemble import GradientBoostingRegressor, GradientBoostingClassifier
 from sklearn.model_selection import KFold
 from sklearn.tree import DecisionTreeClassifier
@@ -9,6 +10,7 @@ from sklearn.tree import DecisionTreeClassifier
 logger = logging.getLogger("causalml")
 
 
+@shim_arg_order
 class PolicyLearner:
     """
     A Learner that learns a treatment assignment policy with observational data using doubly robust estimator of causal

@@ -27,6 +27,7 @@ import torch
 from pyro.contrib.cevae import CEVAE as CEVAEModel
 
 from causalml.inference.meta.utils import convert_pd_to_np
+from causalml.inference._arg_order import shim_arg_order
 
 pyro_logger = logging.getLogger("pyro")
 pyro_logger.setLevel(logging.DEBUG)
@@ -34,6 +35,7 @@ if pyro_logger.handlers:
     pyro_logger.handlers[0].setLevel(logging.DEBUG)
 
 
+@shim_arg_order
 class CEVAE:
     def __init__(
         self,

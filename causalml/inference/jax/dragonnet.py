@@ -25,6 +25,7 @@ from causalml.inference.jax.utils import (
     make_tarreg_loss,
 )
 from causalml.inference.meta.utils import convert_pd_to_np
+from causalml.inference._arg_order import shim_arg_order
 
 
 class EpsilonLayer(nnx.Module):
@@ -278,6 +279,7 @@ def _run_training_loop(
             break
 
 
+@shim_arg_order
 class DragonNet:
     """JAX/flax.nnx DragonNet for treatment effect estimation.
 
