@@ -2,6 +2,7 @@
 Utility functions for uplift trees.
 """
 
+import functools
 import time
 from typing import Callable
 
@@ -342,6 +343,7 @@ def timeit(exclude_kwargs: tuple = ()) -> Callable:
     """
 
     def wrapper(f: Callable):
+        @functools.wraps(f)
         def wrapped(*args, **kw):
             ts = time.time()
             result = f(*args, **kw)
