@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import pytest
 from causalml.features import OneHotEncoder, LabelEncoder, load_data
@@ -28,6 +29,17 @@ def test_load_data(generate_categorical_data):
     features = load_data(df, df.columns)
 
     assert df.shape[0] == features.shape[0]
+
+
+def test_load_data_all_numeric_features():
+    # OneHotEncoder asserts when nothing is categorical, so load_data used to
+    # raise instead of returning the numeric columns unchanged.
+    df = pd.DataFrame({"a": [1.0, 2.0, 3.0], "b": [4, 5, 6]})
+
+    features = load_data(df, df.columns)
+
+    assert features.shape == (3, 2)
+    np.testing.assert_array_equal(features, df.values)
 
 
 def test_LabelEncoder(generate_categorical_data):

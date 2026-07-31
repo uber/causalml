@@ -258,10 +258,16 @@ def load_data(data, features, transformations={}):
     cat_cols = [col for col in features if not pd.api.types.is_numeric_dtype(df[col])]
     num_cols = [col for col in features if col not in cat_cols]
 
-    logger.info("Applying one-hot-encoding to {}".format(cat_cols))
-    ohe = OneHotEncoder(min_obs=df.shape[0] * 0.001)
-    X_cat = ohe.fit_transform(df[cat_cols]).todense()
+    if cat_cols:
+        logger.info("Applying one-hot-encoding to {}".format(cat_cols))
+        ohe = OneHotEncoder(min_obs=df.shape[0] * 0.001)
+        X_cat = ohe.fit_transform(df[cat_cols]).todense()
 
-    X = np.hstack([df[num_cols].values, X_cat])
+        X = np.hstack([df[num_cols].values, X_cat])
+    else:
+        # OneHotEncoder asserts that at least one column was transformed, so
+        # skip it entirely when every feature is already numeric.
+        logger.info("No categorical features to one-hot-encode")
+        X = df[num_cols].values
 
     return X
