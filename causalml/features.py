@@ -263,13 +263,19 @@ def load_data(data, features, transformations={}):
         logger.info("Applying one-hot-encoding to {}".format(cat_cols))
         ohe = OneHotEncoder(min_obs=df.shape[0] * 0.001)
         try:
-            X_cat = ohe.fit_transform(df[cat_cols]).toarray()
+            X_cat = ohe.fit_transform(df[cat_cols])
         except AssertionError:
             # OneHotEncoder asserts when no column produced a non-empty
-            # encoding. That happens when every categorical column holds a
-            # single value, or when all of their levels fall below min_obs,
-            # so there is nothing to append.
+            # encoding: every categorical column holds a single value, or all
+            # of their levels fall below min_obs. Under python -O that
+            # assertion is stripped and transform returns None instead of
+            # raising, so both outcomes end up here.
+            X_cat = None
+
+        if X_cat is None:
             logger.info("No categorical column produced an encoding")
+        else:
+            X_cat = X_cat.toarray()
 
     if X_cat is None:
         X = df[num_cols].values

@@ -55,6 +55,20 @@ def test_load_data_categorical_column_that_encodes_to_nothing():
     np.testing.assert_array_equal(features, df[["num1"]].values)
 
 
+def test_load_data_when_transform_returns_none(monkeypatch):
+    # Under python -O the assertion inside OneHotEncoder.transform is stripped
+    # and it returns None rather than raising, so load_data has to handle the
+    # value as well as the exception.
+    monkeypatch.setattr(OneHotEncoder, "fit_transform", lambda self, X, y=None: None)
+    df = pd.DataFrame({"const_cat": ["x"] * 7, "num1": [1, 2, 1, 2, 1, 1, 1]})
+
+    features = load_data(df, ["const_cat", "num1"])
+
+    assert isinstance(features, np.ndarray) and not isinstance(features, np.matrix)
+    assert features.shape == (7, 1)
+    np.testing.assert_array_equal(features, df[["num1"]].values)
+
+
 def test_load_data_returns_ndarray_with_categorical_features(generate_categorical_data):
     df = generate_categorical_data()
 
