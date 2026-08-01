@@ -43,7 +43,7 @@ jobs:
             pytest-flags: --runjax
           - backend: jax-pytorch-parity
             extras: torch,jax
-            test-path: tests/test_jax_cevae.py
+            test-path: tests/
             marker: jax and torch
             pytest-flags: --runjax --runtorch
 
