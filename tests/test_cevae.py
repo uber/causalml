@@ -10,11 +10,13 @@ except ImportError:
 from causalml.dataset import simulate_hidden_confounder
 from causalml.metrics import get_cumgain
 
+from .const import RANDOM_SEED
+
 
 @pytest.mark.torch
 def test_CEVAE():
-    np.random.seed(0)
-    torch.manual_seed(0)
+    np.random.seed(RANDOM_SEED)
+    torch.manual_seed(RANDOM_SEED)
     y, X, treatment, tau, _, _ = simulate_hidden_confounder(
         n=2000, p=5, sigma=1.0, adj=0.0
     )
