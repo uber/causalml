@@ -12,8 +12,8 @@ Meta-Learner Feature Importances
     from causalml.inference.meta import BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor
 
     slearner = BaseSRegressor(LGBMRegressor(), control_name='control')
-    slearner.estimate_ate(X, w_multi, y)
-    slearner_tau = slearner.fit_predict(X, w_multi, y)
+    slearner.estimate_ate(X=X, treatment=w_multi, y=y)
+    slearner_tau = slearner.fit_predict(X=X, treatment=w_multi, y=y)
 
     model_tau_feature = RandomForestRegressor()  # specify model for model_tau_feature
 
