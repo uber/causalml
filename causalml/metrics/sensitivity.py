@@ -331,7 +331,7 @@ class Sensitivity:
         treatment = self.df[self.treatment_col].values
         y = self.df[self.outcome_col].values
 
-        preds = self.get_prediction(X, p, treatment=treatment, y=y)
+        preds = self.get_prediction(X=X, p=p, treatment=treatment, y=y)
         ate = preds.mean()
         ate_new, ate_new_lower, ate_new_upper = self.sensitivity_estimate()
 
@@ -366,7 +366,7 @@ class SensitivityPlaceboTreatment(Sensitivity):
         y = self.df[self.outcome_col].values
 
         ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(
-            X, p, treatment=treatment_new, y=y
+            X=X, p=p, treatment=treatment_new, y=y
         )
         return ate_new, ate_new_lower, ate_new_upper
 
@@ -388,7 +388,7 @@ class SensitivityRandomCause(Sensitivity):
         X_new = np.hstack((X, new_data.reshape((-1, 1))))
 
         ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(
-            X_new, p, treatment=treatment, y=y
+            X=X_new, p=p, treatment=treatment, y=y
         )
         return ate_new, ate_new_lower, ate_new_upper
 
@@ -422,7 +422,7 @@ class SensitivityRandomReplace(Sensitivity):
         y_new = df_new[self.outcome_col].values
 
         ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(
-            X_new, p_new, treatment=treatment_new, y=y_new
+            X=X_new, p=p_new, treatment=treatment_new, y=y_new
         )
         return ate_new, ate_new_lower, ate_new_upper
 
@@ -444,7 +444,7 @@ class SensitivitySubsetData(Sensitivity):
         y_new = df_new[self.outcome_col].values
 
         ate_new, ate_new_lower, ate_new_upper = self.get_ate_ci(
-            X_new, p_new, treatment=treatment_new, y=y_new
+            X=X_new, p=p_new, treatment=treatment_new, y=y_new
         )
         return ate_new, ate_new_lower, ate_new_upper
 
@@ -521,7 +521,7 @@ class SensitivitySelectionBias(Sensitivity):
         treatment = df[self.treatment_col].values
         y = df[self.outcome_col].values
 
-        preds = self.get_prediction(X, p, treatment=treatment, y=y)
+        preds = self.get_prediction(X=X, p=p, treatment=treatment, y=y)
 
         sens_df = pd.DataFrame()
 
@@ -529,9 +529,9 @@ class SensitivitySelectionBias(Sensitivity):
         for a in alpha_range:
             adj = confound(a, p, treatment)
             preds_adj = y - adj
-            s_preds = self.get_prediction(X, p, treatment=treatment, y=preds_adj)
+            s_preds = self.get_prediction(X=X, p=p, treatment=treatment, y=preds_adj)
             ate, ate_lb, ate_ub = self.get_ate_ci(
-                X, p, treatment=treatment, y=preds_adj
+                X=X, p=p, treatment=treatment, y=preds_adj
             )
 
             s_preds_residul = preds_adj - s_preds
@@ -548,7 +548,7 @@ class SensitivitySelectionBias(Sensitivity):
         for feature in self.sensitivity_features:
             df_new = df.copy()
             X_new = df_new[self.inference_features].drop(feature, axis=1).copy()
-            y_new_preds = self.get_prediction(X_new, p, treatment=treatment, y=y)
+            y_new_preds = self.get_prediction(X=X_new, p=p, treatment=treatment, y=y)
             rss_new = np.sum(np.square(y - y_new_preds))
             partial_rsqs.append(((rss_new - rss) / rss))
 
@@ -802,7 +802,7 @@ class SensitivityMSM(Sensitivity):
 
         # Fit once — mu1_hat/mu0_hat don't depend on gamma.
         mu1_hat, mu0_hat = self.get_potential_outcome_predictions(
-            X, p, treatment=treatment_raw, y=y
+            X=X, p=p, treatment=treatment_raw, y=y
         )
 
         rows = []
