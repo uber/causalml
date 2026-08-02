@@ -77,7 +77,7 @@ def test_kernel_uplift_zero_divergence_root_still_splits():
         min_samples_leaf=100,
         random_state=RANDOM_SEED,
     )
-    kern.fit(X, treatment, y)
+    kern.fit(X=X, treatment=treatment, y=y)
     assert kern.tree_.node_count > 1  # root actually split
 
 
@@ -103,7 +103,7 @@ def test_kernel_uplift_min_samples_treatment_gates_splits():
         n_reg=0,
         random_state=RANDOM_SEED,
     )
-    gated.fit(X, treatment, y)
+    gated.fit(X=X, treatment=treatment, y=y)
     assert gated.tree_.node_count == 1
 
     ungated = _KernelUpliftTreeClassifier(
@@ -115,7 +115,7 @@ def test_kernel_uplift_min_samples_treatment_gates_splits():
         n_reg=0,
         random_state=RANDOM_SEED,
     )
-    ungated.fit(X, treatment, y)
+    ungated.fit(X=X, treatment=treatment, y=y)
     assert ungated.tree_.node_count > 1
 
 
@@ -143,7 +143,7 @@ def test_kernel_uplift_two_class_guard_rejects_multi_treatment(criterion):
         random_state=RANDOM_SEED,
     )
     with pytest.raises(ValueError, match="two-class"):
-        kern.fit(X, treatment, y)
+        kern.fit(X=X, treatment=treatment, y=y)
 
 
 # --- Honest approach + IDDP (issue #950) -------------------------------------
@@ -171,8 +171,12 @@ def test_kernel_uplift_honesty_changes_leaves():
         estimation_sample_size=0.5,
         random_state=RANDOM_SEED,
     )
-    honest = _KernelUpliftTreeClassifier(honesty=True, **common).fit(X, treatment, y)
-    plain = _KernelUpliftTreeClassifier(honesty=False, **common).fit(X, treatment, y)
+    honest = _KernelUpliftTreeClassifier(honesty=True, **common).fit(
+        X=X, treatment=treatment, y=y
+    )
+    plain = _KernelUpliftTreeClassifier(honesty=False, **common).fit(
+        X=X, treatment=treatment, y=y
+    )
     assert not np.allclose(
         honest.predict_proba_by_group(X), plain.predict_proba_by_group(X)
     )
@@ -188,8 +192,12 @@ def test_kernel_uplift_iddp_forces_honesty():
         min_samples_leaf=100,
         random_state=RANDOM_SEED,
     )
-    forced = _KernelUpliftTreeClassifier(honesty=False, **common).fit(X, treatment, y)
-    explicit = _KernelUpliftTreeClassifier(honesty=True, **common).fit(X, treatment, y)
+    forced = _KernelUpliftTreeClassifier(honesty=False, **common).fit(
+        X=X, treatment=treatment, y=y
+    )
+    explicit = _KernelUpliftTreeClassifier(honesty=True, **common).fit(
+        X=X, treatment=treatment, y=y
+    )
     # honesty=False is forced onto the honest path in fit, matching honesty=True,
     # while the constructor keeps the argument verbatim (sklearn clone/get_params).
     assert forced.get_params()["honesty"] is False
@@ -216,7 +224,7 @@ def test_kernel_uplift_iddp_guard_rejects_multi_treatment():
         random_state=RANDOM_SEED,
     )
     with pytest.raises(ValueError, match="two-class"):
-        kern.fit(X, treatment, y)
+        kern.fit(X=X, treatment=treatment, y=y)
 
 
 # ---------------------------------------------------------------------------
@@ -264,9 +272,9 @@ def test_kernel_uplift_tree_visualization(honesty):
         random_state=RANDOM_SEED,
     )
     model.fit(
-        df[x_names].values,
-        df["treatment_group_key"].values,
-        df["conversion"].values,
+        X=df[x_names].values,
+        treatment=df["treatment_group_key"].values,
+        y=df["conversion"].values,
     )
     root = model.fitted_uplift_tree
 
@@ -293,9 +301,9 @@ def test_kernel_uplift_tree_plot_multi_treatment():
         random_state=RANDOM_SEED,
     )
     model.fit(
-        df[x_names].values,
-        df["treatment_group_key"].values,
-        df["conversion"].values,
+        X=df[x_names].values,
+        treatment=df["treatment_group_key"].values,
+        y=df["conversion"].values,
     )
     root = model.fitted_uplift_tree
 
@@ -348,7 +356,7 @@ def _fit_prunable_tree(X, treatment, y, max_depth=4):
         normalization=False,
         random_state=RANDOM_SEED,
     )
-    kern.fit(X, treatment, y)
+    kern.fit(X=X, treatment=treatment, y=y)
     return kern
 
 
@@ -371,7 +379,7 @@ def test_kernel_uplift_prune_reduces_and_stays_compact(rule):
     Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
     kern = _fit_prunable_tree(X, t, y)
     before = kern.tree_.node_count
-    kern.prune(Xv, tv, yv, minGain=0.005, rule=rule)
+    kern.prune(X=Xv, treatment=tv, y=yv, minGain=0.005, rule=rule)
     after = kern.tree_.node_count
 
     assert after < before  # pruning removed nodes
@@ -386,11 +394,11 @@ def test_kernel_uplift_prune_idempotent(rule):
     X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
     Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
     kern = _fit_prunable_tree(X, t, y)
-    kern.prune(Xv, tv, yv, minGain=0.005, rule=rule)
+    kern.prune(X=Xv, treatment=tv, y=yv, minGain=0.005, rule=rule)
     once = kern.tree_.node_count
     proba_once = kern.predict_proba_by_group(X)
 
-    kern.prune(Xv, tv, yv, minGain=0.005, rule=rule)
+    kern.prune(X=Xv, treatment=tv, y=yv, minGain=0.005, rule=rule)
     assert kern.tree_.node_count == once
     assert_array_almost_equal(kern.predict_proba_by_group(X), proba_once, decimal=12)
 
@@ -402,7 +410,7 @@ def test_kernel_uplift_prune_mingain_monotonic(rule):
     counts = []
     for min_gain in (0.0, 0.001, 0.01, 0.05, 0.2):
         kern = _fit_prunable_tree(X, t, y)
-        kern.prune(Xv, tv, yv, minGain=min_gain, rule=rule)
+        kern.prune(X=Xv, treatment=tv, y=yv, minGain=min_gain, rule=rule)
         counts.append(kern.tree_.node_count)
     # Higher minGain prunes at least as aggressively.
     assert all(a >= b for a, b in zip(counts, counts[1:]))
@@ -414,7 +422,7 @@ def test_kernel_uplift_prune_keeps_generalizing_split(rule):
     X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
     Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
     kern = _fit_prunable_tree(X, t, y)
-    kern.prune(Xv, tv, yv, minGain=0.05, rule=rule)
+    kern.prune(X=Xv, treatment=tv, y=yv, minGain=0.05, rule=rule)
 
     # Collapses to the single feature-0 split: root + two leaves.
     assert kern.tree_.node_count == 3
@@ -430,7 +438,7 @@ def test_kernel_uplift_prune_predictions_valid(rule):
     X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
     Xv, tv, yv = _make_prune_signal_data(seed=RANDOM_SEED + 1)
     kern = _fit_prunable_tree(X, t, y)
-    kern.prune(Xv, tv, yv, minGain=0.01, rule=rule)
+    kern.prune(X=Xv, treatment=tv, y=yv, minGain=0.01, rule=rule)
 
     proba = kern.predict_proba_by_group(X)
     assert proba.shape == (X.shape[0], kern.n_outputs_)
@@ -442,7 +450,7 @@ def test_kernel_uplift_prune_invalid_rule_raises():
     X, t, y = _make_prune_signal_data(seed=RANDOM_SEED)
     kern = _fit_prunable_tree(X, t, y)
     with pytest.raises(ValueError, match="maxAbsDiff"):
-        kern.prune(X, t, y, rule="bogus")
+        kern.prune(X=X, treatment=t, y=y, rule="bogus")
 
 
 # ---------------------------------------------------------------------------
@@ -476,7 +484,7 @@ def test_kernel_uplift_forest_predict_shape_with_sparse_groups():
         random_state=RANDOM_SEED,
         n_jobs=2,
     )
-    model.fit(X, treatment, y)
+    model.fit(X=X, treatment=treatment, y=y)
 
     # At least one surviving tree missed a group (the condition _align handles).
     assert any(len(t.classes_) < len(model.classes_) for t in model.estimators_)
@@ -512,9 +520,9 @@ def test_kernel_uplift_forest_backend_determinism_and_auuc(
             joblib_prefer=joblib_prefer,
         )
         model.fit(
-            df_train[x_names].values,
-            df_train["treatment_group_key"].values,
-            df_train[CONVERSION].values,
+            X=df_train[x_names].values,
+            treatment=df_train["treatment_group_key"].values,
+            y=df_train[CONVERSION].values,
         )
 
         predictions = {"single": model.predict(df_test[x_names].values)}
@@ -568,7 +576,7 @@ def test_kernel_uplift_forest_full_output():
         min_samples_leaf=100,
         random_state=RANDOM_SEED,
     )
-    model.fit(X, treatment, y)
+    model.fit(X=X, treatment=treatment, y=y)
 
     delta = model.predict(X)
     full = model.predict(X, full_output=True)
@@ -601,7 +609,7 @@ def test_kernel_uplift_forest_feature_importances():
         min_samples_leaf=100,
         random_state=RANDOM_SEED,
     )
-    model.fit(X, treatment, y)
+    model.fit(X=X, treatment=treatment, y=y)
     fi = model.feature_importances_
     assert fi.shape == (X.shape[1],)
     assert np.isclose(fi.sum(), 1.0)
@@ -647,7 +655,7 @@ def _make_serialization_estimator(kind, **overrides):
 def test_kernel_uplift_save_load_round_trip(kind, tmp_path):
     """save() then load() restores an estimator with identical predictions."""
     X, treatment, y = _make_binary_feature_data()
-    est = _make_serialization_estimator(kind).fit(X, treatment, y)
+    est = _make_serialization_estimator(kind).fit(X=X, treatment=treatment, y=y)
     path = str(tmp_path / f"{kind}.causalml")
     est.save(path)
 
@@ -676,7 +684,7 @@ def test_kernel_uplift_get_params_clone_round_trip(kind):
 def test_kernel_uplift_load_class_mismatch_raises(tmp_path):
     """Loading a saved tree as the forest class is rejected."""
     X, treatment, y = _make_binary_feature_data()
-    tree = _make_serialization_estimator("tree").fit(X, treatment, y)
+    tree = _make_serialization_estimator("tree").fit(X=X, treatment=treatment, y=y)
     path = str(tmp_path / "tree.causalml")
     tree.save(path)
     with pytest.raises(ValueError):
@@ -750,7 +758,7 @@ def test_kernel_uplift_fit_predict_with_nan(criterion):
     est = _KernelUpliftTreeClassifier(
         criterion=criterion, max_depth=4, min_samples_leaf=100, random_state=RANDOM_SEED
     )
-    est.fit(Xn, treatment, y)
+    est.fit(X=Xn, treatment=treatment, y=y)
     proba = est.predict_proba_by_group(Xn)
     assert proba.shape == (len(Xn), 2)
     assert np.isfinite(proba).all()
@@ -768,7 +776,7 @@ def test_kernel_uplift_all_nan_column_and_row():
     Xn[:, 2] = np.nan  # a fully-missing feature must not break the fit
     est = _KernelUpliftTreeClassifier(
         criterion="KL", max_depth=3, min_samples_leaf=100, random_state=RANDOM_SEED
-    ).fit(Xn, treatment, y)
+    ).fit(X=Xn, treatment=treatment, y=y)
     all_nan = np.full((1, X.shape[1]), np.nan)
     proba = est.predict_proba_by_group(all_nan)
     assert proba.shape == (1, 2)
@@ -803,7 +811,7 @@ def test_kernel_uplift_learns_missing_routing():
         normalization=False,
         n_reg=0,
         random_state=RANDOM_SEED,
-    ).fit(X, treatment, y)
+    ).fit(X=X, treatment=treatment, y=y)
 
     uplift_missing = est.predict(np.array([[np.nan, 0.0]]))[0, 0]
     uplift_observed = est.predict(np.array([[0.0, 0.0]]))[0, 0]
@@ -818,7 +826,7 @@ def test_kernel_uplift_rejects_inf():
     Xinf[0, 0] = np.inf
     est = _KernelUpliftTreeClassifier(criterion="KL", random_state=RANDOM_SEED)
     with pytest.raises(ValueError, match="infinity"):
-        est.fit(Xinf, treatment, y)
+        est.fit(X=Xinf, treatment=treatment, y=y)
 
 
 def test_kernel_uplift_forest_with_nan():
@@ -835,7 +843,7 @@ def test_kernel_uplift_forest_with_nan():
         random_state=RANDOM_SEED,
     )
     assert model.__sklearn_tags__().input_tags.allow_nan is True
-    model.fit(Xn, treatment, y)
+    model.fit(X=Xn, treatment=treatment, y=y)
     delta = model.predict(Xn)
     assert delta.shape == (len(Xn), 1)
     assert np.isfinite(delta).all()

@@ -192,7 +192,7 @@ class TestTLearnerPolars:
         self.learner = BaseTRegressor(learner=LinearRegression())
 
     def _fit_predict(self, X, treatment, y):
-        self.learner.fit(X, treatment, y)
+        self.learner.fit(X=X, treatment=treatment, y=y)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
@@ -233,9 +233,9 @@ class TestTLearnerPolars:
         )
 
         learner.fit(
-            X,
-            treatment,
-            y,
+            X=X,
+            treatment=treatment,
+            y=y,
             store_bootstraps=True,
             n_bootstraps=5,
             bootstrap_size=100,
@@ -251,7 +251,7 @@ class TestTLearnerPolars:
 
     def test_estimate_ate_polars(self, synthetic_data_polars):
         X, treatment, y = synthetic_data_polars
-        ate, lb, ub = self.learner.estimate_ate(X, treatment, y)
+        ate, lb, ub = self.learner.estimate_ate(X=X, treatment=treatment, y=y)
         assert isinstance(ate, np.ndarray)
         assert lb[0] < ate[0] < ub[0]
 
@@ -265,7 +265,7 @@ class TestSLearnerPolars:
         self.learner = BaseSRegressor(learner=LinearRegression())
 
     def _fit_predict(self, X, treatment, y):
-        self.learner.fit(X, treatment, y)
+        self.learner.fit(X=X, treatment=treatment, y=y)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
@@ -281,10 +281,12 @@ class TestSLearnerPolars:
     def test_estimate_ate_polars(self, synthetic_data_polars):
         X, treatment, y = synthetic_data_polars
         # BaseSLearner.estimate_ate returns only `ate` when return_ci=False (default)
-        ate = self.learner.estimate_ate(X, treatment, y)
+        ate = self.learner.estimate_ate(X=X, treatment=treatment, y=y)
         assert isinstance(ate, np.ndarray)
         # With return_ci=True it returns (ate, lb, ub)
-        ate, lb, ub = self.learner.estimate_ate(X, treatment, y, return_ci=True)
+        ate, lb, ub = self.learner.estimate_ate(
+            X=X, treatment=treatment, y=y, return_ci=True
+        )
         assert lb[0] < ate[0] < ub[0]
 
 
@@ -297,7 +299,7 @@ class TestXLearnerPolars:
         self.learner = BaseXRegressor(learner=LinearRegression())
 
     def _fit_predict(self, X, treatment, y):
-        self.learner.fit(X, treatment, y)
+        self.learner.fit(X=X, treatment=treatment, y=y)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
@@ -323,7 +325,7 @@ class TestRLearnerPolars:
         )
 
     def _fit_predict(self, X, treatment, y):
-        self.learner.fit(X, treatment, y)
+        self.learner.fit(X=X, treatment=treatment, y=y)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
@@ -350,7 +352,7 @@ class TestDRLearnerPolars:
         self.learner = BaseDRRegressor(learner=LinearRegression())
 
     def _fit_predict(self, X, treatment, y, seed=None):
-        self.learner.fit(X, treatment, y, seed=seed)
+        self.learner.fit(X=X, treatment=treatment, y=y, seed=seed)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(self, synthetic_data_numpy, synthetic_data_polars):
@@ -377,7 +379,7 @@ class TestEdgeCases:
         X_pl, _, _ = synthetic_data_polars
         _, t_np, y_np = synthetic_data_numpy
         learner = BaseTRegressor(learner=LinearRegression())
-        learner.fit(X_pl, t_np, y_np)
+        learner.fit(X=X_pl, treatment=t_np, y=y_np)
         te = learner.predict(X_pl)
         assert isinstance(te, np.ndarray)
 
@@ -386,7 +388,7 @@ class TestEdgeCases:
         X_np, t_np, y_np = synthetic_data_numpy
         X_pl, _, _ = synthetic_data_polars
         learner = BaseTRegressor(learner=LinearRegression())
-        learner.fit(X_np, t_np, y_np)
+        learner.fit(X=X_np, treatment=t_np, y=y_np)
         te = learner.predict(X_pl)
         assert isinstance(te, np.ndarray)
         assert te.shape[0] == N
@@ -401,7 +403,7 @@ class TestTClassifierPolars:
         self.learner = BaseTClassifier(learner=LogisticRegression())
 
     def _fit_predict(self, X, treatment, y):
-        self.learner.fit(X, treatment, y)
+        self.learner.fit(X=X, treatment=treatment, y=y)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(
@@ -434,7 +436,7 @@ class TestSClassifierPolars:
         self.learner = BaseSClassifier(learner=LogisticRegression())
 
     def _fit_predict(self, X, treatment, y):
-        self.learner.fit(X, treatment, y)
+        self.learner.fit(X=X, treatment=treatment, y=y)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(
@@ -470,7 +472,7 @@ class TestXClassifierPolars:
         )
 
     def _fit_predict(self, X, treatment, y):
-        self.learner.fit(X, treatment, y)
+        self.learner.fit(X=X, treatment=treatment, y=y)
         return self.learner.predict(X)
 
     def test_polars_matches_numpy(

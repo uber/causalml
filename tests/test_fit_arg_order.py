@@ -21,6 +21,7 @@ import pkgutil
 import warnings
 
 import numpy as np
+import pandas as pd
 import pytest
 from sklearn.linear_model import LinearRegression
 
@@ -46,7 +47,15 @@ from causalml.inference.tree import (
 )
 from causalml.metrics.sensitivity import Sensitivity
 
-from .const import RANDOM_SEED, CONTROL_NAME, CONVERSION, TREATMENT_NAMES
+from .const import (
+    RANDOM_SEED,
+    CONTROL_NAME,
+    CONVERSION,
+    TREATMENT_NAMES,
+    TREATMENT_COL,
+    OUTCOME_COL,
+    SCORE_COL,
+)
 
 # One representative regressor per meta-learner family; all default to
 # ``control_name=0`` which matches the 0/1 treatment from ``synthetic_data``.
@@ -426,6 +435,42 @@ def test_uplift_forest_keyword_fit_does_not_warn(generate_classification_data):
             X=df[x_names].values,
             y=df[CONVERSION].values,
             treatment=df["treatment_group_key"].values,
+        )
+
+    assert _arg_order_warnings(record) == []
+
+
+def test_sensitivity_analysis_does_not_warn(generate_regression_data):
+    """`sensitivity_analysis` takes no `treatment`/`y`, so it must never warn.
+
+    Same instance-scoped re-entrancy gap as the forests, one module over:
+    `sensitivity_analysis` is not itself shimmed (it has neither parameter), so
+    it sets no guard flag, and the `get_prediction` / `get_ate_ci` /
+    `get_potential_outcome_predictions` calls it makes internally each warned.
+    The caller passed a DataFrame and column names -- there is no positional
+    argument for them to fix, and no way to silence it.
+    """
+    y, X, treatment, _, _, e = generate_regression_data()
+    features = [f"feature_{i}" for i in range(X.shape[1])]
+    df = pd.DataFrame(X, columns=features)
+    df[TREATMENT_COL] = treatment
+    df[OUTCOME_COL] = y
+    df[SCORE_COL] = e
+
+    sens = Sensitivity(
+        df=df,
+        inference_features=features,
+        p_col=SCORE_COL,
+        treatment_col=TREATMENT_COL,
+        outcome_col=OUTCOME_COL,
+        learner=BaseXRegressor(learner=LinearRegression()),
+    )
+
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        sens.sensitivity_analysis(
+            methods=["Random Cause", "Subset Data", "Random Replace"],
+            sample_size=0.5,
         )
 
     assert _arg_order_warnings(record) == []

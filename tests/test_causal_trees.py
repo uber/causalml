@@ -643,7 +643,7 @@ def test_plot_causal_tree_pvalue_nan_handling():
         groups_cnt=True,
         random_state=42,
     )
-    tree.fit(X, treatment, y)
+    tree.fit(X=X, treatment=treatment, y=y)
 
     # In the root node, ttest_ind will return nan because variances are 0.
     exporter = _MPLCTreeExporter(

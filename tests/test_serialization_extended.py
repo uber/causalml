@@ -181,7 +181,7 @@ class TestUpliftTreeRoundTrip:
         tree = UpliftTreeClassifier(
             control_name="control", max_depth=3, min_samples_leaf=20
         )
-        tree.fit(X, treatment, y)
+        tree.fit(X=X, treatment=treatment, y=y)
         preds_before = tree.predict(X)
 
         tree.save(tmp_path_file)
@@ -207,7 +207,7 @@ class TestUpliftTreeRoundTrip:
         tree = UpliftTreeClassifier(
             control_name="control", max_depth=3, min_samples_leaf=20
         )
-        tree.fit(X, treatment, y)
+        tree.fit(X=X, treatment=treatment, y=y)
         tree.save(tmp_path_file)
 
         loaded = load_learner(tmp_path_file)
@@ -233,7 +233,7 @@ class TestUpliftForestRoundTrip:
             min_samples_leaf=20,
             random_state=RANDOM_SEED,
         )
-        forest.fit(X, treatment, y)
+        forest.fit(X=X, treatment=treatment, y=y)
         preds_before = forest.predict(X)
 
         forest.save(tmp_path_file)
@@ -254,7 +254,7 @@ class TestIVRegressorRoundTrip:
     def test_round_trip_predictions_match(self, iv_data, tmp_path_file):
         X, treatment, y, z = iv_data
         model = IVRegressor()
-        model.fit(X, treatment, y, z)
+        model.fit(X=X, treatment=treatment, y=y, w=z)
         ate_before, se_before = model.predict()
 
         model.save(tmp_path_file)
@@ -272,7 +272,7 @@ class TestIVRegressorRoundTrip:
     def test_generic_load_learner(self, iv_data, tmp_path_file):
         X, treatment, y, z = iv_data
         model = IVRegressor()
-        model.fit(X, treatment, y, z)
+        model.fit(X=X, treatment=treatment, y=y, w=z)
         model.save(tmp_path_file)
 
         loaded = load_learner(tmp_path_file)
@@ -281,7 +281,7 @@ class TestIVRegressorRoundTrip:
     def test_metadata_fields_present(self, iv_data, tmp_path_file):
         X, treatment, y, z = iv_data
         model = IVRegressor()
-        model.fit(X, treatment, y, z)
+        model.fit(X=X, treatment=treatment, y=y, w=z)
         model.save(tmp_path_file)
 
         payload = joblib.load(tmp_path_file)
@@ -403,7 +403,7 @@ class TestCrossFamilyEdgeCases:
         """Loading an IV model as a CausalTree should fail."""
         X, treatment, y, z = iv_data
         model = IVRegressor()
-        model.fit(X, treatment, y, z)
+        model.fit(X=X, treatment=treatment, y=y, w=z)
         model.save(tmp_path_file)
 
         with pytest.raises(ValueError, match="Class mismatch"):
@@ -434,7 +434,7 @@ class TestCrossFamilyEdgeCases:
         """Model should survive multiple save/load cycles."""
         X, treatment, y, z = iv_data
         model = IVRegressor()
-        model.fit(X, treatment, y, z)
+        model.fit(X=X, treatment=treatment, y=y, w=z)
         ate_original, se_original = model.predict()
 
         for _ in range(3):

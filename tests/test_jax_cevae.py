@@ -81,7 +81,7 @@ def test_cevae_jax_fit_predict_shapes():
         batch_size=100,
         num_samples=50,
     )
-    ite = cevae.fit_predict(X, treatment, y)
+    ite = cevae.fit_predict(X=X, treatment=treatment, y=y)
     assert ite.shape == (1000,)
     assert np.all(np.isfinite(ite))
 
@@ -103,7 +103,7 @@ def test_cevae_jax_recovers_positive_ate():
         batch_size=100,
         num_samples=100,
     )
-    cevae.fit(X, treatment, y)
+    cevae.fit(X=X, treatment=treatment, y=y)
     ite = cevae.predict(X)
 
     ate_true = float(np.mean(tau))
@@ -129,7 +129,7 @@ def test_cevae_jax_save_load(tmp_path):
         batch_size=100,
         num_samples=20,
     )
-    cevae.fit(X, treatment, y)
+    cevae.fit(X=X, treatment=treatment, y=y)
     ate_before = float(np.mean(cevae.predict(X)))
 
     ckpt_dir = tmp_path / "cevae_ckpt"

@@ -39,8 +39,8 @@ def test_plot_tmlegain(generate_regression_data, monkeypatch):
     ) = train_test_split(X, y, e, treatment, tau, b, test_size=0.5, random_state=42)
 
     learner = LRSRegressor()
-    learner.fit(X_train, treatment_train, y_train)
-    cate_test = learner.predict(X_test, treatment_test).flatten()
+    learner.fit(X=X_train, treatment=treatment_train, y=y_train)
+    cate_test = learner.predict(X=X_test, treatment=treatment_test).flatten()
 
     df = pd.DataFrame(
         {

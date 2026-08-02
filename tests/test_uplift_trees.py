@@ -51,7 +51,7 @@ def test_UpliftRandomForestClassifier(
         )
         if early_stopping == "true":
             uplift_model.fit(
-                df_train[x_names].values,
+                X=df_train[x_names].values,
                 treatment=df_train["treatment_group_key"].values,
                 y=df_train[CONVERSION].values,
                 X_val=df_val[x_names].values,
@@ -60,7 +60,7 @@ def test_UpliftRandomForestClassifier(
             )
         else:
             uplift_model.fit(
-                df_train[x_names].values,
+                X=df_train[x_names].values,
                 treatment=df_train["treatment_group_key"].values,
                 y=df_train[CONVERSION].values,
             )
@@ -151,7 +151,7 @@ def UpliftTreeClassifierTesting(df, x_names, evaluation_function):
     pr = cProfile.Profile(subcalls=True, builtins=True, timeunit=0.001)
     pr.enable()
     uplift_model.fit(
-        df_train[x_names].values,
+        X=df_train[x_names].values,
         treatment=df_train["treatment_group_key"].values,
         y=df_train[CONVERSION].values,
     )
@@ -216,7 +216,7 @@ def UpliftTreeClassifierTesting(df, x_names, evaluation_function):
 
     # Check if it works as expected after filling with validation data
     uplift_model.fill(
-        df_test[x_names].values,
+        X=df_test[x_names].values,
         treatment=df_test["treatment_group_key"].values,
         y=df_test[CONVERSION].values,
     )
@@ -234,7 +234,7 @@ def test_UpliftTreeClassifier_feature_importance(generate_classification_data):
         control_name=TREATMENT_NAMES[0], random_state=RANDOM_SEED
     )
     uplift_model.fit(
-        df_train[x_names].values,
+        X=df_train[x_names].values,
         treatment=df_train["treatment_group_key"].values,
         y=df_train[CONVERSION].values,
     )
@@ -288,7 +288,7 @@ def test_uplift_tree_visualization():
     )
 
     uplift_model.fit(
-        df_train[x_names].values,
+        X=df_train[x_names].values,
         treatment=df_train["treatment_group_key"].values,
         y=df_train["conversion"].values,
     )
@@ -319,7 +319,7 @@ def test_UpliftTreeClassifier_with_nan_values():
 
     # Should not raise any exception
     uplift_model.fit(
-        df_train[x_names].values,
+        X=df_train[x_names].values,
         treatment=df_train["treatment_group_key"].values,
         y=df_train["conversion"].values,
     )
@@ -360,7 +360,7 @@ def test_UpliftTreeClassifier_with_nan_in_categorical_features():
 
     # Should not raise TypeError
     uplift_model.fit(
-        X_train,
+        X=X_train,
         treatment=df_train["treatment_group_key"].values,
         y=df_train["conversion"].values,
     )
@@ -386,7 +386,7 @@ def test_uplift_tree_pvalue_no_nan_with_sparse_groups():
         min_samples_treatment=0,
         max_depth=5,
     )
-    model.fit(X, treatment, y)
+    model.fit(X=X, treatment=treatment, y=y)
     preds = model.predict(X)
 
     assert not np.any(
@@ -417,7 +417,7 @@ def test_UpliftRandomForestClassifier_predict_shape_with_sparse_groups():
         min_samples_treatment=0,
         random_state=RANDOM_SEED,
     )
-    model.fit(X, treatment=treatment, y=y)
+    model.fit(X=X, treatment=treatment, y=y)
 
     # Verify that at least one tree was fit without some treatment groups
     assert any(

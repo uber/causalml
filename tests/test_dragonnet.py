@@ -11,7 +11,7 @@ def test_save_load_dragonnet(tmp_path):
     y, X, w, tau, b, e = simulate_nuisance_and_easy_treatment(n=1000)
 
     dragon = DragonNet(neurons_per_layer=200, targeted_reg=True, verbose=False)
-    dragon_ite = dragon.fit_predict(X, w, y, return_components=False)
+    dragon_ite = dragon.fit_predict(X=X, treatment=w, y=y, return_components=False)
     dragon_ate = dragon_ite.mean()
 
     model_file = tmp_path / "smaug.h5"

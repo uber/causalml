@@ -47,9 +47,9 @@ def test_counterfactual_value_optimization():
 
     tm = BaseTClassifier(learner=LogisticRegression(), control_name="control")
     tm.fit(
-        df_train[X_names].values,
-        df_train["treatment_group_key"],
-        df_train["conversion"],
+        X=df_train[X_names].values,
+        treatment=df_train["treatment_group_key"],
+        y=df_train["conversion"],
     )
     tm_pred = tm.predict(df_test[X_names].values)
 

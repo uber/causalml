@@ -1373,9 +1373,9 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
 
     # Test 1: store_bootstraps=True then predict with return_ci=True
     learner.fit(
-        X,
-        treatment,
-        y,
+        X=X,
+        treatment=treatment,
+        y=y,
         store_bootstraps=True,
         n_bootstraps=50,
         bootstrap_size=500,
@@ -1390,7 +1390,7 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
 
     # Test 2: ValueError without store_bootstraps
     learner2 = BaseTRegressor(learner=LinearRegression(), control_name=0)
-    learner2.fit(X, treatment, y)
+    learner2.fit(X=X, treatment=treatment, y=y)
     with pytest.raises(ValueError):
         learner2.predict(X, return_ci=True)
 
@@ -1405,9 +1405,9 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
     # Test 5: reproducibility via random_state
     learner3 = BaseTRegressor(learner=LinearRegression(), control_name=0)
     learner3.fit(
-        X,
-        treatment,
-        y,
+        X=X,
+        treatment=treatment,
+        y=y,
         store_bootstraps=True,
         n_bootstraps=50,
         bootstrap_size=500,
@@ -1420,9 +1420,9 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
     # Test 6: parallel execution (n_jobs=2) produces same result as serial
     learner_parallel = BaseTRegressor(learner=LinearRegression(), control_name=0)
     learner_parallel.fit(
-        X,
-        treatment,
-        y,
+        X=X,
+        treatment=treatment,
+        y=y,
         store_bootstraps=True,
         n_bootstraps=50,
         bootstrap_size=500,
@@ -1436,9 +1436,9 @@ def test_BaseTLearner_predict_return_ci(generate_regression_data):
     # Test 7: different random_state produces different bounds
     learner_diff = BaseTRegressor(learner=LinearRegression(), control_name=0)
     learner_diff.fit(
-        X,
-        treatment,
-        y,
+        X=X,
+        treatment=treatment,
+        y=y,
         store_bootstraps=True,
         n_bootstraps=50,
         bootstrap_size=500,
@@ -1911,9 +1911,9 @@ def test_BaseTClassifier_predict_return_ci(generate_classification_data):
 
     # Test 1: return_ci=True returns (te, lb, ub)
     learner.fit(
-        X,
-        treatment,
-        y,
+        X=X,
+        treatment=treatment,
+        y=y,
         store_bootstraps=True,
         n_bootstraps=50,
         bootstrap_size=500,
@@ -1927,7 +1927,7 @@ def test_BaseTClassifier_predict_return_ci(generate_classification_data):
 
     # Test 2: ValueError without store_bootstraps
     learner2 = BaseTClassifier(learner=LogisticRegression(), control_name=0)
-    learner2.fit(X, treatment, y)
+    learner2.fit(X=X, treatment=treatment, y=y)
     with pytest.raises(ValueError):
         learner2.predict(X, return_ci=True)
 
@@ -1959,7 +1959,7 @@ def _sklearn_fit(learner, y=None):
     """Fit with the right outcome type; returns whatever fit() returns."""
     if y is None:
         y = _Y_BIN if "Classifier" in type(learner).__name__ else _Y_CONT
-    return learner.fit(_X, _TREATMENT, y)
+    return learner.fit(X=_X, treatment=_TREATMENT, y=y)
 
 
 def _sklearn_predict(learner, **kw):
@@ -2188,7 +2188,12 @@ def test_xgb_rregressor_fit_predict_return_ci():
     """
     r = XGBRRegressor(effect_learner_n_estimators=20, random_state=0)
     te, lo, hi = r.fit_predict(
-        _X, _TREATMENT, _Y_CONT, return_ci=True, n_bootstraps=5, bootstrap_size=200
+        X=_X,
+        treatment=_TREATMENT,
+        y=_Y_CONT,
+        return_ci=True,
+        n_bootstraps=5,
+        bootstrap_size=200,
     )
     assert te.shape == lo.shape == hi.shape == (_N, 1)
     assert np.all(lo <= hi), "CI lower bound must be <= upper bound"
@@ -2236,9 +2241,13 @@ def test_finite_predict_stochastic(Cls, kwargs):
 def test_bit_identical_estimate_ate_s():
     """S-learner estimate_ate() CI triple is bit-identical across clone+refit."""
     m1 = BaseSRegressor(learner=_DT_REG)
-    ate1, lb1, ub1 = m1.estimate_ate(_X, _TREATMENT, _Y_CONT, return_ci=True)
+    ate1, lb1, ub1 = m1.estimate_ate(
+        X=_X, treatment=_TREATMENT, y=_Y_CONT, return_ci=True
+    )
     m2 = clone(m1)
-    ate2, lb2, ub2 = m2.estimate_ate(_X, _TREATMENT, _Y_CONT, return_ci=True)
+    ate2, lb2, ub2 = m2.estimate_ate(
+        X=_X, treatment=_TREATMENT, y=_Y_CONT, return_ci=True
+    )
     np.testing.assert_array_equal(ate1, ate2)
     np.testing.assert_array_equal(lb1, lb2)
     np.testing.assert_array_equal(ub1, ub2)
@@ -2248,10 +2257,10 @@ def test_t_regressor_return_ci_bit_identical():
     """TLearner stored bootstrap ensemble is reproducible with fixed random_state."""
     kw = dict(store_bootstraps=True, n_bootstraps=10, random_state=7)
     m1 = BaseTRegressor(learner=_DT_REG)
-    m1.fit(_X, _TREATMENT, _Y_CONT, **kw)
+    m1.fit(X=_X, treatment=_TREATMENT, y=_Y_CONT, **kw)
     te1, lo1, hi1 = m1.predict(_X, return_ci=True, verbose=False)
     m2 = BaseTRegressor(learner=_DT_REG)
-    m2.fit(_X, _TREATMENT, _Y_CONT, **kw)
+    m2.fit(X=_X, treatment=_TREATMENT, y=_Y_CONT, **kw)
     te2, lo2, hi2 = m2.predict(_X, return_ci=True, verbose=False)
     np.testing.assert_array_equal(te1, te2)
     np.testing.assert_array_equal(lo1, lo2)
@@ -2293,7 +2302,7 @@ def test_x_learner_pretrain_before_fit_raises():
     """BaseXRegressor.estimate_ate(pretrain=True) before fit() raises ValueError."""
     with pytest.raises(ValueError):
         BaseXRegressor(learner=_DT_REG).estimate_ate(
-            _X, _TREATMENT, _Y_CONT, pretrain=True
+            X=_X, treatment=_TREATMENT, y=_Y_CONT, pretrain=True
         )
 
 
@@ -2305,5 +2314,5 @@ def test_dr_learner_pretrain_before_fit_raises():
     """
     with pytest.raises(ValueError):
         BaseDRRegressor(learner=_DT_REG).estimate_ate(
-            _X, _TREATMENT, _Y_CONT, pretrain=True
+            X=_X, treatment=_TREATMENT, y=_Y_CONT, pretrain=True
         )

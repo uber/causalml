@@ -15,7 +15,7 @@ def test_dragonnet_jax_fit_predict():
     """DragonNet ITE predictions should lift above random targeting."""
     y, X, w, tau, b, e = simulate_nuisance_and_easy_treatment(n=1000)
     dragon = DragonNet(neurons_per_layer=200, targeted_reg=True, verbose=False)
-    ite = dragon.fit_predict(X, w, y)
+    ite = dragon.fit_predict(X=X, treatment=w, y=y)
 
     assert ite.shape == (1000, 1)
     ate = float(ite.mean())
@@ -43,7 +43,7 @@ def test_dragonnet_jax_predict_propensity():
         adam_epochs=2,
         epochs=5,
     )
-    dragon.fit(X, w, y)
+    dragon.fit(X=X, treatment=w, y=y)
     propensity = dragon.predict_propensity(X)
 
     assert propensity.shape == (500,)
@@ -61,7 +61,7 @@ def test_dragonnet_jax_save_load(tmp_path):
         adam_epochs=2,
         epochs=5,
     )
-    dragon.fit(X, w, y)
+    dragon.fit(X=X, treatment=w, y=y)
     ate_before = float(dragon.predict_tau(X).mean())
 
     ckpt_dir = tmp_path / "dragon_ckpt"
