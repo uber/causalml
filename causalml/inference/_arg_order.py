@@ -35,6 +35,12 @@ import warnings
 #: Parameters whose positional slot changes in v1.0, in their v1.0 order.
 REORDERED_PARAMS = ("y", "treatment")
 
+#: Where the warning sends callers. This is the page that tells them what to
+#: type; #854 is a bug report and cannot serve that purpose.
+MIGRATION_GUIDE_URL = (
+    "https://causalml.readthedocs.io/en/latest/migration.html#fit-argument-order"
+)
+
 
 def _positional_params(method):
     """Return the names of ``method``'s positional parameters, minus ``self``."""
@@ -129,9 +135,9 @@ def deprecate_positional_treatment_y(method):
     message = (
         "Passing `treatment` and/or `y` to {name}() by position is deprecated "
         "and will change in causalml v1.0: the positional argument order "
-        "becomes ({new_order}) for scikit-learn Pipeline compatibility "
-        "(see https://github.com/uber/causalml/issues/854). To be safe across "
-        "the change, pass them as keyword arguments, e.g. {example}."
+        "becomes ({new_order}) for scikit-learn Pipeline compatibility. To be "
+        "safe across the change, pass them as keyword arguments, e.g. "
+        "{example}. Migration guide: {guide}"
     ).format(
         name=method.__name__,
         new_order=", ".join(target),
@@ -140,6 +146,7 @@ def deprecate_positional_treatment_y(method):
             params[0],
             ", ".join(f"{p}={p}" for p in REORDERED_PARAMS if p in params),
         ),
+        guide=MIGRATION_GUIDE_URL,
     )
 
     @functools.wraps(method)

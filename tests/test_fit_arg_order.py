@@ -19,12 +19,17 @@ import importlib
 import inspect
 import pkgutil
 import warnings
+from pathlib import Path
 
 import numpy as np
 import pytest
 from sklearn.linear_model import LinearRegression
 
-from causalml.inference._arg_order import _positional_params, v1_order
+from causalml.inference._arg_order import (
+    MIGRATION_GUIDE_URL,
+    _positional_params,
+    v1_order,
+)
 from causalml.inference.iv import BaseDRIVRegressor, IVRegressor
 from causalml.inference.meta import (
     BaseSRegressor,
@@ -376,6 +381,53 @@ def test_uplift_tree_validation_triple_is_reordered():
         "sample_weight",
         "check_input",
     ]
+
+
+# --- the warning must point at a page that actually exists ------------------
+
+
+def test_warning_links_to_the_migration_guide(generate_regression_data):
+    """The link a user follows out of the warning has to reach instructions.
+
+    It originally pointed at #854, which is a bug report -- it tells a reader
+    what went wrong for someone else, not what to type.
+    """
+    y, X, treatment, _, _, _ = generate_regression_data()
+    learner = BaseTRegressor(learner=LinearRegression())
+
+    with warnings.catch_warnings(record=True) as record:
+        warnings.simplefilter("always")
+        learner.fit(X, treatment, y)
+
+    message = str(_order_warnings(record)[0].message)
+    assert MIGRATION_GUIDE_URL in message
+    # The actionable instruction must be in the warning itself, not only behind
+    # the link -- a user with no network still needs to know what to change.
+    assert "fit(X, y=y, treatment=treatment)" in message
+
+
+def test_migration_guide_url_matches_the_docs_source():
+    """Pin the URL to the file and label it points at.
+
+    Sphinx derives ``migration.html#fit-argument-order`` from the filename and
+    the ``.. _fit-argument-order:`` label. Renaming either would leave the
+    warning pointing at a 404 that nothing else would catch, because the
+    warning text is a plain string and the docs build would stay green.
+    """
+    page, _, anchor = MIGRATION_GUIDE_URL.rpartition("/")[2].partition("#")
+    guide = Path(__file__).resolve().parents[1] / "docs" / page.replace(".html", ".rst")
+
+    assert guide.is_file(), f"{guide.name} is missing; the warning links to it"
+    assert f".. _{anchor}:" in guide.read_text(), (
+        f"label `{anchor}` is missing from {guide.name}; "
+        "the warning's anchor would 404"
+    )
+
+
+def test_migration_guide_is_in_the_docs_toctree():
+    """An unlinked page is unreachable by browsing and warns at build time."""
+    docs = Path(__file__).resolve().parents[1] / "docs"
+    assert "\n    migration\n" in (docs / "index.rst").read_text()
 
 
 # --- the library's own internal calls must not warn the caller --------------

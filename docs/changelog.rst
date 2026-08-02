@@ -5,6 +5,28 @@ Changelog
 
 You can find the latest changes in the `GitHub releases <https://github.com/uber/causalml/releases>`_
 
+Unreleased
+----------
+
+Deprecations
+~~~~~~~~~~~~
+* **Positional** ``treatment`` **and** ``y`` **are deprecated (#854).** In v1.0 every
+  learner's positional argument order becomes ``fit(X, y, treatment, ...)``, matching
+  the scikit-learn convention so a CausalML learner can be a ``Pipeline`` step. Passing
+  ``treatment`` or ``y`` by position now emits a ``FutureWarning``; positional order is
+  unchanged in this release, so nothing breaks yet.
+
+  The fix is to pass them by keyword — ``learner.fit(X=X, treatment=treatment, y=y)`` —
+  which is order-independent and therefore correct both before and after the flip.
+
+  This one cannot be caught at runtime: ``y`` and ``treatment`` are both same-length
+  arrays, so a call left in the old positional form will silently train on swapped
+  arguments at v1.0 rather than raising ``TypeError``. See the
+  :ref:`migration guide <fit-argument-order>` for the per-family table and for the
+  signatures that are not a plain swap (``IVRegressor.fit`` and ``BaseDRIVLearner``).
+
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/975
+
 0.17.0 (Jul 2026)
 -----------------
 * Adds **scikit-learn 1.9 support**, resolving an ``import causalml.dataset`` failure present on the 0.16.0 wheel (#926).

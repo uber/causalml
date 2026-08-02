@@ -9,6 +9,7 @@ Contents:
     about
     installation
     quickstart
+    migration
     examples
     methodology
     interpretation
