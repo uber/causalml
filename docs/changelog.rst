@@ -25,7 +25,36 @@ Deprecations
   :ref:`migration guide <fit-argument-order>` for the per-family table and for the
   signatures that are not a plain swap (``IVRegressor.fit`` and ``BaseDRIVLearner``).
 
+  The warning is live for three minor releases — 0.18.0, 0.19.0 and 0.20.0 — before
+  the flip in v1.0, roughly nine months.
+
   By @jeongyoonlee in https://github.com/uber/causalml/pull/975
+
+Release Schedule
+~~~~~~~~~~~~~~~~
+Quarterly, targeting:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Release
+     - Target
+     - Argument order
+   * - 0.18.0
+     - September 2026
+     - ``fit(X, treatment, y, ...)`` — deprecation warning added
+   * - 0.19.0
+     - December 2026
+     - unchanged, warning continues
+   * - 0.20.0
+     - March 2027
+     - unchanged, warning continues
+   * - 1.0.0
+     - June 2027
+     - ``fit(X, y, treatment, ...)`` — the flip, shim removed
+
+Dates are targets, not commitments. The ordering is fixed: no signature moves before
+v1.0.
 
 0.17.0 (Jul 2026)
 -----------------

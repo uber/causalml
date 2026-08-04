@@ -48,17 +48,23 @@ scikit-learn convention.
 What happens when
 -----------------
 
-**Today (the release that ships this guide).** Positional order is *unchanged*.
-Passing ``treatment`` or ``y`` positionally emits a ``FutureWarning`` pointing
-here. Nothing breaks.
+**0.18.0 (September 2026), the release that ships this guide.** Positional order
+is *unchanged*. Passing ``treatment`` or ``y`` positionally emits a
+``FutureWarning`` pointing here. Nothing breaks.
 
-**At v1.0.** The signatures are reordered and the warning is removed. Positional
-calls in the old order start silently mis-training; keyword calls are unaffected.
+**0.19.0 (December 2026) and 0.20.0 (March 2027).** Unchanged — the warning
+stays, the signatures do not move.
 
-The number of releases between the two is still being decided — see open
-question 2 in the `v1.0 roadmap discussion
-<https://github.com/uber/causalml/discussions/938>`_ if you need a longer
-window, or want to say so.
+**v1.0 (June 2027).** The signatures are reordered and the warning is removed.
+Positional calls in the old order start silently mis-training; keyword calls are
+unaffected.
+
+That is **three minor releases and roughly nine months** of warning before
+anything moves. If that is not enough for your codebase, say so on the `v1.0
+roadmap discussion <https://github.com/uber/causalml/discussions/938>`_.
+
+Release dates are targets rather than commitments; the *ordering* is the part
+you can rely on, and no signature moves before v1.0.
 
 The rule
 --------
