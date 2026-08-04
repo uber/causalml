@@ -15,7 +15,7 @@ The data generators use binary features so split behavior is easy to reason abou
 import numpy as np
 import pandas as pd
 import pytest
-from joblib import parallel_backend
+from joblib import effective_n_jobs, parallel_backend
 from numpy.testing import assert_array_almost_equal
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
@@ -25,6 +25,7 @@ from causalml.inference.tree import uplift_tree_plot, uplift_tree_string
 from causalml.inference.tree._uplift.uplifttree import _KernelUpliftTreeClassifier
 from causalml.inference.tree._uplift.upliftforest import (
     _KernelUpliftRandomForestClassifier,
+    UpliftRandomForestClassifier,
 )
 from causalml.metrics import auuc_score
 
@@ -847,3 +848,42 @@ def test_kernel_uplift_forest_with_nan():
     delta = model.predict(Xn)
     assert delta.shape == (len(Xn), 1)
     assert np.isfinite(delta).all()
+
+
+def test_kernel_uplift_forest_n_jobs_defaults_to_serial():
+    """Both forests default to one worker (#991).
+
+    Trees are fitted in parallel and each concurrent fit holds its own working
+    set, so peak memory grows with the worker count -- which means the same fit
+    needs more memory on a machine with more cores. scikit-learn's forests use
+    the same across-trees parallelism and default to serial for this reason.
+    """
+    assert _KernelUpliftRandomForestClassifier(control_name=CONTROL_NAME).n_jobs is None
+    assert (
+        UpliftRandomForestClassifier(control_name=CONTROL_NAME).n_jobs is None
+    ), "the legacy-shaped subclass must not reintroduce n_jobs=-1"
+    assert effective_n_jobs(None) == 1
+
+
+@pytest.mark.parametrize("n_jobs", [None, 1, 2, -1])
+def test_kernel_uplift_forest_predictions_independent_of_n_jobs(n_jobs):
+    """n_jobs is a memory/speed knob only -- it must not move the numbers.
+
+    This is what makes the #991 default change safe: raising or lowering
+    n_jobs changes peak memory and wall time, never the fitted model.
+    """
+    X, treatment, y = _make_binary_feature_data(n_samples=2000, n_features=5)
+    common = dict(
+        control_name=CONTROL_NAME,
+        n_estimators=6,
+        max_depth=4,
+        min_samples_leaf=100,
+        random_state=RANDOM_SEED,
+    )
+    serial = _KernelUpliftRandomForestClassifier(**common, n_jobs=1)
+    serial.fit(X=X, treatment=treatment, y=y)
+
+    other = _KernelUpliftRandomForestClassifier(**common, n_jobs=n_jobs)
+    other.fit(X=X, treatment=treatment, y=y)
+
+    assert_array_almost_equal(serial.predict(X), other.predict(X), decimal=12)

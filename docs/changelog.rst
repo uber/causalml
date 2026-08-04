@@ -8,6 +8,22 @@ You can find the latest changes in the `GitHub releases <https://github.com/uber
 Unreleased
 ----------
 
+Behavior Changes
+~~~~~~~~~~~~~~~~
+* **`UpliftRandomForestClassifier` now defaults to** ``n_jobs=None`` **(one worker) instead of**
+  ``n_jobs=-1`` **(#991).** Trees are fitted in parallel and each concurrent fit holds its own
+  working set, so peak memory grew in proportion to the machine's core count — the same fit
+  needed more memory on a larger machine. On a 100k × 440 benchmark, peak memory was 8.8× the
+  input array at ``n_jobs=-1`` (10 cores) versus 1.4× at ``n_jobs=1``.
+
+  Fitted models and predictions are unchanged; only peak memory and wall time move. Existing
+  code gets slower and much lighter without any edit. Pass ``n_jobs=-1`` explicitly to restore
+  the previous behavior. Note that ``n_estimators`` does not affect peak memory once ``n_jobs``
+  is fixed.
+
+  This matches ``CausalRandomForestRegressor`` and scikit-learn's forests, which use the same
+  across-trees parallelism and default to serial.
+
 Deprecations
 ~~~~~~~~~~~~
 * **Positional** ``treatment`` **and** ``y`` **are deprecated (#854).** In v1.0 every

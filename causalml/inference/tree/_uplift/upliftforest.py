@@ -15,7 +15,7 @@ because the kernel tree does not implement it.
 """
 
 import warnings
-from typing import Union
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -87,6 +87,15 @@ class _KernelUpliftRandomForestClassifier(SerializableLearner, ForestRegressor):
     ``save`` / ``load`` and is a scikit-learn ``BaseEstimator`` via
     ``ForestRegressor`` (``get_params`` / ``clone`` round-trip). Full
     ``check_estimator`` does not apply -- ``fit`` takes ``(X, treatment, y)``.
+
+    ``n_jobs`` trades memory for speed. Trees are fitted in parallel and each
+    concurrent fit holds its own working set, so peak memory grows roughly in
+    proportion to the number of workers -- on one benchmark (100k x 440
+    features) peak rose from 1.4x the input array at ``n_jobs=1`` to 8.8x at
+    ``n_jobs=-1`` on 10 cores, for a ~4.5x speedup. The default ``None`` means
+    one worker, as in scikit-learn's forests. Raise it when memory allows.
+    ``n_estimators`` does not affect peak memory once ``n_jobs`` is fixed.
+    Results do not depend on ``n_jobs``.
     """
 
     def __init__(
@@ -105,7 +114,7 @@ class _KernelUpliftRandomForestClassifier(SerializableLearner, ForestRegressor):
         estimation_sample_size: float = 0.5,
         max_features: Union[int, float, str, None] = "sqrt",
         min_weight_fraction_leaf: float = 0.0,
-        n_jobs: int = -1,
+        n_jobs: Optional[int] = None,
         random_state: int = None,
         joblib_prefer: str = "threads",
     ):
@@ -260,6 +269,12 @@ class UpliftRandomForestClassifier(_KernelUpliftRandomForestClassifier):
     ``early_stopping_eval_diff_scale`` and ``fit``'s ``X_val`` / ``treatment_val``
     / ``y_val`` are accepted for backward compatibility but ignored: validation-set
     early stopping is not implemented on the kernel trees.
+
+    ``n_jobs`` defaults to ``None`` (one worker). Peak memory during ``fit``
+    grows roughly in proportion to the number of workers, since each concurrent
+    tree fit holds its own working set; see
+    :class:`_KernelUpliftRandomForestClassifier` for measurements. Results are
+    unaffected by ``n_jobs``.
     """
 
     def __init__(
@@ -277,7 +292,7 @@ class UpliftRandomForestClassifier(_KernelUpliftRandomForestClassifier):
         normalization=True,
         honesty=False,
         estimation_sample_size=0.5,
-        n_jobs=-1,
+        n_jobs=None,
         joblib_prefer: str = "threads",
     ):
         # Retained verbatim for the sklearn get_params / clone contract on the
