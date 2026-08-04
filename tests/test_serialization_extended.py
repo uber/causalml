@@ -232,6 +232,7 @@ class TestUpliftForestRoundTrip:
             max_depth=3,
             min_samples_leaf=20,
             random_state=RANDOM_SEED,
+            n_jobs=-1,
         )
         forest.fit(X=X, treatment=treatment, y=y)
         preds_before = forest.predict(X)
@@ -243,7 +244,9 @@ class TestUpliftForestRoundTrip:
         np.testing.assert_array_almost_equal(preds_before, preds_after)
 
     def test_unfitted_save_raises(self, tmp_path_file):
-        forest = UpliftRandomForestClassifier(control_name="control", n_estimators=5)
+        forest = UpliftRandomForestClassifier(
+            control_name="control", n_estimators=5, n_jobs=-1
+        )
         with pytest.raises(ValueError, match="Cannot save an unfitted model"):
             forest.save(tmp_path_file)
 

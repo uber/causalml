@@ -479,6 +479,7 @@ def test_uplift_forest_keyword_fit_does_not_warn(generate_classification_data):
         min_samples_leaf=50,
         control_name=CONTROL_NAME,
         random_state=RANDOM_SEED,
+        n_jobs=-1,
     )
 
     with warnings.catch_warnings(record=True) as record:

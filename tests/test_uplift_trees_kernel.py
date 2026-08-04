@@ -576,6 +576,7 @@ def test_kernel_uplift_forest_full_output():
         max_depth=3,
         min_samples_leaf=100,
         random_state=RANDOM_SEED,
+        n_jobs=-1,
     )
     model.fit(X=X, treatment=treatment, y=y)
 
@@ -609,6 +610,7 @@ def test_kernel_uplift_forest_feature_importances():
         max_depth=3,
         min_samples_leaf=100,
         random_state=RANDOM_SEED,
+        n_jobs=-1,
     )
     model.fit(X=X, treatment=treatment, y=y)
     fi = model.feature_importances_
@@ -649,7 +651,7 @@ def _make_serialization_estimator(kind, **overrides):
         random_state=RANDOM_SEED,
     )
     params.update(overrides)
-    return _KernelUpliftRandomForestClassifier(**params)
+    return _KernelUpliftRandomForestClassifier(**params, n_jobs=-1)
 
 
 @pytest.mark.parametrize("kind", ["tree", "forest"])
@@ -842,6 +844,7 @@ def test_kernel_uplift_forest_with_nan():
         max_depth=4,
         min_samples_leaf=100,
         random_state=RANDOM_SEED,
+        n_jobs=-1,
     )
     assert model.__sklearn_tags__().input_tags.allow_nan is True
     model.fit(X=Xn, treatment=treatment, y=y)
