@@ -4,6 +4,7 @@ import logging
 import numpy as np
 import pandas as pd
 import seaborn as sns
+from scipy import stats
 from lightgbm import LGBMRegressor
 from ..inference.meta.tmle import TMLELearner
 
@@ -775,6 +776,78 @@ def plot_tmleqini(
     )
 
 
+def _validate_bootstrap_args(n_bootstrap, alpha):
+    """Reject bootstrap settings that would produce an interval meaning nothing."""
+    if n_bootstrap < 1:
+        raise ValueError(
+            "n_bootstrap must be a positive integer, got {}".format(n_bootstrap)
+        )
+    if not 0 < alpha < 1:
+        raise ValueError(
+            "alpha must lie strictly between 0 and 1, got {}".format(alpha)
+        )
+
+
+def _bootstrap_score_ci(
+    df, score_fn, point, score_name, n_bootstrap, alpha, random_state, p_value=True
+):
+    """Half-sample bootstrap interval for a curve-summary score.
+
+    Draws m = n // 2 units without replacement, exactly as ``rate_score()`` does,
+    and for the same reason: these scores are functionals of a *ranking*, and the
+    m-out-of-n bootstrap stays valid where the naive n-out-of-n resample of a
+    non-smooth functional need not.
+
+    ``score_fn`` is the scoring function itself, called on each resample, so the
+    bootstrap can never drift from the point estimate it is an interval around.
+
+    Args:
+        df (pandas.DataFrame): the data the point estimate was computed on
+        score_fn (callable): maps a data frame to a Series of scores per model
+        point (pandas.Series): the point estimates
+        score_name (str): name for the point-estimate column in the result
+        n_bootstrap (int): number of half-sample draws
+        alpha (float): significance level
+        random_state (int or None): seed for the resampler
+        p_value (bool, optional): whether H0 = 0 is a meaningful null for this
+            score. True for Qini, which is already measured against random.
+            False for AUUC, whose random baseline is about 0.5 rather than 0.
+
+    Returns:
+        (pandas.DataFrame): score, se, ci_lower, ci_upper and, when meaningful,
+            p_value, indexed by model
+    """
+    n = len(df)
+    m = n // 2
+    rng = np.random.default_rng(random_state)
+    boot_scores = {model: [] for model in point.index}
+
+    for _ in range(n_bootstrap):
+        idx = rng.choice(n, size=m, replace=False)
+        resampled = score_fn(df.iloc[idx].reset_index(drop=True))
+        for model in point.index:
+            boot_scores[model].append(resampled[model])
+
+    z_crit = stats.norm.ppf(1 - alpha / 2)
+    results = []
+    for model in point.index:
+        estimate = point[model]
+        se = np.std(np.array(boot_scores[model]), ddof=1)
+        row = {
+            "model": model,
+            score_name: estimate,
+            "se": se,
+            "ci_lower": estimate - z_crit * se,
+            "ci_upper": estimate + z_crit * se,
+        }
+        if p_value:
+            z_stat = estimate / se if se > 0 else np.inf
+            row["p_value"] = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+        results.append(row)
+
+    return pd.DataFrame(results).set_index("model")
+
+
 def auuc_score(
     df,
     outcome_col="y",
@@ -783,6 +856,10 @@ def auuc_score(
     normalize=True,
     tmle=False,
     *args,
+    return_ci=False,
+    n_bootstrap=200,
+    alpha=0.05,
+    random_state=None,
     **kwarg,
 ):
     """Calculate the AUUC (Area Under the Uplift Curve) score.
@@ -795,10 +872,32 @@ def auuc_score(
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
         normalize (bool, optional): whether to normalize the y-axis to 1 or not
+        return_ci (bool, optional): whether to return standard errors and bootstrap
+            confidence intervals. Default False, so existing callers are unaffected.
+        n_bootstrap (int, optional): number of half-sample bootstrap iterations.
+            Only used when return_ci=True. Default 200.
+        alpha (float, optional): significance level for confidence intervals.
+            Only used when return_ci=True. Default 0.05.
+        random_state (int or None, optional): random seed for the bootstrap sampler.
+            Pass an integer for reproducible results. Default None.
 
     Returns:
-        (float): the AUUC score
+        If return_ci=False:
+            (float): the AUUC score
+        If return_ci=True:
+            (pandas.DataFrame): AUUC score, standard error and confidence interval
+                bounds for each model estimate column.
+
+    Note:
+        No p-value is reported for AUUC. A ranking drawn at random scores about 0.5
+        here rather than 0, so testing H0: AUUC = 0 would reject for essentially
+        every model and say nothing about whether the model beats random. Use
+        ``qini_score()``, which is already measured against the random curve, when
+        a test against random is what is wanted.
     """
+    if return_ci:
+        _validate_bootstrap_args(n_bootstrap, alpha)
+
     required_cols = {outcome_col, treatment_col, treatment_effect_col}
     model_names = [x for x in df.columns if x not in required_cols]
     if len(model_names) == 0:
@@ -814,10 +913,36 @@ def auuc_score(
             df, outcome_col, treatment_col, treatment_effect_col, normalize
         )
     else:
+        if return_ci:
+            raise ValueError(
+                "return_ci=True is not supported with tmle=True: each bootstrap "
+                "draw would refit the TMLE learner. Score without tmle for an "
+                "interval, or use plot_tmlegain(ci=True) for the TMLE path."
+            )
         cumgain = get_tmlegain(
             df, outcome_col=outcome_col, treatment_col=treatment_col, *args, **kwarg
         )
-    return cumgain.sum() / cumgain.shape[0]
+    point = cumgain.sum() / cumgain.shape[0]
+
+    if not return_ci:
+        return point
+
+    return _bootstrap_score_ci(
+        df,
+        lambda resampled: auuc_score(
+            resampled,
+            outcome_col=outcome_col,
+            treatment_col=treatment_col,
+            treatment_effect_col=treatment_effect_col,
+            normalize=normalize,
+        ),
+        point,
+        "auuc",
+        n_bootstrap,
+        alpha,
+        random_state,
+        p_value=False,
+    )
 
 
 def qini_score(
@@ -828,6 +953,10 @@ def qini_score(
     normalize=True,
     tmle=False,
     *args,
+    return_ci=False,
+    n_bootstrap=200,
+    alpha=0.05,
+    random_state=None,
     **kwarg,
 ):
     """Calculate the Qini score: the area between the Qini curves of a model and random.
@@ -841,20 +970,67 @@ def qini_score(
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
         normalize (bool, optional): whether to normalize the y-axis to 1 or not
+        return_ci (bool, optional): whether to return standard errors, bootstrap
+            confidence intervals and p-values. Default False, so existing callers
+            are unaffected.
+        n_bootstrap (int, optional): number of half-sample bootstrap iterations.
+            Only used when return_ci=True. Default 200.
+        alpha (float, optional): significance level for confidence intervals.
+            Only used when return_ci=True. Default 0.05.
+        random_state (int or None, optional): random seed for the bootstrap sampler.
+            Pass an integer for reproducible results. Default None.
 
     Returns:
-        (float): the Qini score
+        If return_ci=False:
+            (float): the Qini score
+        If return_ci=True:
+            (pandas.DataFrame): Qini score, standard error, confidence interval bounds
+                and p-value for each model estimate column.
+
+    Note:
+        The p-value tests H0: Qini = 0, which here means the model's ranking is no
+        better than random at finding units that benefit. That null is meaningful
+        because the score is already the area *between* the model curve and the
+        random curve — unlike AUUC, whose random baseline is about 0.5.
     """
+    if return_ci:
+        _validate_bootstrap_args(n_bootstrap, alpha)
 
     if not tmle:
         qini = get_qini(df, outcome_col, treatment_col, treatment_effect_col, normalize)
     else:
+        if return_ci:
+            raise ValueError(
+                "return_ci=True is not supported with tmle=True: each bootstrap "
+                "draw would refit the TMLE learner. Score without tmle for an "
+                "interval, or use plot_tmleqini(ci=True) for the TMLE path."
+            )
         qini = get_tmleqini(
             df, outcome_col=outcome_col, treatment_col=treatment_col, *args, **kwarg
         )
 
     random_area = np.linspace(qini.iloc[0, 0], qini.iloc[-1, 0], qini.shape[0]).sum()
-    return (qini.sum(axis=0) - random_area) / qini.shape[0]
+    point = (qini.sum(axis=0) - random_area) / qini.shape[0]
+
+    if not return_ci:
+        return point
+
+    return _bootstrap_score_ci(
+        df,
+        lambda resampled: qini_score(
+            resampled,
+            outcome_col=outcome_col,
+            treatment_col=treatment_col,
+            treatment_effect_col=treatment_effect_col,
+            normalize=normalize,
+        ),
+        point,
+        "qini",
+        n_bootstrap,
+        alpha,
+        random_state,
+        p_value=True,
+    )
 
 
 def plot_ps_diagnostics(df, covariate_col, treatment_col="w", p_col="p", bal_tol=0.1):
