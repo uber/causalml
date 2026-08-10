@@ -535,3 +535,24 @@ def test_timeit_preserves_signature():
     assert CausalTreeRegressor.bootstrap_pool.__name__ == "bootstrap_pool"
     params = _positional_params(CausalTreeRegressor.bootstrap_pool.__wrapped__)
     assert params[:3] == ["X", "treatment", "y"]
+
+
+def test_arg_order_warning_is_an_error_under_the_repo_pytest_config():
+    """The suite must fail, not merely print, when the shim warns.
+
+    ``filterwarnings`` in ``pyproject.toml`` selects this warning by message, so
+    editing the text in ``_arg_order.py`` would stop it matching and the guard
+    would go quiet while CI stayed green. Both internal-positional-call
+    regressions (#988, #989) were found only by running the suite by hand with
+    ``-W error::FutureWarning``; this test fails if that lane is ever removed or
+    stops matching (#995).
+
+    The warning is raised before the wrapped method runs, so these arrays are
+    never actually fitted.
+    """
+    X = np.zeros((4, 2))
+    treatment = np.array([0, 1, 0, 1])
+    y = np.zeros(4)
+
+    with pytest.raises(FutureWarning, match="argument order"):
+        BaseSRegressor(learner=LinearRegression()).fit(X, treatment, y)

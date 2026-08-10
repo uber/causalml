@@ -76,6 +76,18 @@ requires = [
 [project.urls]
 homepage = "https://github.com/uber/causalml"
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    # CausalML's own #854 argument-order deprecation must never fire during the
+    # suite: it means the library called a shimmed method positionally, and a
+    # user calling the API correctly would see the warning with nothing to fix.
+    # Scoped to this one message rather than all FutureWarnings, so a warning
+    # from numpy, pandas or scikit-learn cannot fail the build on a dependency
+    # release. Tests that assert the warning use `pytest.warns`, which is
+    # unaffected.
+    'error:Passing .treatment. and/or .y. to \w+\(\) by position is deprecated:FutureWarning',
+]
+
 [tool.cibuildwheel]
 build = ["cp311-*", "cp312-*"]
 build-verbosity = 1
