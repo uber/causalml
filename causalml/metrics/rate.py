@@ -122,6 +122,7 @@ def _bootstrap_score_ci(
 
     return pd.DataFrame(results).set_index("model")
 
+
 def get_toc(
     df,
     outcome_col="y",
