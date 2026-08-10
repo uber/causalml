@@ -6,10 +6,7 @@ import pytest
 
 from causalml.metrics.visualize import auuc_score, qini_score
 
-try:
-    from tests.const import RANDOM_SEED
-except ImportError:
-    RANDOM_SEED = 42
+from .const import RANDOM_SEED
 
 N_BOOTSTRAP = 100
 
@@ -227,3 +224,43 @@ def test_bootstrap_arguments_are_ignored_when_ci_is_not_requested(uplift_df, sco
     result = score_fn(uplift_df, n_bootstrap=0, alpha=5.0)
 
     assert isinstance(result, pd.Series)
+
+
+@pytest.mark.parametrize("score_fn", [auuc_score, qini_score])
+def test_single_draw_is_rejected_rather_than_producing_a_nan_standard_error(
+    uplift_df, score_fn
+):
+    """A single bootstrap draw has no standard error: ``np.std(ddof=1)`` is NaN.
+
+    Left to run, that NaN reached the interval bounds while the p-value was computed
+    from ``se > 0 else np.inf`` and came out 0.0 — a certain-looking answer produced
+    by the absence of a measurement.
+    """
+    with pytest.raises(ValueError, match="at least 2"):
+        score_fn(uplift_df, return_ci=True, n_bootstrap=1, random_state=RANDOM_SEED)
+
+
+def test_degenerate_resample_reports_no_p_value():
+    """When every draw lands on the same value the standard error is 0.
+
+    There is no p-value to report there, and NaN says so; dividing by zero would
+    have said p = 0.0 instead.
+    """
+    from causalml.metrics.rate import _bootstrap_score_ci
+
+    df = pd.DataFrame({"y": np.arange(40)})
+    constant = lambda resampled: pd.Series({"model_a": 1.0})  # noqa: E731
+
+    out = _bootstrap_score_ci(
+        df,
+        constant,
+        pd.Series({"model_a": 1.0}),
+        "score",
+        n_bootstrap=5,
+        alpha=0.05,
+        random_state=RANDOM_SEED,
+        p_value=True,
+    )
+
+    assert out["se"].iloc[0] == 0
+    assert np.isnan(out["p_value"].iloc[0])

@@ -36,6 +36,92 @@ def _compute_rate_from_toc(toc, weighting):
     )
 
 
+def _validate_bootstrap_args(n_bootstrap, alpha):
+    """Reject bootstrap settings that would produce an interval meaning nothing.
+
+    ``n_bootstrap`` must be at least 2: the standard error is ``np.std(..., ddof=1)``
+    over the draws, which is NaN for a single draw, and a NaN standard error would
+    otherwise travel onward as NaN interval bounds beside a confident-looking p-value.
+    """
+    if n_bootstrap < 2:
+        raise ValueError(
+            "n_bootstrap must be at least 2 to estimate a standard error, got {}".format(
+                n_bootstrap
+            )
+        )
+    if not 0 < alpha < 1:
+        raise ValueError(
+            "alpha must lie strictly between 0 and 1, got {}".format(alpha)
+        )
+
+
+def _bootstrap_score_ci(
+    df, score_fn, point, score_name, n_bootstrap, alpha, random_state, p_value=True
+):
+    """Half-sample bootstrap interval for a curve-summary score.
+
+    Draws m = n // 2 units without replacement, exactly as ``rate_score()`` does,
+    and for the same reason: these scores are functionals of a *ranking*, and the
+    m-out-of-n bootstrap stays valid where the naive n-out-of-n resample of a
+    non-smooth functional need not.
+
+    ``score_fn`` is the scoring function itself, called on each resample, so the
+    bootstrap can never drift from the point estimate it is an interval around.
+
+    Args:
+        df (pandas.DataFrame): the data the point estimate was computed on
+        score_fn (callable): maps a data frame to a Series of scores per model
+        point (pandas.Series): the point estimates
+        score_name (str): name for the point-estimate column in the result
+        n_bootstrap (int): number of half-sample draws
+        alpha (float): significance level
+        random_state (int or None): seed for the resampler
+        p_value (bool, optional): whether H0 = 0 is a meaningful null for this
+            score. True for Qini, which is already measured against random.
+            False for AUUC, whose random baseline is about 0.5 rather than 0.
+
+    Returns:
+        (pandas.DataFrame): score, se, ci_lower, ci_upper and, when meaningful,
+            p_value, indexed by model
+    """
+    n = len(df)
+    m = n // 2
+    rng = np.random.default_rng(random_state)
+    boot_scores = {model: [] for model in point.index}
+
+    for _ in range(n_bootstrap):
+        idx = rng.choice(n, size=m, replace=False)
+        resampled = score_fn(df.iloc[idx].reset_index(drop=True))
+        for model in point.index:
+            boot_scores[model].append(resampled[model])
+
+    z_crit = stats.norm.ppf(1 - alpha / 2)
+    results = []
+    for model in point.index:
+        estimate = point[model]
+        se = np.std(np.array(boot_scores[model]), ddof=1)
+        row = {
+            "model": model,
+            score_name: estimate,
+            "se": se,
+            "ci_lower": estimate - z_crit * se,
+            "ci_upper": estimate + z_crit * se,
+        }
+        if p_value:
+            # A p-value is only defined when the standard error is a real, positive
+            # number. Where it is not — a degenerate resample, or every draw landing
+            # on the same value — the honest answer is NaN. Dividing by a zero or NaN
+            # standard error would report p = 0.0 next to NaN interval bounds, which
+            # reads as certainty produced by the absence of a measurement.
+            if np.isfinite(se) and se > 0:
+                z_stat = estimate / se
+                row["p_value"] = 2 * (1 - stats.norm.cdf(abs(z_stat)))
+            else:
+                row["p_value"] = np.nan
+        results.append(row)
+
+    return pd.DataFrame(results).set_index("model")
+
 def get_toc(
     df,
     outcome_col="y",
@@ -272,49 +358,28 @@ def rate_score(
     if not return_ci:
         return rate
 
-    # Half-sample bootstrap for SE and p-value
-    n = len(df)
-    m = n // 2
-    model_names = toc.columns.tolist()
-    boot_scores = {model: [] for model in model_names}
+    _validate_bootstrap_args(n_bootstrap, alpha)
 
-    rng = np.random.default_rng(random_state)
-    for _ in range(n_bootstrap):
-        idx = rng.choice(n, size=m, replace=False)
-        df_boot = df.iloc[idx].reset_index(drop=True)
+    def _score(resampled):
         toc_boot = get_toc(
-            df_boot,
+            resampled,
             outcome_col=outcome_col,
             treatment_col=treatment_col,
             treatment_effect_col=treatment_effect_col,
             normalize=normalize,
         )
-        rate_boot = _compute_rate_from_toc(toc_boot, weighting)
-        for model in model_names:
-            boot_scores[model].append(rate_boot[model])
+        return _compute_rate_from_toc(toc_boot, weighting)
 
-    z_crit = stats.norm.ppf(1 - alpha / 2)
-    results = []
-    for model in model_names:
-        point = rate[model]
-        boot = np.array(boot_scores[model])
-        se = np.std(boot, ddof=1)
-        ci_lower = point - z_crit * se
-        ci_upper = point + z_crit * se
-        z_stat = point / se if se > 0 else np.inf
-        p_value = 2 * (1 - stats.norm.cdf(abs(z_stat)))
-        results.append(
-            {
-                "model": model,
-                "rate": point,
-                "se": se,
-                "ci_lower": ci_lower,
-                "ci_upper": ci_upper,
-                "p_value": p_value,
-            }
-        )
-
-    return pd.DataFrame(results).set_index("model")
+    return _bootstrap_score_ci(
+        df,
+        _score,
+        rate,
+        "rate",
+        n_bootstrap=n_bootstrap,
+        alpha=alpha,
+        random_state=random_state,
+        p_value=True,
+    )
 
 
 def plot_toc(

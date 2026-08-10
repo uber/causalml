@@ -7,6 +7,7 @@ import seaborn as sns
 from scipy import stats
 from lightgbm import LGBMRegressor
 from ..inference.meta.tmle import TMLELearner
+from .rate import _bootstrap_score_ci, _validate_bootstrap_args
 
 plt.style.use("fivethirtyeight")
 sns.set_palette("Paired")
@@ -776,78 +777,6 @@ def plot_tmleqini(
     )
 
 
-def _validate_bootstrap_args(n_bootstrap, alpha):
-    """Reject bootstrap settings that would produce an interval meaning nothing."""
-    if n_bootstrap < 1:
-        raise ValueError(
-            "n_bootstrap must be a positive integer, got {}".format(n_bootstrap)
-        )
-    if not 0 < alpha < 1:
-        raise ValueError(
-            "alpha must lie strictly between 0 and 1, got {}".format(alpha)
-        )
-
-
-def _bootstrap_score_ci(
-    df, score_fn, point, score_name, n_bootstrap, alpha, random_state, p_value=True
-):
-    """Half-sample bootstrap interval for a curve-summary score.
-
-    Draws m = n // 2 units without replacement, exactly as ``rate_score()`` does,
-    and for the same reason: these scores are functionals of a *ranking*, and the
-    m-out-of-n bootstrap stays valid where the naive n-out-of-n resample of a
-    non-smooth functional need not.
-
-    ``score_fn`` is the scoring function itself, called on each resample, so the
-    bootstrap can never drift from the point estimate it is an interval around.
-
-    Args:
-        df (pandas.DataFrame): the data the point estimate was computed on
-        score_fn (callable): maps a data frame to a Series of scores per model
-        point (pandas.Series): the point estimates
-        score_name (str): name for the point-estimate column in the result
-        n_bootstrap (int): number of half-sample draws
-        alpha (float): significance level
-        random_state (int or None): seed for the resampler
-        p_value (bool, optional): whether H0 = 0 is a meaningful null for this
-            score. True for Qini, which is already measured against random.
-            False for AUUC, whose random baseline is about 0.5 rather than 0.
-
-    Returns:
-        (pandas.DataFrame): score, se, ci_lower, ci_upper and, when meaningful,
-            p_value, indexed by model
-    """
-    n = len(df)
-    m = n // 2
-    rng = np.random.default_rng(random_state)
-    boot_scores = {model: [] for model in point.index}
-
-    for _ in range(n_bootstrap):
-        idx = rng.choice(n, size=m, replace=False)
-        resampled = score_fn(df.iloc[idx].reset_index(drop=True))
-        for model in point.index:
-            boot_scores[model].append(resampled[model])
-
-    z_crit = stats.norm.ppf(1 - alpha / 2)
-    results = []
-    for model in point.index:
-        estimate = point[model]
-        se = np.std(np.array(boot_scores[model]), ddof=1)
-        row = {
-            "model": model,
-            score_name: estimate,
-            "se": se,
-            "ci_lower": estimate - z_crit * se,
-            "ci_upper": estimate + z_crit * se,
-        }
-        if p_value:
-            z_stat = estimate / se if se > 0 else np.inf
-            row["p_value"] = 2 * (1 - stats.norm.cdf(abs(z_stat)))
-        results.append(row)
-
-    return pd.DataFrame(results).set_index("model")
-
-
 def auuc_score(
     df,
     outcome_col="y",
@@ -883,7 +812,7 @@ def auuc_score(
 
     Returns:
         If return_ci=False:
-            (float): the AUUC score
+            (pandas.Series): the AUUC score for each model estimate column
         If return_ci=True:
             (pandas.DataFrame): AUUC score, standard error and confidence interval
                 bounds for each model estimate column.
@@ -982,7 +911,7 @@ def qini_score(
 
     Returns:
         If return_ci=False:
-            (float): the Qini score
+            (pandas.Series): the Qini score for each model estimate column
         If return_ci=True:
             (pandas.DataFrame): Qini score, standard error, confidence interval bounds
                 and p-value for each model estimate column.
