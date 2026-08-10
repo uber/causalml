@@ -24,6 +24,18 @@ Behavior Changes
   This matches ``CausalRandomForestRegressor`` and scikit-learn's forests, which use the same
   across-trees parallelism and default to serial.
 
+* **`causalml.features.load_data` now returns** ``numpy.ndarray`` **instead of**
+  ``numpy.matrix`` **(#978).** This was the only function in the package that returned a
+  ``numpy.matrix``. Code that relied on matrix semantics — ``*`` as matrix multiplication,
+  or an always-2-D result from indexing — needs ``np.asmatrix()`` around the call or,
+  preferably, the equivalent ``ndarray`` operation. ``numpy.matrix`` carries a
+  ``PendingDeprecationWarning`` upstream.
+
+  The same change fixes an ``AssertionError`` raised whenever the one-hot encoder produced
+  no columns: with an all-numeric feature list, a constant categorical column, or a
+  high-cardinality column whose levels all fall below ``min_obs``. All three now return a
+  feature matrix instead of raising (#978, #979).
+
 Deprecations
 ~~~~~~~~~~~~
 * **Positional** ``treatment`` **and** ``y`` **are deprecated (#854).** In v1.0 every
