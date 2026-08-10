@@ -28,8 +28,8 @@ CausalML currently supports the following methods:
     - :ref:`2-Stage Least Squares (2SLS)`
     - :ref:`Doubly Robust Instrumental Variable (DRIV) learner`
 - Neural network based algorithms
-    - CEVAE
-    - DragonNet
+    - :ref:`CEVAE`
+    - :ref:`DragonNet`
 - Treatment optimization algorithms
     - :ref:`Counterfactual Unit Selection`
     - :ref:`Counterfactual Value Estimator`
@@ -370,6 +370,102 @@ The final Uplift Tree algorithm that is implemented is the Contextual Treatment 
 
 where :math:`\phi_l` and :math:`\phi_r` refer to the feature subspaces in the left leaf and the right leaves respectively, :math:`\hat{p}(\phi_j \mid \phi)` denotes the estimated conditional probability of a subject's being in :math:`\phi_j` given :math:`\phi`, and :math:`\hat{y}_t(\phi_j)` is the conditional expected response under treatment :math:`t`.
 
+
+Neural Network Algorithms
+-------------------------
+
+Both methods below are optional backends. Install them with the ``tf``, ``torch``
+or ``jax`` extras, e.g. ``pip install causalml[tf]``.
+
+CEVAE
+~~~~~
+
+The Causal Effect Variational Autoencoder (CEVAE) :cite:`louizos2017causal`
+targets the case where the confounders are never observed directly. Instead of
+assuming that the covariates :math:`X` satisfy unconfoundedness, it assumes
+:math:`X` are noisy **proxies** for a latent confounder :math:`Z` — for example,
+a zip code standing in for socio-economic status — and recovers the treatment
+effect by inferring :math:`Z`.
+
+The generative model is
+
+.. math::
+   Z \sim p(Z), \quad
+   X \sim p(X \mid Z), \quad
+   W \sim p(W \mid Z), \quad
+   Y \sim p(Y \mid W, Z)
+
+where each distribution is parameterised by a neural network. The outcome model
+uses a disjoint pair of networks for :math:`p(Y \mid W=0, Z)` and
+:math:`p(Y \mid W=1, Z)`, so a treatment arm with few observations does not have
+its outcome head diluted by the other arm.
+
+Because :math:`Z` is latent, the posterior :math:`p(Z \mid X, W, Y)` is
+intractable. CEVAE approximates it with an inference network
+:math:`q(Z \mid X, W, Y)` trained jointly with the generative model by
+maximising the evidence lower bound (ELBO). Two auxiliary networks,
+:math:`q(W \mid X)` and :math:`q(Y \mid X, W)`, are trained alongside it, because
+at prediction time only :math:`X` is available: the treatment and outcome that
+the inference network expects have to be supplied by the auxiliary heads before
+:math:`Z` can be inferred for a new unit.
+
+The CATE estimate marginalises the outcome heads over the inferred latent:
+
+.. math::
+   \hat\tau(x) = \mathbb{E}_{Z \sim q(Z \mid X=x)}
+       \big[\mathbb{E}[Y \mid W=1, Z] - \mathbb{E}[Y \mid W=0, Z]\big]
+
+CausalML wraps Pyro's implementation in ``causalml.inference.torch.CEVAE`` and
+also ships a JAX/``flax.nnx`` backend.
+
+DragonNet
+~~~~~~~~~
+
+DragonNet :cite:`shi2019adapting` starts from the sufficiency of the propensity
+score: if adjusting for :math:`X` suffices to identify the treatment effect, then
+adjusting for :math:`e(X) = P(W=1 \mid X)` alone also suffices. A representation
+of :math:`X` therefore only has to retain what predicts treatment, and a
+representation trained purely to predict the outcome may discard exactly that.
+
+The architecture makes this explicit with three heads on a shared trunk
+:math:`Z(x)` of three fully-connected layers:
+
+- a **propensity head** :math:`\hat{e}(x)`, a single sigmoid unit on
+  :math:`Z(x)`;
+- two **outcome heads** :math:`\hat{Q}(0, x)` and :math:`\hat{Q}(1, x)`, each its
+  own stack of layers.
+
+Attaching the propensity head directly to :math:`Z(x)` — with no hidden layer of
+its own — is what forces the shared trunk to keep the propensity information
+rather than discarding it in favour of outcome prediction.
+
+The second contribution is **targeted regularization**, which adds a trainable
+scalar :math:`\epsilon` and an extra loss term. Writing
+:math:`\hat{y} = w\hat{Q}(1,x) + (1-w)\hat{Q}(0,x)` and
+
+.. math::
+   h(w, x) = \frac{w}{\hat{e}(x)} - \frac{1-w}{1 - \hat{e}(x)}
+
+the perturbed prediction is :math:`\tilde{y} = \hat{y} + \epsilon \, h(w, x)`, and
+the training objective becomes
+
+.. math::
+   \mathcal{L} = \mathcal{L}_{\text{DragonNet}}
+       + \beta \sum_i \big(y_i - \tilde{y}_i\big)^2
+
+with :math:`\beta` the ``ratio`` argument. This is a one-step correction in the
+spirit of :ref:`TMLE <Targeted maximum likelihood estimation (TMLE) for ATE>`:
+at the optimum the fitted model satisfies the estimating equation for the ATE,
+which is what gives the resulting estimator its asymptotic guarantees. It is
+enabled by default via ``targeted_reg=True``.
+
+The CATE estimate is the difference of the two outcome heads:
+
+.. math::
+   \hat\tau(x) = \hat{Q}(1, x) - \hat{Q}(0, x)
+
+CausalML ships DragonNet as ``causalml.inference.tf.DragonNet`` (TensorFlow) and
+a JAX/``flax.nnx`` backend.
 
 Value optimization methods
 --------------------------
