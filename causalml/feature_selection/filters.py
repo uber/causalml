@@ -377,10 +377,15 @@ class FilterSelect:
             pk (float): Probability of class 1 in treatment group
             qk (float): Probability of class 1 in control group
         """
-        if qk < 0.1**6:
-            qk = 0.1**6
-        elif qk > 1 - 0.1**6:
-            qk = 1 - 0.1**6
+        eps = 0.1**6
+        if qk < eps:
+            qk = eps
+        elif qk > 1 - eps:
+            qk = 1 - eps
+        if pk < eps:
+            pk = eps
+        elif pk > 1 - eps:
+            pk = 1 - eps
         S = pk * np.log(pk / qk) + (1 - pk) * np.log((1 - pk) / (1 - qk))
         return S
 

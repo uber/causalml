@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import pytest
 
 from causalml.feature_selection.filters import FilterSelect
@@ -100,3 +101,32 @@ def test_filter_f_accepts_continuous_outcome(generate_classification_data):
         df, X_names, CONVERSION, "F", treatment_group="treatment1"
     )
     assert f_imp.shape[0] == len(X_names)
+
+
+def test_filter_kl_bin_with_no_conversions():
+    """A bin where nobody converted must not turn the whole score into NaN.
+
+    ``_kl_divergence`` clamps the control probability away from 0 and 1 but not
+    the treatment one, so ``pk = 0`` gives ``0 * log(0 / qk)`` -> NaN, and the
+    NaN then propagates through the bin sum to the feature's score and rank.
+    """
+    n = 400
+    x = np.arange(n) % 20 * 1.0
+    df = pd.DataFrame(
+        {
+            "x": x,
+            "treatment_group_key": np.where(
+                np.arange(n) % 2 == 0, "control", "treatment"
+            ),
+            # conversions only happen in the upper half of x, so the lower bins
+            # have no converters in either arm
+            CONVERSION: ((x >= 10) & (np.arange(n) % 3 == 0)).astype(int),
+        }
+    )
+
+    imp = FilterSelect().filter_D(
+        data=df, features=["x"], y_name=CONVERSION, n_bins=5, method="KL"
+    )
+
+    assert np.isfinite(imp["score"].values[0])
+    assert imp["rank"].values[0] == 1
