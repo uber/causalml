@@ -4,7 +4,6 @@ import logging
 import numpy as np
 import pandas as pd
 import seaborn as sns
-from scipy import stats
 from lightgbm import LGBMRegressor
 from ..inference.meta.tmle import TMLELearner
 from .rate import _bootstrap_score_ci, _validate_bootstrap_args

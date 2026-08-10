@@ -60,10 +60,9 @@ def _bootstrap_score_ci(
 ):
     """Half-sample bootstrap interval for a curve-summary score.
 
-    Draws m = n // 2 units without replacement, exactly as ``rate_score()`` does,
-    and for the same reason: these scores are functionals of a *ranking*, and the
-    m-out-of-n bootstrap stays valid where the naive n-out-of-n resample of a
-    non-smooth functional need not.
+    Draws m = n // 2 units without replacement: these scores are functionals of
+    a *ranking*, and the m-out-of-n bootstrap stays valid where the naive
+    n-out-of-n resample of a non-smooth functional need not.
 
     ``score_fn`` is the scoring function itself, called on each resample, so the
     bootstrap can never drift from the point estimate it is an interval around.
