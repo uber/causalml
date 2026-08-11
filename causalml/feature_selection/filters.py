@@ -382,11 +382,16 @@ class FilterSelect:
             qk = eps
         elif qk > 1 - eps:
             qk = 1 - eps
-        if pk < eps:
-            pk = eps
-        elif pk > 1 - eps:
-            pk = 1 - eps
-        S = pk * np.log(pk / qk) + (1 - pk) * np.log((1 - pk) / (1 - qk))
+
+        # pk = 0 and pk = 1 send one of the two terms to 0 * log(0), which numpy
+        # evaluates as NaN rather than the 0 the limit gives. Take the limits
+        # directly, as _kl_divergence in inference/tree/_uplift/_criterion.pyx does.
+        if pk == 0:
+            S = -np.log(1 - qk)
+        elif pk == 1:
+            S = -np.log(qk)
+        else:
+            S = pk * np.log(pk / qk) + (1 - pk) * np.log((1 - pk) / (1 - qk))
         return S
 
     def _evaluate_KL(self, nodeSummary, control_group="control"):

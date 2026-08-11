@@ -130,3 +130,44 @@ def test_filter_kl_bin_with_no_conversions():
 
     assert np.isfinite(imp["score"].values[0])
     assert imp["rank"].values[0] == 1
+
+
+@pytest.mark.parametrize(
+    "pk, qk",
+    [(0.0, 0.5), (1.0, 0.5), (0.0, 0.001), (1.0, 0.001), (0.0, 0.999)],
+)
+def test_kl_divergence_at_the_limits(pk, qk):
+    """``pk`` at 0 or 1 must give the limit, not an epsilon-shifted approximation.
+
+    Clamping ``pk`` keeps the result finite but biased low, by ~0.8% at
+    ``qk = 0.001``. ``_kl_divergence`` in
+    ``causalml/inference/tree/_uplift/_criterion.pyx`` already takes the limits
+    directly; this keeps the two implementations agreeing.
+    """
+    expected = -np.log(1 - qk) if pk == 0 else -np.log(qk)
+
+    assert FilterSelect._kl_divergence(pk, qk) == pytest.approx(expected, rel=1e-12)
+
+
+def test_filter_kl_bin_where_everyone_converted():
+    """``pk = 1`` is the other NaN trigger: a bin in which every unit converted."""
+    n = 400
+    x = np.arange(n) % 20 * 1.0
+    df = pd.DataFrame(
+        {
+            "x": x,
+            "treatment_group_key": np.where(
+                np.arange(n) % 2 == 0, "control", "treatment"
+            ),
+            # the upper bins convert in both arms, so their treatment probability
+            # is exactly 1
+            CONVERSION: (x >= 10).astype(int),
+        }
+    )
+
+    imp = FilterSelect().filter_D(
+        data=df, features=["x"], y_name=CONVERSION, n_bins=5, method="KL"
+    )
+
+    assert np.isfinite(imp["score"].values[0])
+    assert imp["rank"].values[0] == 1
