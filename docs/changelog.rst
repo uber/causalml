@@ -65,6 +65,7 @@ New Features
 
   ``ccp_alpha="cv"`` requires ``honesty=True`` and raises otherwise, since the
   cross-validation scores candidate subtrees with the honest objective.
+
 * **`UpliftTreeClassifier` can prune inside** ``fit`` **(#1003).** ``prune_fraction``
   (default ``None``, off) holds out that fraction of the rows stratified on
   (treatment, outcome), grows the tree on the rest, and runs the existing ``prune()``
@@ -86,10 +87,13 @@ New Features
 Bug Fixes
 ~~~~~~~~~
 * **`UpliftTreeClassifier.prune` left `_node_group_counts` stale (#1003).** ``prune()``
-  replaces ``tree_`` without rebuilding the per-node group counts, which are indexed by
+  replaced ``tree_`` without rebuilding the per-node group counts, which are indexed by
   node id and read by the uplift-score p-value and the plot's ``group_size``. The stale
   array is longer than the pruned tree, so it returned another node's counts instead of
-  raising. The counts are now rebuilt whenever ``fit`` prunes.
+  raising. ``prune()`` now carries the counts over to the pruned node ids, so a
+  standalone call is fixed too, not only the fit-time path. A surviving node is reached
+  by the same rows either way, so the values transfer unchanged; the remap replays the
+  pruner's traversal and matches a full recomputation exactly.
 
 Behavior Changes
 ~~~~~~~~~~~~~~~~

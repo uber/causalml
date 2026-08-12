@@ -150,10 +150,8 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
             super().fit(
                 X=X_enc, y=y_2dim, sample_weight=sample_weight, check_input=check_input
             )
+            self._maybe_prune()
             self._node_group_counts = self._compute_node_group_counts(X_enc, y_2dim)
-            # Recorded for `_fit_with_pruning`, which has to redo both against the
-            # pruned tree. Structure rows only; there is no estimation half here.
-            self._fit_splits = (X_enc, y_2dim, None, None)
             return self
 
         # Honest approach (Athey & Imbens 2016): grow the tree on one split and
@@ -190,10 +188,12 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
         sw_tr = split[4] if sample_weight is not None else None
 
         super().fit(X=X_tr, y=y_tr, sample_weight=sw_tr, check_input=check_input)
+        # Prune first: `_honest_reestimate` only writes leaves, so a node promoted
+        # to a leaf afterwards would keep the value it held as an internal node.
+        self._maybe_prune()
         self._honest_reestimate(X_est, y_est)
         # Per-group counts for plotting come from the structure (train) split.
         self._node_group_counts = self._compute_node_group_counts(X_tr, y_tr)
-        self._fit_splits = (X_tr, y_tr, X_est, y_est)
         return self
 
     def _fit_with_pruning(
@@ -204,18 +204,14 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
         sample_weight: Union[np.ndarray, None],
         check_input: bool,
     ):
-        """Grow on part of the sample and prune on the rest (``prune_fraction``).
+        """Hold rows out for pruning, then fit normally (``prune_fraction``).
 
-        The pruning rows are taken out first, so neither the split search nor the
-        honest estimation half sees them -- a split kept because it helps on rows
-        that chose it is exactly what pruning is meant to catch.
-
-        Order matters. Pruning collapses leaves, so the honest re-estimation and
-        the per-node group counts are redone against the pruned tree: the former
-        because ``_honest_reestimate`` only writes leaves, so a node promoted to a
-        leaf would otherwise keep the structure-split estimate it was given as an
-        internal node; the latter because pruning renumbers nodes and
-        ``_node_group_counts`` is indexed by node id.
+        The pruning rows come out first, so neither the split search nor the honest
+        estimation half sees them -- a split kept because it helps on the rows that
+        chose it is what pruning is meant to catch. The holdout is parked on the
+        instance for :meth:`_maybe_prune`, which the ordinary fit path calls at the
+        point where the tree is grown but the leaves are not yet estimated, and is
+        dropped again on the way out so a fitted tree holds no training data.
         """
         treatment = np.asarray(treatment)
         y_arr = np.asarray(y).ravel()
@@ -243,8 +239,9 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
         y_grow, y_prune = split[4], split[5]
         sw_grow = split[6] if sample_weight is not None else None
 
-        # Grow with pruning disabled, otherwise this recurses.
+        # prune_fraction is cleared so the recursive call takes the ordinary path.
         prune_fraction, self.prune_fraction = self.prune_fraction, None
+        self._prune_holdout = (X_prune, w_prune, y_prune)
         try:
             self.fit(
                 X=X_grow,
@@ -255,7 +252,15 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
             )
         finally:
             self.prune_fraction = prune_fraction
+            del self._prune_holdout
+        return self
 
+    def _maybe_prune(self) -> None:
+        """Prune on the held-out rows, if ``fit`` set any aside."""
+        holdout = getattr(self, "_prune_holdout", None)
+        if holdout is None:
+            return
+        X_prune, w_prune, y_prune = holdout
         self.n_nodes_before_pruning_ = self.tree_.node_count
         self.prune(
             X=X_prune,
@@ -264,14 +269,6 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
             minGain=self.min_gain,
             rule=self.prune_rule,
         )
-
-        X_structure, y_structure, X_est, y_est = self._fit_splits
-        if X_est is not None:
-            self._honest_reestimate(X_est, y_est)
-        self._node_group_counts = self._compute_node_group_counts(
-            X_structure, y_structure
-        )
-        return self
 
     def _honest_reestimate(self, X_est: np.ndarray, y_est: np.ndarray) -> None:
         """Overwrite each leaf's per-group P(Y=1|T=g) on the estimation split.
@@ -517,8 +514,45 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
         leaves_in_subtree = (is_orig_leaf | collapsed).astype(np.uint8)
         pruned = Tree(self.n_features_, self.tree_.n_classes, self.n_outputs_)
         build_pruned_tree_from_mask(pruned, self.tree_, leaves_in_subtree)
+        self._remap_node_group_counts(leaves_in_subtree, pruned.node_count)
         self.tree_ = pruned
         return self
+
+    def _remap_node_group_counts(
+        self, leaves_in_subtree: np.ndarray, n_pruned_nodes: int
+    ) -> None:
+        """Carry ``_node_group_counts`` over to the pruned tree's node ids.
+
+        The counts are per-node totals of the rows reaching each node, and a node
+        that survives pruning is reached by exactly the same rows, so the values
+        transfer unchanged -- only the ids move. Collapsing a subtree does not
+        change its root's count either, since every row that reached a descendant
+        reached the root first.
+
+        Without this the array keeps the unpruned tree's length, and because it is
+        longer than the pruned tree nothing raises: ``_node_group_counts[node_id]``
+        just returns some other node's counts. The uplift-score p-value and the
+        plot's ``group_size`` read it that way.
+
+        The mapping replays ``_build_pruned_tree``'s traversal: a stack-based
+        preorder that pushes the right child before the left, so ids are assigned
+        in the order nodes are popped.
+        """
+        counts = getattr(self, "_node_group_counts", None)
+        if counts is None:
+            return
+
+        left, right = self.tree_.children_left, self.tree_.children_right
+        remapped = np.zeros((n_pruned_nodes, counts.shape[1]), dtype=counts.dtype)
+        stack, new_id = [0], 0
+        while stack:
+            old_id = stack.pop()
+            remapped[new_id] = counts[old_id]
+            new_id += 1
+            if not leaves_in_subtree[old_id]:
+                stack.append(right[old_id])
+                stack.append(left[old_id])
+        self._node_group_counts = remapped
 
     def predict_proba_by_group(
         self, X: np.ndarray, check_input: bool = True

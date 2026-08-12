@@ -960,40 +960,94 @@ def test_uplift_tree_prune_fraction_keeps_node_counts_consistent():
     assert model._node_group_counts.shape[1] == model.n_outputs_
 
 
-def test_uplift_tree_prune_fraction_reestimates_honest_leaves():
-    """With honesty on, every leaf of the pruned tree carries an estimation-half value.
+def test_uplift_tree_prune_fraction_prunes_before_honest_reestimation():
+    """Pruning runs before the honest re-estimation, not after.
 
     `_honest_reestimate` only writes leaves, so a node that pruning turns into a
-    leaf would otherwise keep the structure-split value it held as an internal
-    node. Asserted by recomputing the estimation-half per-group rates against the
-    pruned tree and comparing to what the leaves actually hold -- comparing an
-    honest fit to a plain one does not test this, since the two differ anyway
-    from the structure/estimation split.
+    leaf afterwards would keep the value it held as an internal node. The order is
+    asserted directly because the fitted tree keeps no training rows to check the
+    leaf values against.
     """
     X, treatment, y = _prune_data()
+    calls = []
+    cls = UpliftTreeClassifier
+    real_prune, real_reestimate = cls.prune, cls._honest_reestimate
+
+    def spy_prune(self, *a, **k):
+        calls.append("prune")
+        return real_prune(self, *a, **k)
+
+    def spy_reestimate(self, *a, **k):
+        calls.append("reestimate")
+        return real_reestimate(self, *a, **k)
+
+    cls.prune, cls._honest_reestimate = spy_prune, spy_reestimate
+    try:
+        model = cls(
+            control_name="control",
+            max_depth=None,
+            min_samples_leaf=20,
+            prune_fraction=0.3,
+            honesty=True,
+            random_state=RANDOM_SEED,
+        ).fit(X=X, treatment=treatment, y=y)
+    finally:
+        cls.prune, cls._honest_reestimate = real_prune, real_reestimate
+
+    assert calls == ["prune", "reestimate"]
+    assert np.isfinite(model.predict(X)).all()
+
+
+def test_uplift_tree_fit_retains_no_training_rows():
+    """A fitted tree holds no copy of the data it was fitted on.
+
+    `UpliftRandomForestClassifier` fits each tree on its own full-size bootstrap
+    copy, so an array parked on the estimator is multiplied by `n_estimators`.
+    """
+    X, treatment, y = _prune_data(n=2000)
     model = UpliftTreeClassifier(
         control_name="control",
         max_depth=None,
         min_samples_leaf=20,
         prune_fraction=0.3,
-        honesty=True,
         random_state=RANDOM_SEED,
     ).fit(X=X, treatment=treatment, y=y)
 
-    _, _, X_est, y_est = model._fit_splits
-    leaf_ids = model.tree_.apply(np.ascontiguousarray(X_est, dtype=np.float32))
-    value = model.tree_.value
-    is_leaf = model.tree_.children_left == -1
-    n_nodes = model.tree_.node_count
+    big = [
+        name
+        for name, value in vars(model).items()
+        if isinstance(value, np.ndarray) and value.shape[:1] == (X.shape[0],)
+    ]
+    assert not big, f"fitted estimator retains row-length arrays: {big}"
+    assert not hasattr(model, "_prune_holdout")
 
-    for group in range(model.n_outputs_):
-        column = y_est[:, group]
-        observed = ~np.isnan(column)
-        at = leaf_ids[observed]
-        n = np.bincount(at, minlength=n_nodes).astype(float)
-        total = np.bincount(at, weights=column[observed], minlength=n_nodes)
-        expected = np.divide(total, n, out=np.zeros_like(n), where=n > 0)
-        assert_array_almost_equal(value[is_leaf, group, 0], expected[is_leaf])
+
+def test_uplift_tree_standalone_prune_remaps_node_group_counts():
+    """`prune()` carries the per-node counts over to the pruned node ids.
+
+    Pruning renumbers nodes, and `_node_group_counts` is indexed by node id. A
+    stale array is longer than the pruned tree, so it returns another node's
+    counts rather than raising. The remap is checked against a full recomputation
+    on the original training rows.
+    """
+    X, treatment, y = _prune_data()
+    train = np.random.RandomState(RANDOM_SEED).rand(len(y)) < 0.7
+    model = UpliftTreeClassifier(
+        control_name="control",
+        max_depth=None,
+        min_samples_leaf=20,
+        random_state=RANDOM_SEED,
+    ).fit(X=X[train], treatment=treatment[train], y=y[train])
+
+    model.prune(X=X[~train], treatment=treatment[~train], y=y[~train])
+    assert model._node_group_counts.shape[0] == model.tree_.node_count
+
+    X_enc, y_2dim = model._prepare_data(
+        X=X[train], treatment=treatment[train], y=y[train]
+    )
+    assert_array_almost_equal(
+        model._node_group_counts, model._compute_node_group_counts(X_enc, y_2dim)
+    )
 
 
 def test_uplift_tree_prune_fraction_survives_clone():
