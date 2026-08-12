@@ -884,7 +884,7 @@ def test_honesty_params_survive_clone(estimator):
 
 
 # ---------------------------------------------------------------------------
-# The full CT-H algorithm (Athey and Imbens 2016), opt-in via honest_criterion:
+# The full CT-H algorithm (Athey and Imbens 2016), opt-in via ccp_alpha="cv":
 # the variance penalty scaled by 1 + N_structure/N_estimation, and tree size
 # chosen by cross-validation on that same objective.
 # ---------------------------------------------------------------------------
@@ -910,35 +910,36 @@ CT_H_PARAMS = dict(
 )
 
 
-def test_causal_tree_honest_criterion_off_by_default():
-    """``honest_criterion`` defaults to False and needs ``honesty`` to do anything."""
+def test_causal_tree_cv_penalty_off_by_default():
+    """``ccp_alpha`` defaults to 0.0 and ``"cv"`` requires ``honesty``."""
     X, treatment, y, _ = _make_noisy_effect_data()
 
-    assert CausalTreeRegressor().honest_criterion is False
-    assert CausalRandomForestRegressor().honest_criterion is False
+    assert CausalTreeRegressor().ccp_alpha == 0.0
+    assert CausalRandomForestRegressor().ccp_alpha == 0.0
 
     default = CausalTreeRegressor(**CT_H_PARAMS).fit(X=X, treatment=treatment, y=y)
-    opted_in = CausalTreeRegressor(honest_criterion=True, **CT_H_PARAMS).fit(
+    opted_in = CausalTreeRegressor(ccp_alpha="cv", **CT_H_PARAMS).fit(
         X=X, treatment=treatment, y=y
     )
     assert default.ccp_alpha_ == 0.0
     assert opted_in.ccp_alpha_ > 0.0
 
-    # Without honesty there is no structure/estimation split to price, so the flag
-    # is inert rather than half-applied.
-    adaptive_on = CausalTreeRegressor(
-        honesty=False, honest_criterion=True, **CT_H_PARAMS
-    ).fit(X=X, treatment=treatment, y=y)
-    adaptive_off = CausalTreeRegressor(honesty=False, **CT_H_PARAMS).fit(
-        X=X, treatment=treatment, y=y
-    )
-    assert np.array_equal(adaptive_on.tree_.value, adaptive_off.tree_.value)
+    # Without honesty there is no structure/estimation split for the objective the
+    # cross-validation scores, so this raises rather than silently doing nothing.
+    with pytest.raises(ValueError, match="requires honesty=True"):
+        CausalTreeRegressor(honesty=False, ccp_alpha="cv", **CT_H_PARAMS).fit(
+            X=X, treatment=treatment, y=y
+        )
+    with pytest.raises(ValueError, match="non-negative float"):
+        CausalTreeRegressor(ccp_alpha="nope", **CT_H_PARAMS).fit(
+            X=X, treatment=treatment, y=y
+        )
 
 
 @pytest.mark.parametrize(
     "estimation_sample_size, expected", [(0.5, 1.0), (0.25, 3.0), (0.75, 1 / 3)]
 )
-def test_causal_tree_honest_criterion_scales_variance_penalty(
+def test_causal_tree_cv_penalty_scales_variance_penalty(
     estimation_sample_size, expected
 ):
     """The penalty scale is ``N_structure / N_estimation``, the paper's factor of 2 at 0.5.
@@ -951,7 +952,7 @@ def test_causal_tree_honest_criterion_scales_variance_penalty(
     X, treatment, y, _ = _make_noisy_effect_data(n=2000)
 
     honest = CausalTreeRegressor(
-        honest_criterion=True,
+        ccp_alpha="cv",
         estimation_sample_size=estimation_sample_size,
         **CT_H_PARAMS,
     ).fit(X=X, treatment=treatment, y=y)
@@ -968,7 +969,7 @@ def test_causal_tree_honest_criterion_scales_variance_penalty(
     assert CausalMSE(2, 100).train_to_est_ratio == 0.0
 
 
-def test_causal_tree_honest_criterion_stops_overfitting_under_noise():
+def test_causal_tree_cv_penalty_stops_overfitting_under_noise():
     """Cross-validated sizing yields a smaller tree and a better held-out fit.
 
     This is the half of CT-H that changes results: with a weak effect under heavy
@@ -980,16 +981,16 @@ def test_causal_tree_honest_criterion_stops_overfitting_under_noise():
     test = np.random.RandomState(RANDOM_SEED).rand(len(y)) < 0.3
     train = ~test
 
-    def fit(honest_criterion):
-        model = CausalTreeRegressor(
-            honest_criterion=honest_criterion, **CT_H_PARAMS
-        ).fit(X=X[train], treatment=treatment[train], y=y[train])
+    def fit(ccp_alpha):
+        model = CausalTreeRegressor(ccp_alpha=ccp_alpha, **CT_H_PARAMS).fit(
+            X=X[train], treatment=treatment[train], y=y[train]
+        )
         preds = model.predict(X=X[test])
         leaves = (model.tree_.children_left == -1).sum()
         return leaves, np.sqrt(np.mean((preds - tau[test]) ** 2))
 
-    leaves_plain, rmse_plain = fit(False)
-    leaves_cth, rmse_cth = fit(True)
+    leaves_plain, rmse_plain = fit(0.0)
+    leaves_cth, rmse_cth = fit("cv")
 
     assert leaves_cth < leaves_plain
     assert rmse_cth < rmse_plain
@@ -999,9 +1000,9 @@ def test_causal_tree_explicit_ccp_alpha_skips_cross_validation():
     """A ``ccp_alpha`` the caller set wins over the cross-validated one."""
     X, treatment, y, _ = _make_noisy_effect_data(n=2000)
 
-    pinned = CausalTreeRegressor(
-        honest_criterion=True, ccp_alpha=0.05, **CT_H_PARAMS
-    ).fit(X=X, treatment=treatment, y=y)
+    pinned = CausalTreeRegressor(ccp_alpha=0.05, **CT_H_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
     assert pinned.ccp_alpha_ == 0.05
     # The parameter itself is never overwritten -- sklearn's get_params contract.
     assert pinned.get_params()["ccp_alpha"] == 0.05
@@ -1023,8 +1024,8 @@ def test_causal_tree_honest_objective_ignores_unsupported_leaves():
     assert tree._honest_objective(tree.tree_, X, np.full_like(y_2dim, np.nan)) == 0.0
 
 
-def test_causal_forest_honest_criterion_reaches_every_tree():
-    """The forest forwards ``honest_criterion`` / ``cv_folds``; each tree prunes itself."""
+def test_causal_forest_cv_penalty_reaches_every_tree():
+    """The forest forwards ``ccp_alpha="cv"`` / ``cv_folds``; each tree prunes itself."""
     X, treatment, y, _ = _make_noisy_effect_data(n=3000)
     forest_params = dict(
         n_estimators=5,
@@ -1038,12 +1039,12 @@ def test_causal_forest_honest_criterion_reaches_every_tree():
     default = CausalRandomForestRegressor(**forest_params).fit(
         X=X, treatment=treatment, y=y
     )
-    cth = CausalRandomForestRegressor(
-        honest_criterion=True, cv_folds=3, **forest_params
-    ).fit(X=X, treatment=treatment, y=y)
+    cth = CausalRandomForestRegressor(ccp_alpha="cv", cv_folds=3, **forest_params).fit(
+        X=X, treatment=treatment, y=y
+    )
 
-    assert all(tree.honest_criterion is False for tree in default.estimators_)
-    assert all(tree.honest_criterion is True for tree in cth.estimators_)
+    assert all(tree.ccp_alpha == 0.0 for tree in default.estimators_)
+    assert all(tree.ccp_alpha == "cv" for tree in cth.estimators_)
     assert all(tree.cv_folds == 3 for tree in cth.estimators_)
     # Each tree runs its own cross-validation, so the penalties are not shared.
     assert len({tree.ccp_alpha_ for tree in cth.estimators_}) > 1
@@ -1059,12 +1060,12 @@ def test_causal_forest_honest_criterion_reaches_every_tree():
 @pytest.mark.parametrize(
     "estimator", [CausalTreeRegressor, CausalRandomForestRegressor]
 )
-def test_honest_criterion_params_survive_clone(estimator):
-    """``honest_criterion`` / ``cv_folds`` round-trip through ``get_params``."""
+def test_cv_penalty_params_survive_clone(estimator):
+    """``ccp_alpha="cv"`` / ``cv_folds`` round-trip through ``get_params``."""
     from sklearn.base import clone
 
-    cloned = clone(estimator(honest_criterion=True, cv_folds=3))
-    assert cloned.get_params()["honest_criterion"] is True
+    cloned = clone(estimator(ccp_alpha="cv", cv_folds=3))
+    assert cloned.get_params()["ccp_alpha"] == "cv"
     assert cloned.get_params()["cv_folds"] == 3
 
 
@@ -1072,18 +1073,17 @@ def test_causal_tree_fold_trees_inherit_the_parent_objective():
     """Cross-validation fold trees grow with the parent's splitting objective.
 
     A fold tree is an adaptive clone -- honesty off so it does not split its fold
-    again, ``honest_criterion`` off so it does not recurse into another
+    again, ``ccp_alpha`` a plain float so it does not recurse into another
     cross-validation -- but it must still price variance the way the final tree
     will, or the candidate subtrees being scored are not the ones the final tree
     would produce. Asserted directly: the scaling is a small enough term in the
     objective that no prediction-level test detects it (see
-    ``test_causal_tree_honest_criterion_scales_variance_penalty``).
+    ``test_causal_tree_cv_penalty_scales_variance_penalty``).
     """
-    parent = CausalTreeRegressor(honest_criterion=True, **CT_H_PARAMS)
+    parent = CausalTreeRegressor(ccp_alpha="cv", **CT_H_PARAMS)
     parent._train_to_est_ratio = parent._honest_penalty_ratio()
     fold = parent._make_fold_tree()
 
     assert fold.honesty is False
-    assert fold.honest_criterion is False
     assert fold.ccp_alpha == 0.0
     assert fold._train_to_est_ratio_override == parent._train_to_est_ratio == 1.0

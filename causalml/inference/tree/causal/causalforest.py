@@ -186,14 +186,13 @@ class CausalRandomForestRegressor(SerializableLearner, ForestRegressor):
         random_state: int = None,
         verbose: int = 0,
         warm_start: bool = False,
-        ccp_alpha: float = 0.0,
+        ccp_alpha: Union[float, str] = 0.0,
         groups_penalty: float = 0.5,
         max_samples: int = None,
         groups_cnt: bool = True,
         groups_cnt_mode: str = "nodes",
         honesty: bool = True,
         estimation_sample_size: float = 0.5,
-        honest_criterion: bool = False,
         cv_folds: int = 5,
     ):
         """
@@ -243,6 +242,18 @@ class CausalRandomForestRegressor(SerializableLearner, ForestRegressor):
                     new forest.
             ccp_alpha : (non-negative float, default=0.0)
                     Complexity parameter used for Minimal Cost-Complexity Pruning.
+
+                    ``"cv"`` has every tree select its own penalty by
+                    ``cv_folds``-fold cross-validation, completing the CT-H algorithm; see
+                    :class:`CausalTreeRegressor`. Measured no gain on a forest: held-out
+                    CATE RMSE went from 0.084 to 0.130 at ``sigma=0.5`` (+55%, 0 of 10
+                    paired seeds better, 100 trees; +50% with 50 trees) and was unchanged
+                    at ``sigma=2.0``, while the same setting on a single tree reduces RMSE
+                    by 25% to 55%. Averaging across trees already removes the variance the
+                    cross-validated pruning targets, so pruning each tree to a few leaves
+                    adds bias and reduces ensemble diversity, at a larger cost when noise
+                    is lower. Each tree also runs its own cross-validation, so fitting
+                    costs roughly ``cv_folds`` times as much.
             groups_penalty: (float, default=0.5)
                     This penalty coefficient manages the node impurity increase in case of the difference between
                     treatment and control samples sizes.
@@ -269,24 +280,9 @@ class CausalRandomForestRegressor(SerializableLearner, ForestRegressor):
             estimation_sample_size: (float, default=0.5)
                     Fraction of each tree's sample held out for leaf re-estimation when
                     ``honesty=True``. Ignored otherwise.
-            honest_criterion: (bool, default=False)
-                    Grow every tree with the full CT-H algorithm -- the scaled variance
-                    penalty and cross-validated tree size -- rather than only held-out
-                    leaf estimation. See :class:`CausalTreeRegressor`.
-
-                    Measured no gain on a forest. Held-out CATE RMSE over paired seeds went
-                    from 0.084 to 0.130 at ``sigma=0.5`` (+55%, 0 of 10 seeds better, 100
-                    trees; +50% with 50 trees), and was unchanged at ``sigma=2.0``. The
-                    same option on a single tree reduces RMSE by 25% to 55%. Averaging
-                    across trees already removes the variance the cross-validated pruning
-                    targets, so pruning each tree to a few leaves adds bias and reduces
-                    ensemble diversity, at a larger cost when noise is lower. Exposed here
-                    for comparison against a single tree; prefer it on
-                    :class:`CausalTreeRegressor`. Each tree runs its own ``cv_folds``-fold
-                    cross-validation, so fitting costs roughly ``cv_folds`` times as much.
             cv_folds: (int, default=5)
-                    Folds each tree uses to select its penalty when
-                    ``honest_criterion=True``. Ignored otherwise.
+                    Folds each tree uses to select its penalty when ``ccp_alpha="cv"``.
+                    Ignored otherwise.
         """
         self._estimator = CausalTreeRegressor(
             control_name=control_name,
@@ -319,7 +315,6 @@ class CausalRandomForestRegressor(SerializableLearner, ForestRegressor):
                 "random_state",
                 "honesty",
                 "estimation_sample_size",
-                "honest_criterion",
                 "cv_folds",
             ),
             "bootstrap": bootstrap,
@@ -350,7 +345,6 @@ class CausalRandomForestRegressor(SerializableLearner, ForestRegressor):
         self.groups_cnt_mode = groups_cnt_mode
         self.honesty = honesty
         self.estimation_sample_size = estimation_sample_size
-        self.honest_criterion = honest_criterion
         self.cv_folds = cv_folds
 
     def _fit(

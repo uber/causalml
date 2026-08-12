@@ -10,10 +10,9 @@ Unreleased
 
 New Features
 ~~~~~~~~~~~~
-* **`CausalTreeRegressor` and `CausalRandomForestRegressor` gained the full CT-H algorithm
-  via** ``honest_criterion=True`` **(#584).** ``honesty=True`` supplies held-out leaf
-  estimation; this option adds the two remaining pieces of
-  :cite:`athey2016recursive`. The splitting objective's variance penalty is scaled by
+* **`CausalTreeRegressor` and `CausalRandomForestRegressor` accept** ``ccp_alpha="cv"``
+  **(#584).** ``honesty=True`` supplies held-out leaf estimation; this setting adds the
+  two remaining pieces of :cite:`athey2016recursive`. The splitting objective's variance penalty is scaled by
   ``1 + N_structure / N_estimation`` — the paper's factor of 2 at an even split — and tree
   size is selected by ``cv_folds``-fold cross-validation over the cost-complexity path,
   scoring each candidate subtree with that same objective evaluated on the held-out fold.
@@ -28,7 +27,7 @@ New Features
 
      * - Noise
        - ``honesty`` only
-       - ``honest_criterion=True``
+       - ``ccp_alpha="cv"``
        - Change
        - Leaves
      * - ``sigma=0.1``
@@ -63,6 +62,9 @@ New Features
   already removes the variance the cross-validated pruning targets, so pruning each tree to
   a few leaves adds bias and reduces ensemble diversity, at a larger cost when noise is
   lower. Prefer it on ``CausalTreeRegressor``.
+
+  ``ccp_alpha="cv"`` requires ``honesty=True`` and raises otherwise, since the
+  cross-validation scores candidate subtrees with the honest objective.
 
 Behavior Changes
 ~~~~~~~~~~~~~~~~

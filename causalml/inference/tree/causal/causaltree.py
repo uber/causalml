@@ -25,6 +25,9 @@ logger = logging.getLogger("causalml")
 #: alpha per internal node, and scoring is cheap but not free.
 MAX_CCP_CANDIDATES = 40
 
+#: ``ccp_alpha`` sentinel selecting the penalty by cross-validation.
+CV_PENALTY = "cv"
+
 
 class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisionTree):
     """A Causal Tree regressor class.
@@ -71,7 +74,7 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         max_features: Union[int, float, str] = None,
         max_leaf_nodes: int = None,
         min_impurity_decrease: float = float("-inf"),
-        ccp_alpha: float = 0.0,
+        ccp_alpha: Union[float, str] = 0.0,
         groups_penalty: float = 0.5,
         min_group_samples: int = 50,
         min_samples_leaf: int = 100,
@@ -81,7 +84,6 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         node_pvalues: bool = False,
         honesty: bool = True,
         estimation_sample_size: float = 0.5,
-        honest_criterion: bool = False,
         cv_folds: int = 5,
     ):
         """
@@ -127,11 +129,34 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
             min_impurity_decrease: (float, default=float("-inf")))
                 A node will be split if this split induces a decrease of the impurity
                 greater than or equal to this value.
-            ccp_alpha: (non-negative float, default=0.0)
+            ccp_alpha: (non-negative float or "cv", default=0.0)
                 Complexity parameter used for Minimal Cost-Complexity Pruning. The
                 subtree with the largest cost complexity that is smaller than
                 ``ccp_alpha`` will be chosen. By default, no pruning is performed. See
                 :ref:`minimal_cost_complexity_pruning` for details.
+
+                ``"cv"`` selects it by ``cv_folds``-fold cross-validation, completing the
+                CT-H algorithm of `Athey and Imbens (2016)
+                <https://arxiv.org/abs/1504.01132>`_. ``honesty=True`` supplies held-out
+                leaf estimation; ``"cv"`` adds the two remaining pieces:
+
+                1. The splitting objective's variance penalty is scaled by
+                   ``1 + N_structure / N_estimation`` (the paper's factor of 2 at an even
+                   split), pricing the noise the held-out leaf estimates will carry.
+                2. Every subtree on the cost-complexity path is scored with that same
+                   objective evaluated on the held-out fold -- the paper's
+                   ``-EMSE_tau(S^tr,cv, Pi)`` -- and the best-scoring penalty is used.
+                   Otherwise the tree grows until ``min_samples_leaf`` /
+                   ``min_group_samples`` stop it, and the variance penalty only ranks
+                   candidate splits rather than choosing tree size, which is the job it
+                   does in the paper.
+
+                Requires ``honesty=True``, and costs ``cv_folds`` extra fits. Held-out CATE
+                RMSE over 10 paired seeds fell by 25% at ``sigma=0.5`` and 55% at
+                ``sigma=2.0`` (10 of 10 seeds each), and is unchanged where there is no
+                overfitting to remove. This applies to a single tree; on
+                :class:`CausalRandomForestRegressor` it measured no gain and is worse at
+                low noise, because averaging across trees already removes that variance.
             groups_penalty: (float, default=0.5)
                 This penalty coefficient manages the node impurity increase in case of the difference between
                 treatment and control samples sizes.
@@ -177,34 +202,8 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
                 being pruned into its sibling (``honesty.prune.leaves``).
             estimation_sample_size: (float, default=0.5), fraction of the sample held out
                 for leaf re-estimation when ``honesty=True``. Ignored otherwise.
-            honest_criterion: (bool, default=False), use the full CT-H algorithm of
-                `Athey and Imbens (2016) <https://arxiv.org/abs/1504.01132>`_ rather than
-                only its held-out leaf estimation. Two changes, both off by default
-                because they alter fitted trees:
-
-                1. The splitting objective's variance penalty is scaled by
-                   ``1 + N_structure / N_estimation`` (the paper's factor of 2 at an even
-                   split), pricing the noise the held-out leaf estimates will carry.
-                2. Tree size is chosen by ``cv_folds``-fold cross-validation over the
-                   cost-complexity path, scoring each candidate subtree with that same
-                   objective evaluated on the held-out fold — the paper's
-                   ``-EMSE_tau(S^tr,cv, Pi)``. Without this the tree grows until
-                   ``min_samples_leaf`` / ``min_group_samples`` stop it, and the variance
-                   penalty only ranks candidate splits rather than choosing tree size,
-                   which is the job it does in the paper.
-
-                Requires ``honesty=True``; ignored otherwise. An explicit non-zero
-                ``ccp_alpha`` is respected and skips the cross-validation. Costs
-                ``cv_folds`` extra fits.
-
-                Held-out CATE RMSE over 10 paired seeds fell by 25% at ``sigma=0.5`` and
-                55% at ``sigma=2.0`` (10 of 10 seeds each), and is unchanged where there is
-                no overfitting to remove. This applies to a single tree; on
-                :class:`CausalRandomForestRegressor` the same option measured no gain and
-                is worse at low noise, because averaging across trees already removes that
-                variance.
-            cv_folds: (int, default=5), folds used to select ``ccp_alpha`` when
-                ``honest_criterion=True``. Ignored otherwise.
+            cv_folds: (int, default=5), folds used to select the penalty when
+                ``ccp_alpha="cv"``. Ignored otherwise.
         """
 
         self.criterion = criterion
@@ -224,7 +223,6 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         self.random_state = random_state
         self.honesty = honesty
         self.estimation_sample_size = estimation_sample_size
-        self.honest_criterion = honest_criterion
         self.cv_folds = cv_folds
 
         self._classes = {}
@@ -284,6 +282,22 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
                 "min_impurity_decrease must be set to -inf for causal_mse criterion"
             )
 
+        if isinstance(self.ccp_alpha, str):
+            if self.ccp_alpha != CV_PENALTY:
+                raise ValueError(
+                    f"ccp_alpha must be a non-negative float or {CV_PENALTY!r}, "
+                    f"got {self.ccp_alpha!r}"
+                )
+            if not self.honesty:
+                # The cross-validation scores subtrees with the honest objective, which
+                # is defined by the structure/estimation split. Raise rather than fall
+                # back silently, so the setting cannot look applied when it is not.
+                raise ValueError(
+                    f"ccp_alpha={CV_PENALTY!r} requires honesty=True; it scores "
+                    "candidate subtrees with the honest objective, which needs the "
+                    "structure/estimation split."
+                )
+
         # Keep original 1d outcomes for post-fit computations
         y_orig = y.copy()
 
@@ -295,7 +309,9 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         self._train_to_est_ratio = getattr(
             self, "_train_to_est_ratio_override", self._honest_penalty_ratio()
         )
-        self.ccp_alpha_ = self.ccp_alpha
+        # Resolved penalty. Stays a float even when ``ccp_alpha`` is the "cv" sentinel,
+        # which ``_fit_honest`` replaces with the cross-validated value.
+        self.ccp_alpha_ = 0.0 if self.ccp_alpha == CV_PENALTY else self.ccp_alpha
 
         if prepare_data:
             X, y = self._prepare_data(X=X, y=y, treatment=treatment)
@@ -540,7 +556,7 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
             split[6:8] if sample_weight is not None else (None, None)
         )
 
-        if self.honest_criterion and self.ccp_alpha == 0.0:
+        if self.ccp_alpha == CV_PENALTY:
             self.ccp_alpha_ = self._select_ccp_alpha(
                 X=X_structure,
                 y=y_structure,
@@ -561,7 +577,7 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
 
     def _honest_penalty_ratio(self) -> float:
         """``N^tr / N^est``, the honest variance-penalty scale, or 0.0 when unused."""
-        if not (self.honesty and self.honest_criterion):
+        if not (self.honesty and self.ccp_alpha == CV_PENALTY):
             return 0.0
         return (1.0 - self.estimation_sample_size) / self.estimation_sample_size
 
@@ -705,7 +721,7 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         subtrees are the ones the final tree would produce.
         """
         params = self.get_params()
-        params.update(honesty=False, honest_criterion=False, ccp_alpha=0.0)
+        params.update(honesty=False, ccp_alpha=0.0)
         fold_tree = CausalTreeRegressor(**params)
         fold_tree._train_to_est_ratio_override = self._train_to_est_ratio
         return fold_tree

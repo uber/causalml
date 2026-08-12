@@ -76,7 +76,7 @@ class BaseCausalDecisionTree(BaseDecisionTree):
 
         Mirrors the base implementation, which reads the ``ccp_alpha`` constructor
         parameter directly. ``CausalTreeRegressor`` may choose the penalty by
-        cross-validation instead (``honest_criterion=True``), and sklearn's convention
+        cross-validation instead (``ccp_alpha="cv"``), and sklearn's convention
         is that a value learned at fit time lives on a trailing-underscore attribute
         rather than overwriting the parameter.
         """
@@ -100,7 +100,10 @@ class BaseCausalDecisionTree(BaseDecisionTree):
     ):
         random_state = check_random_state(self.random_state)
 
-        if self.ccp_alpha < 0.0:
+        # ``ccp_alpha`` may be a sentinel such as "cv", in which case the resolved
+        # penalty lives on ``ccp_alpha_`` and the sentinel itself is not comparable.
+        ccp_alpha = getattr(self, "ccp_alpha_", self.ccp_alpha)
+        if not isinstance(ccp_alpha, str) and ccp_alpha < 0.0:
             raise ValueError("ccp_alpha must be greater than or equal to 0")
 
         missing_values_in_feature_mask = None
