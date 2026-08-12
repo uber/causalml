@@ -127,10 +127,23 @@ cdef class StandardMSE(CausalRegressionCriterion):
 
 cdef class CausalMSE(CausalRegressionCriterion):
     """
-    Mean squared error impurity criterion for Causal Tree
-    CausalTreeMSE = right_effect + left_effect
-    where,
-    effect = alpha * tau^2 - (1 - alpha) * (1 + train_to_est_ratio) * (VAR_tr / p + VAR_cont / (1 - p))
+    Mean squared error impurity criterion for Causal Tree.
+
+    Implements the Athey and Imbens (2016) treatment-effect criterion
+    (https://arxiv.org/abs/1504.01132, section 3.2), negated because scikit-learn
+    minimises impurity::
+
+        impurity = (1 + train_to_est_ratio) * (VAR_tr / n_tr + VAR_ct / n_ct) - tau^2
+
+    The paper's honest criterion carries a factor of 2 on the variance penalty, which
+    is ``1 + N_tr / N_est`` for an equal structure/estimation split; ``train_to_est_ratio``
+    generalises it to an arbitrary split and is set from ``estimation_sample_size``
+    when ``honesty=True``. It defaults to 0, which leaves the penalty unscaled -- the
+    behaviour of every release before the honest default.
+
+    Rewarding tau^2 finds heterogeneity; the variance penalty stops the tree buying
+    that heterogeneity with leaves too small to estimate on, which is precisely the
+    cost honest estimation pays later.
     """
 
     cdef float64_t node_impurity(self) noexcept nogil:
@@ -145,6 +158,7 @@ cdef class CausalMSE(CausalRegressionCriterion):
         cdef float64_t ct_var = self.state.node.outcome_var(CONTROL_GROUP_IDX)
         cdef float64_t tr_count
         cdef float64_t ct_count = self.state.node.count_1d[CONTROL_GROUP_IDX]
+        cdef float64_t honest_scale = 1. + self.train_to_est_ratio
 
         for tr_group_idx in range(1, self.n_outputs):
             node_tau = self.state.node.effect(tr_group_idx)
@@ -152,7 +166,7 @@ cdef class CausalMSE(CausalRegressionCriterion):
             tr_count = self.state.node.count_1d[tr_group_idx]
 
             if tr_count > 0 and ct_count > 0:
-                impurity += (tr_var / tr_count + ct_var / ct_count) - node_tau * node_tau
+                impurity += honest_scale * (tr_var / tr_count + ct_var / ct_count) - node_tau * node_tau
 
         impurity /= (self.n_outputs - 1)
         impurity += self.get_groups_penalty(self.state.node)
@@ -176,6 +190,7 @@ cdef class CausalMSE(CausalRegressionCriterion):
         cdef float64_t left_ct_count = self.state.left.count_1d[CONTROL_GROUP_IDX]
         cdef float64_t right_tau
         cdef float64_t left_tau
+        cdef float64_t honest_scale = 1. + self.train_to_est_ratio
 
         impurity_right[0] = 0.
         impurity_left[0] = 0.
@@ -190,9 +205,9 @@ cdef class CausalMSE(CausalRegressionCriterion):
             left_tr_count = self.state.left.count_1d[tr_group_idx]
 
             if right_tr_count > 0 and right_ct_count > 0:
-                impurity_right[0] += (right_tr_var / right_tr_count + right_ct_var / right_ct_count) - right_tau * right_tau
+                impurity_right[0] += honest_scale * (right_tr_var / right_tr_count + right_ct_var / right_ct_count) - right_tau * right_tau
             if left_tr_count > 0 and left_ct_count > 0:
-                impurity_left[0] += (left_tr_var / left_tr_count + left_ct_var / left_ct_count) - left_tau * left_tau
+                impurity_left[0] += honest_scale * (left_tr_var / left_tr_count + left_ct_var / left_ct_count) - left_tau * left_tau
 
         impurity_right[0] /= (self.n_outputs - 1)
         impurity_left[0] /= (self.n_outputs - 1)

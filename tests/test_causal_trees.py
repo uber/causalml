@@ -94,8 +94,19 @@ class CausalTreeBase:
 class TestCausalTreeCase(CausalTreeBase):
 
     def prepare_model(self) -> CausalTreeRegressor:
+        # honesty=False pins these to the in-sample fit they were written against.
+        # ``test_ate`` asserts ``ape(...) < ERROR_THRESHOLD`` on a fixture where both
+        # modes sit near the 0.5 threshold: at n_treatments=2 the measured APE is
+        # 0.405 in-sample and 0.544 honest, and over five other seeds the in-sample
+        # mean is itself 0.515. The default flip moved the pinned seed across a line
+        # the fixture was already close to, rather than exposing a systematic loss
+        # (honest is the more accurate of the two on average at this size). Honest
+        # behaviour is covered by the dedicated tests below.
         ctree = CausalTreeRegressor(
-            control_name=self.control_name, groups_cnt=True, random_state=RANDOM_SEED
+            control_name=self.control_name,
+            groups_cnt=True,
+            random_state=RANDOM_SEED,
+            honesty=False,
         )
         return ctree
 
@@ -666,3 +677,413 @@ def test_plot_causal_tree_pvalue_nan_handling():
 
     node_str = exporter.node_to_str(tree.tree_, 0, "causal_mse")
     assert "p_value(1) = N/A" in node_str
+
+
+# ---------------------------------------------------------------------------
+# Honest estimation (#584). ``honesty=True`` grows the tree structure on one
+# half of the sample and re-estimates each leaf's per-group outcome mean on the
+# other, so a leaf value no longer inherits the bias of the split search that
+# produced it (Athey and Imbens 2016).
+# ---------------------------------------------------------------------------
+
+HONEST_TREE_PARAMS = dict(
+    control_name=0,
+    max_depth=3,
+    min_samples_leaf=50,
+    min_group_samples=20,
+    random_state=RANDOM_SEED,
+)
+
+
+def _make_heterogeneous_effect_data(n=3000, seed=RANDOM_SEED, n_treatments=1):
+    """Regression data whose treatment effect varies with feature 1.
+
+    Group ``g`` has effect ``g + X[:, 1]``; ``X[:, 1]`` is centered, so group
+    ``g``'s ATE is ``g``. The heterogeneity gives the tree something to split on,
+    which is what makes the honest and in-sample leaf values diverge.
+    """
+    rng = np.random.RandomState(seed)
+    X = rng.randn(n, 5)
+    treatment = rng.randint(0, n_treatments + 1, n)
+    y = X[:, 0] + rng.randn(n) * 0.5
+    for group in range(1, n_treatments + 1):
+        y += (treatment == group) * (group + X[:, 1])
+    return X, treatment, y
+
+
+@pytest.mark.parametrize("estimation_sample_size", [0.5, 0.25])
+def test_causal_tree_honesty_splits_structure_from_estimation(estimation_sample_size):
+    """The honest tree's structure is the structure half's; its values are not.
+
+    Both halves are asserted because a bug in either direction is silent: letting
+    the estimation rows into the split search would defeat honesty, while skipping
+    the re-estimation would leave the tree numerically identical to a plain tree
+    fit on a fraction of the data. Checking ``estimation_sample_size`` twice pins
+    that the parameter reaches ``train_test_split`` rather than being ignored.
+    """
+    X, treatment, y = _make_heterogeneous_effect_data()
+
+    honest = CausalTreeRegressor(
+        honesty=True,
+        estimation_sample_size=estimation_sample_size,
+        **HONEST_TREE_PARAMS,
+    ).fit(X=X, treatment=treatment, y=y)
+
+    X_structure, _, treatment_structure, _, y_structure, _ = train_test_split(
+        X,
+        treatment,
+        y,
+        test_size=estimation_sample_size,
+        shuffle=True,
+        random_state=RANDOM_SEED,
+        stratify=treatment,
+    )
+    structure_only = CausalTreeRegressor(honesty=False, **HONEST_TREE_PARAMS).fit(
+        X=X_structure, treatment=treatment_structure, y=y_structure
+    )
+
+    assert np.array_equal(honest.tree_.feature, structure_only.tree_.feature)
+    assert np.array_equal(honest.tree_.threshold, structure_only.tree_.threshold)
+    assert not np.allclose(honest.tree_.value, structure_only.tree_.value)
+    assert np.isfinite(honest.predict(X=X)).all()
+
+
+def test_causal_tree_honesty_on_by_default():
+    """``honesty`` defaults to True, matching grf and EconML.
+
+    The opt-out is also pinned: ``honesty=False`` must still give the pre-0.18
+    in-sample fit, which is the escape hatch the changelog points users at.
+    """
+    X, treatment, y = _make_heterogeneous_effect_data()
+
+    assert CausalTreeRegressor().honesty is True
+    assert CausalRandomForestRegressor().honesty is True
+
+    default = CausalTreeRegressor(**HONEST_TREE_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
+    explicit = CausalTreeRegressor(honesty=True, **HONEST_TREE_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
+    in_sample = CausalTreeRegressor(honesty=False, **HONEST_TREE_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
+
+    assert np.array_equal(default.tree_.value, explicit.tree_.value)
+    assert not np.allclose(default.predict(X=X), in_sample.predict(X=X))
+    # The opt-out is a whole-sample fit, so it sees splits the honest half cannot.
+    assert in_sample.tree_.node_count >= default.tree_.node_count
+
+
+def test_causal_tree_honest_reestimate_keeps_leaves_without_estimation_rows():
+    """A group with no estimation rows in a leaf keeps its structure-split value.
+
+    ``min_group_samples`` is enforced by the builder on the structure half only,
+    so the estimation half can leave a group empty in a leaf. Writing a zero there
+    would corrupt that leaf's effect rather than leave it merely stale, so the
+    guard is asserted directly instead of through a fit that happens to hit it.
+    Internal nodes are never rewritten, honest or not.
+    """
+    X, treatment, y = _make_heterogeneous_effect_data()
+    # honesty=False so the method under test is exercised exactly once, from a
+    # known in-sample starting point.
+    tree = CausalTreeRegressor(honesty=False, **HONEST_TREE_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
+    before = tree.tree_.value.copy()
+    is_leaf = tree.tree_.children_left == -1
+
+    # No group observed on any estimation row: nothing may move.
+    y_estimation = np.full((X.shape[0], tree.n_outputs_), np.nan)
+    tree._honest_reestimate(X=X, y=y_estimation, sample_weight=None)
+    assert np.array_equal(tree.tree_.value, before)
+
+    # Only the control column observed: control leaves move, the rest do not.
+    y_estimation[:, 0] = y
+    tree._honest_reestimate(X=X, y=y_estimation, sample_weight=None)
+    assert not np.allclose(tree.tree_.value[is_leaf, 0, 0], before[is_leaf, 0, 0])
+    assert np.array_equal(tree.tree_.value[~is_leaf], before[~is_leaf])
+    assert np.array_equal(tree.tree_.value[:, 1:, :], before[:, 1:, :])
+
+
+def test_causal_tree_honesty_multi_treatment():
+    """Honest fitting recovers both effects with two treatment groups."""
+    X, treatment, y = _make_heterogeneous_effect_data(n=6000, n_treatments=2)
+    honest = CausalTreeRegressor(honesty=True, **HONEST_TREE_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
+
+    preds = honest.predict(X=X)
+    assert preds.shape == (X.shape[0], 2)
+    assert np.isfinite(preds).all()
+    assert np.allclose(preds.mean(axis=0), [1.0, 2.0], atol=0.2)
+
+
+def test_causal_tree_honesty_with_nan():
+    """Honest fitting keeps the tree's native NaN handling.
+
+    The honest path routes the estimation rows back through ``_validate_X_predict``,
+    which rejects NaNs unless the tree advertises missing-value support -- so this
+    would fail loudly if the re-estimation validated its input as training data.
+    """
+    X, treatment, y = _make_missing_effect_data()
+    honest = CausalTreeRegressor(honesty=True, **HONEST_TREE_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
+
+    preds = honest.predict(X=X)
+    missing = np.isnan(X[:, 0])
+    assert np.isfinite(preds).all()
+    # The effect is 2.0 on the missing rows and 0.0 on the observed ones.
+    assert preds[missing].mean() > preds[~missing].mean() + 1.0
+
+
+def test_causal_forest_honesty_reaches_every_tree():
+    """The forest forwards ``honesty`` / ``estimation_sample_size`` to its trees."""
+    X, treatment, y = _make_heterogeneous_effect_data()
+    forest_params = dict(
+        n_estimators=5,
+        control_name=0,
+        max_depth=3,
+        min_samples_leaf=50,
+        min_group_samples=20,
+        random_state=RANDOM_SEED,
+        n_jobs=1,
+    )
+
+    in_sample = CausalRandomForestRegressor(honesty=False, **forest_params).fit(
+        X=X, treatment=treatment, y=y
+    )
+    honest = CausalRandomForestRegressor(
+        estimation_sample_size=0.4, **forest_params
+    ).fit(X=X, treatment=treatment, y=y)
+
+    assert all(tree.honesty is False for tree in in_sample.estimators_)
+    assert all(tree.honesty is True for tree in honest.estimators_)
+    assert all(tree.estimation_sample_size == 0.4 for tree in honest.estimators_)
+    # Each tree draws its own honest split from its own random_state.
+    assert len({tree.random_state for tree in honest.estimators_}) == len(
+        honest.estimators_
+    )
+
+    preds = honest.predict(X)
+    assert np.isfinite(preds).all()
+    assert not np.allclose(preds, in_sample.predict(X))
+
+
+@pytest.mark.parametrize(
+    "estimator", [CausalTreeRegressor, CausalRandomForestRegressor]
+)
+def test_honesty_params_survive_clone(estimator):
+    """``honesty`` / ``estimation_sample_size`` round-trip through ``get_params``."""
+    from sklearn.base import clone
+
+    cloned = clone(estimator(honesty=True, estimation_sample_size=0.3))
+    assert cloned.get_params()["honesty"] is True
+    assert cloned.get_params()["estimation_sample_size"] == 0.3
+
+
+# ---------------------------------------------------------------------------
+# The full CT-H algorithm (Athey and Imbens 2016), opt-in via honest_criterion:
+# the variance penalty scaled by 1 + N_structure/N_estimation, and tree size
+# chosen by cross-validation on that same objective.
+# ---------------------------------------------------------------------------
+
+
+def _make_noisy_effect_data(n=5000, seed=RANDOM_SEED, sigma=2.0):
+    """Heterogeneous effect buried in noise, where tree size matters most.
+
+    ``tau = (X0 + X1) / 2`` on uniform features, so the signal is weak next to a
+    ``sigma=2`` error term. An unpruned tree keeps splitting into leaves it cannot
+    estimate; that is the overfitting cross-validated pruning is meant to stop.
+    """
+    rng = np.random.RandomState(seed)
+    X = rng.uniform(size=n * 5).reshape((n, -1))
+    tau = (X[:, 0] + X[:, 1]) / 2
+    treatment = rng.binomial(1, 0.5, size=n)
+    y = X[:, 3] + (treatment - 0.5) * tau + sigma * rng.normal(size=n)
+    return X, treatment, y, tau
+
+
+CT_H_PARAMS = dict(
+    control_name=0, min_samples_leaf=25, min_group_samples=10, random_state=RANDOM_SEED
+)
+
+
+def test_causal_tree_honest_criterion_off_by_default():
+    """``honest_criterion`` defaults to False and needs ``honesty`` to do anything."""
+    X, treatment, y, _ = _make_noisy_effect_data()
+
+    assert CausalTreeRegressor().honest_criterion is False
+    assert CausalRandomForestRegressor().honest_criterion is False
+
+    default = CausalTreeRegressor(**CT_H_PARAMS).fit(X=X, treatment=treatment, y=y)
+    opted_in = CausalTreeRegressor(honest_criterion=True, **CT_H_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
+    assert default.ccp_alpha_ == 0.0
+    assert opted_in.ccp_alpha_ > 0.0
+
+    # Without honesty there is no structure/estimation split to price, so the flag
+    # is inert rather than half-applied.
+    adaptive_on = CausalTreeRegressor(
+        honesty=False, honest_criterion=True, **CT_H_PARAMS
+    ).fit(X=X, treatment=treatment, y=y)
+    adaptive_off = CausalTreeRegressor(honesty=False, **CT_H_PARAMS).fit(
+        X=X, treatment=treatment, y=y
+    )
+    assert np.array_equal(adaptive_on.tree_.value, adaptive_off.tree_.value)
+
+
+@pytest.mark.parametrize(
+    "estimation_sample_size, expected", [(0.5, 1.0), (0.25, 3.0), (0.75, 1 / 3)]
+)
+def test_causal_tree_honest_criterion_scales_variance_penalty(
+    estimation_sample_size, expected
+):
+    """The penalty scale is ``N_structure / N_estimation``, the paper's factor of 2 at 0.5.
+
+    Checked on the estimator rather than through predictions because the scale is a
+    property of the objective, and at causalml's default leaf sizes the variance term
+    is a small fraction of ``tau^2`` -- so a prediction-level assertion would be
+    testing rounding, not the formula.
+    """
+    X, treatment, y, _ = _make_noisy_effect_data(n=2000)
+
+    honest = CausalTreeRegressor(
+        honest_criterion=True,
+        estimation_sample_size=estimation_sample_size,
+        **CT_H_PARAMS,
+    ).fit(X=X, treatment=treatment, y=y)
+    assert honest._train_to_est_ratio == pytest.approx(expected)
+
+    plain = CausalTreeRegressor(
+        estimation_sample_size=estimation_sample_size, **CT_H_PARAMS
+    ).fit(X=X, treatment=treatment, y=y)
+    assert plain._train_to_est_ratio == 0.0
+
+    # The criterion leaves the penalty unscaled unless it is told otherwise.
+    from causalml.inference.tree.causal._criterion import CausalMSE
+
+    assert CausalMSE(2, 100).train_to_est_ratio == 0.0
+
+
+def test_causal_tree_honest_criterion_stops_overfitting_under_noise():
+    """Cross-validated sizing yields a smaller tree and a better held-out fit.
+
+    This is the half of CT-H that changes results: with a weak effect under heavy
+    noise the unpruned tree splits far past what the data supports. Measured over 16
+    seeds the held-out RMSE improves by ~57% at this noise level, in 16 of 16 seeds,
+    so a single-seed assertion has ample margin.
+    """
+    X, treatment, y, tau = _make_noisy_effect_data()
+    test = np.random.RandomState(RANDOM_SEED).rand(len(y)) < 0.3
+    train = ~test
+
+    def fit(honest_criterion):
+        model = CausalTreeRegressor(
+            honest_criterion=honest_criterion, **CT_H_PARAMS
+        ).fit(X=X[train], treatment=treatment[train], y=y[train])
+        preds = model.predict(X=X[test])
+        leaves = (model.tree_.children_left == -1).sum()
+        return leaves, np.sqrt(np.mean((preds - tau[test]) ** 2))
+
+    leaves_plain, rmse_plain = fit(False)
+    leaves_cth, rmse_cth = fit(True)
+
+    assert leaves_cth < leaves_plain
+    assert rmse_cth < rmse_plain
+
+
+def test_causal_tree_explicit_ccp_alpha_skips_cross_validation():
+    """A ``ccp_alpha`` the caller set wins over the cross-validated one."""
+    X, treatment, y, _ = _make_noisy_effect_data(n=2000)
+
+    pinned = CausalTreeRegressor(
+        honest_criterion=True, ccp_alpha=0.05, **CT_H_PARAMS
+    ).fit(X=X, treatment=treatment, y=y)
+    assert pinned.ccp_alpha_ == 0.05
+    # The parameter itself is never overwritten -- sklearn's get_params contract.
+    assert pinned.get_params()["ccp_alpha"] == 0.05
+
+
+def test_causal_tree_honest_objective_ignores_unsupported_leaves():
+    """Leaves the held-out fold cannot estimate contribute nothing to the score.
+
+    A leaf needs two rows in every group for a variance; otherwise the score would
+    be NaN and the whole cross-validation would collapse to it.
+    """
+    X, treatment, y, _ = _make_noisy_effect_data(n=2000)
+    tree = CausalTreeRegressor(**CT_H_PARAMS).fit(X=X, treatment=treatment, y=y)
+
+    _, y_2dim = tree._prepare_data(X=X, treatment=treatment, y=y)
+    assert np.isfinite(tree._honest_objective(tree.tree_, X, y_2dim))
+
+    # Nothing observed anywhere: no leaf is usable, so the score is exactly zero.
+    assert tree._honest_objective(tree.tree_, X, np.full_like(y_2dim, np.nan)) == 0.0
+
+
+def test_causal_forest_honest_criterion_reaches_every_tree():
+    """The forest forwards ``honest_criterion`` / ``cv_folds``; each tree prunes itself."""
+    X, treatment, y, _ = _make_noisy_effect_data(n=3000)
+    forest_params = dict(
+        n_estimators=5,
+        control_name=0,
+        min_samples_leaf=25,
+        min_group_samples=10,
+        random_state=RANDOM_SEED,
+        n_jobs=1,
+    )
+
+    default = CausalRandomForestRegressor(**forest_params).fit(
+        X=X, treatment=treatment, y=y
+    )
+    cth = CausalRandomForestRegressor(
+        honest_criterion=True, cv_folds=3, **forest_params
+    ).fit(X=X, treatment=treatment, y=y)
+
+    assert all(tree.honest_criterion is False for tree in default.estimators_)
+    assert all(tree.honest_criterion is True for tree in cth.estimators_)
+    assert all(tree.cv_folds == 3 for tree in cth.estimators_)
+    # Each tree runs its own cross-validation, so the penalties are not shared.
+    assert len({tree.ccp_alpha_ for tree in cth.estimators_}) > 1
+    assert all(tree.ccp_alpha_ > 0.0 for tree in cth.estimators_)
+
+    preds = cth.predict(X)
+    assert np.isfinite(preds).all()
+    assert np.mean(
+        [(t.tree_.children_left == -1).sum() for t in cth.estimators_]
+    ) < np.mean([(t.tree_.children_left == -1).sum() for t in default.estimators_])
+
+
+@pytest.mark.parametrize(
+    "estimator", [CausalTreeRegressor, CausalRandomForestRegressor]
+)
+def test_honest_criterion_params_survive_clone(estimator):
+    """``honest_criterion`` / ``cv_folds`` round-trip through ``get_params``."""
+    from sklearn.base import clone
+
+    cloned = clone(estimator(honest_criterion=True, cv_folds=3))
+    assert cloned.get_params()["honest_criterion"] is True
+    assert cloned.get_params()["cv_folds"] == 3
+
+
+def test_causal_tree_fold_trees_inherit_the_parent_objective():
+    """Cross-validation fold trees grow with the parent's splitting objective.
+
+    A fold tree is an adaptive clone -- honesty off so it does not split its fold
+    again, ``honest_criterion`` off so it does not recurse into another
+    cross-validation -- but it must still price variance the way the final tree
+    will, or the candidate subtrees being scored are not the ones the final tree
+    would produce. Asserted directly: the scaling is a small enough term in the
+    objective that no prediction-level test detects it (see
+    ``test_causal_tree_honest_criterion_scales_variance_penalty``).
+    """
+    parent = CausalTreeRegressor(honest_criterion=True, **CT_H_PARAMS)
+    parent._train_to_est_ratio = parent._honest_penalty_ratio()
+    fold = parent._make_fold_tree()
+
+    assert fold.honesty is False
+    assert fold.honest_criterion is False
+    assert fold.ccp_alpha == 0.0
+    assert fold._train_to_est_ratio_override == parent._train_to_est_ratio == 1.0

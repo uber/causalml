@@ -86,6 +86,9 @@ cdef class CausalRegressionCriterion(RegressionCriterion):
 
     cdef public NodeSplitState state
     cdef public float64_t groups_penalty
+    # N^tr / N^est. Scales the honest variance penalty of Athey and Imbens
+    # (2016) by (1 + train_to_est_ratio); 0.0 leaves the penalty unscaled.
+    cdef public float64_t train_to_est_ratio
 
     cdef int get_group_stats(
         self,

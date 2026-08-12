@@ -8,6 +8,7 @@ from numpy import float32 as DTYPE
 from pathos.pools import ProcessPool as PPool
 from scipy.stats import norm, ttest_ind
 from sklearn.base import RegressorMixin
+from sklearn.model_selection import StratifiedKFold, train_test_split
 from sklearn.utils import check_array
 from sklearn.utils.validation import check_is_fitted
 
@@ -15,15 +16,46 @@ from causalml.inference.meta.utils import check_treatment_vector
 from causalml.inference.serialization import SerializableLearner
 
 from ._tree import BaseCausalDecisionTree
+from .._tree._tree import Tree, _build_pruned_tree_ccp, ccp_pruning_path
 from ..utils import get_tree_leaves_mask, timeit
 
 logger = logging.getLogger("causalml")
+
+#: Cap on the cost-complexity candidates scored per fold. The path can hold one
+#: alpha per internal node, and scoring is cheap but not free.
+MAX_CCP_CANDIDATES = 40
 
 
 class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisionTree):
     """A Causal Tree regressor class.
     The Causal Tree is a decision tree regressor with a split criteria for treatment effects.
     Details are available at `Athey and Imbens (2015) <https://arxiv.org/abs/1504.01132)>`_.
+
+    .. note::
+        **Observational data needs inverse-propensity weights.** Every criterion here
+        compares raw group means, with no adjustment for how treatment was assigned, so
+        when the propensity varies with ``X`` both the split search and the leaf estimates
+        inherit the confounding bias. Pass inverse-propensity weights as ``sample_weight``
+        to correct it::
+
+            e_hat = cross_val_predict(clf, X, treatment, cv=5, method="predict_proba")[:, 1]
+            e_hat = np.clip(e_hat, 0.05, 0.95)
+            ipw = np.where(treatment == 1, 1 / e_hat, 1 / (1 - e_hat))
+            model.fit(X=X, treatment=treatment, y=y, sample_weight=ipw)
+
+        Measured on Nie & Wager Setup A over 10 seeds (a confounded design whose propensity
+        and treatment effect share the same features), for
+        :class:`CausalRandomForestRegressor` with a cross-fitted propensity:
+
+        ==================  ==================  =========  =========
+        weights             corr with true tau  ATE error  CATE RMSE
+        ==================  ==================  =========  =========
+        none                0.381               0.389      0.433
+        inverse-propensity  0.844               0.067      0.142
+        ==================  ==================  =========  =========
+
+        No correction is needed for a randomized experiment. See
+        ``docs/examples/causal_tree_honesty_parity.ipynb`` for the full comparison.
     """
 
     def __init__(
@@ -47,6 +79,10 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         groups_cnt: bool = False,
         groups_cnt_mode: str = "nodes",
         node_pvalues: bool = False,
+        honesty: bool = True,
+        estimation_sample_size: float = 0.5,
+        honest_criterion: bool = False,
+        cv_folds: int = 5,
     ):
         """
         Initialize a Causal Tree
@@ -120,7 +156,47 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
             node_pvalues: (bool), compute treatment effect p-values for each node.
                 Note: These are naive in-sample t-tests and do not account for the tree
                 structure or multiple testing. They should be used for descriptive
-                purposes only and are not valid for post-selection inference.
+                purposes only and are not valid for post-selection inference. They are
+                computed on the full ``fit`` sample even when ``honesty=True``.
+            honesty: (bool, default=True), use the honest approach of
+                `Athey and Imbens (2016) <https://arxiv.org/abs/1504.01132>`_: split the
+                sample in two, grow the tree structure on one half and re-estimate each
+                leaf's group outcome means on the other. The leaf estimates are then
+                independent of the splits that produced them, which removes the
+                overfitting bias of a tree that both chooses and estimates on the same
+                rows. The cost is that each half sees only part of the data, so an honest
+                tree is usually shallower and noisier per leaf.
+
+                On by default, matching ``grf``'s ``honesty = TRUE`` and EconML's
+                ``honest=True``. Pass ``honesty=False`` for the pre-0.18 behavior, where
+                the same rows both chose the splits and estimated the leaves.
+
+                Two details differ from ``grf``: the split here is stratified on
+                treatment, so both halves keep every group; and a leaf that the
+                estimation half leaves empty keeps its structure-half value instead of
+                being pruned into its sibling (``honesty.prune.leaves``).
+            estimation_sample_size: (float, default=0.5), fraction of the sample held out
+                for leaf re-estimation when ``honesty=True``. Ignored otherwise.
+            honest_criterion: (bool, default=False), use the full CT-H algorithm of
+                `Athey and Imbens (2016) <https://arxiv.org/abs/1504.01132>`_ rather than
+                only its held-out leaf estimation. Two changes, both off by default
+                because they alter fitted trees:
+
+                1. The splitting objective's variance penalty is scaled by
+                   ``1 + N_structure / N_estimation`` (the paper's factor of 2 at an even
+                   split), pricing the noise the held-out leaf estimates will carry.
+                2. Tree size is chosen by ``cv_folds``-fold cross-validation over the
+                   cost-complexity path, scoring each candidate subtree with that same
+                   objective evaluated on the held-out fold — the paper's
+                   ``-EMSE_tau(S^tr,cv, Pi)``. Without this the tree grows until
+                   ``min_samples_leaf`` / ``min_group_samples`` stop it, and the variance
+                   penalty only ranks candidate splits rather than choosing tree size,
+                   which is the job it does in the paper.
+
+                Requires ``honesty=True``; ignored otherwise. An explicit non-zero
+                ``ccp_alpha`` is respected and skips the cross-validation.
+            cv_folds: (int, default=5), folds used to select ``ccp_alpha`` when
+                ``honest_criterion=True``. Ignored otherwise.
         """
 
         self.criterion = criterion
@@ -138,6 +214,10 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         self.groups_penalty = groups_penalty
         self.min_samples_leaf = min_samples_leaf
         self.random_state = random_state
+        self.honesty = honesty
+        self.estimation_sample_size = estimation_sample_size
+        self.honest_criterion = honest_criterion
+        self.cv_folds = cv_folds
 
         self._classes = {}
         self.groups_cnt = groups_cnt
@@ -173,13 +253,18 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
     ):
         """
         Fit CausalTreeRegressor
+
         Args:
             X (np.ndarray): feature matrix
             treatment (np.ndarray): treatment vector, includes control group
             y (np.ndarray): outcome vector
-            sample_weight (np.ndarray): sample_weight, optional
+            sample_weight (np.ndarray): sample_weight, optional. Weights the split search
+                and the leaf estimates alike, including the honest re-estimation, so
+                inverse-propensity weights passed here correct the confounding bias on
+                observational data — see the note on the class.
             check_input (bool, optional): default=False
             prepare_data (bool): default=True
+
         Returns:
             self
         """
@@ -194,10 +279,29 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         # Keep original 1d outcomes for post-fit computations
         y_orig = y.copy()
 
+        # The honest criterion of Athey and Imbens (2016) scales its variance penalty
+        # by (1 + N^tr / N^est). Read by the builder in ``_tree.py``; 0.0 leaves the
+        # penalty unscaled. The override lets the cross-validation fold trees grow
+        # with the parent's splitting objective without recomputing it from their own
+        # (honesty=False) settings.
+        self._train_to_est_ratio = getattr(
+            self, "_train_to_est_ratio_override", self._honest_penalty_ratio()
+        )
+        self.ccp_alpha_ = self.ccp_alpha
+
         if prepare_data:
             X, y = self._prepare_data(X=X, y=y, treatment=treatment)
 
-        super().fit(X=X, y=y, sample_weight=sample_weight, check_input=check_input)
+        if self.honesty:
+            self._fit_honest(
+                X=X,
+                treatment=treatment,
+                y=y,
+                sample_weight=sample_weight,
+                check_input=check_input,
+            )
+        else:
+            super().fit(X=X, y=y, sample_weight=sample_weight, check_input=check_input)
 
         if self.groups_cnt:
             self._groups_cnt = self._count_groups_distribution(X=X, treatment=treatment)
@@ -382,6 +486,268 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         self.fit(X=X_b, treatment=treatment_b, y=y_b)
         te_b = self.predict(X=X)
         return te_b
+
+    def _fit_honest(
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+        sample_weight: Union[np.ndarray, None],
+        check_input: bool,
+    ) -> None:
+        """Grow the tree on one half of the sample, re-estimate leaves on the other.
+
+        The rows that choose the splits are disjoint from the rows that estimate the
+        leaf values, so a leaf value no longer inherits the selection bias of the
+        split search that produced it (Athey and Imbens 2016). The split is
+        stratified on ``treatment`` so every group is represented in both halves,
+        falling back to an unstratified split when a group is too small for that --
+        the same fallback ``_KernelUpliftTreeClassifier.fit`` uses.
+
+        Args:
+            X: (np.ndarray), feature matrix
+            treatment: (np.ndarray), treatment vector, only used to stratify the split
+            y: (np.ndarray), outcomes as (samples x groups), from ``_prepare_data``
+            sample_weight: (np.ndarray or None), split alongside the rows
+            check_input: (bool), forwarded to the structure-split fit
+        """
+        arrays = [X, y, np.asarray(treatment)]
+        if sample_weight is not None:
+            arrays.append(sample_weight)
+        split_kwargs = dict(
+            test_size=self.estimation_sample_size,
+            shuffle=True,
+            random_state=self.random_state,
+        )
+        try:
+            split = train_test_split(
+                *arrays, stratify=np.asarray(treatment), **split_kwargs
+            )
+        except ValueError:
+            split = train_test_split(*arrays, **split_kwargs)
+
+        X_structure, X_estimation, y_structure, y_estimation = split[:4]
+        treatment_structure = split[4]
+        weight_structure, weight_estimation = (
+            split[6:8] if sample_weight is not None else (None, None)
+        )
+
+        if self.honest_criterion and self.ccp_alpha == 0.0:
+            self.ccp_alpha_ = self._select_ccp_alpha(
+                X=X_structure,
+                y=y_structure,
+                treatment=treatment_structure,
+                sample_weight=weight_structure,
+                check_input=check_input,
+            )
+
+        super().fit(
+            X=X_structure,
+            y=y_structure,
+            sample_weight=weight_structure,
+            check_input=check_input,
+        )
+        self._honest_reestimate(
+            X=X_estimation, y=y_estimation, sample_weight=weight_estimation
+        )
+
+    def _honest_penalty_ratio(self) -> float:
+        """``N^tr / N^est``, the honest variance-penalty scale, or 0.0 when unused."""
+        if not (self.honesty and self.honest_criterion):
+            return 0.0
+        return (1.0 - self.estimation_sample_size) / self.estimation_sample_size
+
+    def _honest_objective(self, tree, X: np.ndarray, y: np.ndarray) -> float:
+        """``-EMSE_tau(S, Pi)``: the splitting objective evaluated on held-out rows.
+
+        Athey and Imbens (2016) select the cost-complexity penalty by scoring each
+        candidate subtree with the *same* objective the splitter maximises, computed
+        on a cross-validation sample rather than on the rows that chose the splits::
+
+            sum_leaves  (n_leaf / N) * [ tau_hat^2
+                                         - (1 + ratio) * (Var_t / n_t + Var_c / n_c) ]
+
+        A leaf that the held-out fold cannot support -- fewer than two rows in any
+        group, so its variance is undefined -- contributes nothing. That is what
+        penalises a tree grown deeper than the data can estimate: the extra leaves
+        stop earning their ``tau_hat^2``.
+
+        Args:
+            tree: a fitted ``Tree`` (pruned or not) to route ``X`` through
+            X: (np.ndarray), held-out feature matrix
+            y: (np.ndarray), held-out outcomes as (samples x groups)
+
+        Returns:
+            (float): the objective; larger is better, and 0.0 if nothing scored.
+        """
+        leaves = tree.apply(np.ascontiguousarray(X, dtype=DTYPE))
+        n_nodes = tree.node_count
+        scale = 1.0 + self._train_to_est_ratio
+
+        count, mean, var = [], [], []
+        for group in range(y.shape[1]):
+            column = y[:, group]
+            observed = ~np.isnan(column)
+            values = column[observed]
+            at = leaves[observed]
+            n = np.bincount(at, minlength=n_nodes).astype(np.float64)
+            total = np.bincount(at, weights=values, minlength=n_nodes)
+            total_sq = np.bincount(at, weights=values**2, minlength=n_nodes)
+            safe = np.where(n > 0, n, 1.0)
+            group_mean = total / safe
+            count.append(n)
+            mean.append(group_mean)
+            var.append(np.maximum(total_sq / safe - group_mean**2, 0.0))
+
+        is_leaf = tree.children_left == -1
+        # Every group needs at least two rows for a usable variance.
+        usable = is_leaf & np.all(np.vstack(count) >= 2, axis=0)
+        if not usable.any():
+            return 0.0
+
+        n_leaf = np.sum(np.vstack(count), axis=0)
+        per_group = np.zeros(n_nodes, dtype=np.float64)
+        for group in range(1, y.shape[1]):
+            tau = mean[group] - mean[0]
+            penalty = var[group] / np.where(count[group] > 0, count[group], 1.0) + var[
+                0
+            ] / np.where(count[0] > 0, count[0], 1.0)
+            per_group += tau**2 - scale * penalty
+        per_group /= max(y.shape[1] - 1, 1)
+
+        return float(np.sum(n_leaf[usable] * per_group[usable]) / n_leaf.sum())
+
+    def _select_ccp_alpha(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        treatment: np.ndarray,
+        sample_weight: Union[np.ndarray, None],
+        check_input: bool,
+    ) -> float:
+        """Choose the cost-complexity penalty by cross-validation (Athey-Imbens 2016).
+
+        Each fold grows its own tree on the fold's training rows -- with the parent's
+        splitting objective, via ``_train_to_est_ratio_override`` -- and every subtree
+        on that tree's cost-complexity path is scored by :meth:`_honest_objective` on
+        the held-out rows. The penalty with the best average score wins. Pruning
+        reuses the already-grown fold tree rather than refitting per candidate, so the
+        cost is ``cv_folds`` fits, not ``cv_folds x n_alphas``.
+
+        Returns:
+            (float): the selected ``ccp_alpha``; 0.0 (no pruning) if CV is not usable.
+        """
+        splitter = StratifiedKFold(
+            n_splits=self.cv_folds, shuffle=True, random_state=self.random_state
+        )
+        try:
+            folds = list(splitter.split(X, treatment))
+        except ValueError:
+            return 0.0
+
+        totals, counts = {}, {}
+        for train_idx, test_idx in folds:
+            fold_tree = self._make_fold_tree()
+            try:
+                fold_tree.fit(
+                    X=X[train_idx],
+                    treatment=treatment[train_idx],
+                    y=y[train_idx],
+                    sample_weight=(
+                        None if sample_weight is None else sample_weight[train_idx]
+                    ),
+                    check_input=check_input,
+                    prepare_data=False,
+                )
+            except (ValueError, IndexError):
+                continue
+
+            alphas = np.unique(ccp_pruning_path(fold_tree.tree_)["ccp_alphas"])
+            alphas = alphas[alphas >= 0.0]
+            if alphas.size > MAX_CCP_CANDIDATES:
+                keep = np.linspace(0, alphas.size - 1, MAX_CCP_CANDIDATES).astype(int)
+                alphas = alphas[keep]
+
+            for alpha in alphas:
+                pruned = Tree(
+                    fold_tree.n_features_in_,
+                    np.array([1] * fold_tree.n_outputs_, dtype=np.intp),
+                    fold_tree.n_outputs_,
+                )
+                _build_pruned_tree_ccp(pruned, fold_tree.tree_, float(alpha))
+                score = self._honest_objective(pruned, X[test_idx], y[test_idx])
+                key = float(alpha)
+                totals[key] = totals.get(key, 0.0) + score
+                counts[key] = counts.get(key, 0) + 1
+
+        if not totals:
+            return 0.0
+        # Average over the folds that offered each candidate, then break ties toward
+        # the larger penalty: among equally-scoring trees the paper prefers the
+        # smaller one.
+        best = max(sorted(totals), key=lambda a: totals[a] / counts[a])
+        return float(best)
+
+    def _make_fold_tree(self) -> "CausalTreeRegressor":
+        """An adaptive clone used to grow one cross-validation fold.
+
+        Honesty and the cross-validation are both off -- the fold tree is grown on
+        its fold's rows and scored on the held-out ones, so it neither re-splits nor
+        recurses -- but it keeps the parent's splitting objective so the candidate
+        subtrees are the ones the final tree would produce.
+        """
+        params = self.get_params()
+        params.update(honesty=False, honest_criterion=False, ccp_alpha=0.0)
+        fold_tree = CausalTreeRegressor(**params)
+        fold_tree._train_to_est_ratio_override = self._train_to_est_ratio
+        return fold_tree
+
+    def _honest_reestimate(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        sample_weight: Union[np.ndarray, None],
+    ) -> None:
+        """Overwrite each leaf's per-group outcome mean from the estimation split.
+
+        A causal-tree leaf holds one mean outcome per group (control first) and
+        ``predict`` differences them into the treatment effect, so re-estimating
+        those means is what makes the effect honest. ``tree_.value`` is a writable
+        view on the tree's own buffer, so the assignment reaches the values that
+        predictions read.
+
+        A group with no estimation rows in a leaf keeps its structure-split value:
+        ``min_group_samples`` is enforced by the builder on the structure half only,
+        and writing a zero (or a NaN) for the missing group would corrupt that leaf's
+        effect rather than leave it merely stale.
+
+        Args:
+            X: (np.ndarray), estimation-split feature matrix
+            y: (np.ndarray), estimation-split outcomes as (samples x groups)
+            sample_weight: (np.ndarray or None), weights for the estimation rows
+        """
+        X = self._validate_X_predict(X, check_input=True)
+        leaf_ids = self.tree_.apply(X)
+        value = self.tree_.value  # (node_count, n_groups, 1), writable view
+        n_nodes = self.tree_.node_count
+        is_leaf = self.tree_.children_left == -1
+
+        for group in range(self.n_outputs_):
+            outcomes = y[:, group]
+            observed = ~np.isnan(outcomes)
+            leaves = leaf_ids[observed]
+            if sample_weight is None:
+                weights = np.ones(leaves.shape[0], dtype=np.float64)
+            else:
+                weights = np.asarray(sample_weight, dtype=np.float64)[observed]
+            total_weight = np.bincount(leaves, weights=weights, minlength=n_nodes)
+            total_outcome = np.bincount(
+                leaves, weights=weights * outcomes[observed], minlength=n_nodes
+            )
+            estimated = is_leaf & (total_weight > 0)
+            value[estimated, group, 0] = (
+                total_outcome[estimated] / total_weight[estimated]
+            )
 
     def _prepare_data(
         self,

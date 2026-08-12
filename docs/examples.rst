@@ -29,6 +29,7 @@ Follow the below links for an approximate ordering of example tutorials from int
     examples/necessity_sufficiency_example
     examples/causal_trees_with_synthetic_data
     examples/causal_trees_interpretation
+    examples/causal_tree_honesty_parity
     examples/logistic_regression_based_data_generation_for_uplift_classification
     examples/qini_curves_for_costly_treatment_arms
     examples/calibration
