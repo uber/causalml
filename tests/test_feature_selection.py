@@ -143,10 +143,27 @@ def test_kl_divergence_at_the_limits(pk, qk):
     ``qk = 0.001``. ``_kl_divergence`` in
     ``causalml/inference/tree/_uplift/_criterion.pyx`` already takes the limits
     directly; this keeps the two implementations agreeing.
+
+    These pairs cover direct callers of the scalar. ``filter_D`` cannot emit a
+    degenerate ``pk`` against a non-degenerate ``qk``; see
+    ``test_kl_divergence_identical_arms`` for the pairs it does reach.
     """
     expected = -np.log(1 - qk) if pk == 0 else -np.log(qk)
 
     assert FilterSelect._kl_divergence(pk, qk) == pytest.approx(expected, rel=1e-12)
+
+
+@pytest.mark.parametrize("value", [0.0, 1.0, 0.3])
+def test_kl_divergence_identical_arms(value):
+    """Two arms that behaved the same have no divergence between them.
+
+    ``_GetNodeSummary`` smooths a missing count to 1, so ``pk`` only reaches 0
+    or 1 when the whole bin is degenerate, which puts ``qk`` at the same value.
+    (0, 0) and (1, 1) are therefore the degenerate pairs ``filter_D`` actually
+    produces, and clamping ``qk`` away from ``pk`` before comparing them would
+    report a difference of about 1e-6 between identical arms.
+    """
+    assert FilterSelect._kl_divergence(value, value) == 0.0
 
 
 def test_filter_kl_bin_where_everyone_converted():
@@ -169,5 +186,7 @@ def test_filter_kl_bin_where_everyone_converted():
         data=df, features=["x"], y_name=CONVERSION, n_bins=5, method="KL"
     )
 
-    assert np.isfinite(imp["score"].values[0])
+    # every bin is identical across the two arms, so there is no divergence
+    # for the feature to report
+    assert imp["score"].values[0] == 0
     assert imp["rank"].values[0] == 1

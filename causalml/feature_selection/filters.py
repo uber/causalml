@@ -377,6 +377,15 @@ class FilterSelect:
             pk (float): Probability of class 1 in treatment group
             qk (float): Probability of class 1 in control group
         """
+        # Identical arms have no divergence. This is checked before the clamp
+        # below, which would otherwise move qk away from pk and report a
+        # difference between two arms that behaved the same. It is also the only
+        # way pk reaches 0 or 1 through filter_D: _GetNodeSummary smooths a
+        # missing count to 1, so a degenerate pk means the whole bin is
+        # degenerate and qk holds the same value.
+        if pk == qk:
+            return 0.0
+
         eps = 0.1**6
         if qk < eps:
             qk = eps
