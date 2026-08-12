@@ -23,6 +23,22 @@ System Requirements
 
 **macOS and Windows:** All recent versions are supported.
 
+.. note::
+   On macOS, ``xgboost`` and ``lightgbm`` require the OpenMP runtime (``libomp``),
+   which is not included by default. Without it, importing CausalML modules that
+   use XGBoost can fail when the XGBoost native library cannot be loaded.
+   Install it via Homebrew:
+
+   .. code-block:: bash
+
+      brew install libomp
+
+   or via conda-forge:
+
+   .. code-block:: bash
+
+      conda install -c conda-forge llvm-openmp
+
 Install using ``conda``
 -----------------------
 

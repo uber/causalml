@@ -58,6 +58,12 @@ Deprecations
 
   By @jeongyoonlee in https://github.com/uber/causalml/pull/975
 
+Bug Fixes
+~~~~~~~~~
+* **macOS without the OpenMP runtime now reports an actionable error (#908).**
+  The installation guide now documents the required OpenMP runtime and
+  installation options.
+
 Release Schedule
 ~~~~~~~~~~~~~~~~
 Quarterly, targeting:
