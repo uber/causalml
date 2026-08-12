@@ -198,9 +198,15 @@ class TestSafetyChecks:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             loaded = BaseTRegressor.load(tmp_path_file)
-            assert len(w) == 1
-            assert issubclass(w[0].category, CausalMLVersionMismatchWarning)
-            assert "0.0.1" in str(w[0].message)
+            # Filter rather than count: `load` goes through joblib, and a
+            # dependency warning raised on the way (NumPy 2.5 deprecates setting
+            # an array's shape, which joblib's unpickler still does) would
+            # otherwise fail a test that is about our own warning.
+            version_warnings = [
+                x for x in w if issubclass(x.category, CausalMLVersionMismatchWarning)
+            ]
+            assert len(version_warnings) == 1
+            assert "0.0.1" in str(version_warnings[0].message)
 
     def test_no_warning_when_versions_match(self, regression_data, tmp_path_file):
         """No warning should be raised when versions match."""
@@ -340,8 +346,16 @@ class TestEdgeCases:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             loaded = load_learner(tmp_path_file)
-            assert len(w) == 1
-            assert "without causalml metadata" in str(w[0].message)
+            # See test_version_mismatch_warning: filter to our own warning so a
+            # dependency's deprecation raised during the joblib load cannot fail
+            # this.
+            metadata_warnings = [
+                x for x in w if "without causalml metadata" in str(x.message)
+            ]
+            assert len(metadata_warnings) == 1
+            assert issubclass(
+                metadata_warnings[0].category, CausalMLVersionMismatchWarning
+            )
 
         preds = loaded.predict(X=X)
         assert preds.shape[0] == X.shape[0]
