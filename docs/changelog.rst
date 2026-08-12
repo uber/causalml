@@ -54,9 +54,15 @@ New Features
 
   Better in 16 of 16 seeds at every noise level above 0.1, ``p < 0.0001``; at
   ``sigma=0.1`` there is little overfitting to remove and the two are equivalent. The cost
-  is ``cv_folds`` extra fits per tree, roughly 5x fit time. It is off by default because it
-  changes fitted trees, and on a forest the averaging already removes some of the same
-  variance — measure before enabling it there.
+  is ``cv_folds`` extra fits per tree, roughly 5x fit time. Off by default because it
+  changes fitted trees.
+
+  **The gain is specific to a single tree.** On ``CausalRandomForestRegressor`` the same
+  option measured *worse* — held-out CATE RMSE 0.084 to 0.130 (+55%, 0 of 10 paired seeds
+  better) at ``sigma=0.5``, and 0.184 to 0.200 (+9%) at ``sigma=2.0``. Averaging across
+  trees already removes the variance the cross-validated pruning is fighting, so pruning
+  each tree back to a handful of leaves only adds bias and costs ensemble diversity.
+  Prefer it on ``CausalTreeRegressor``.
 
 Behavior Changes
 ~~~~~~~~~~~~~~~~

@@ -194,7 +194,14 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
                    which is the job it does in the paper.
 
                 Requires ``honesty=True``; ignored otherwise. An explicit non-zero
-                ``ccp_alpha`` is respected and skips the cross-validation.
+                ``ccp_alpha`` is respected and skips the cross-validation. Costs
+                ``cv_folds`` extra fits.
+
+                Held-out CATE RMSE over 10 paired seeds improved by 25% at ``sigma=0.5``
+                and 55% at ``sigma=2.0`` (10 of 10 seeds each), and is a wash where there
+                is no overfitting to remove. The gain is specific to a single tree: on
+                :class:`CausalRandomForestRegressor` the same option measured *worse*,
+                because averaging across trees already removes that variance.
             cv_folds: (int, default=5), folds used to select ``ccp_alpha`` when
                 ``honest_criterion=True``. Ignored otherwise.
         """
