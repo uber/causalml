@@ -22,7 +22,10 @@ from sklearn.model_selection import train_test_split
 
 from causalml.dataset import make_uplift_classification
 from causalml.inference.tree import uplift_tree_plot, uplift_tree_string
-from causalml.inference.tree._uplift.uplifttree import _KernelUpliftTreeClassifier
+from causalml.inference.tree._uplift.uplifttree import (
+    UpliftTreeClassifier,
+    _KernelUpliftTreeClassifier,
+)
 from causalml.inference.tree._uplift.upliftforest import (
     _KernelUpliftRandomForestClassifier,
     UpliftRandomForestClassifier,
@@ -890,3 +893,119 @@ def test_kernel_uplift_forest_predictions_independent_of_n_jobs(n_jobs):
     other.fit(X=X, treatment=treatment, y=y)
 
     assert_array_almost_equal(serial.predict(X), other.predict(X), decimal=12)
+
+
+# ---------------------------------------------------------------------------
+# Fit-time pruning (#1003). `prune_fraction` holds rows out of the fit, grows on
+# the rest, and prunes on the holdout with the existing `prune()`.
+# ---------------------------------------------------------------------------
+
+
+def _prune_data(n=3000, seed=RANDOM_SEED):
+    df, x_names = make_uplift_classification(
+        n_samples=n, treatment_name=["control", "t1"], random_seed=seed
+    )
+    return (
+        df[x_names].values,
+        df["treatment_group_key"].values,
+        df["conversion"].values,
+    )
+
+
+def test_uplift_tree_prune_fraction_off_by_default():
+    """`prune_fraction` defaults to None and leaves the fit untouched."""
+    X, treatment, y = _prune_data()
+    assert UpliftTreeClassifier(control_name="control").prune_fraction is None
+
+    common = dict(
+        control_name="control",
+        max_depth=None,
+        min_samples_leaf=20,
+        random_state=RANDOM_SEED,
+    )
+    default = UpliftTreeClassifier(**common).fit(X=X, treatment=treatment, y=y)
+    explicit = UpliftTreeClassifier(prune_fraction=None, **common).fit(
+        X=X, treatment=treatment, y=y
+    )
+    pruned = UpliftTreeClassifier(prune_fraction=0.3, **common).fit(
+        X=X, treatment=treatment, y=y
+    )
+
+    assert np.array_equal(default.tree_.value, explicit.tree_.value)
+    # Against the tree's own pre-prune size, not against `default`: `default` is
+    # grown on all the rows, so a smaller pruned tree could just be the effect of
+    # holding rows out rather than of any pruning.
+    assert pruned.tree_.node_count < pruned.n_nodes_before_pruning_
+    assert not hasattr(default, "n_nodes_before_pruning_")
+
+
+def test_uplift_tree_prune_fraction_keeps_node_counts_consistent():
+    """Pruning renumbers nodes, so `_node_group_counts` is rebuilt to match.
+
+    `_node_group_counts` is indexed by node id (the uplift-score p-value and the
+    plot's group_size read it), and `prune()` replaces `tree_` without touching
+    it. A stale array is longer than the pruned tree, so it silently returns
+    another node's counts rather than raising.
+    """
+    X, treatment, y = _prune_data()
+    model = UpliftTreeClassifier(
+        control_name="control",
+        max_depth=None,
+        min_samples_leaf=20,
+        prune_fraction=0.3,
+        random_state=RANDOM_SEED,
+    ).fit(X=X, treatment=treatment, y=y)
+
+    assert model._node_group_counts.shape[0] == model.tree_.node_count
+    assert model._node_group_counts.shape[1] == model.n_outputs_
+
+
+def test_uplift_tree_prune_fraction_reestimates_honest_leaves():
+    """With honesty on, every leaf of the pruned tree carries an estimation-half value.
+
+    `_honest_reestimate` only writes leaves, so a node that pruning turns into a
+    leaf would otherwise keep the structure-split value it held as an internal
+    node. Asserted by recomputing the estimation-half per-group rates against the
+    pruned tree and comparing to what the leaves actually hold -- comparing an
+    honest fit to a plain one does not test this, since the two differ anyway
+    from the structure/estimation split.
+    """
+    X, treatment, y = _prune_data()
+    model = UpliftTreeClassifier(
+        control_name="control",
+        max_depth=None,
+        min_samples_leaf=20,
+        prune_fraction=0.3,
+        honesty=True,
+        random_state=RANDOM_SEED,
+    ).fit(X=X, treatment=treatment, y=y)
+
+    _, _, X_est, y_est = model._fit_splits
+    leaf_ids = model.tree_.apply(np.ascontiguousarray(X_est, dtype=np.float32))
+    value = model.tree_.value
+    is_leaf = model.tree_.children_left == -1
+    n_nodes = model.tree_.node_count
+
+    for group in range(model.n_outputs_):
+        column = y_est[:, group]
+        observed = ~np.isnan(column)
+        at = leaf_ids[observed]
+        n = np.bincount(at, minlength=n_nodes).astype(float)
+        total = np.bincount(at, weights=column[observed], minlength=n_nodes)
+        expected = np.divide(total, n, out=np.zeros_like(n), where=n > 0)
+        assert_array_almost_equal(value[is_leaf, group, 0], expected[is_leaf])
+
+
+def test_uplift_tree_prune_fraction_survives_clone():
+    """The three pruning parameters round-trip through `get_params`."""
+    cloned = clone(
+        UpliftTreeClassifier(
+            control_name="control",
+            prune_fraction=0.3,
+            min_gain=0.01,
+            prune_rule="bestUplift",
+        )
+    )
+    assert cloned.get_params()["prune_fraction"] == 0.3
+    assert cloned.get_params()["min_gain"] == 0.01
+    assert cloned.get_params()["prune_rule"] == "bestUplift"

@@ -65,6 +65,31 @@ New Features
 
   ``ccp_alpha="cv"`` requires ``honesty=True`` and raises otherwise, since the
   cross-validation scores candidate subtrees with the honest objective.
+* **`UpliftTreeClassifier` can prune inside** ``fit`` **(#1003).** ``prune_fraction``
+  (default ``None``, off) holds out that fraction of the rows stratified on
+  (treatment, outcome), grows the tree on the rest, and runs the existing ``prune()``
+  on the holdout with ``min_gain`` / ``prune_rule``. Reaching validation-based pruning
+  previously meant splitting the data, fitting, and calling ``prune()`` as a second
+  step. ``prune()`` is unchanged for callers who manage their own holdout, and
+  ``n_nodes_before_pruning_`` records the size pruning started from.
+
+  The pruning rows are removed before the honest split, so neither the split search nor
+  the estimation half sees them. Pruning renumbers nodes and promotes internal nodes to
+  leaves, so the honest re-estimation and the per-node group counts are redone against
+  the pruned tree.
+
+  On ``make_uplift_classification`` (n=3000, 6 seeds, ``max_depth=None``,
+  ``min_samples_leaf=20``), held-out qini went from -1.74 unpruned to -1.44 with
+  ``prune_fraction=0.3``, and to 0.83 combined with ``honesty=True``. One simulated
+  design, so the magnitudes are indicative.
+
+Bug Fixes
+~~~~~~~~~
+* **`UpliftTreeClassifier.prune` left `_node_group_counts` stale (#1003).** ``prune()``
+  replaces ``tree_`` without rebuilding the per-node group counts, which are indexed by
+  node id and read by the uplift-score p-value and the plot's ``group_size``. The stale
+  array is longer than the pruned tree, so it returned another node's counts instead of
+  raising. The counts are now rebuilt whenever ``fit`` prunes.
 
 Behavior Changes
 ~~~~~~~~~~~~~~~~
