@@ -274,17 +274,16 @@ class CausalRandomForestRegressor(SerializableLearner, ForestRegressor):
                     penalty and cross-validated tree size -- rather than only held-out
                     leaf estimation. See :class:`CausalTreeRegressor`.
 
-                    **Measured worse on a forest.** Held-out CATE RMSE over 10 paired
-                    seeds went from 0.084 to 0.130 (+55%, 0 of 10 seeds better) at
-                    ``sigma=0.5`` and 0.184 to 0.200 (+9%) at ``sigma=2.0``, while the
-                    same option on a single tree improved RMSE by 25% and 55%. Averaging
-                    across trees already removes the variance the cross-validated
-                    pruning is fighting, so pruning each tree back to a handful of leaves
-                    only adds bias and costs ensemble diversity. It is exposed here for
-                    completeness and for comparison against a single tree; prefer it on
-                    :class:`CausalTreeRegressor`. Each tree also runs its own
-                    ``cv_folds``-fold cross-validation, so fitting costs roughly
-                    ``cv_folds`` times as much.
+                    Measured no gain on a forest. Held-out CATE RMSE over paired seeds went
+                    from 0.084 to 0.130 at ``sigma=0.5`` (+55%, 0 of 10 seeds better, 100
+                    trees; +50% with 50 trees), and was unchanged at ``sigma=2.0``. The
+                    same option on a single tree reduces RMSE by 25% to 55%. Averaging
+                    across trees already removes the variance the cross-validated pruning
+                    targets, so pruning each tree to a few leaves adds bias and reduces
+                    ensemble diversity, at a larger cost when noise is lower. Exposed here
+                    for comparison against a single tree; prefer it on
+                    :class:`CausalTreeRegressor`. Each tree runs its own ``cv_folds``-fold
+                    cross-validation, so fitting costs roughly ``cv_folds`` times as much.
             cv_folds: (int, default=5)
                     Folds each tree uses to select its penalty when
                     ``honest_criterion=True``. Ignored otherwise.

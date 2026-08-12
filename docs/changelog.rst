@@ -53,16 +53,16 @@ New Features
        - 46 → 8
 
   Better in 16 of 16 seeds at every noise level above 0.1, ``p < 0.0001``; at
-  ``sigma=0.1`` there is little overfitting to remove and the two are equivalent. The cost
-  is ``cv_folds`` extra fits per tree, roughly 5x fit time. Off by default because it
-  changes fitted trees.
+  ``sigma=0.1`` there is no overfitting to remove and the two are equivalent. The cost is
+  ``cv_folds`` extra fits per tree, roughly 5x fit time. Off by default because it changes
+  fitted trees.
 
-  **The gain is specific to a single tree.** On ``CausalRandomForestRegressor`` the same
-  option measured *worse* — held-out CATE RMSE 0.084 to 0.130 (+55%, 0 of 10 paired seeds
-  better) at ``sigma=0.5``, and 0.184 to 0.200 (+9%) at ``sigma=2.0``. Averaging across
-  trees already removes the variance the cross-validated pruning is fighting, so pruning
-  each tree back to a handful of leaves only adds bias and costs ensemble diversity.
-  Prefer it on ``CausalTreeRegressor``.
+  This applies to a single tree. On ``CausalRandomForestRegressor`` the same option
+  measured no gain: held-out CATE RMSE went from 0.084 to 0.130 at ``sigma=0.5`` (+55%,
+  0 of 10 paired seeds better) and was unchanged at ``sigma=2.0``. Averaging across trees
+  already removes the variance the cross-validated pruning targets, so pruning each tree to
+  a few leaves adds bias and reduces ensemble diversity, at a larger cost when noise is
+  lower. Prefer it on ``CausalTreeRegressor``.
 
 Behavior Changes
 ~~~~~~~~~~~~~~~~
@@ -75,18 +75,17 @@ Behavior Changes
   stratified on treatment. Both are the names ``UpliftTreeClassifier`` already uses, and
   the default matches ``grf``'s ``honesty = TRUE`` and EconML's ``honest=True``.
 
-  **This changes fitted models and predictions.** Unlike the ``n_jobs`` change below, the
-  numbers move: an existing script gets a different tree, different leaf values and
-  different CATE estimates without any edit. Pass ``honesty=False`` to keep the previous
-  behavior exactly.
+  **This changes fitted models and predictions.** An existing script gets a different tree,
+  different leaf values and different CATE estimates without any edit. Pass
+  ``honesty=False`` to keep the previous behavior.
 
   Measured over 200 replications on data with no treatment effect anywhere, with the tree
   structure held fixed across both arms: in-sample leaves reported a mean absolute
   estimated effect of 0.163 versus 0.095 for honest leaves, a 42% reduction in spurious
-  heterogeneity. The trade is variance — each half sees only part of the data, so an
-  honest tree is usually shallower and noisier per leaf, and at small sample sizes an
-  individual estimate can be worse. Prefer ``honesty=False`` when the fit is small enough
-  that halving it leaves too little to split on.
+  heterogeneity. The trade is variance: each half sees only part of the data, so an honest
+  tree is shallower and noisier per leaf, and at small sample sizes an individual estimate
+  can be worse. Use ``honesty=False`` when halving the sample leaves too little to split
+  on.
 
   On the forest, honesty composes with ``bootstrap`` rather than replacing it: the
   bootstrap counts arrive as each tree's ``sample_weight`` and weight both the structure
