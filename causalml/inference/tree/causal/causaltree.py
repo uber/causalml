@@ -17,7 +17,7 @@ from causalml.inference.serialization import SerializableLearner
 
 from ._tree import BaseCausalDecisionTree
 from .._tree._tree import Tree, _build_pruned_tree_ccp, ccp_pruning_path
-from ..utils import get_tree_leaves_mask, timeit
+from ..utils import _check_fraction, get_tree_leaves_mask, timeit
 
 logger = logging.getLogger("causalml")
 
@@ -281,6 +281,8 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
             raise ValueError(
                 "min_impurity_decrease must be set to -inf for causal_mse criterion"
             )
+
+        _check_fraction("estimation_sample_size", self.estimation_sample_size)
 
         if isinstance(self.ccp_alpha, str):
             if self.ccp_alpha != CV_PENALTY:

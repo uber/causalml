@@ -4,6 +4,7 @@ from abc import abstractmethod
 import numpy as np
 import pandas as pd
 import pytest
+from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 
 from causalml.inference.tree import CausalTreeRegressor, CausalRandomForestRegressor
@@ -1087,3 +1088,42 @@ def test_causal_tree_fold_trees_inherit_the_parent_objective():
     assert fold.honesty is False
     assert fold.ccp_alpha == 0.0
     assert fold._train_to_est_ratio_override == parent._train_to_est_ratio == 1.0
+
+
+@pytest.mark.parametrize("bad", [0.0, 1.0, 1.5, -0.5, "abc", np.nan])
+def test_causal_tree_fit_rejects_invalid_estimation_sample_size(bad):
+    """`fit` names the offending parameter instead of `train_test_split`'s.
+
+    The value reaches `train_test_split` as `test_size`, which rejects the
+    out-of-range ones but reports them against its own parameter name. `0.0`
+    would otherwise reach it as "hold nothing out".
+    """
+    X, treatment, y = _make_heterogeneous_effect_data(n=300)
+    model = CausalTreeRegressor(
+        honesty=True, estimation_sample_size=bad, **HONEST_TREE_PARAMS
+    )
+
+    with pytest.raises(ValueError, match="estimation_sample_size"):
+        model.fit(X=X, treatment=treatment, y=y)
+
+
+def test_causal_forest_surfaces_the_estimation_sample_size_error():
+    """The forest fits trees in parallel; the tree's message must survive that."""
+    X, treatment, y = _make_heterogeneous_effect_data(n=300)
+    forest = CausalRandomForestRegressor(
+        honesty=True,
+        estimation_sample_size=1.5,
+        n_estimators=3,
+        **HONEST_TREE_PARAMS,
+    )
+
+    with pytest.raises(ValueError, match="estimation_sample_size"):
+        forest.fit(X=X, treatment=treatment, y=y)
+
+
+def test_causal_tree_validation_does_not_raise_in_init():
+    """Validation belongs to `fit`: `__init__` stores its arguments verbatim."""
+    model = CausalTreeRegressor(honesty=True, estimation_sample_size=0.0)
+
+    assert model.get_params()["estimation_sample_size"] == 0.0
+    assert clone(model).get_params()["estimation_sample_size"] == 0.0

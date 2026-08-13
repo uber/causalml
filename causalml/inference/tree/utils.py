@@ -1,5 +1,5 @@
 """
-Utility functions for uplift trees.
+Utility functions for uplift and causal trees.
 """
 
 import functools
@@ -8,6 +8,40 @@ from typing import Callable
 
 import numpy as np
 import pandas as pd
+
+
+def _check_fraction(name: str, value, allow_none: bool = False) -> None:
+    """Reject a held-out fraction that is not strictly inside (0, 1).
+
+    Shared by the uplift and causal trees, whose ``estimation_sample_size`` and
+    ``prune_fraction`` reach ``train_test_split`` as ``test_size``. That call
+    rejects out-of-range values but reports them against its own parameter name
+    rather than the one the caller passed, and ``0.0`` never reaches it: it is a
+    plausible way to write "hold nothing out", and each caller reads it as off.
+
+    Called from ``fit`` rather than ``__init__`` so constructors keep storing
+    their arguments verbatim, which sklearn's ``get_params`` / ``clone``
+    round-trip on.
+
+    Args:
+        name (str): parameter name, for the message
+        value: the value to check
+        allow_none (bool): whether ``None`` is a valid value (off)
+
+    Raises:
+        ValueError: if the value is not a float strictly between 0 and 1
+    """
+    if allow_none and value is None:
+        return
+    try:
+        fraction = float(value)
+    except (TypeError, ValueError):
+        fraction = float("nan")
+    if not 0.0 < fraction < 1.0:
+        allowed = "a float strictly between 0 and 1"
+        if allow_none:
+            allowed += " or None"
+        raise ValueError(f"{name} must be {allowed}, got {value!r}")
 
 
 def cat_group(dfx, kpix, n_group=10):

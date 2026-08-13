@@ -26,36 +26,7 @@ from causalml.inference.serialization import SerializableLearner
 
 from ._tree import BaseUpliftDecisionTree
 from .._tree._tree import Tree, build_pruned_tree_from_mask
-
-
-def _check_fraction(name: str, value, allow_none: bool = False) -> None:
-    """Reject a held-out fraction that is not strictly inside (0, 1).
-
-    Both fractions reach ``train_test_split`` as ``test_size``, which rejects
-    out-of-range values but reports them against its own parameter name rather
-    than the one the caller passed. ``0.0`` needs catching here in particular:
-    it is a plausible way to write "hold nothing out", and nothing downstream
-    would have complained about it.
-
-    Args:
-        name (str): parameter name, for the message
-        value: the value to check
-        allow_none (bool): whether ``None`` is a valid value (off)
-
-    Raises:
-        ValueError: if the value is not a float strictly between 0 and 1
-    """
-    if allow_none and value is None:
-        return
-    try:
-        fraction = float(value)
-    except (TypeError, ValueError):
-        fraction = float("nan")
-    if not 0.0 < fraction < 1.0:
-        allowed = "a float strictly between 0 and 1"
-        if allow_none:
-            allowed += " or None"
-        raise ValueError(f"{name} must be {allowed}, got {value!r}")
+from ..utils import _check_fraction
 
 
 class _UpliftTreeNode:

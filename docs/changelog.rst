@@ -79,6 +79,11 @@ New Features
   leaves, so the honest re-estimation and the per-node group counts are redone against
   the pruned tree.
 
+  ``fit`` now rejects a held-out fraction outside ``(0, 1)`` — ``prune_fraction`` on the
+  uplift tree and ``estimation_sample_size`` on both the uplift and causal trees —
+  raising a ``ValueError`` that names the parameter instead of ``train_test_split``'s
+  ``test_size``. ``prune_fraction=0.0`` was read as off.
+
   On ``make_uplift_classification`` (n=3000, 6 seeds, ``max_depth=None``,
   ``min_samples_leaf=20``), held-out qini went from -1.74 unpruned to -1.44 with
   ``prune_fraction=0.3``, and to 0.83 combined with ``honesty=True``. One simulated
