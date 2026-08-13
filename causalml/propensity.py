@@ -6,7 +6,13 @@ from sklearn.metrics import roc_auc_score as auc
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
 from sklearn.isotonic import IsotonicRegression
-import xgboost as xgb
+
+try:
+    import xgboost as xgb
+except ValueError as exc:
+    from causalml.exceptions import handle_xgboost_error
+
+    handle_xgboost_error(exc)
 
 logger = logging.getLogger("causalml")
 

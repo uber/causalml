@@ -14,7 +14,13 @@ from causalml.propensity import compute_propensity_score
 from scipy.stats import norm
 from sklearn.model_selection import KFold
 from tqdm import tqdm
-from xgboost import XGBRegressor
+
+try:
+    from xgboost import XGBRegressor
+except ValueError as exc:
+    from causalml.exceptions import handle_xgboost_error
+
+    handle_xgboost_error(exc)
 
 from causalml.inference.serialization import SerializableLearner
 

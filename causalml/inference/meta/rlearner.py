@@ -4,7 +4,13 @@ import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
-from xgboost import XGBRegressor, XGBClassifier
+
+try:
+    from xgboost import XGBRegressor, XGBClassifier
+except ValueError as exc:
+    from causalml.exceptions import handle_xgboost_error
+
+    handle_xgboost_error(exc)
 
 from causalml.inference.meta.base import BaseLearner
 from causalml.inference.meta.utils import (

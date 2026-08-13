@@ -10,16 +10,10 @@ try:
     from xgboost import XGBRegressor
 except ImportError:  # pragma: no cover
     XGBRegressor = None
-except ValueError as exc:  # pragma: no cover
-    if type(exc).__name__ != "XGBoostError":
-        raise
-    raise RuntimeError(
-        "xgboost is installed, but its native library could not be loaded. This "
-        "is commonly caused by a missing OpenMP runtime on macOS, which xgboost "
-        "and lightgbm require at runtime (it is not a CausalML dependency). "
-        "Install the runtime with `brew install libomp` (Homebrew) or "
-        "`conda install -c conda-forge llvm-openmp` (conda), then retry."
-    ) from exc
+except ValueError as exc:
+    from causalml.exceptions import handle_xgboost_error
+
+    handle_xgboost_error(exc)
 from scipy.stats import entropy
 import warnings
 

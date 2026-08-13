@@ -2,7 +2,13 @@ import pandas as pd
 import numpy as np
 
 from packaging import version
-from xgboost import __version__ as xgboost_version
+
+try:
+    from xgboost import __version__ as xgboost_version
+except ValueError as exc:
+    from causalml.exceptions import handle_xgboost_error
+
+    handle_xgboost_error(exc)
 
 # ---------------------------------------------------------------------------
 # Optional Polars import
