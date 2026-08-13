@@ -1063,3 +1063,61 @@ def test_uplift_tree_prune_fraction_survives_clone():
     assert cloned.get_params()["prune_fraction"] == 0.3
     assert cloned.get_params()["min_gain"] == 0.01
     assert cloned.get_params()["prune_rule"] == "bestUplift"
+
+
+@pytest.mark.parametrize("bad", [0.0, 1.0, 1.5, -0.5, "abc", np.nan])
+def test_uplift_tree_fit_rejects_invalid_prune_fraction(bad):
+    """`fit` names the offending parameter instead of `train_test_split`'s.
+
+    `0.0` is the case worth catching: `fit` branched on truthiness before, so it
+    read as off and pruning was skipped without a word. The others already raised,
+    but from `train_test_split` and against `test_size`.
+    """
+    X, treatment, y = _prune_data(n=300)
+    model = UpliftTreeClassifier(
+        control_name="control", max_depth=3, min_samples_leaf=10, prune_fraction=bad
+    )
+
+    with pytest.raises(ValueError, match="prune_fraction"):
+        model.fit(X=X, treatment=treatment, y=y)
+
+
+@pytest.mark.parametrize("bad", [0.0, 1.0, 1.5, -0.5, "abc", np.nan])
+def test_uplift_tree_fit_rejects_invalid_estimation_sample_size(bad):
+    """The honest fraction gets the same check as the pruning one."""
+    X, treatment, y = _prune_data(n=300)
+    model = UpliftTreeClassifier(
+        control_name="control",
+        max_depth=3,
+        min_samples_leaf=10,
+        honesty=True,
+        estimation_sample_size=bad,
+    )
+
+    with pytest.raises(ValueError, match="estimation_sample_size"):
+        model.fit(X=X, treatment=treatment, y=y)
+
+
+def test_uplift_tree_validation_does_not_raise_in_init():
+    """Validation belongs to `fit`: `__init__` stores its arguments verbatim.
+
+    sklearn's contract is that a constructor only assigns parameters, which is what
+    `get_params` / `clone` round-trip on. Raising here would break both.
+    """
+    model = UpliftTreeClassifier(control_name="control", prune_fraction=0.0)
+
+    assert model.get_params()["prune_fraction"] == 0.0
+    assert clone(model).get_params()["prune_fraction"] == 0.0
+
+
+def test_uplift_tree_fit_accepts_the_valid_fractions():
+    """`None` (off) and an in-range fraction both fit."""
+    X, treatment, y = _prune_data(n=300)
+    common = dict(control_name="control", max_depth=3, min_samples_leaf=10)
+
+    UpliftTreeClassifier(**common, prune_fraction=None).fit(
+        X=X, treatment=treatment, y=y
+    )
+    UpliftTreeClassifier(**common, prune_fraction=0.3, honesty=True).fit(
+        X=X, treatment=treatment, y=y
+    )

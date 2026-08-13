@@ -28,6 +28,36 @@ from ._tree import BaseUpliftDecisionTree
 from .._tree._tree import Tree, build_pruned_tree_from_mask
 
 
+def _check_fraction(name: str, value, allow_none: bool = False) -> None:
+    """Reject a held-out fraction that is not strictly inside (0, 1).
+
+    Both fractions reach ``train_test_split`` as ``test_size``, which rejects
+    out-of-range values but reports them against its own parameter name rather
+    than the one the caller passed. ``0.0`` needs catching here in particular:
+    it is a plausible way to write "hold nothing out", and nothing downstream
+    would have complained about it.
+
+    Args:
+        name (str): parameter name, for the message
+        value: the value to check
+        allow_none (bool): whether ``None`` is a valid value (off)
+
+    Raises:
+        ValueError: if the value is not a float strictly between 0 and 1
+    """
+    if allow_none and value is None:
+        return
+    try:
+        fraction = float(value)
+    except (TypeError, ValueError):
+        fraction = float("nan")
+    if not 0.0 < fraction < 1.0:
+        allowed = "a float strictly between 0 and 1"
+        if allow_none:
+            allowed += " or None"
+        raise ValueError(f"{name} must be {allowed}, got {value!r}")
+
+
 class _UpliftTreeNode:
     """A minimal ``DecisionTree``-shaped node for ``plot.py``.
 
@@ -131,7 +161,12 @@ class _KernelUpliftTreeClassifier(SerializableLearner, BaseUpliftDecisionTree):
         Returns:
             self
         """
-        if self.prune_fraction:
+        # Validated here rather than in __init__ so the constructor stores its
+        # arguments verbatim (sklearn get_params / clone round-trip).
+        _check_fraction("estimation_sample_size", self.estimation_sample_size)
+        _check_fraction("prune_fraction", self.prune_fraction, allow_none=True)
+
+        if self.prune_fraction is not None:
             return self._fit_with_pruning(
                 X=X,
                 treatment=treatment,
@@ -641,7 +676,9 @@ class UpliftTreeClassifier(_KernelUpliftTreeClassifier):
     ``min_gain`` / ``prune_rule``. The pruning rows are taken out before the honest
     split, so neither the split search nor the estimation half sees them, and
     ``n_nodes_before_pruning_`` records the size pruning started from. :meth:`prune`
-    is unchanged for callers managing their own holdout.
+    is unchanged for callers managing their own holdout. ``prune_fraction`` and
+    ``estimation_sample_size`` are held-out fractions, so ``fit`` rejects anything
+    outside ``(0, 1)`` — including ``0.0``, which would otherwise read as off.
 
     On ``make_uplift_classification`` (n=3000, 6 seeds, ``max_depth=None``,
     ``min_samples_leaf=20``), ``prune_fraction=0.3`` took held-out qini from -1.74 to
