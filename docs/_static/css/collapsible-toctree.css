@@ -1,0 +1,56 @@
+/* Collapse an inline contents list (the ``toctree`` written into the body of a
+ * page, as index.rst does) down to its top level, with a toggle that reveals
+ * the level below it.
+ *
+ * The ``is-collapsible`` class is added by collapsible-toctree.js rather than
+ * being written into the HTML, so with JavaScript disabled the list still
+ * renders in full instead of losing its second level entirely.
+ */
+
+.bd-article .toctree-wrapper.is-collapsible > ul > li > ul {
+  display: none;
+}
+
+.bd-article .toctree-wrapper.is-collapsible > ul > li.is-open > ul {
+  display: block;
+}
+
+.toctree-toggle {
+  background: none;
+  border: 0;
+  border-radius: 0.2rem;
+  color: var(--pst-color-text-muted);
+  cursor: pointer;
+  font-size: 1em;
+  line-height: 1;
+  padding: 0.15em 0.45em 0.15em 0;
+}
+
+.toctree-toggle:hover {
+  color: var(--pst-color-primary);
+}
+
+.toctree-toggle:focus-visible {
+  outline: 2px solid var(--pst-color-primary);
+  outline-offset: 1px;
+}
+
+/* A CSS triangle, so the control needs no icon font or image. */
+.toctree-toggle::before {
+  border-bottom: 0.3em solid transparent;
+  border-left: 0.35em solid currentColor;
+  border-top: 0.3em solid transparent;
+  content: "";
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+
+.toctree-toggle[aria-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toctree-toggle::before {
+    transition: none;
+  }
+}

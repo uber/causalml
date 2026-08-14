@@ -177,6 +177,11 @@ html_favicon = "_static/img/logo/favicon.ico"
 # which it looks for at the root of the static output, resolve there too.
 html_static_path = ["_static", "_static/img/logo"]
 
+# Collapses the contents list index.rst writes into the landing page down to its
+# top level, with a toggle per entry for the level below it.
+html_css_files = ["css/collapsible-toctree.css"]
+html_js_files = ["js/collapsible-toctree.js"]
+
 # If not '', a 'Last updated on:' timestamp is inserted at every page
 # bottom, using the given strftime format.
 # html_last_updated_fmt = '%b %d, %Y'
