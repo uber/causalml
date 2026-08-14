@@ -46,11 +46,28 @@ extensions = [
     "sphinx.ext.mathjax",
     "sphinx.ext.viewcode",
     "sphinx.ext.autosectionlabel",
+    "sphinx.ext.intersphinx",
     "sphinxcontrib.bibtex",
     "nbsphinx",
 ]
 
 autodoc_mock_imports = ["_tkinter"]
+
+# `causalml` estimators inherit scikit-learn docstrings, which cross-reference
+# labels that only exist in scikit-learn's own documentation (`metadata_routing`,
+# `r2_score`, `roc_auc_score`, ...).  Without these inventories those references
+# resolve to nothing; with them they resolve to the upstream page.
+intersphinx_mapping = {
+    "python": ("https://docs.python.org/3", None),
+    "numpy": ("https://numpy.org/doc/stable/", None),
+    "pandas": ("https://pandas.pydata.org/docs/", None),
+    "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+    "sklearn": ("https://scikit-learn.org/stable/", None),
+}
+
+# Keep a network hiccup from stalling the build; a missing inventory degrades to
+# an unresolved reference rather than a hang.
+intersphinx_timeout = 30
 
 
 # Add any paths that contain templates here, relative to this directory.
