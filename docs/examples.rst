@@ -26,8 +26,9 @@ Follow the below links for an approximate ordering of example tutorials from int
     examples/cevae_jax_vs_torch
     examples/dr_learner_with_synthetic_data
     examples/benchmark_simulation_studies
-    examples/necessity_sufficiency_example
+    examples/necessary_and_sufficient
     examples/causal_trees_with_synthetic_data
+    examples/causal_trees_with_synthetic_data_multiple_treatment_groups
     examples/causal_trees_interpretation
     examples/causal_tree_honesty_parity
     examples/logistic_regression_based_data_generation_for_uplift_classification
