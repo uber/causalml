@@ -6,8 +6,8 @@ dependencies:
   - pip=24.0
   - python=3.11
   - pandoc
-  - sphinx
-  - sphinx-rtd-theme
+  - sphinx>=8.2,<10
+  - pydata-sphinx-theme>=0.20.0
   - sphinxcontrib-bibtex
   - nbsphinx
   - pip:

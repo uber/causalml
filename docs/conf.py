@@ -109,8 +109,9 @@ exclude_patterns = ["_build", "*processor*", "causalml.batch"]
 # output. They are ignored by default.
 # show_authors = False
 
-# The name of the Pygments (syntax highlighting) style to use.
-pygments_style = "sphinx"
+# The Pygments style is left to the theme, which ships an accessible pair of
+# light and dark syntax highlighting styles and switches between them with the
+# color-mode toggle. Pinning a single style here breaks the dark one.
 
 # A list of ignored prefixes for module index sorting.
 # modindex_common_prefix = []
@@ -124,15 +125,31 @@ pygments_style = "sphinx"
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = "sphinx_rtd_theme"
+html_theme = "pydata_sphinx_theme"
 
 # Theme options are theme-specific and customize the look and feel of a
 # theme further.  For a list of options available for each theme, see the
 # documentation.
-html_theme_options = {"logo_only": False, "display_version": True}
+html_theme_options = {
+    # The wordmark is near-black, which is illegible on the dark navbar, so the
+    # dark variant recolours it (the cube keeps its colours).  The theme
+    # resolves these against the root of the static output, so they are
+    # basenames and the logo directory is added to html_static_path below.
+    "logo": {
+        "image_light": "causalml_logo_transparent.png",
+        "image_dark": "causalml_logo_dark_transparent.png",
+        "alt_text": "CausalML",
+    },
+    "github_url": "https://github.com/uber/causalml",
+    # index.rst has 11 top-level toctree entries and this theme renders them in
+    # the header; the rest collapse into a "More" dropdown.
+    "header_links_before_dropdown": 6,
+    "navigation_depth": 2,
+    "navbar_align": "left",
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
-# html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+# html_theme_path = []
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
@@ -142,9 +159,10 @@ html_theme_options = {"logo_only": False, "display_version": True}
 # html_title.
 # html_short_title = None
 
-# The name of an image file (relative to this directory) to place at the
-# top of the sidebar.
-html_logo = "_static/img/logo/causalml_logo_square_transparent.png"
+# The name of an image file (relative to this directory) to place in the header
+# navbar.  This is the wide (760x280) logo rather than the square one, which the
+# horizontal navbar scales down to an unreadable size.
+html_logo = "_static/img/logo/causalml_logo_transparent.png"
 
 # The name of an image file (within the static path) to use as favicon
 # of the docs.  This file should be a Windows icon file (.ico) being
@@ -155,7 +173,9 @@ html_favicon = "_static/img/logo/favicon.ico"
 # here, relative to this directory. They are copied after the builtin
 # static files, so a file named "default.css" will overwrite the builtin
 # "default.css".
-html_static_path = ["_static"]
+# The logo directory is listed a second time so the theme's light/dark logos,
+# which it looks for at the root of the static output, resolve there too.
+html_static_path = ["_static", "_static/img/logo"]
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page
 # bottom, using the given strftime format.
