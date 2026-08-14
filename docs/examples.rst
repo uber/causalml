@@ -34,3 +34,4 @@ Follow the below links for an approximate ordering of example tutorials from int
     examples/qini_curves_for_costly_treatment_arms
     examples/calibration
     examples/benchmark_semi_synthetic_simulation_studies
+    examples/benchmark_leaderboard

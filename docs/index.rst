@@ -11,6 +11,7 @@ Contents:
     quickstart
     migration
     examples
+    datasets
     methodology
     interpretation
     validation

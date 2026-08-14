@@ -1,3 +1,5 @@
+from ._base import get_data_home, clear_data_dir
+from ._benchmarks import fetch_lalonde, fetch_ihdp, fetch_twins
 from .regression import synthetic_data
 from .regression import simulate_nuisance_and_easy_treatment
 from .regression import simulate_randomized_trial

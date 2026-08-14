@@ -1,3 +1,4 @@
+from .ground_truth import pehe, ate_error, policy_risk  # noqa
 from .classification import roc_auc_score, logloss, classification_metrics  # noqa
 from .regression import (
     ape,

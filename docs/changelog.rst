@@ -10,6 +10,26 @@ Unreleased
 
 New Features
 ~~~~~~~~~~~~
+* **Benchmark dataset loaders and ground-truth metrics (v1.0 M3).** ``fetch_lalonde``,
+  ``fetch_ihdp`` and ``fetch_twins`` download a benchmark from its original source on
+  first use and cache it under ``~/causalml-data`` (``CAUSALML_DATA`` overrides), with
+  SHA256 verification so a file that has moved or been truncated raises instead of
+  being parsed as data. ``download_if_missing=False`` stays offline, and
+  ``clear_data_dir()`` empties the cache. None of the datasets are redistributed with
+  CausalML; :doc:`datasets` records where each comes from and on what terms, including
+  the four benchmarks that are documented rather than shipped.
+
+  ``causalml.metrics`` gains the three metrics that need a known truth: ``pehe``
+  (Hill's precision in estimating heterogeneous effects, with ``squared=False`` for the
+  root), ``ate_error`` for the absolute error in the average effect, and
+  ``policy_risk`` for the expected loss of the treat-if-positive policy on randomized
+  data. Each docstring names what it requires — the ranking metrics stay the only ones
+  computable on ordinary observational data.
+
+  ``docs/examples/benchmark_leaderboard.ipynb`` is the leaderboard itself: running it
+  end to end regenerates every published number. It reports three tables rather than
+  one, because what is measurable is a property of how each dataset was made.
+
 * **`CausalTreeRegressor` and `CausalRandomForestRegressor` accept** ``ccp_alpha="cv"``
   **(#584).** ``honesty=True`` supplies held-out leaf estimation; this setting adds the
   two remaining pieces of :cite:`athey2016recursive`. The splitting objective's variance penalty is scaled by

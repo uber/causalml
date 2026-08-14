@@ -77,6 +77,12 @@ requires = [
 homepage = "https://github.com/uber/causalml"
 
 [tool.pytest.ini_options]
+markers = [
+    # The benchmark dataset loaders fetch from their original hosts. Tests that
+    # touch the network are opt-in (`pytest -m network`) so the ordinary suite
+    # stays offline and a source URL moving cannot redden an unrelated PR.
+    "network: needs a benchmark dataset, downloaded or already cached",
+]
 filterwarnings = [
     # CausalML's own #854 argument-order deprecation must never fire during the
     # suite: it means the library called a shimmed method positionally, and a
