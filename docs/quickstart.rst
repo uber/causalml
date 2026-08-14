@@ -41,7 +41,7 @@ Average Treatment Effect (ATE) Estimation
 Meta-learners and Uplift Trees
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-In addition to the Methodology section, you can find examples in the links below for :ref:`Meta-Learner Algorithms` and :ref:`Tree-Based Algorithms`
+In addition to the Methodology section, you can find examples in the links below for :ref:`Meta-Learner Algorithms <methodology:Meta-Learner Algorithms>` and :ref:`Tree-Based Algorithms <methodology:Tree-Based Algorithms>`
 
 - Meta-learners (S/T/X/R): `meta_learners_with_synthetic_data.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/meta_learners_with_synthetic_data.ipynb>`_
 - Meta-learners (S/T/X/R) with multiple treatment: `meta_learners_with_synthetic_data_multiple_treatment.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/meta_learners_with_synthetic_data_multiple_treatment.ipynb>`_
@@ -91,7 +91,7 @@ More algorithms
 Treatment optimization algorithms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-We have developed :ref:`Counterfactual Unit Selection` and :ref:`Counterfactual Value Estimator` methods, please find the code snippet below and details in the following notebooks:
+We have developed :ref:`Counterfactual Unit Selection <methodology:Counterfactual Unit Selection>` and :ref:`Counterfactual Value Estimator <methodology:Counterfactual Value Estimator>` methods, please find the code snippet below and details in the following notebooks:
 
 - `counterfactual_unit_selection.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/counterfactual_unit_selection.ipynb>`_
 - `counterfactual_value_optimization.ipynb <https://github.com/uber/causalml/blob/master/docs/examples/counterfactual_value_optimization.ipynb>`_
@@ -156,12 +156,12 @@ Neural network based algorithms
 
 Interpretation
 ----------------
-Please see :ref:`Interpretable Causal ML` section
+Please see :ref:`Interpretable Causal ML <interpretation:Interpretable Causal ML>` section
 
 Validation
 ----------
 
-Please see :ref:`validation` section
+Please see :ref:`Validation <validation:Validation>` section
 
 
 Synthetic Data Generation Process

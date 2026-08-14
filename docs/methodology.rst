@@ -12,27 +12,27 @@ Supported Algorithms
 CausalML currently supports the following methods:
 
 - Tree-based algorithms
-    - :ref:`Uplift Random Forests <Uplift Tree>` on KL divergence, Euclidean Distance, and Chi-Square
-    - :ref:`Uplift Random Forests <Uplift Tree>` on Contextual Treatment Selection
-    - :ref:`Uplift Random Forests <DDP>` on delta-delta-p (:math:`\Delta\Delta P`) criterion (only for binary trees and two-class problems)
-    - :ref:`Uplift Random Forests <IDDP>` on IDDP (only for binary trees and two-class problems)
-    - :ref:`Interaction Tree <IT>` (only for binary trees and two-class problems)
-    - :ref:`Causal Inference Tree <CIT>` (only for binary trees and two-class problems)
+    - :ref:`Uplift Random Forests <methodology:Uplift Tree>` on KL divergence, Euclidean Distance, and Chi-Square
+    - :ref:`Uplift Random Forests <methodology:Uplift Tree>` on Contextual Treatment Selection
+    - :ref:`Uplift Random Forests <methodology:DDP>` on delta-delta-p (:math:`\Delta\Delta P`) criterion (only for binary trees and two-class problems)
+    - :ref:`Uplift Random Forests <methodology:IDDP>` on IDDP (only for binary trees and two-class problems)
+    - Interaction Tree (only for binary trees and two-class problems)
+    - :ref:`Causal Inference Tree <methodology:CIT>` (only for binary trees and two-class problems)
 - Meta-learner algorithms
-    - :ref:`S-learner`
-    - :ref:`T-learner`
-    - :ref:`X-learner`
-    - :ref:`R-learner`
-    - :ref:`Doubly Robust (DR) learner`
+    - :ref:`S-Learner <methodology:S-Learner>`
+    - :ref:`T-Learner <methodology:T-Learner>`
+    - :ref:`X-Learner <methodology:X-Learner>`
+    - :ref:`R-Learner <methodology:R-Learner>`
+    - :ref:`Doubly Robust (DR) learner <methodology:Doubly Robust (DR) learner>`
 - Instrumental variables algorithms
-    - :ref:`2-Stage Least Squares (2SLS)`
-    - :ref:`Doubly Robust Instrumental Variable (DRIV) learner`
+    - :ref:`2-Stage Least Squares (2SLS) <methodology:2-Stage Least Squares (2SLS)>`
+    - :ref:`Doubly Robust Instrumental Variable (DRIV) learner <methodology:Doubly Robust Instrumental Variable (DRIV) learner>`
 - Neural network based algorithms
-    - :ref:`CEVAE`
-    - :ref:`DragonNet`
+    - :ref:`CEVAE <methodology:CEVAE>`
+    - :ref:`DragonNet <methodology:DragonNet>`
 - Treatment optimization algorithms
-    - :ref:`Counterfactual Unit Selection`
-    - :ref:`Counterfactual Value Estimator`
+    - :ref:`Counterfactual Unit Selection <methodology:Counterfactual Unit Selection>`
+    - :ref:`Counterfactual Value Estimator <methodology:Counterfactual Value Estimator>`
 
 
 Decision Guide
@@ -182,7 +182,7 @@ Fit propensity score models :math:`\hat{e}_0(x)` and :math:`\hat{e}_1(x)` for as
 
 **Stage 2**
 
-Use machine learning to fit the conditional :ref:`LATE` model, :math:`\hat{\tau}(X)` by minimizing the following loss function
+Use machine learning to fit the conditional :ref:`LATE <methodology:LATE>` model, :math:`\hat{\tau}(X)` by minimizing the following loss function
 
 .. math::
    L(\hat{\tau}(X)) = \hat{E} &\left[\left(\hat{m}_1(X)-\hat{m}_0(X)+\frac{Z(Y-\hat{m}_1(X))}{p_Z}-\frac{(1-Z)(Y-\hat{m}_0(X))}{1-p_Z} \right.\right.\\
@@ -233,7 +233,7 @@ across 78 benchmark datasets for CATE model selection.
 Plug-in T-learner loss
 ~~~~~~~~~~~~~~~~~~~~~~
 
-A simpler, non-doubly-robust baseline: fit a cross-fit :ref:`T-learner`, and use
+A simpler, non-doubly-robust baseline: fit a cross-fit :ref:`T-Learner <methodology:T-Learner>`, and use
 its held-out estimate :math:`\hat\mu_1(x) - \hat\mu_0(x)` directly as a proxy
 for the true CATE:
 
@@ -454,7 +454,7 @@ the training objective becomes
        + \beta \sum_i \big(y_i - \tilde{y}_i\big)^2
 
 with :math:`\beta` the ``ratio`` argument. This is a one-step correction in the
-spirit of :ref:`TMLE <Targeted maximum likelihood estimation (TMLE) for ATE>`:
+spirit of :ref:`TMLE <methodology:Targeted maximum likelihood estimation (TMLE) for ATE>`:
 at the optimum the fitted model satisfies the estimating equation for the ATE,
 which is what gives the resulting estimator its asymptotic guarantees. It is
 enabled by default via ``targeted_reg=True``.

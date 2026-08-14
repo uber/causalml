@@ -112,7 +112,7 @@ We can validate the estimation by evaluating and comparing the uplift gains with
 .. image:: ./_static/img/auuc_vis.png
     :width: 629
 
-For data with skewed treatment, it is sometimes advantageous to use :ref:`Targeted maximum likelihood estimation (TMLE) for ATE` to generate the AUUC curve for validation, as TMLE provides a more accurate estimation of ATE. Please find `validation_with_tmle.ipynb example notebook <https://github.com/uber/causalml/blob/master/docs/examples/validation_with_tmle.ipynb>`_ for details.
+For data with skewed treatment, it is sometimes advantageous to use :ref:`Targeted maximum likelihood estimation (TMLE) for ATE <methodology:Targeted maximum likelihood estimation (TMLE) for ATE>` to generate the AUUC curve for validation, as TMLE provides a more accurate estimation of ATE. Please find `validation_with_tmle.ipynb example notebook <https://github.com/uber/causalml/blob/master/docs/examples/validation_with_tmle.ipynb>`_ for details.
 
 Validation with Sensitivity Analysis
 ------------------------------------

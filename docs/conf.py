@@ -53,6 +53,17 @@ extensions = [
 
 autodoc_mock_imports = ["_tkinter"]
 
+# Section labels are prefixed with the document name.  Without this, every
+# repeated section title across the notebooks and the changelog ("Updates",
+# "CATE", "ATE w/ confidence intervals", ...) collides into one ambiguous label.
+autosectionlabel_prefix_document = True
+
+# Only label sections down to the third level.  The deepest headings that are
+# actually cross-referenced are third level (the individual learners in
+# methodology.rst); below that the notebooks repeat the same few subsection
+# titles many times over, which produces ambiguous labels and nothing else.
+autosectionlabel_maxdepth = 3
+
 # `causalml` estimators inherit scikit-learn docstrings, which cross-reference
 # labels that only exist in scikit-learn's own documentation (`metadata_routing`,
 # `r2_score`, `roc_auc_score`, ...).  Without these inventories those references
