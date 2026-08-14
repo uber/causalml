@@ -4,9 +4,11 @@ from abc import abstractmethod
 import numpy as np
 import pandas as pd
 import pytest
+from scipy.stats import norm
 from sklearn.base import clone
 from sklearn.model_selection import train_test_split
 
+from causalml.dataset import synthetic_data
 from causalml.inference.tree import CausalTreeRegressor, CausalRandomForestRegressor
 from causalml.metrics import ape
 from causalml.metrics import qini_score
@@ -1127,3 +1129,105 @@ def test_causal_tree_validation_does_not_raise_in_init():
 
     assert model.get_params()["estimation_sample_size"] == 0.0
     assert clone(model).get_params()["estimation_sample_size"] == 0.0
+
+
+def _ate_truth_data(seed, n=2000):
+    """Randomized-trial draw with the individual effects known."""
+    np.random.seed(seed)
+    y, X, w, tau, _, _ = synthetic_data(mode=2, n=n, p=5, sigma=1.0)
+    return X, w, y, tau
+
+
+def test_causal_tree_ate_standard_error_matches_the_meta_learner_formula():
+    """The interval's width is an influence-function standard error, not a spread.
+
+    `BaseTLearner.estimate_ate` computes the same quantity as a three-term
+    variance; the two agree to within a percent, the difference being cross terms
+    that vanish when the residuals are mean-zero. Asserting against it pins the
+    scale, which the previous `dhat.std() / n` missed by a factor of ~n / sqrt(n).
+    """
+    X, treatment, y, _ = _ate_truth_data(RANDOM_SEED)
+    model = CausalTreeRegressor(control_name=0, random_state=RANDOM_SEED).fit(
+        X=X, treatment=treatment, y=y
+    )
+
+    out = model.predict(X, with_outcomes=True)
+    yhat_c, yhat_t = out[:, 0], out[:, 1]
+    prob_treatment = (treatment == 1).mean()
+    expected = np.sqrt(
+        (
+            (y[treatment == 0] - yhat_c[treatment == 0]).var() / (1 - prob_treatment)
+            + (y[treatment == 1] - yhat_t[treatment == 1]).var() / prob_treatment
+            + (yhat_t - yhat_c).var()
+        )
+        / X.shape[0]
+    )
+
+    assert model._ate_standard_error(X=X, treatment=treatment, y=y) == pytest.approx(
+        expected, rel=0.05
+    )
+
+
+def test_causal_tree_ate_interval_narrows_with_sqrt_n():
+    """Quadrupling the sample halves the interval, rather than quartering it.
+
+    Dividing by `n` instead of `sqrt(n)` is invisible at a single sample size --
+    the interval is simply too narrow -- but shows up in how it scales.
+    """
+    widths = []
+    for n in (1000, 4000):
+        X, treatment, y, _ = _ate_truth_data(RANDOM_SEED, n=n)
+        _, lb, ub = CausalTreeRegressor(
+            control_name=0, random_state=RANDOM_SEED
+        ).estimate_ate(X=X, treatment=treatment, y=y)
+        widths.append(ub - lb)
+
+    assert widths[0] / widths[1] == pytest.approx(2.0, rel=0.25)
+
+
+def test_causal_tree_ate_interval_covers_the_truth():
+    """Coverage over repeated draws is the only thing that pins an interval.
+
+    A single fit cannot tell a correct interval from one 30x too narrow. Measured
+    88 of 100 seeds against a nominal 95%; the shortfall is `estimate_ate` fitting
+    and estimating on the same rows, which makes the residuals optimistic (#517).
+    The threshold is loose enough not to flake and far above the 0 of 20 the
+    previous formula gave.
+    """
+    covered = 0
+    for seed in range(20):
+        X, treatment, y, tau = _ate_truth_data(seed)
+        _, lb, ub = CausalTreeRegressor(control_name=0, random_state=seed).estimate_ate(
+            X=X, treatment=treatment, y=y
+        )
+        covered += lb <= tau.mean() <= ub
+
+    assert covered >= 14
+
+
+def test_causal_tree_ate_standard_error_tracks_the_spread_over_draws_multi_arm():
+    """With several treatment groups, the reported error must match the real one.
+
+    A standard error claims how far the estimate lands from the truth on a fresh
+    draw, so comparing it against that spread over repeated draws is what pins it.
+    Dividing the control residual by the number of treatment groups -- plausible,
+    since each group's contrast is averaged -- is invisible in the binary case and
+    passes every other test here; a control unit enters every contrast, so its
+    residual is not divided. That error takes this ratio from 0.89 to 0.69.
+    """
+    errors, standard_errors = [], []
+    z = norm.ppf(1 - 0.05 / 2)
+    for seed in range(40):
+        X, treatment, y = _make_heterogeneous_effect_data(
+            n=2000, seed=seed, n_treatments=2
+        )
+        truth = np.mean([g + X[:, 1] for g in (1, 2)])
+        te, lb, ub = CausalTreeRegressor(
+            control_name=0, random_state=seed
+        ).estimate_ate(X=X, treatment=treatment, y=y)
+
+        assert lb < te < ub
+        errors.append(te - truth)
+        standard_errors.append((ub - lb) / (2 * z))
+
+    assert 0.75 <= np.mean(standard_errors) / np.std(errors) <= 1.25

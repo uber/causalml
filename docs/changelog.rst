@@ -91,6 +91,19 @@ New Features
 
 Bug Fixes
 ~~~~~~~~~
+* **`CausalTreeRegressor.estimate_ate` understated the standard error (#1006).** The
+  interval came from ``dhat.std() / n``, which divides by ``n`` rather than ``sqrt(n)``
+  and measures how the predicted effect varies across units instead of the sampling
+  variability of its mean. At a nominal 95% over 100 randomized-trial draws
+  (``n=1000``), the interval contained the true ATE 0 times.
+
+  It is now the standard error of the estimate's influence function, which adds the
+  model's residuals on the observed outcomes to the spread of the predicted effects —
+  the quantity ``BaseTLearner.estimate_ate`` already computes as a three-term
+  variance. Coverage on the same draws is 88%, the remainder being that ``estimate_ate``
+  fits and estimates on the same rows (#517). Point estimates are unchanged; only the
+  interval moves, and it is wider.
+
 * **`UpliftTreeClassifier.prune` left `_node_group_counts` stale (#1003).** ``prune()``
   replaced ``tree_`` without rebuilding the per-node group counts, which are indexed by
   node id and read by the uplift-score p-value and the plot's ``group_size``. The stale

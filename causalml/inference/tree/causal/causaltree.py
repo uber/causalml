@@ -418,22 +418,72 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray
     ) -> tuple:
         """Estimate the Average Treatment Effect (ATE).
+
         Args:
             X (np.ndarray): a feature matrix
             treatment (np.array): a treatment vector
             y (np.ndarray): an outcome vector
+
         Returns:
             tuple, The mean and confidence interval (LB, UB) of the ATE estimate.
         """
         dhat = self.fit_predict(X, treatment, y)
 
         te = dhat.mean()
-        se = dhat.std() / X.shape[0]
+        se = self._ate_standard_error(X=X, treatment=treatment, y=y)
 
         te_lb = te - se * norm.ppf(1 - self.alpha / 2)
         te_ub = te + se * norm.ppf(1 - self.alpha / 2)
 
         return te, te_lb, te_ub
+
+    def _ate_standard_error(
+        self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray
+    ) -> float:
+        """Standard error of the ATE estimate, from its influence function.
+
+        The predicted effects alone describe how the effect varies across units, not
+        how much the sample mean of that effect would move on another draw, so their
+        spread is not a standard error of the ATE. The influence function adds what
+        the model got wrong on the observed outcomes::
+
+            psi_i = mean_g (yhat_g,i - yhat_0,i)
+                    + (y_i - yhat_g(i),i) / (share_g(i) * n_treatments)   if treated
+                    - (y_i - yhat_0,i) / share_0                          if control
+
+        A control unit enters every treatment group's contrast, so its residual is
+        not divided by the number of them. With one treatment group this is the
+        AIPW influence function, and its variance is the three-term expression the
+        meta-learners use (``BaseTLearner.estimate_ate``).
+
+        Args:
+            X (np.ndarray): a feature matrix
+            treatment (np.array): a treatment vector
+            y (np.ndarray): an outcome vector
+
+        Returns:
+            float, the standard error of the ATE estimate
+        """
+        n_groups = len(self._group2index)
+        yhat = np.atleast_2d(self.predict(X, with_outcomes=True))[:, :n_groups]
+        y = np.asarray(y, dtype=float).ravel()
+        group_idx = np.array([self._group2index[t] for t in treatment])
+
+        n_treatments = n_groups - 1
+        psi = (yhat[:, 1:] - yhat[:, [0]]).mean(axis=1)
+
+        share = np.bincount(group_idx, minlength=n_groups) / group_idx.size
+        is_control = group_idx == 0
+        psi[is_control] -= (y[is_control] - yhat[is_control, 0]) / share[0]
+        for group in range(1, n_groups):
+            in_group = group_idx == group
+            if not in_group.any():
+                continue
+            psi[in_group] += (y[in_group] - yhat[in_group, group]) / (
+                share[group] * n_treatments
+            )
+
+        return psi.std() / np.sqrt(psi.size)
 
     @timeit(exclude_kwargs=("X", "treatment", "y"))
     def bootstrap_pool(
