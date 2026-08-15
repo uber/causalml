@@ -10,6 +10,14 @@ dependencies:
   - pydata-sphinx-theme>=0.20.0
   - sphinxcontrib-bibtex
   - nbsphinx
+  # nbsphinx renders every notebook code cell as `ipython3`, and that Pygments
+  # lexer ships with IPython. Without it the lexer is unknown and each cell
+  # falls back to unhighlighted text -- 721 of them across the 27 notebooks.
+  # 8.10.0 is the floor that clears GHSA-29gw-9793-fvw7.
+  - ipython>=8.10.0
+  # Sphinx pulls Pygments in regardless; < 2.20.0 carries a ReDoS in AdlLexer
+  # (GHSA-5239-wwwm-4pmq), so the floor is stated rather than left to resolution.
+  - pygments>=2.20.0
   - pip:
     - cython>=3.0.11
     - dill>=0.3.8

@@ -792,7 +792,7 @@ def auuc_score(
 ):
     """Calculate the AUUC (Area Under the Uplift Curve) score.
 
-     Args:
+    Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns.
             Columns not matching outcome_col, treatment_col, or treatment_effect_col are
             treated as model prediction columns whose AUUC will be computed.
@@ -810,11 +810,8 @@ def auuc_score(
             Pass an integer for reproducible results. Default None.
 
     Returns:
-        If return_ci=False:
-            (pandas.Series): the AUUC score for each model estimate column
-        If return_ci=True:
-            (pandas.DataFrame): AUUC score, standard error and confidence interval
-                bounds for each model estimate column.
+        If return_ci=False: (pandas.Series): the AUUC score for each model estimate column
+        If return_ci=True: (pandas.DataFrame): AUUC score, standard error and confidence interval bounds for each model estimate column.
 
     Note:
         No p-value is reported for AUUC. A ranking drawn at random scores about 0.5
@@ -892,7 +889,7 @@ def qini_score(
     For details, see Radcliffe (2007), `Using Control Group to Target on Predicted Lift:
     Building and Assessing Uplift Models`
 
-     Args:
+    Args:
         df (pandas.DataFrame): a data frame with model estimates and actual data as columns
         outcome_col (str, optional): the column name for the actual outcome
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
@@ -909,11 +906,8 @@ def qini_score(
             Pass an integer for reproducible results. Default None.
 
     Returns:
-        If return_ci=False:
-            (pandas.Series): the Qini score for each model estimate column
-        If return_ci=True:
-            (pandas.DataFrame): Qini score, standard error, confidence interval bounds
-                and p-value for each model estimate column.
+        If return_ci=False: (pandas.Series): the Qini score for each model estimate column
+        If return_ci=True: (pandas.DataFrame): Qini score, standard error, confidence interval bounds and p-value for each model estimate column.
 
     Note:
         The p-value tests H0: Qini = 0, which here means the model's ranking is no
@@ -965,7 +959,7 @@ def plot_ps_diagnostics(df, covariate_col, treatment_col="w", p_col="p", bal_tol
     """Plot covariate balances (standardized differences between the treatment and the control)
     before and after weighting the sample using the inverse probability of treatment weights.
 
-     Args:
+    Args:
         df (pandas.DataFrame): a data frame containing the covariates and treatment indicator
         covariate_col (list of str): a list of columns that are used a covariates
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)

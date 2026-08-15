@@ -539,7 +539,7 @@ def make_uplift_classification(
     Notes
     -----
     The algorithm for generating the base classification dataset is adapted from the make_classification method in the
-    sklearn package, that uses the algorithm in Guyon [1] designed to generate the "Madelon" dataset.
+    sklearn package, that uses the algorithm in Guyon [1]_ designed to generate the "Madelon" dataset.
 
     References
     ----------

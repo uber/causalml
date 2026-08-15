@@ -165,7 +165,7 @@ def get_toc(
         treatment_col (str, optional): the column name for the treatment indicator (0 or 1)
         treatment_effect_col (str, optional): the column name for the true treatment effect
         normalize (bool, optional): whether to normalize the TOC curve by its maximum
-            absolute value. Uses max(|TOC|) as the reference to avoid division by zero
+            absolute value. Uses ``max(|TOC|)`` as the reference to avoid division by zero
             at q=1 where TOC is always zero by definition.
 
     Returns:
@@ -331,11 +331,8 @@ def rate_score(
             Pass an integer for reproducible results. Default None.
 
     Returns:
-        If return_ci=False:
-            (pandas.Series): RATE scores of model estimates
-        If return_ci=True:
-            (pandas.DataFrame): RATE score, standard error, CI lower bound, CI upper bound,
-                and p-value for each model estimate column
+        If return_ci=False: (pandas.Series): RATE scores of model estimates
+        If return_ci=True: (pandas.DataFrame): RATE score, standard error, CI lower bound, CI upper bound, and p-value for each model estimate column
     """
     assert weighting in (
         "autoc",

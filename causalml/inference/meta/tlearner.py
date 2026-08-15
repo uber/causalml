@@ -93,7 +93,7 @@ class BaseTLearner(BaseLearner):
             y (np.array, pd.Series, or pl.Series): an outcome vector
             p: unused, kept for API consistency
             store_bootstraps (bool, optional): if True, trains a bootstrap ensemble
-                during fit and stores it in self.bootstrap_models_ for post-fit CI
+                during fit and stores it in ``self.bootstrap_models_`` for post-fit CI
                 estimation via predict(return_ci=True). Default: False.
             n_bootstraps (int, optional): number of bootstrap iterations. Default: 200.
             n_jobs (int, optional): number of parallel jobs for bootstrap fitting.
