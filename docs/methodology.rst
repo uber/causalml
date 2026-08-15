@@ -16,7 +16,7 @@ CausalML currently supports the following methods:
     - :ref:`Uplift Random Forests <methodology:Uplift Tree>` on Contextual Treatment Selection
     - :ref:`Uplift Random Forests <methodology:DDP>` on delta-delta-p (:math:`\Delta\Delta P`) criterion (only for binary trees and two-class problems)
     - :ref:`Uplift Random Forests <methodology:IDDP>` on IDDP (only for binary trees and two-class problems)
-    - Interaction Tree (only for binary trees and two-class problems)
+    - :ref:`Interaction Tree <methodology:IT>` (only for binary trees and two-class problems)
     - :ref:`Causal Inference Tree <methodology:CIT>` (only for binary trees and two-class problems)
 - Meta-learner algorithms
     - :ref:`S-Learner <methodology:S-Learner>`
@@ -206,7 +206,7 @@ S/T/X/R/DR-learners above can be compared and selected among.
 These metrics evaluate *effect-magnitude accuracy* -- how close a model's CATE
 estimate is to the truth -- which is a distinct question from *targeting
 quality* -- whether a model correctly ranks units by benefit -- addressed by
-:ref:`RATE`.
+:ref:`RATE <methodology:RATE>`.
 
 DR (Doubly Robust) pseudo-outcome loss
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -244,6 +244,62 @@ This is biased under a misspecified outcome model, unlike the DR loss above.
 Despite that, :cite:`mahajan2024empirical` found it is never dominated across
 their benchmark datasets, making it a useful complement to DR-based scoring
 rather than a replacement.
+
+RATE
+~~~~
+
+The Rank-Weighted Average Treatment Effect (RATE) of
+:cite:`yadlowsky2021evaluating` scores a model as a *targeting rule*: not how
+close :math:`\hat\tau(x)` is to the truth, but whether the units it ranks
+highest are the ones that benefit most.
+
+Rank units by a prioritization score :math:`\hat\tau(x)`, treat the top
+:math:`q` fraction, and measure the gain over treating everyone. That is the
+Targeting Operator Characteristic (TOC) curve:
+
+.. math::
+   \text{TOC}(q) = E\left[Y(1)-Y(0) \mid \hat\tau(X) \ge F^{-1}_{\hat\tau}(1-q)\right] - E\left[Y(1)-Y(0)\right]
+
+where :math:`F^{-1}_{\hat\tau}(1-q)` is the :math:`(1-q)` quantile of the
+score, so the conditioning set is exactly the top-:math:`q` fraction.
+:math:`\text{TOC}(1) = 0` by construction, since selecting everyone gives back
+the overall ATE, and a curve that is positive at small :math:`q` means the rule
+has found units with above-average benefit. RATE reduces the curve to a single
+number with a weight function :math:`\alpha(q)`:
+
+.. math::
+   \text{RATE} = \int_0^1 \alpha(q)\,\text{TOC}(q)\,dq
+
+Two weightings are implemented, and the choice between them is one of
+statistical power rather than correctness:
+
+- ``weighting="autoc"`` (the default) sets :math:`\alpha(q) = 1/q`. It weights
+  the highest-priority units most heavily and is most powerful when the benefit
+  is concentrated in a small subgroup.
+- ``weighting="qini"`` sets :math:`\alpha(q) = q`, which recovers the Qini
+  coefficient. It is more powerful when treatment effects are diffuse across
+  the population.
+
+``causalml.metrics.rate_score`` returns the scalar;
+``causalml.metrics.get_toc`` and ``causalml.metrics.plot_toc`` return and draw
+the curve behind it. The integral is evaluated on the discrete quantile grid as
+a midpoint-weighted mean whose weights are normalized to sum to one, so the
+absolute scale can differ slightly from the continuous definition above while
+the ordering of models is unchanged.
+
+Passing ``return_ci=True`` adds a standard error, a confidence interval and a
+p-value for :math:`H_0: \text{RATE} = 0` -- the null that the ranking is no
+better than random -- from a half-sample bootstrap that draws :math:`n/2` units
+without replacement, the resampling scheme covered by the functional central
+limit theorem in :cite:`yadlowsky2021evaluating`.
+
+One assumption is easy to miss: without a ground-truth effect column, the
+subset ATE inside the TOC is a plain difference in mean outcomes between the
+treated and control units of each band, which is unbiased under randomization
+but not under confounding. For observational data, pass cross-fit AIPW
+pseudo-outcomes -- the same :math:`\phi` as in the DR loss above -- as
+``treatment_effect_col``, so that the ranking is scored against a
+doubly-robust estimate rather than a raw difference in means.
 
 Tree-Based Algorithms
 ---------------------
