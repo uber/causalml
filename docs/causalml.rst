@@ -92,6 +92,7 @@ causalml.metrics module
     :imported-members:
     :undoc-members:
     :show-inheritance:
+    :exclude-members: mae, r2_score, roc_auc_score
 
 causalml.feature_selection module
 ---------------------------------

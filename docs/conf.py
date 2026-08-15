@@ -96,6 +96,11 @@ suppress_warnings = [
     "autosectionlabel.examples/iv_nlsym_synthetic_data",
     "autosectionlabel.examples/meta_learners_with_synthetic_data_multiple_treatment",
     "autosectionlabel.examples/sensitivity_example_with_synthetic_data",
+    # `formats: all` in .readthedocs.yml also builds an epub, and its builder
+    # warns for every static asset whose extension it has no mimetype for --
+    # the two favicons and 27 notebook images. Nothing is broken: the files are
+    # simply left out of the epub manifest, and the HTML build does not care.
+    "epub.unknown_project_files",
 ]
 
 # `causalml` estimators inherit scikit-learn docstrings, which cross-reference
