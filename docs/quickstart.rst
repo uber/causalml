@@ -14,7 +14,9 @@ Propensity Score Estimation
     from causalml.propensity import ElasticNetPropensityModel
 
     pm = ElasticNetPropensityModel(n_fold=5, random_state=42)
-    ps = pm.fit_predict(X, y)
+    # The second argument is the treatment indicator, not the outcome: a
+    # propensity score is P(W = 1 | X).
+    ps = pm.fit_predict(X, treatment)
 
 Propensity Score Matching
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -232,7 +234,7 @@ For more details, please refer to the `sensitivity_example_with_synthetic_data.i
     sens_x = Sensitivity(df=df, inference_features=INFERENCE_FEATURES, p_col='pihat',
                          treatment_col=TREATMENT_COL, outcome_col=OUTCOME_COL, learner=learner_x)
     # Here for Selection Bias method will use default one-sided confounding function and alpha (quantile range of outcome values) input
-    sens_sumary_x = sens_x.sensitivity_analysis(methods=['Placebo Treatment',
+    sens_summary_x = sens_x.sensitivity_analysis(methods=['Placebo Treatment',
                                                          'Random Cause',
                                                          'Subset Data',
                                                          'Random Replace',
@@ -252,7 +254,7 @@ For more details, please refer to the `sensitivity_example_with_synthetic_data.i
 Feature Selection
 ---------------------------
 
-For more details, please refer to the `feature_selection.ipynb notebook <https://github.com/uber/causalml/blob/master/docs/examples/feature_selection.ipynb>`_ and the associated paper reference by Zhao, Zhenyu, et al.
+For more details, please refer to the `feature_selection.ipynb notebook <https://github.com/uber/causalml/blob/master/docs/examples/feature_selection.ipynb>`_ and the associated paper, :cite:`zhao2020feature`.
 
 .. code-block:: python
 

@@ -23,7 +23,7 @@ Meta-Learner Feature Importances
     # Using the feature_importances_ method in the base learner (LGBMRegressor() in this example)
     slearner.plot_importance(X=X, tau=slearner_tau, normalize=True, method='auto')
 
-    # Using eli5's PermutationImportance
+    # Using scikit-learn's permutation_importance
     slearner.plot_importance(X=X, tau=slearner_tau, normalize=True, method='permutation')
 
     # Using SHAP

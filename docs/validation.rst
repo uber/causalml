@@ -37,7 +37,7 @@ Mechanism 1
 | This generates a complex outcome regression model with easy treatment effect with input variables :math:`X_i \sim Unif(0, 1)^d`.
 | The treatment flag is a binomial variable, whose d.g.p. is:
 |
-|   :math:`P(W_i = 1 | X_i) = trim_{0.1}(sin(\pi X_{i1} X_{i2})`
+|   :math:`P(W_i = 1 | X_i) = trim_{0.1}(sin(\pi X_{i1} X_{i2}))`
 |
 | With :
 |   :math:`trim_\eta(x)=\max (\eta,\min (x,1-\eta))`
@@ -86,7 +86,7 @@ Mechanism 4
 |
 | The outcome variable is:
 |
-|   :math:`y_i = \frac{1}{2}\big(max(X_{i1} + X_{i2} + X_{i3}, 0) + max(X_{i4} + X_{i5}, 0)\big) + (W_i - 0.5)(max(X_{i1} + X_{i2} + X_{i3}, 0) - max(X_{i4}, X_{i5}, 0))`
+|   :math:`y_i = \frac{1}{2}\big(max(X_{i1} + X_{i2} + X_{i3}, 0) + max(X_{i4} + X_{i5}, 0)\big) + (W_i - 0.5)(max(X_{i1} + X_{i2} + X_{i3}, 0) - max(X_{i4} + X_{i5}, 0))`
 |
 
 Validation with Uplift Curve (AUUC)
@@ -116,37 +116,37 @@ For data with skewed treatment, it is sometimes advantageous to use :ref:`Target
 
 Validation with Sensitivity Analysis
 ------------------------------------
-Sensitivity analysis aim to check the robustness of the unconfoundeness assumption. If there is hidden bias (unobserved confounders), it determines how severe would have to be to change conclusion by examining the average treatment effect estimation.
+Sensitivity analysis aims to check the robustness of the unconfoundedness assumption. If there is hidden bias (unobserved confounders), it determines how severe that bias would have to be to change the conclusion, by examining the average treatment effect estimation.
 
-We implemented the following methods to conduct sensitivity analysis:
+We implemented the following methods to conduct sensitivity analysis. The heading of each is the string to pass to ``Sensitivity.sensitivity_analysis(methods=[...])``:
 
 Placebo Treatment
 ~~~~~~~~~~~~~~~~~
 
 | Replace treatment with a random variable.
 
-Irrelevant Additional Confounder
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Random Cause
+~~~~~~~~~~~~
 
 | Add a random common cause variable.
 
-Subset validation
-~~~~~~~~~~~~~~~~~
+Subset Data
+~~~~~~~~~~~
 
 | Remove a random subset of the data.
 
 Random Replace
 ~~~~~~~~~~~~~~
 
-| Random replace a covariate with an irrelevant variable.
+| Randomly replace a covariate with an irrelevant variable.
 
 Selection Bias
 ~~~~~~~~~~~~~~
 
-| `Blackwell(2013) <https://www.mattblackwell.org/files/papers/sens.pdf>` introduced an approach to sensitivity analysis for causal effects that directly models confounding or selection bias.
+| `Blackwell (2013) <https://www.mattblackwell.org/files/papers/sens.pdf>`_ introduced an approach to sensitivity analysis for causal effects that directly models confounding or selection bias.
 |
-| One Sided Confounding Function: here as the name implies, this function can detect sensitivity to one-sided selection bias, but it would fail to detect other deviations from ignobility. That is, it can only determine the bias resulting from the treatment group being on average better off or the control group being on average better off.
+| One Sided Confounding Function: here as the name implies, this function can detect sensitivity to one-sided selection bias, but it would fail to detect other deviations from ignorability. That is, it can only determine the bias resulting from the treatment group being on average better off or the control group being on average better off.
 |
 | Alignment Confounding Function: this type of bias is likely to occur when units select into treatment and control based on their predicted treatment effects
 |
-| The sensitivity analysis is rigid in this way because the confounding function is not identified from the data, so that the causal model in the last section is only identified conditional on a specific choice of that function. The goal of the sensitivity analysis is not to choose the “correct” confounding function, since we have no way of evaluating this correctness. By its very nature, unmeasured confounding is unmeasured. Rather, the goal is to identify plausible deviations from ignobility and test sensitivity to those deviations. The main harm that results from the incorrect specification of the confounding function is that hidden biases remain hidden.
+| The sensitivity analysis is rigid in this way because the confounding function is not identified from the data, so that the causal model in the last section is only identified conditional on a specific choice of that function. The goal of the sensitivity analysis is not to choose the “correct” confounding function, since we have no way of evaluating this correctness. By its very nature, unmeasured confounding is unmeasured. Rather, the goal is to identify plausible deviations from ignorability and test sensitivity to those deviations. The main harm that results from the incorrect specification of the confounding function is that hidden biases remain hidden.

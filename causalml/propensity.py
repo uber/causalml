@@ -48,7 +48,9 @@ class PropensityModel(metaclass=ABCMeta):
             X (numpy.ndarray, pd.DataFrame, or pl.DataFrame): a feature matrix.
                 scikit-learn >= 1.6 accepts pandas and Polars DataFrames
                 natively, so no conversion is performed here.
-            y (numpy.ndarray, pd.Series, or pl.Series): a binary target vector
+            y (numpy.ndarray, pd.Series, or pl.Series): the binary treatment
+                indicator, not the outcome. A propensity score is P(W = 1 | X),
+                so this vector must be the treatment assignment.
         """
         self.model.fit(X, y)
         if self.calibrate:
@@ -83,7 +85,9 @@ class PropensityModel(metaclass=ABCMeta):
 
         Args:
             X (numpy.ndarray, pd.DataFrame, or pl.DataFrame): a feature matrix
-            y (numpy.ndarray, pd.Series, or pl.Series): a binary target vector
+            y (numpy.ndarray, pd.Series, or pl.Series): the binary treatment
+                indicator, not the outcome. A propensity score is P(W = 1 | X),
+                so this vector must be the treatment assignment.
 
         Returns:
             (numpy.ndarray): Propensity scores between 0 and 1.
@@ -169,7 +173,9 @@ class GradientBoostedPropensityModel(PropensityModel):
 
         Args:
             X (numpy.ndarray, pd.DataFrame, or pl.DataFrame): a feature matrix
-            y (numpy.ndarray, pd.Series, or pl.Series): a binary target vector
+            y (numpy.ndarray, pd.Series, or pl.Series): the binary treatment
+                indicator, not the outcome. A propensity score is P(W = 1 | X),
+                so this vector must be the treatment assignment.
         """
         if self.early_stop:
             X_train, X_val, y_train, y_val = train_test_split(

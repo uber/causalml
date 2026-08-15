@@ -13,7 +13,7 @@ CausalML currently supports the following methods:
 
 - Tree-based algorithms
     - :ref:`Uplift Random Forests <methodology:Uplift Tree>` on KL divergence, Euclidean Distance, and Chi-Square
-    - :ref:`Uplift Random Forests <methodology:Uplift Tree>` on Contextual Treatment Selection
+    - :ref:`Uplift Random Forests <methodology:CTS>` on Contextual Treatment Selection
     - :ref:`Uplift Random Forests <methodology:DDP>` on delta-delta-p (:math:`\Delta\Delta P`) criterion (only for binary trees and two-class problems)
     - :ref:`Uplift Random Forests <methodology:IDDP>` on IDDP (only for binary trees and two-class problems)
     - :ref:`Interaction Tree <methodology:IT>` (only for binary trees and two-class problems)
@@ -35,12 +35,6 @@ CausalML currently supports the following methods:
     - :ref:`Counterfactual Value Estimator <methodology:Counterfactual Value Estimator>`
 
 
-Decision Guide
---------------
-
-See image in: https://github.com/uber/causalml/issues/677#issuecomment-1712088558
-
-
 Meta-Learner Algorithms
 -----------------------
 
@@ -48,7 +42,7 @@ A meta-algorithm (or meta-learner) is a framework to estimate the Conditional Av
 
 A meta-algorithm uses either a single base learner while having the treatment indicator as a feature (e.g. S-learner), or multiple base learners separately for each of the treatment and control groups (e.g. T-learner, X-learner and R-learner).
 
-Confidence intervals of average treatment effect estimates are calculated based on the lower bound formular (7) from :cite:`imbens2009recent`.
+Confidence intervals of average treatment effect estimates are calculated based on the lower bound formula (7) from :cite:`imbens2009recent`.
 
 S-Learner
 ~~~~~~~~~
@@ -169,7 +163,7 @@ with :math:`\{Y^3, X^3, W^3\}`
 
 **Stage 3**
 
-Repeat Stage 1 and Stage 2 again twice. First use :math:`\{Y^2, X^2, W^2\}`, :math:`\{Y^3, X^3, W^3\}`, and :math:`\{Y^1, X^1, W^1\}` for the propensity score model, the outcome models, and the CATE model. Then use :math:`\{Y^3, X^3, W^3\}`, :math:`\{Y^2, X^2, W^2\}`, and :math:`\{Y^1, X^1, W^1\}` for the propensity score model, the outcome models, and the CATE model. The final CATE model is the average of the 3 CATE models.
+Repeat Stage 1 and Stage 2 again twice, rotating the three partitions so that each one trains the CATE model exactly once. First use :math:`\{Y^2, X^2, W^2\}`, :math:`\{Y^3, X^3, W^3\}`, and :math:`\{Y^1, X^1, W^1\}` for the propensity score model, the outcome models, and the CATE model. Then use :math:`\{Y^3, X^3, W^3\}`, :math:`\{Y^1, X^1, W^1\}`, and :math:`\{Y^2, X^2, W^2\}` for the propensity score model, the outcome models, and the CATE model. The final CATE model is the average of the 3 CATE models.
 
 Doubly Robust Instrumental Variable (DRIV) learner
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -178,7 +172,7 @@ We combine the idea from DR-learner :cite:`kennedy2020optimal` with the doubly r
 
 **Stage 1**
 
-Fit propensity score models :math:`\hat{e}_0(x)` and :math:`\hat{e}_1(x)` for assigned and unassigned users using :math:`\{X^1, W^1, Z^1\}`, and fit outcome regression models :math:`\hat{m}_0(x)` and :math:`\hat{m}_1(x)` for assigned and unassigned users with machine learning using :math:`\{Y^2, X^2, Z^2\}`. Assignment probabiliy, :math:`p_Z`, can either be user provided or come from a simple model, since in most use cases assignment is random by design.
+Fit propensity score models :math:`\hat{e}_0(x)` and :math:`\hat{e}_1(x)` for assigned and unassigned users using :math:`\{X^1, W^1, Z^1\}`, and fit outcome regression models :math:`\hat{m}_0(x)` and :math:`\hat{m}_1(x)` for assigned and unassigned users with machine learning using :math:`\{Y^2, X^2, Z^2\}`. Assignment probability, :math:`p_Z`, can either be user provided or come from a simple model, since in most use cases assignment is random by design.
 
 **Stage 2**
 
@@ -314,21 +308,30 @@ The Uplift Tree approach consists of a set of methods that use a tree-based algo
 
 where :math:`D` measures the divergence and :math:`P^T` and :math:`P^C` refer to the probability distribution of the outcome of interest in the treatment and control groups, respectively. Three different ways to quantify the divergence, KL, ED and Chi, are implemented in the package.
 
+Throughout this subsection the outcome is binary, so :math:`P^T` and :math:`P^C`
+are each described by a single number: let :math:`p` be the sample mean of the
+outcome in the treatment group and :math:`q` the sample mean in the control
+group, both computed within the node being scored. Each divergence below sums
+over the two outcome classes :math:`\{1, 0\}` -- which is where the second term
+in each expression comes from -- and :math:`D_{gain}` then combines the parent's
+divergence with its children's as above :cite:`Gutierrez2016-co`.
+
 KL
 ~~~
 The Kullback-Leibler (KL) divergence is given by:
 
 .. math::
-   KL(P : Q) = \sum_{k=left, right}p_klog\frac{p_k}{q_k}
+   KL(P^T : P^C) = p\log\frac{p}{q} + (1-p)\log\frac{1-p}{1-q}
 
-where :math:`p` is the sample mean in the treatment group, :math:`q` is the sample mean in the control group and :math:`k` indicates the leaf in which :math:`p` and :math:`q` are computed :cite:`Gutierrez2016-co`
+At :math:`p = 0` and :math:`p = 1` the expression is taken at its limit,
+:math:`-\log(1-q)` and :math:`-\log q` respectively.
 
 ED
 ~~~
 The Euclidean Distance is given by:
 
 .. math::
-   ED(P : Q) = \sum_{k=left, right}(p_k - q_k)^2
+   ED(P^T : P^C) = (p - q)^2 + \big((1-p) - (1-q)\big)^2 = 2(p - q)^2
 
 where the notation is the same as above.
 
@@ -337,7 +340,7 @@ Chi
 Finally, the :math:`\chi^2`-divergence is given by:
 
 .. math::
-   \chi^2(P : Q) = \sum_{k=left, right}\frac{(p_k - q_k)^2}{q_k}
+   \chi^2(P^T : P^C) = \frac{(p - q)^2}{q} + \frac{(p - q)^2}{1 - q}
 
 where the notation is again the same as above.
 
@@ -360,7 +363,7 @@ criterion is defined as follows:
 .. math::
     IDDP = \frac{\Delta\Delta P^*}{I(\phi, \phi_l, \phi_r)}
 
-where :math:`\Delta\Delta P^*` is defined as :math:`\Delta\Delta P - |E[Y(1) - Y(0)]| X \epsilon \phi|` and
+where :math:`\Delta\Delta P^*` is defined as :math:`\Delta\Delta P - |E[Y(1) - Y(0) \mid X \in \phi]|` and
 :math:`I(\phi, \phi_l, \phi_r)` is defined as:
 
 .. math::
@@ -379,16 +382,16 @@ Further, the package implements the Interaction Tree (IT) proposed by :cite:`su2
 maximizes the G statistic among all permissible splits:
 
 .. math::
-    G(s^*) = max G(s)
+    G(s^*) = \max_s G(s)
 
 where :math:`G(s)=t^2(s)` and :math:`t(s)` is defined as:
 
 .. math::
-    t(s) = \frac{(y^L_1 - y^L_0) - (y^R_1 - y^R_0)}{\sigma * (1/n_1 + 1/n_2 + 1/n_3 + 1/n_4)}
+    t(s) = \frac{(y^L_1 - y^L_0) - (y^R_1 - y^R_0)}{\sigma \sqrt{1/n_1 + 1/n_2 + 1/n_3 + 1/n_4}}
 
-where :math:`\sigma=\sum_{i=4}^4w_is_i^2` is a pooled estimator of the constant variance, and :math:`w_i=(n_i-1)/\sum_{j=1}^4(n_j-1)`.
-Further, :math:`y^L_1`, :math:`s^2_1`, and :math:`n_1` are the the sample mean, the sample variance, and the sample size
-for the treatment group in the left child node ,respectively. Similar notation applies to the other quantities.
+where :math:`\sigma=\sqrt{\sum_{i=1}^4 w_i s_i^2}` is a pooled estimator of the constant standard deviation, and :math:`w_i=(n_i-1)/\sum_{j=1}^4(n_j-1)`.
+Further, :math:`y^L_1`, :math:`s^2_1`, and :math:`n_1` are the sample mean, the sample variance, and the sample size
+for the treatment group in the left child node, respectively. Similar notation applies to the other quantities.
 
 Note that this implementation deviates from the original implementation in that (1) the pruning techniques and (2) the validation method
 for determining the best tree size are different.
@@ -408,7 +411,7 @@ the number of observations in node :math:`\tau` that are assigned to the control
 that are assigned to the treatment group, respectively. :math:`SSE_{\tau}` is defined as:
 
 .. math::
-    SSE_{\tau} = \sum_{i \epsilon \tau: t_i=1}(y_i - \hat{y_{t1}})^2 + \sum_{i \epsilon \tau: t_i=0}(y_i - \hat{y_{t0}})^2
+    SSE_{\tau} = \sum_{i \in \tau: t_i=1}(y_i - \hat{y_{t1}})^2 + \sum_{i \in \tau: t_i=0}(y_i - \hat{y_{t0}})^2
 
 and :math:`\hat{y_{t0}}` and :math:`\hat{y_{t1}}` are the sample average responses of the control and treatment groups in node
 :math:`\tau`, respectively.
@@ -526,35 +529,35 @@ a JAX/``flax.nnx`` backend.
 Value optimization methods
 --------------------------
 
-The package supports methods for assigning treatment groups when treatments are costly. To understand the problem, it is helpful to divide populations into the following four categories:
+The package supports methods for assigning treatment groups when treatments are costly. To understand the problem, it is helpful to divide the population into four categories according to how a unit's *outcome* responds to being treated:
 
-* **Compliers**. Those who will have a favourable outcome if and only if they are treated.
-* **Always-takers**. Those who will have a favourable outcome whether or not they are treated.
-* **Never-takers**. Those who will never have a favourable outcome whether or not they are treated.
-* **Defiers**. Those who will have a favourable outcome if and only if they are not treated.
+* **Persuadables**. Those who will have a favourable outcome if and only if they are treated.
+* **Sure things**. Those who will have a favourable outcome whether or not they are treated.
+* **Lost causes**. Those who will never have a favourable outcome whether or not they are treated.
+* **Sleeping dogs**. Those who will have a favourable outcome if and only if they are not treated.
 
-For a more detailed discussion see e.g. :cite:`angrist2008mostly`.
+These four response types are also referred to as compliers, always-takers, never-takers and defiers. Note that those names are standard in the instrumental variables literature for a **different** partition of the population -- one defined by whether a unit *takes* the treatment in response to its *assignment*, which is the sense used in the :ref:`LATE <methodology:LATE>` section below (see :cite:`angrist2008mostly` for that one). The two partitions do not coincide, so the uplift names are used here.
 
 Counterfactual Unit Selection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 :cite:`ijcai2019-248` propose a method for selecting units for treatments using counterfactual logic. Suppose the following benefits for selecting units belonging to the different categories above:
 
-* Compliers: :math:`\beta`
-* Always-takers: :math:`\gamma`
-* Never-takers: :math:`\theta`
-* Defiers: :math:`\delta`
+* Persuadables: :math:`\beta`
+* Sure things: :math:`\gamma`
+* Lost causes: :math:`\theta`
+* Sleeping dogs: :math:`\delta`
 
 If :math:`X` denotes the set of individual's features, the unit selection problem can be formulated as follows:
 
 .. math::
-   argmax_X \beta P(\text{complier} \mid X) + \gamma P(\text{always-taker} \mid X) + \theta P(\text{never-taker} \mid X) + \delta P(\text{defier} \mid X)
+   \operatorname*{argmax}_X \beta P(\text{persuadable} \mid X) + \gamma P(\text{sure thing} \mid X) + \theta P(\text{lost cause} \mid X) + \delta P(\text{sleeping dog} \mid X)
 
 The problem can be reformulated using counterfactual logic. Suppose :math:`W = w` indicates that an individual is treated and :math:`W = w'` indicates he or she is untreated. Similarly, let :math:`F = f` denote a favourable outcome for the individual and :math:`F = f'` an unfavourable outcome. Then the optimization problem becomes:
 
 .. math::
-   argmax_X \beta P(f_w, f'_{w'} \mid X) + \gamma P(f_w, f_{w'} \mid X) + \theta P(f'_w, f'_{w'} \mid X) + \delta P(f_{w'}, f'_{w} \mid X)
+   \operatorname*{argmax}_X \beta P(f_w, f'_{w'} \mid X) + \gamma P(f_w, f_{w'} \mid X) + \theta P(f'_w, f'_{w'} \mid X) + \delta P(f_{w'}, f'_{w} \mid X)
 
-Note that the above simply follows from the definitions of the relevant users segments. :cite:`ijcai2019-248` then use counterfactual logic (:cite:`pearl2009causality`) to solve the above optimization problem under certain conditions.
+Note that the above simply follows from the definitions of the relevant user segments. :cite:`ijcai2019-248` then use counterfactual logic (:cite:`pearl2009causality`) to solve the above optimization problem under certain conditions.
 
 N.B. The current implementation in the package is highly experimental.
 
@@ -606,15 +609,15 @@ In bounding the above three quantities, we utilize observational data in additio
 
 Given this, :cite:`tian2000probabilities` use the program developed in :cite:`balke1995probabilistic` to obtain sharp bounds of the above three quantities. The main idea in this program is to turn the bounding task into a linear programming problem (for a modern implementation of their approach see `here <https://cran.r-project.org/web/packages/causaloptim/vignettes/vertexenum-speed.html>`_).
 
-Using the linear programming approach and given certain constraints together with observational data, :cite:`tian2000probabilities` find that the shar lower bound for PNS is given by
+Using the linear programming approach and given certain constraints together with observational data, :cite:`tian2000probabilities` find that the sharp lower bound for PNS is given by
 
 .. math::
-    max\{0, P(y_t) - P(y_c), P(y) - P(y_c), P(y_t) - P(y)\}
+    \max\{0, P(y_t) - P(y_c), P(y) - P(y_c), P(y_t) - P(y)\}
 
 and the sharp upper bound is given by
 
 .. math::
-    min\{P(y_t), P(y^{\prime}_c), P(t, y) + P(c, y^{\prime}), P(y_t) - P(y_c) + P(t, y^{\prime}) + P(c, y)\}
+    \min\{P(y_t), P(y^{\prime}_c), P(t, y) + P(c, y^{\prime}), P(y_t) - P(y_c) + P(t, y^{\prime}) + P(c, y)\}
 
 They use a similar routine to find the bounds for PS and PN. The `get_pns_bounds()` function calculates the bounds for each of the three probabilities of causation using the results in :cite:`tian2000probabilities`.
 
@@ -668,18 +671,18 @@ The most common method for instrumental variables estimation is the two-stage le
 Here for convenience we let :math:`\Xi=[W, X]` and :math:`\gamma=[\alpha', \beta']'`. Assume that we have instrumental variables :math:`Z` whose number of columns is at least the number of columns of :math:`W`, let :math:`\Omega=[Z, X]`, 2SLS estimator is as follows
 
 .. math::
-   \hat{\gamma}_{2SLS} = \left[\Xi'\Omega (\Omega'\Omega)^{-1} \Omega' \Xi\right]^{-1}\left[\Xi'\Omega'(\Omega'\Omega)^{-1}\Omega'Y\right].
+   \hat{\gamma}_{2SLS} = \left[\Xi'\Omega (\Omega'\Omega)^{-1} \Omega' \Xi\right]^{-1}\left[\Xi'\Omega(\Omega'\Omega)^{-1}\Omega'Y\right].
 
 See :cite:`10.1257/jep.15.4.69` for a detailed discussion of the method.
 
 LATE
 ~~~~
 
-In many situations the treatment :math:`W` may depend on subject's own choice and cannot be administered directly in an experimental setting. However one can randomly assign users into treatment/control groups so that users in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where users may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. Similar to the section of Value optimization methods, in general there are 3 types of users in this situation,
+In many situations the treatment :math:`W` may depend on subject's own choice and cannot be administered directly in an experimental setting. However one can randomly assign users into treatment/control groups so that users in the treatment group can be nudged to take the treatment. This is the case of noncompliance, where users may fail to comply with their assignment status, :math:`Z`, as to whether to take treatment or not. In general there are 3 types of users in this situation, classified by whether they *take* the treatment in response to their assignment:
 
 * **Compliers** Those who will take the treatment if and only if they are assigned to the treatment group.
-* **Always-Taker** Those who will take the treatment regardless which group they are assigned to.
-* **Never-Taker** Those who wil not take the treatment regardless which group they are assigned to.
+* **Always-Takers** Those who will take the treatment regardless of which group they are assigned to.
+* **Never-Takers** Those who will not take the treatment regardless of which group they are assigned to.
 
 However one assumes that there is no Defier for identification purposes, i.e. those who will only take the treatment if they are assigned to the control group.
 
@@ -711,8 +714,8 @@ Scale :math:`Y` into :math:`\tilde{Y}=\frac{Y-\min Y}{\max Y - \min Y}` so that 
 Let :math:`Q=\log(\tilde{m}_W(X)/(1-\tilde{m}_W(X)))`. Maximize the following pseudo log-likelihood function
 
 .. math::
-   \max_{h_0, h_1} -\frac{1}{N} \sum_i & \left[ \tilde{Y}_i \log \left(1+\exp(-Q_i-h_0 \frac{1-W}{1-\hat{e}(X_i)}-h_1 \frac{W}{\hat{e}(X_i)} \right) \right. \\
-   &\quad\left.+(1-\tilde{Y}_i)\log\left(1+\exp(Q_i+h_0\frac{1-W}{1-\hat{e}(X_i)}+h_1\frac{W}{\hat{e}(X_i)}\right)\right]
+   \max_{h_0, h_1} -\frac{1}{N} \sum_i & \left[ \tilde{Y}_i \log \left(1+\exp\left(-Q_i-h_0 \frac{1-W}{1-\hat{e}(X_i)}-h_1 \frac{W}{\hat{e}(X_i)}\right) \right) \right. \\
+   &\quad\left.+(1-\tilde{Y}_i)\log\left(1+\exp\left(Q_i+h_0\frac{1-W}{1-\hat{e}(X_i)}+h_1\frac{W}{\hat{e}(X_i)}\right)\right)\right]
 
 **Step 4**
 
