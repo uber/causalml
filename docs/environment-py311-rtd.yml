@@ -10,6 +10,10 @@ dependencies:
   - pydata-sphinx-theme>=0.20.0
   - sphinxcontrib-bibtex
   - nbsphinx
+  # nbsphinx renders every notebook code cell as `ipython3`, and that Pygments
+  # lexer ships with IPython. Without it the lexer is unknown and each cell
+  # falls back to unhighlighted text -- 721 of them across the 27 notebooks.
+  - ipython
   - pip:
     - cython>=3.0.11
     - dill>=0.3.8

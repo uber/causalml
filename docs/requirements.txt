@@ -6,3 +6,4 @@ sphinx>=8.2,<10
 pydata-sphinx-theme>=0.20.0
 sphinxcontrib-bibtex
 nbsphinx
+ipython
