@@ -6,6 +6,8 @@ import pandas as pd
 import pytest
 from scipy.stats import norm
 from sklearn.base import clone
+from numpy.testing import assert_array_almost_equal
+from sklearn.exceptions import NotFittedError
 from sklearn.model_selection import train_test_split
 
 from causalml.dataset import synthetic_data
@@ -1231,3 +1233,60 @@ def test_causal_tree_ate_standard_error_tracks_the_spread_over_draws_multi_arm()
         standard_errors.append((ub - lb) / (2 * z))
 
     assert 0.75 <= np.mean(standard_errors) / np.std(errors) <= 1.25
+
+
+def test_causal_tree_estimate_ate_pretrain_reuses_the_fitted_tree():
+    """`pretrain=True` estimates from the fitted tree instead of refitting on X.
+
+    The default path refits on the rows it then estimates from, so the estimate
+    carries whatever the tree overfit; this is the fit-on-train, estimate-on-held-out
+    workflow #517 asks for. The tree is asserted untouched because a refit would be
+    invisible in the returned numbers alone.
+    """
+    X, treatment, y, tau = _ate_truth_data(RANDOM_SEED)
+    Xtr, Xva, wtr, wva, ytr, yva = train_test_split(
+        X, treatment, y, test_size=0.5, random_state=RANDOM_SEED
+    )
+    model = CausalTreeRegressor(control_name=0, random_state=RANDOM_SEED).fit(
+        X=Xtr, treatment=wtr, y=ytr
+    )
+    before, n_nodes = model.predict(Xva).copy(), model.tree_.node_count
+
+    te, lb, ub = model.estimate_ate(X=Xva, treatment=wva, y=yva, pretrain=True)
+
+    assert_array_almost_equal(model.predict(Xva), before)
+    assert model.tree_.node_count == n_nodes
+    assert lb < te < ub
+    assert te == pytest.approx(model.predict(Xva).mean())
+
+
+def test_causal_tree_estimate_ate_pretrain_matches_the_refit_on_the_same_rows():
+    """On the rows the model was just fit on, both paths give the same answer."""
+    X, treatment, y, _ = _ate_truth_data(RANDOM_SEED)
+    model = CausalTreeRegressor(control_name=0, random_state=RANDOM_SEED)
+
+    refit = model.estimate_ate(X=X, treatment=treatment, y=y)
+    pretrained = model.estimate_ate(X=X, treatment=treatment, y=y, pretrain=True)
+
+    assert refit == pretrained
+
+
+def test_causal_tree_estimate_ate_pretrain_requires_a_fitted_model():
+    """Without a fit there is nothing to reuse."""
+    X, treatment, y, _ = _ate_truth_data(RANDOM_SEED, n=200)
+
+    with pytest.raises(NotFittedError):
+        CausalTreeRegressor(control_name=0).estimate_ate(
+            X=X, treatment=treatment, y=y, pretrain=True
+        )
+
+
+def test_causal_tree_estimate_ate_rejects_unseen_treatment_groups():
+    """A group absent from the fit has no column to read, so say which one."""
+    X, treatment, y, _ = _ate_truth_data(RANDOM_SEED, n=500)
+    model = CausalTreeRegressor(control_name=0, random_state=RANDOM_SEED).fit(
+        X=X, treatment=treatment, y=y
+    )
+
+    with pytest.raises(ValueError, match="groups the model was not fit on"):
+        model.estimate_ate(X=X, treatment=np.full(X.shape[0], 9), y=y, pretrain=True)

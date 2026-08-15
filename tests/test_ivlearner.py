@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from xgboost import XGBRegressor
@@ -80,3 +81,61 @@ def test_drivlearner():
         normalize=True,
     )
     assert auuc["cate_p"] > 0.5
+
+
+def _driv_data(n=1000, p=8, sigma=1.0):
+    """Compliance design with a known effect, matching `test_drivlearner`."""
+    np.random.seed(RANDOM_SEED)
+    X = np.random.uniform(size=n * p).reshape((n, -1))
+    b = (
+        np.sin(np.pi * X[:, 0] * X[:, 1])
+        + 2 * (X[:, 2] - 0.5) ** 2
+        + X[:, 3]
+        + 0.5 * X[:, 4]
+    )
+    assignment = (np.random.uniform(size=n) > 0.5).astype(int)
+    eta = 0.1
+    e_raw = np.maximum(
+        np.repeat(eta, n),
+        np.minimum(np.sin(np.pi * X[:, 0] * X[:, 1]), np.repeat(1 - eta, n)),
+    )
+    e = e_raw.copy()
+    e[assignment == 0] = 0
+    tau = (X[:, 0] + X[:, 1]) / 2
+    treatment = np.random.binomial(1, e, size=n)
+    y = b + (treatment - 0.5) * tau + sigma * np.random.normal(size=n)
+    return X, assignment, treatment, y, (np.ones(n) * 1e-6, e_raw)
+
+
+def test_drivlearner_estimate_ate_pretrain():
+    """`pretrain=True` estimates from the fitted models instead of refitting.
+
+    The propensity has to be passed: the one `fit` stored is indexed by the rows it
+    was fit on, and the standard error indexes `p` by the rows passed here, so
+    reusing it on held-out rows would silently read the wrong values.
+    """
+    X, assignment, treatment, y, p = _driv_data()
+    learner = BaseDRIVLearner(
+        learner=XGBRegressor(), treatment_effect_learner=LinearRegression()
+    )
+
+    refit = learner.estimate_ate(
+        X=X, assignment=assignment, treatment=treatment, y=y, p=p
+    )
+    pretrained = learner.estimate_ate(
+        X=X, assignment=assignment, treatment=treatment, y=y, p=p, pretrain=True
+    )
+
+    assert all(np.allclose(a, b) for a, b in zip(refit, pretrained))
+
+    with pytest.raises(ValueError, match="requires p"):
+        learner.estimate_ate(
+            X=X, assignment=assignment, treatment=treatment, y=y, pretrain=True
+        )
+
+    with pytest.raises(ValueError, match="No fitted model found"):
+        BaseDRIVLearner(
+            learner=XGBRegressor(), treatment_effect_learner=LinearRegression()
+        ).estimate_ate(
+            X=X, assignment=assignment, treatment=treatment, y=y, p=p, pretrain=True
+        )
