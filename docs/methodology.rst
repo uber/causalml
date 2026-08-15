@@ -429,6 +429,60 @@ The final Uplift Tree algorithm that is implemented is the Contextual Treatment 
 
 where :math:`\phi_l` and :math:`\phi_r` refer to the feature subspaces in the left leaf and the right leaves respectively, :math:`\hat{p}(\phi_j \mid \phi)` denotes the estimated conditional probability of a subject's being in :math:`\phi_j` given :math:`\phi`, and :math:`\hat{y}_t(\phi_j)` is the conditional expected response under treatment :math:`t`.
 
+Honest estimation
+~~~~~~~~~~~~~~~~~
+
+A tree that estimates each leaf's treatment effect on the same rows that chose
+its splits inherits the selection bias of the split search: the search favors
+partitions whose in-sample effects look large, so re-using those rows makes the
+leaf estimates systematically too extreme. *Honest estimation*
+:cite:`athey2016recursive` removes this bias by splitting the sample in two --
+the tree structure is grown on one half and each leaf's per-group outcome means
+are re-estimated on the other -- at the cost of fitting each half with less
+data.
+
+``CausalTreeRegressor`` and ``CausalRandomForestRegressor`` estimate honestly
+by default (``honesty=True``), matching the defaults of ``grf`` and EconML.
+``UpliftTreeClassifier`` and ``UpliftRandomForestClassifier`` accept the same
+parameters with ``honesty=False`` by default. ``estimation_sample_size``
+(default ``0.5``) sets the held-out fraction, and the split is stratified on
+treatment.
+
+The trade is variance: each half sees only part of the data, so an honest tree
+is shallower and noisier per leaf. Pass ``honesty=False`` when halving the
+sample leaves too little to split on.
+
+On ``CausalRandomForestRegressor``, honesty composes with the bootstrap: each
+tree's bootstrap counts weight both the structure fit and the leaf
+re-estimation. This is not the subsample-without-replacement scheme of
+generalized random forests :cite:`athey2019generalized`.
+
+Pruning
+~~~~~~~
+
+Both tree families grow greedily and can overfit. Each offers a
+validation-based way to cut the fitted tree back; both are off by default
+because they change fitted trees.
+
+``UpliftTreeClassifier`` prunes against a held-out sample:
+``prune(X, treatment, y)`` collapses an internal node whose split does not
+improve the treatment-effect estimate on that sample, controlled by
+``min_gain`` and ``prune_rule``, cascading upward until no further merge helps.
+Passing ``prune_fraction`` to ``fit`` runs the same procedure as part of the
+fit: that fraction of the rows is held out, stratified on treatment and
+outcome, the tree grows on the remainder, and pruning uses the holdout.
+
+``CausalTreeRegressor`` uses cost-complexity pruning, the scheme behind
+scikit-learn's ``ccp_alpha``: a penalty per leaf defines a sequence of nested
+subtrees, and a larger ``ccp_alpha`` keeps a smaller one. Setting
+``ccp_alpha="cv"`` selects the subtree by ``cv_folds``-fold cross-validation
+instead, scoring each candidate with the honest splitting objective on the
+held-out fold; it requires ``honesty=True`` and completes the algorithm of
+:cite:`athey2016recursive`. Prefer it on a single tree, where the gains grow
+with the noise level -- on ``CausalRandomForestRegressor`` the same option
+measured no gain, since averaging across trees already removes the variance
+that pruning targets.
+
 
 Neural Network Algorithms
 -------------------------
