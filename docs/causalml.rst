@@ -50,6 +50,15 @@ causalml.inference.tf module
     :undoc-members:
     :show-inheritance:
 
+causalml.inference.jax module
+-----------------------------
+
+.. automodule:: causalml.inference.jax
+    :members:
+    :imported-members:
+    :undoc-members:
+    :show-inheritance:
+
 causalml.optimize module
 ------------------------
 
