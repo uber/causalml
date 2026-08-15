@@ -415,7 +415,11 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
             return te
 
     def estimate_ate(
-        self, X: np.ndarray, treatment: np.ndarray, y: np.ndarray
+        self,
+        X: np.ndarray,
+        treatment: np.ndarray,
+        y: np.ndarray,
+        pretrain: bool = False,
     ) -> tuple:
         """Estimate the Average Treatment Effect (ATE).
 
@@ -423,11 +427,20 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
             X (np.ndarray): a feature matrix
             treatment (np.array): a treatment vector
             y (np.ndarray): an outcome vector
+            pretrain (bool): whether a model has been fit, default False. When True
+                the fitted tree is reused instead of being refit, so these rows can
+                be ones it never saw. The default refits on ``X`` and estimates from
+                the same rows, which leaves the estimate carrying whatever the tree
+                overfit.
 
         Returns:
             tuple, The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        dhat = self.fit_predict(X, treatment, y)
+        if pretrain:
+            check_is_fitted(self, "tree_")
+            dhat = self.predict(X)
+        else:
+            dhat = self.fit_predict(X, treatment, y)
 
         te = dhat.mean()
         se = self._ate_standard_error(X=X, treatment=treatment, y=y)
@@ -467,6 +480,13 @@ class CausalTreeRegressor(SerializableLearner, RegressorMixin, BaseCausalDecisio
         n_groups = len(self._group2index)
         yhat = np.atleast_2d(self.predict(X, with_outcomes=True))[:, :n_groups]
         y = np.asarray(y, dtype=float).ravel()
+
+        unknown = set(np.unique(treatment)) - set(self._group2index)
+        if unknown:
+            raise ValueError(
+                "treatment contains groups the model was not fit on: "
+                f"{sorted(str(group) for group in unknown)}"
+            )
         group_idx = np.array([self._group2index[t] for t in treatment])
 
         n_treatments = n_groups - 1

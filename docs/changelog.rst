@@ -86,6 +86,22 @@ New Features
   ``ccp_alpha="cv"`` requires ``honesty=True`` and raises otherwise, since the
   cross-validation scores candidate subtrees with the honest objective.
 
+* **`CausalTreeRegressor.estimate_ate` and `BaseDRIVLearner.estimate_ate` accept**
+  ``pretrain`` **(#517).** ``pretrain=True`` estimates from the already-fitted model
+  instead of refitting on ``X``, so the rows passed in can be held out from the fit.
+  The default refits on the rows it then estimates from, which leaves the estimate
+  carrying whatever the model overfit. Fitting on half a randomized draw and
+  estimating on the other half gave a mean absolute ATE error of 0.099 against 0.114
+  in-sample, over 20 seeds on ``CausalTreeRegressor``.
+
+  This completes the parameter across the package: the meta-learners have had it
+  since #511. ``TMLELearner.estimate_ate`` is the remaining one without it and stays
+  that way, since the class has no ``fit`` and so no fitted model to reuse.
+
+  ``BaseDRIVLearner`` requires ``p`` when ``pretrain=True``: the propensity stored by
+  ``fit`` is indexed by the rows it was fit on, while the standard error indexes it by
+  the rows passed here. ``assignment`` and ``pZ`` are only used to fit and go unused.
+
 * **`UpliftTreeClassifier` can prune inside** ``fit`` **(#1003).** ``prune_fraction``
   (default ``None``, off) holds out that fraction of the rows stratified on
   (treatment, outcome), grows the tree on the rest, and runs the existing ``prune()``

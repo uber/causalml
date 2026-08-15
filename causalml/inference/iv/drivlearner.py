@@ -453,6 +453,7 @@ class BaseDRIVLearner(SerializableLearner):
         bootstrap_size=10000,
         seed=None,
         calibrate=True,
+        pretrain=False,
     ):
         """Estimate the Average Treatment Effect (ATE) for compliers.
 
@@ -474,19 +475,38 @@ class BaseDRIVLearner(SerializableLearner):
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
             seed (int): random seed for cross-fitting
+            pretrain (bool): whether a model has been fit, default False. When True
+                the fitted models are reused instead of being refit, so these rows
+                can be ones they never saw. ``p`` is required in that case: the
+                propensity :meth:`fit` stored belongs to the rows it was fit on, and
+                the standard error needs the propensity of the rows estimated here.
+                ``assignment`` and ``pZ`` are only used to fit, so they go unused.
         Returns:
             The mean and confidence interval (LB, UB) of the ATE estimate.
         """
-        te, yhat_cs, yhat_ts = self.fit_predict(
-            X,
-            assignment,
-            treatment,
-            y,
-            p,
-            return_components=True,
-            seed=seed,
-            calibrate=calibrate,
-        )
+        if pretrain:
+            if not hasattr(self, "t_groups"):
+                raise ValueError(
+                    "No fitted model found. Call fit() before estimate_ate(pretrain=True)."
+                )
+            if p is None:
+                raise ValueError(
+                    "estimate_ate(pretrain=True) requires p, the propensity of the rows "
+                    "passed here. The propensity stored by fit() belongs to the rows it "
+                    "was fit on, and the standard error indexes it by these rows."
+                )
+            te, yhat_cs, yhat_ts = self.predict(X, treatment, y, return_components=True)
+        else:
+            te, yhat_cs, yhat_ts = self.fit_predict(
+                X,
+                assignment,
+                treatment,
+                y,
+                p,
+                return_components=True,
+                seed=seed,
+                calibrate=calibrate,
+            )
         X, assignment, treatment, y = convert_pd_to_np(X, assignment, treatment, y)
 
         if p is None:
