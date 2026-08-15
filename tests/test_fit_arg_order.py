@@ -433,10 +433,46 @@ def test_migration_guide_url_matches_the_docs_source():
     )
 
 
+def _toctree_entries(rst):
+    """Document names listed by every ``toctree`` directive in one .rst file."""
+    entries = []
+    in_toctree = False
+    for line in rst.read_text().splitlines():
+        stripped = line.strip()
+        if stripped.startswith(".. toctree::"):
+            in_toctree = True
+        elif in_toctree:
+            if not stripped:
+                continue  # blank lines are allowed inside the directive
+            if not line[:1].isspace():
+                in_toctree = False  # a dedent ends it
+            elif not stripped.startswith(":"):
+                entries.append(stripped)  # not an option, so an entry
+    return entries
+
+
 def test_migration_guide_is_in_the_docs_toctree():
-    """An unlinked page is unreachable by browsing and warns at build time."""
+    """An unlinked page is unreachable by browsing and warns at build time.
+
+    Reachability is walked from ``index.rst`` rather than asserted against it
+    directly, so that regrouping the documentation into sections keeps working
+    while an orphaned page still fails.
+    """
     docs = Path(__file__).resolve().parents[1] / "docs"
-    assert "\n    migration\n" in (docs / "index.rst").read_text()
+    reachable, pending = set(), ["index"]
+    while pending:
+        doc = pending.pop()
+        if doc in reachable:
+            continue
+        reachable.add(doc)
+        page = docs / f"{doc}.rst"
+        if page.exists():
+            pending.extend(_toctree_entries(page))
+
+    assert "migration" in reachable, (
+        "docs/migration.rst is not reachable from docs/index.rst through any "
+        f"toctree; reachable pages are {sorted(reachable)}"
+    )
 
 
 # --- the library's own internal calls must not warn the caller --------------
