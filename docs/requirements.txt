@@ -7,3 +7,6 @@ pydata-sphinx-theme>=0.20.0
 sphinxcontrib-bibtex
 nbsphinx
 ipython
+# Sphinx pulls Pygments in regardless; < 2.20.0 carries a ReDoS in AdlLexer
+# (GHSA-5239-wwwm-4pmq), so the floor is stated rather than left to resolution.
+pygments>=2.20.0
