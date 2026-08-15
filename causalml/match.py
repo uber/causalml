@@ -99,7 +99,7 @@ class NearestNeighborMatch:
             None means 1 unless in a joblib.parallel_backend context. -1 means using all processors
 
     Fitted attributes (populated after :meth:`match`):
-        matched_indexes_ (pandas.DataFrame): two-column dataframe with the
+        ``matched_indexes_`` (pandas.DataFrame): two-column dataframe with the
             ``(from, to)`` pairs of original data indices produced by the most
             recent :meth:`match` call. ``from`` corresponds to the matching
             source group (treatment if ``treatment_to_control`` else control);

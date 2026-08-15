@@ -70,7 +70,7 @@ Install from ``PyPI``
     pip install causalml
 
 Install ``causalml`` with ``tensorflow`` for ``DragonNet`` from ``PyPI``
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. code-block:: bash
 
@@ -92,7 +92,7 @@ Install ``causalml`` with ``jax`` for ``DragonNet`` or ``CEVAE`` from ``PyPI``
 
 
 Install using `uv <https://github.com/astral-sh/uv/blob/main/README.md>`_
----------------------
+-------------------------------------------------------------------------
 
 .. code-block:: bash
 

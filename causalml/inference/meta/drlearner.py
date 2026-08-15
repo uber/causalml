@@ -602,10 +602,9 @@ class BaseDRClassifier(BaseDRLearner):
                 groups separately. Defaults to False.
             verbose (bool, optional): whether to output progress logs. Defaults to True.
         Returns:
-            (numpy.ndarray): Predictions of treatment effects.
-            If return_components is True, also returns:
-                - dict: Predicted probabilities for the control group (yhat_cs).
-                - dict: Predicted probabilities for the treatment group (yhat_ts).
+            (numpy.ndarray): predictions of treatment effects. If ``return_components``
+            is True, also returns a dict of predicted probabilities for the control
+            group (``yhat_cs``) and a dict for the treatment group (``yhat_ts``).
         """
         X = collect_if_lazy(X)
 

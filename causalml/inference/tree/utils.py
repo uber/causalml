@@ -337,14 +337,13 @@ def kpi_transform(dfx, kpi_combo, kpi_combo_new):
 
 
 def get_tree_leaves_mask(tree) -> np.ndarray:
-    """
-    Get mask array for tree leaves
-    Args:
-        tree: CausalTreeRegressor
-              Tree object
-    Returns: np.ndarray
-             Mask array
+    """Get mask array for tree leaves.
 
+    Args:
+        tree (CausalTreeRegressor): a fitted tree object
+
+    Returns:
+        (numpy.ndarray): boolean mask, True at each leaf node
     """
     n_nodes = tree.tree_.node_count
     children_left = tree.tree_.children_left

@@ -334,11 +334,8 @@ def dr_score(
             the bootstrap sampler. Default None
 
     Returns:
-        If return_ci=False:
-            (pandas.Series): DR loss for each model column (lower is better)
-        If return_ci=True:
-            (pandas.DataFrame): DR loss, standard error, and confidence
-                interval bounds for each model column
+        If return_ci=False: (pandas.Series): DR loss for each model column (lower is better)
+        If return_ci=True: (pandas.DataFrame): DR loss, standard error, and confidence interval bounds for each model column
     """
     have_pseudo_outcome = (
         pseudo_outcome_col is not None and pseudo_outcome_col in df.columns
@@ -440,11 +437,8 @@ def plug_in_t_score(
             the bootstrap sampler. Default None
 
     Returns:
-        If return_ci=False:
-            (pandas.Series): plug-in T-learner loss for each model column (lower is better)
-        If return_ci=True:
-            (pandas.DataFrame): loss, standard error, and confidence
-                interval bounds for each model column
+        If return_ci=False: (pandas.Series): plug-in T-learner loss for each model column (lower is better)
+        If return_ci=True: (pandas.DataFrame): loss, standard error, and confidence interval bounds for each model column
     """
     assert (
         outcome_col in df.columns and treatment_col in df.columns

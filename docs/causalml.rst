@@ -32,10 +32,10 @@ causalml.inference.iv module
     :undoc-members:
     :show-inheritance:
 
-causalml.inference.nn module
-----------------------------
+causalml.inference.torch module
+-------------------------------
 
-.. automodule:: causalml.inference.nn
+.. automodule:: causalml.inference.torch
     :members:
     :imported-members:
     :undoc-members:

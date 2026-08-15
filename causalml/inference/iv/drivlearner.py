@@ -650,13 +650,16 @@ class BaseDRIVLearner(SerializableLearner):
         based on a specified method.
 
         Currently supported methods are:
-            - auto (calculates importance based on estimator's default implementation of feature importance;
-                    estimator must be tree-based)
-                    Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
-                    importance type
-            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted;
-                           estimator can be any form)
-        Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
+
+            - auto (calculates importance based on estimator's default implementation
+              of feature importance; estimator must be tree-based).
+              Note: if none provided, it uses lightgbm's LGBMRegressor as estimator,
+              and "gain" as importance type.
+            - permutation (calculates importance based on mean decrease in accuracy
+              when a feature column is permuted; estimator can be any form).
+
+        Hint: for permutation, downsample data for better performance especially if
+        X.shape[1] is large.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
@@ -720,13 +723,16 @@ class BaseDRIVLearner(SerializableLearner):
         based on a specified method.
 
         Currently supported methods are:
-            - auto (calculates importance based on estimator's default implementation of feature importance;
-                    estimator must be tree-based)
-                    Note: if none provided, it uses lightgbm's LGBMRegressor as estimator, and "gain" as
-                    importance type
-            - permutation (calculates importance based on mean decrease in accuracy when a feature column is permuted;
-                           estimator can be any form)
-        Hint: for permutation, downsample data for better performance especially if X.shape[1] is large
+
+            - auto (calculates importance based on estimator's default implementation
+              of feature importance; estimator must be tree-based).
+              Note: if none provided, it uses lightgbm's LGBMRegressor as estimator,
+              and "gain" as importance type.
+            - permutation (calculates importance based on mean decrease in accuracy
+              when a feature column is permuted; estimator can be any form).
+
+        Hint: for permutation, downsample data for better performance especially if
+        X.shape[1] is large.
 
         Args:
             X (np.matrix or np.array or pd.Dataframe): a feature matrix
