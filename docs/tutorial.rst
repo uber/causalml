@@ -2,22 +2,27 @@
 A First Causal Analysis
 ========================
 
-This tutorial walks one real analysis end to end, on a dataset where the
-per-unit ground truth is known -- so every estimate below can be checked
-against the right answer, including the heterogeneous ones. Each step names
-the User Guide page that covers it in depth. The dataset downloads on first
-use and is cached locally (see :doc:`datasets`).
+This tutorial trains four CATE estimators on the same data and then does the
+part that is genuinely hard in causal ML: deciding which of them to believe.
+The data is the IHDP benchmark, where the per-unit ground truth is known -- so
+the validation methods you would use on real data can themselves be checked
+against the right answer. Each step names the User Guide page that covers it
+in depth. The dataset downloads on first use and is cached locally (see
+:doc:`datasets`).
 
 Step 1: State the question
 ==========================
 
-The Twins benchmark :cite:`louizos2017causal` covers 11,400 same-sex twin
-births from US birth records. The treatment is being the heavier twin of the
-pair and the outcome is one-year mortality. Because *both* twins are observed,
-both potential outcomes are measured rather than simulated: the true effect
-for every pair, and therefore the true average effect, is known. The question:
-what is the effect of higher birth weight on survival, and does it vary across
-pairs?
+The Infant Health and Development Program (IHDP) benchmark
+:cite:`hill2011bayesian` starts from a real randomized trial of home visits
+for premature infants, with a child's cognitive test score as the outcome. Two
+modifications made it the standard testbed for heterogeneous-effect
+estimation: a nonrandom subset of the treated group was removed, so treatment
+assignment is confounded the way observational data is, and the outcomes are
+simulated from the real covariates -- so both potential outcomes, and
+therefore every unit's true effect, are known. Each of its 100 replications
+simulates new outcomes for the same 747 units and draws its own 672/75
+train-test split.
 
 Step 2: Load the data
 =====================
@@ -26,261 +31,241 @@ Step 2: Load the data
 
     import numpy as np
     import pandas as pd
-    from causalml.dataset import fetch_twins
+    from causalml.dataset import fetch_ihdp
 
     RS = 42
     np.random.seed(RS)
 
-    data = fetch_twins(random_state=RS)
-    X = pd.DataFrame(data.data, columns=data.feature_names)
-    treatment = np.asarray(data.treatment)
-    y = 1 - np.asarray(data.target)   # survival = 1 - mortality
-    tau_true = -np.asarray(data.tau)  # effect on survival
+    train = fetch_ihdp(replication=0, split="train")
+    test = fetch_ihdp(replication=0, split="test")
+    X_tr = pd.DataFrame(train.data, columns=train.feature_names)
+    w_tr, y_tr, tau_tr = train.treatment, train.target, train.tau
+    X_te = pd.DataFrame(test.data, columns=test.feature_names)
+    w_te, y_te, tau_te = test.treatment, test.target, test.tau
 
-    print(X.shape, treatment.sum())
-    print("true ATE: %.4f" % tau_true.mean())
-    print("diff in means: %.4f" % (y[treatment == 1].mean() - y[treatment == 0].mean()))
+    print(X_tr.shape, w_tr.sum(), X_te.shape, w_te.sum())
+    print("true ATE: %.3f | sd of tau: %.3f" % (tau_tr.mean(), tau_tr.std()))
 
 .. code-block:: text
 
-    (11400, 30) 5640
-    true ATE: 0.0161
-    diff in means: 0.0189
+    (672, 25) 123 (75, 25) 16
+    true ATE: 4.012 | sd of tau: 0.866
 
-The recorded outcome is mortality; the code models survival so that a positive
-effect is a benefit, which is the orientation the ranking metrics in Step 6
-assume. The lighter twin's one-year mortality is 17.8%, matching the figure
-reported by :cite:`louizos2017causal`, and being the heavier twin raises
-survival by 1.61 percentage points on average. The loader reveals one twin per
-pair by a fair coin (``random_state`` fixes the coin), so the difference in
-means, 1.89 points, is a valid but noisy estimate of that truth.
+672 training units with 123 treated, 25 covariates, and -- because this is a
+benchmark -- the true effect of every unit, held aside for scoring.
 
 Step 3: Check overlap
 =====================
 
-Estimation needs both treated and untreated units throughout the covariate
-space (see :ref:`Checking Overlap <validation:Checking Overlap>`). Estimate
-each unit's probability of treatment -- the propensity score -- and compare
-its distribution across groups:
+Estimation needs treated and untreated units throughout the covariate space
+(see :ref:`Checking Overlap <validation:Checking Overlap>`). Estimate each
+unit's probability of treatment -- the propensity score -- and compare its
+distribution across groups. One practical note: on this data the model's
+default cross-validation grid selects a penalty that collapses every score to
+the treated share, so the grid is widened explicitly.
 
 .. code-block:: python
 
     from causalml.propensity import ElasticNetPropensityModel
 
-    pm = ElasticNetPropensityModel(random_state=RS)
-    p_hat = pm.fit_predict(X, treatment)
-    print("%.3f - %.3f" % (p_hat.min(), p_hat.max()))
-
-.. code-block:: text
-
-    0.495 - 0.495
+    pm = ElasticNetPropensityModel(Cs=np.logspace(0, 3, 8), random_state=RS)
+    pm.fit(X_tr, w_tr)
+    p_tr, p_te = pm.predict(X_tr), pm.predict(X_te)
 
 .. image:: ./_static/img/tutorial_overlap.png
     :width: 629
-    :alt: Propensity scores concentrated at a single value for both twins, as expected under randomized assignment.
+    :alt: Propensity-score distributions with the treatment group shifted right and a mass of control units near zero.
 
-The estimated propensity is the same for every unit: no covariate predicts
-which twin was revealed, exactly what a coin flip should produce. On
-observational data this picture instead shows two separated distributions, and
-this step is where problems announce themselves. Because the assignment
-probability is known here, the estimators below receive it directly:
+The two distributions overlap over most of the range -- estimation is possible
+-- but they are far from identical: the confounding introduced by removing
+part of the treated group is exactly what this picture shows, and a spike of
+near-zero-propensity controls marks a region with almost no treated
+counterparts. On a randomized experiment this plot is flat.
 
-.. code-block:: python
+Step 4: Train four estimators
+=============================
 
-    p = np.full(len(y), treatment.mean())
-
-Step 4: Estimate the average effect
-===================================
-
-Start with a transparent baseline -- a :ref:`T-Learner <methodology:T-Learner>`
-with linear regression, which fits one regression per group and differences
-the predictions -- then a more flexible :ref:`X-Learner
-<methodology:X-Learner>` with gradient-boosted trees. (The outcome is binary;
-the ``*Classifier`` learner variants accept classification base learners, but
-a regressor on a binary outcome estimates the same risk difference and keeps
-this tutorial short.)
+Four meta-learners (see :doc:`methodology`), all wrapping the same
+gradient-boosted base learner so the comparison is about the learner
+*strategies*. The X- and R-learners consume the propensity score:
 
 .. code-block:: python
 
-    from sklearn.linear_model import LinearRegression
     from xgboost import XGBRegressor
-    from causalml.inference.meta import BaseTRegressor, BaseXRegressor
+    from causalml.inference.meta import (
+        BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor,
+    )
 
-    tl = BaseTRegressor(learner=LinearRegression())
-    print(tl.estimate_ate(X=X, treatment=treatment, y=y))
+    base = lambda: XGBRegressor(random_state=RS)
+    learners = {
+        "S-learner": BaseSRegressor(learner=base()),
+        "T-learner": BaseTRegressor(learner=base()),
+        "X-learner": BaseXRegressor(learner=base()),
+        "R-learner": BaseRRegressor(learner=base()),
+    }
 
-    xl = BaseXRegressor(learner=XGBRegressor(random_state=RS))
-    print(xl.estimate_ate(X=X, treatment=treatment, y=y, p=p))
-
-.. code-block:: text
-
-    (array([0.01767856]), array([0.00610093]), array([0.02925618]))
-    (array([0.01737203]), array([0.01086719]), array([0.02387686]))
-
-Each call returns the ATE with a confidence interval (how these are computed
-is cataloged in :doc:`inference`). Both intervals bracket the true value of
-0.0161 -- on most datasets there is no such number to check against, which is
-what the :doc:`validation <validation>` machinery is for.
-
-Step 5: Estimate heterogeneous effects
-======================================
-
-The same fitted X-learner produces a per-unit CATE estimate:
-
-.. code-block:: python
-
-    cate = xl.fit_predict(X=X, treatment=treatment, y=y, p=p).flatten()
-    print("mean %.4f sd %.4f" % (cate.mean(), cate.std()))
+    print("ATE (truth: %.3f):" % tau_tr.mean())
+    for name, m in learners.items():
+        if name in ("X-learner", "R-learner"):
+            ate, lb, ub = m.estimate_ate(X=X_tr, treatment=w_tr, y=y_tr, p=p_tr)
+        elif name == "S-learner":
+            ate, lb, ub = m.estimate_ate(X=X_tr, treatment=w_tr, y=y_tr, return_ci=True)
+        else:
+            ate, lb, ub = m.estimate_ate(X=X_tr, treatment=w_tr, y=y_tr)
+        print("  %-10s %.2f (%.2f, %.2f)" % (name, ate, lb, ub))
 
 .. code-block:: text
 
-    mean 0.0174 sd 0.1495
+    ATE (truth: 4.012):
+      S-learner  3.88 (3.79, 3.98)
+      T-learner  3.96 (3.84, 4.08)
+      X-learner  4.16 (4.07, 4.24)
+      R-learner  4.18 (4.16, 4.19)
 
-The spread is nine times the average effect -- but spread in the *estimates*
-is not evidence of real heterogeneity. Whether any of it is signal is the next
-step's question.
+All four land near the truth (how the intervals are computed is cataloged in
+:doc:`inference`). Note the R-learner: the narrowest interval of the four, and
+the only one that excludes the true value. Precision is not accuracy, and
+nothing on this table says which estimator to trust -- that takes the next two
+steps.
 
-Step 6: Evaluate against the ground truth
+Step 5: Evaluate against the ground truth
 =========================================
 
-Refit on a training split and evaluate the held-out split. With ground truth
-available, PEHE (the root mean squared error of the per-unit effect estimates)
-and ``ate_error`` measure accuracy directly; the Qini coefficient and
-:ref:`RATE <methodology:RATE>` are the tests available on real data, where no
-truth exists (see :doc:`validation`):
+Predict each unit's effect on the held-out split and score it against the
+truth: PEHE (precision in estimating heterogeneous effects -- the root mean
+squared error of the per-unit estimates) and :func:`~causalml.metrics.ate_error`:
 
 .. code-block:: python
 
-    from sklearn.model_selection import train_test_split
-    from causalml.metrics import pehe, ate_error, qini_score, rate_score
+    from causalml.metrics import pehe, ate_error
 
-    idx = np.arange(len(y))
-    tr, te = train_test_split(idx, test_size=0.3, random_state=RS,
-                              stratify=treatment)
-    p_tr = np.full(len(tr), treatment[tr].mean())
-    p_te = np.full(len(te), treatment[tr].mean())
+    cate_te = {}
+    for name, m in learners.items():
+        if name == "X-learner":
+            cate_te[name] = m.predict(X=X_te, p=p_te).flatten()
+        else:
+            cate_te[name] = m.predict(X=X_te).flatten()
 
-    xl_ho = BaseXRegressor(learner=XGBRegressor(random_state=RS))
-    xl_ho.fit(X=X.iloc[tr], treatment=treatment[tr], y=y[tr], p=p_tr)
-    cate_te = xl_ho.predict(X=X.iloc[te], p=p_te).flatten()
+    for name, c in cate_te.items():
+        print("  %-10s PEHE %.3f  ate_error %+.3f"
+              % (name, pehe(tau_te, c, squared=False), ate_error(tau_te, c)))
 
-    print("PEHE: %.4f" % pehe(tau_true[te], cate_te, squared=False))
-    print("PEHE, predicting zero: %.4f" % pehe(tau_true[te], np.zeros(len(te)), squared=False))
-    print("ate_error: %.4f" % ate_error(tau_true[te], cate_te))
+.. code-block:: text
 
-    df = pd.DataFrame({"y": y[te], "w": treatment[te], "X-learner": cate_te})
+      S-learner  PEHE 0.722  ate_error +0.044
+      T-learner  PEHE 0.994  ate_error +0.019
+      X-learner  PEHE 0.883  ate_error +0.164
+      R-learner  PEHE 2.855  ate_error +1.329
+
+With ground truth, evaluation is just measurement: the R-learner -- with this
+base learner and these defaults -- is failing on both metrics, and the other
+three are close to each other. On real data there is no such measurement,
+which is the situation the next step simulates.
+
+Step 6: Validate as if the truth were unknown
+=============================================
+
+Everything in this step uses only what real data provides: covariates,
+treatment, outcome, and the models' predictions. The validation losses score
+each model's predictions against a proxy for the true effect built by
+cross-fitting on the held-out data -- the doubly robust (DR) pseudo-outcome
+loss and the plug-in T-learner loss (see
+:ref:`Model Selection with Validation Losses <validation:Model Selection with Validation Losses>`):
+
+.. code-block:: python
+
+    from causalml.metrics import dr_score, plug_in_t_score, rate_score
+
+    df = pd.DataFrame({"y": y_te, "w": w_te, **cate_te})
+    print(dr_score(df, X=X_te, outcome_col="y", treatment_col="w", p=p_te,
+                   learner=XGBRegressor(random_state=RS),
+                   return_ci=True, random_state=RS).round(3))
+    print(plug_in_t_score(df, X=X_te, outcome_col="y", treatment_col="w",
+                          learner=XGBRegressor(random_state=RS),
+                          return_ci=True, random_state=RS).round(3))
+
+.. code-block:: text
+
+               dr_loss      se  ci_lower  ci_upper
+    model
+    S-learner   39.307  23.815    -7.369    85.984
+    T-learner   40.219  23.369    -5.583    86.021
+    X-learner   37.947  22.495    -6.142    82.036
+    R-learner   44.041  20.881     3.115    84.968
+
+               plug_in_t_loss     se  ci_lower  ci_upper
+    model
+    S-learner           2.247  0.635     1.003     3.491
+    T-learner           2.967  0.855     1.292     4.642
+    X-learner           1.773  0.272     1.241     2.305
+    R-learner           9.281  1.517     6.307    12.255
+
+Both losses, knowing nothing of the truth, reproduce its verdict: the
+R-learner is worst by a wide margin, and the other three sit within each
+other's uncertainty. (They rank the X-learner first where the truth ranks the
+S-learner first -- differences inside the top group are within the intervals,
+and the losses cannot resolve them. What they reliably do is catch the failing
+model.)
+
+The ranking metrics tell a different story about sample size:
+
+.. code-block:: python
+
     print(rate_score(df, outcome_col="y", treatment_col="w",
-                     return_ci=True, random_state=RS))
+                     return_ci=True, random_state=RS).round(3))
 
 .. code-block:: text
 
-    PEHE: 0.3540
-    PEHE, predicting zero: 0.3231
-    ate_error: 0.0056
-
-                   rate       se  ci_lower  ci_upper   p_value
+                rate     se  ci_lower  ci_upper  p_value
     model
-    X-learner -0.246639  0.08943 -0.421918  -0.07136  0.005817
+    S-learner  0.316  0.230    -0.134     0.767    0.168
+    T-learner -0.197  0.170    -0.530     0.136    0.246
+    X-learner -0.166  0.191    -0.541     0.208    0.385
+    R-learner  0.283  0.225    -0.157     0.724    0.208
 
-Both verdicts are bad, and they agree. The model's PEHE is *worse* than
-predicting zero effect for everyone, and its RATE is significantly
-*negative*: units it ranks as high-benefit actually gained less than average.
-(The absolute PEHE level is dominated by irreducible noise -- each true
-``tau`` is a difference of two binary outcomes, so values of :math:`\pm 1` are
-common and no estimator can score far below the zero baseline here; PEHE is
-read comparatively.) The diagnosis is overfitting: a flexible learner fit the
-individual noise. The remedy is regularization, chosen exactly as
-:ref:`Model Selection with Validation Losses <validation:Model Selection with Validation Losses>`
-prescribes:
+Every :ref:`RATE <methodology:RATE>` interval spans zero (the Qini scores look
+the same): 75 validation rows carry too little information for rank-based
+metrics to separate anything, even models the losses separate cleanly. On
+data this small, lean on the validation losses; save the ranking metrics for
+validation sets in the thousands, as on the :doc:`validation` page.
+
+Step 7: The replication protocol
+================================
+
+IHDP results are published as a mean and standard error *across* replications
+-- a single replication is not comparable to a published number. The loop is
+the unit of comparison:
 
 .. code-block:: python
 
-    xl_reg = BaseXRegressor(learner=XGBRegressor(
-        max_depth=2, n_estimators=100, learning_rate=0.05,
-        min_child_weight=100, random_state=RS))
-    xl_reg.fit(X=X.iloc[tr], treatment=treatment[tr], y=y[tr], p=p_tr)
-    cate_reg = xl_reg.predict(X=X.iloc[te], p=p_te).flatten()
-
-    print("PEHE: %.4f" % pehe(tau_true[te], cate_reg, squared=False))
-    print("ate_error: %.4f" % ate_error(tau_true[te], cate_reg))
-    df["X-reg"] = cate_reg
-    print(rate_score(df[["y", "w", "X-reg"]], outcome_col="y",
-                     treatment_col="w", return_ci=True, random_state=RS))
+    rows = []
+    for rep in range(10):
+        train = fetch_ihdp(replication=rep, split="train")
+        test = fetch_ihdp(replication=rep, split="test")
+        ...  # refit the four learners, score PEHE on the test split
+    print(pd.DataFrame(rows).groupby("model")["pehe"].agg(["mean", "sem"]).round(3))
 
 .. code-block:: text
 
-    PEHE: 0.3233
-    ate_error: 0.0016
-
-               rate        se  ci_lower  ci_upper  p_value
+                mean    sem
     model
-    X-reg  0.027949  0.084229 -0.13714  0.193038  0.74096
+    R-learner  4.876  1.858
+    S-learner  3.298  2.068
+    T-learner  3.286  2.001
+    X-learner  3.524  2.031
 
-The regularized model stops adding noise (PEHE at the zero baseline, a 3x
-smaller ATE error) and its RATE is indistinguishable from zero. The honest
-conclusion: higher birth weight raises survival by about 1.6 percentage
-points, and neither model finds heterogeneity in that effect that survives a
-held-out test -- a common and publishable finding, not a failure.
-
-Step 7: Interpret the model
-===========================
-
-Permutation importance shows which covariates the CATE model relies on (see
-:doc:`interpretation`):
-
-.. code-block:: python
-
-    print(xl.get_importance(X=X, tau=cate, method="permutation",
-                            features=X.columns, random_state=RS).head(4))
-
-.. code-block:: text
-
-    gestat      0.376208
-    wtgain      0.259032
-    dmage       0.125790
-    nprevist    0.120816
-    dtype: float64
-
-Gestation length, maternal weight gain, maternal age and the number of
-prenatal visits drive the model's estimates. Read this descriptively: Step 6
-found no validated heterogeneity, so these are properties of the fitted model,
-not established effect modifiers.
-
-Step 8: Stress the assumptions
-==============================
-
-Sensitivity analysis (see
-:ref:`Validation with Sensitivity Analysis <validation:Validation with Sensitivity Analysis>`)
-perturbs the analysis and re-estimates. Replacing the treatment with random
-noise -- the placebo test -- should destroy the effect:
-
-.. code-block:: python
-
-    from causalml.metrics.sensitivity import Sensitivity
-
-    df_s = X.assign(treatment=treatment, outcome=y, p=p)
-    sens = Sensitivity(df=df_s, inference_features=list(X.columns),
-                       p_col="p", treatment_col="treatment",
-                       outcome_col="outcome",
-                       learner=BaseXRegressor(learner=XGBRegressor(random_state=RS)))
-    print(sens.sensitivity_analysis(
-        methods=["Placebo Treatment", "Random Cause", "Subset Data"],
-        sample_size=0.5).to_string())
-
-.. code-block:: text
-
-                              Method       ATE   New ATE  New ATE LB  New ATE UB
-    0              Placebo Treatment  0.017372 -0.000768   -0.007422    0.005885
-    1                   Random Cause  0.017372  0.015239    0.009209    0.021269
-    2  Subset Data(sample size @0.5)  0.017372  0.011045    0.003613    0.018476
-
-The placebo estimate is centered on zero, and neither adding a random
-covariate nor halving the sample changes the conclusion.
+The means dwarf the replication-0 numbers because a few replications simulate
+heavy-tailed outcomes that dominate the average -- and with standard errors
+this size, ten replications establish no significant differences. The
+:doc:`benchmark leaderboard <examples/benchmark_leaderboard>` is the canonical
+version of this loop; published tables run all 100 replications.
 
 Where to next
 =============
 
 * Which estimator fits your problem: :doc:`choosing_an_estimator`
 * The mathematics of each method: :doc:`methodology`
-* The full evaluation workflow: :doc:`validation`
+* The full evaluation workflow, including sensitivity analysis for the
+  unconfoundedness assumption: :doc:`validation`
 * What uncertainty each estimator reports: :doc:`inference`
+* Interpreting a fitted model: :doc:`interpretation`
