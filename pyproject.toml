@@ -63,6 +63,22 @@ jax = [
     "optax>=0.1.4",
     "orbax-checkpoint>=0.10.0",
 ]
+# The Sphinx toolchain only.  Everything the docs import -- numpy, scikit-learn,
+# matplotlib and the rest -- already comes from the package's own dependencies,
+# and the neural backends are mocked in docs/conf.py rather than installed.
+# nbsphinx also needs the `pandoc` binary, which is not a Python package.
+docs = [
+    "sphinx>=8.2,<10",
+    "pydata-sphinx-theme>=0.20.0",
+    "sphinxcontrib-bibtex",
+    "nbsphinx",
+    # nbsphinx renders every notebook code cell as `ipython3`, and that Pygments
+    # lexer ships with IPython.  8.10.0 clears GHSA-29gw-9793-fvw7.
+    "ipython>=8.10.0",
+    # Sphinx pulls Pygments in regardless; < 2.20.0 carries a ReDoS in AdlLexer
+    # (GHSA-5239-wwwm-4pmq).
+    "pygments>=2.20.0",
+]
 
 [build-system]
 requires = [
