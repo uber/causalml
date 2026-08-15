@@ -28,6 +28,49 @@ Measuring Causal Effects
 
 If an RCT is available and the treatment effects are heterogeneous across covariates, measuring the conditional average treatment effect (CATE) can be of interest.  The CATE is an estimate of the treatment effect conditioned on the available covariates.  We call these Heterogeneous Treatment Effects (HTEs).
 
+Why a Predictive Model Is Not Enough
+------------------------------------
+
+Outside an RCT, the units that received treatment differ from those that did
+not, and any variable that drives both the treatment and the outcome -- a
+*confounder* -- makes the naive comparison wrong. The simulation below makes
+this concrete. Data are drawn from the first synthetic mechanism of
+:cite:`nie2017quasi` (see :ref:`Validation with Synthetic Data Sets
+<validation:Validation with Synthetic Data Sets>`), where the same covariates
+drive both the probability of treatment and the outcome, and the true average
+treatment effect is 0.5. Two hundred datasets are simulated; on each, the
+treatment-minus-control difference in means and a T-learner's ATE estimate
+(:ref:`T-Learner <methodology:T-Learner>` with gradient boosting) are recorded:
+
+.. code-block:: python
+
+    import numpy as np
+    from sklearn.ensemble import GradientBoostingRegressor
+    from causalml.dataset import synthetic_data
+    from causalml.inference.meta import BaseTRegressor
+
+    naive, tlearn = [], []
+    for i in range(200):
+        np.random.seed(i)
+        y, X, treatment, tau, b, e = synthetic_data(mode=1, n=2000, p=5, sigma=1.0)
+        naive.append(y[treatment == 1].mean() - y[treatment == 0].mean())
+        learner = BaseTRegressor(learner=GradientBoostingRegressor(random_state=i))
+        ate, _, _ = learner.estimate_ate(X=X, treatment=treatment, y=y)
+        tlearn.append(float(ate))
+
+.. image:: ./_static/img/intro_confounding_sim.png
+    :width: 629
+    :alt: Histograms of 200 ATE estimates: the difference in means centers far from the true ATE, the T-learner centers close to it.
+
+The difference in means centers at 0.90 -- a bias of +0.40, nearly the size of
+the true effect itself -- because treated units would have had higher outcomes
+even without treatment. The T-learner, which models the outcome separately in
+each group and differences the predictions, centers at 0.59. Its remaining bias
+comes from regularization in the outcome models; estimators designed to be
+robust to it, such as the :ref:`R-Learner <methodology:R-Learner>` and
+:ref:`Doubly Robust (DR) learner <methodology:Doubly Robust (DR) learner>`,
+are covered in the :doc:`methodology`.
+
 
 Example Use Cases
 -----------------

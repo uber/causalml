@@ -6,6 +6,9 @@ In this section we dive more deeply into the algorithms implemented in CausalML.
 
 We use the Neyman-Rubin potential outcomes framework and assume Y represents the outcome, W represents the treatment assignment, and X_i the observed covariates.
 
+If you are deciding which of these methods to use on a given problem, start
+with :doc:`choosing_an_estimator`; this page documents how each method works.
+
 
 Supported Algorithms
 --------------------
@@ -37,6 +40,14 @@ CausalML currently supports the following methods:
 
 Meta-Learner Algorithms
 -----------------------
+
+*Relevant classes:* ``BaseSRegressor``/``BaseSClassifier``,
+``BaseTRegressor``/``BaseTClassifier``, ``BaseXRegressor``/``BaseXClassifier``,
+``BaseRRegressor``/``BaseRClassifier`` and
+``BaseDRRegressor``/``BaseDRClassifier`` in ``causalml.inference.meta``, each
+taking any scikit-learn-compatible model as its base learner. Preconfigured
+variants (``XGBTRegressor``, ``LRSRegressor``, ...) are listed in the
+:doc:`API Reference <causalml>`.
 
 A meta-algorithm (or meta-learner) is a framework to estimate the Conditional Average Treatment Effect (CATE) using any machine learning estimators (called base learners) :cite:`kunzel2019metalearners`.
 
@@ -298,6 +309,14 @@ doubly-robust estimate rather than a raw difference in means.
 Tree-Based Algorithms
 ---------------------
 
+*Relevant classes:* the uplift trees ``UpliftTreeClassifier`` and
+``UpliftRandomForestClassifier``, which split on the divergence criteria below,
+and the causal trees ``CausalTreeRegressor`` and
+``CausalRandomForestRegressor``, regression trees that split on
+treatment-effect heterogeneity and estimate leaves honestly by default (see
+:ref:`Honest estimation <methodology:Honest estimation>`). All live in
+``causalml.inference.tree``.
+
 Uplift Tree
 ~~~~~~~~~~~
 
@@ -487,6 +506,10 @@ that pruning targets.
 Neural Network Algorithms
 -------------------------
 
+*Relevant classes:* ``DragonNet`` in ``causalml.inference.tf`` or
+``causalml.inference.jax``, and ``CEVAE`` in ``causalml.inference.torch`` or
+``causalml.inference.jax``.
+
 Both methods below are optional backends. Install them with the ``tf``, ``torch``
 or ``jax`` extras, e.g. ``pip install causalml[tf]``.
 
@@ -583,6 +606,10 @@ a JAX/``flax.nnx`` backend.
 Value optimization methods
 --------------------------
 
+*Relevant classes:* ``CounterfactualUnitSelector`` and
+``CounterfactualValueEstimator`` in ``causalml.optimize``. ``PolicyLearner``
+in the same module learns a treatment-assignment policy directly.
+
 The package supports methods for assigning treatment groups when treatments are costly. To understand the problem, it is helpful to divide the population into four categories according to how a unit's *outcome* responds to being treated:
 
 * **Persuadables**. Those who will have a favourable outcome if and only if they are treated.
@@ -677,6 +704,11 @@ They use a similar routine to find the bounds for PS and PN. The `get_pns_bounds
 
 Selected traditional methods
 ----------------------------
+
+*Relevant classes:* ``NearestNeighborMatch`` and ``MatchOptimizer`` in
+``causalml.match``, the propensity models in ``causalml.propensity``,
+``IVRegressor`` in ``causalml.inference.iv`` for 2SLS, and ``TMLELearner`` in
+``causalml.inference.meta``.
 
 The package supports selected traditional causal inference methods. These are usually used to conduct causal inference with observational (non-experimental) data. In these types of studies, the observed difference between the treatment and the control is in general not equal to the difference between "potential outcomes" :math:`\mathbb{E}[Y(1) - Y(0)]`. Thus, the methods below try to deal with this problem in different ways.
 
