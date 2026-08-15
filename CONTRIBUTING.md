@@ -60,10 +60,18 @@ All public classes and functions should have docstrings to specify their inputs,
 
 You can generate documentation in HTML locally as follows:
 ```bash
+$ pip install -e ".[docs]"
 $ cd docs/
-$ pip install -r requirements.txt
 $ make html
 ```
+
+`nbsphinx` renders the example notebooks through [`pandoc`](https://pandoc.org/installing.html),
+which is a system binary rather than a Python package, so install that too (`brew install pandoc`,
+`apt install pandoc`, or `conda install -c conda-forge pandoc`).
+
+The build fails on warnings, matching the Read the Docs check on your pull request. If a warning is
+genuinely not worth fixing, add its subtype to `suppress_warnings` in `docs/conf.py` rather than
+turning the gate off.
 
 Documentation will be available in `docs/_build/html/index.html`.
 

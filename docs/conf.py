@@ -51,7 +51,23 @@ extensions = [
     "nbsphinx",
 ]
 
-autodoc_mock_imports = ["_tkinter"]
+# The neural backends are optional extras (`tf`, `torch`, `jax`) and none of them
+# is installed in the docs environment -- `docs/environment-py311-rtd.yml` pulls
+# none of tensorflow, torch or jax. Without mocks, `automodule` cannot import
+# `causalml.inference.tf` or `causalml.inference.torch` at all, so their API has
+# never appeared on the published site. Mocking lets autodoc read the signatures
+# and docstrings without adding heavy dependencies to the docs build.
+autodoc_mock_imports = [
+    "_tkinter",
+    "flax",
+    "jax",
+    "jaxlib",
+    "keras",
+    "optax",
+    "pyro",
+    "tensorflow",
+    "torch",
+]
 
 # Section labels are prefixed with the document name.  Without this, every
 # repeated section title across the notebooks and the changelog ("Updates",
@@ -63,6 +79,29 @@ autosectionlabel_prefix_document = True
 # methodology.rst); below that the notebooks repeat the same few subsection
 # titles many times over, which produces ambiguous labels and nothing else.
 autosectionlabel_maxdepth = 3
+
+# Documents that legitimately repeat a section title *within themselves*, which a
+# document prefix cannot separate: the changelog gives every release its own
+# "Updates" / "Bug Fixes" / "New Contributors" headings, and these notebooks walk
+# the same steps ("CATE", "ATE w/ confidence intervals", ...) once per learner.
+# Renaming those headings would mean rewriting release history and reflowing the
+# notebooks, so the duplicate-label warning is accepted here and nowhere else --
+# on the narrative pages it still fires, and a new notebook has to be added to
+# this list deliberately rather than inheriting the exemption.
+suppress_warnings = [
+    "autosectionlabel.changelog",
+    "autosectionlabel.examples/causal_trees_with_synthetic_data",
+    "autosectionlabel.examples/causal_trees_with_synthetic_data_multiple_treatment_groups",
+    "autosectionlabel.examples/feature_interpretations_example",
+    "autosectionlabel.examples/iv_nlsym_synthetic_data",
+    "autosectionlabel.examples/meta_learners_with_synthetic_data_multiple_treatment",
+    "autosectionlabel.examples/sensitivity_example_with_synthetic_data",
+    # `formats: all` in .readthedocs.yml also builds an epub, and its builder
+    # warns for every static asset whose extension it has no mimetype for --
+    # the two favicons and 27 notebook images. Nothing is broken: the files are
+    # simply left out of the epub manifest, and the HTML build does not care.
+    "epub.unknown_project_files",
+]
 
 # `causalml` estimators inherit scikit-learn docstrings, which cross-reference
 # labels that only exist in scikit-learn's own documentation (`metadata_routing`,

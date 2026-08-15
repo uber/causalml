@@ -18,6 +18,15 @@ python:
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   configuration: docs/conf.py
+  # Read the Docs already builds on every pull request and reports a status
+  # check, but nothing failed on warnings, so the build stayed green while
+  # references silently broke.  The build is at zero warnings across the html,
+  # epub and latex builders, so this holds it there: a new broken reference,
+  # malformed docstring or orphaned page now fails the docs check.
+  #
+  # A warning that is genuinely not worth fixing belongs in `suppress_warnings`
+  # in docs/conf.py, named by its subtype, rather than turning this back off.
+  fail_on_warning: true
 
 # Optionally build your docs in additional formats such as PDF and ePub
 formats: all
