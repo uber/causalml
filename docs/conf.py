@@ -169,9 +169,6 @@ html_theme_options = {
         "alt_text": "CausalML",
     },
     "github_url": "https://github.com/uber/causalml",
-    # index.rst has 11 top-level toctree entries and this theme renders them in
-    # the header; the rest collapse into a "More" dropdown.
-    "header_links_before_dropdown": 6,
     "navigation_depth": 2,
     "navbar_align": "left",
 }

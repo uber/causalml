@@ -1,23 +1,14 @@
 Welcome to Causal ML's documentation
 ====================================
 
-Contents:
-
 .. toctree::
     :maxdepth: 2
 
-    about
-    installation
-    quickstart
-    migration
-    examples
-    datasets
-    methodology
-    interpretation
-    validation
+    getting_started
+    user_guide
     causalml
-    references
-    changelog
+    contributing
+    release_notes
 
 
 Indices and tables

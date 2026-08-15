@@ -1,5 +1,6 @@
-causalml package
-================
+=============
+API Reference
+=============
 
 Submodules
 ----------
