@@ -77,7 +77,13 @@ Results on IHDP are reported as a mean and standard error across replications::
 
     scores = [pehe(fetch_ihdp(replication=r).tau, predict(r)) for r in range(100)]
 
-A single replication is not comparable to a published IHDP number.
+A single replication is not comparable to a published IHDP number. Neither,
+exactly, is a mean over this file: the same release also exists in a
+1,000-replication version, and that is what the published tables of the CEVAE
+:cite:`louizos2017causal` and DragonNet :cite:`shi2019adapting` papers
+aggregate over (with the 672 further split 63/27 into train and validation).
+The data-generating process and split geometry match; the replication count
+does not.
 
 Source: the `clinicalml/cfrnet <https://github.com/clinicalml/cfrnet>`_ lineage
 (MIT), files hosted at ``fredjo.com``.

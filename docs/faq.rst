@@ -77,8 +77,8 @@ The Twins benchmark encodes survival as ``9999``, so mortality is
 My IHDP results differ across replications more than expected
 -------------------------------------------------------------
 
-Each of the 1,000 IHDP replications draws its own train/test split of the same
-747 units, so rows are **not** aligned across replications -- averaging
+Each IHDP replication draws its own train/test split of the same 747 units,
+so rows are **not** aligned across replications -- averaging
 predictions row-wise across replications compares different children. Evaluate
 each replication independently and aggregate the metric, as the
 :doc:`benchmark leaderboard <examples/benchmark_leaderboard>` does.
