@@ -225,11 +225,151 @@ The ranking metrics tell a different story about sample size:
 
 Every :ref:`RATE <methodology:RATE>` interval spans zero (the Qini scores look
 the same): 75 validation rows carry too little information for rank-based
-metrics to separate anything, even models the losses separate cleanly. On
-data this small, lean on the validation losses; save the ranking metrics for
-validation sets in the thousands, as on the :doc:`validation` page.
+metrics to separate anything, even models the losses separate cleanly. On data
+this small, lean on the validation losses. The next step gives the ranking
+metrics the sample size they need.
 
-Step 7: The replication protocol
+Step 7: Visualize the ranking with gain and TOC curves
+======================================================
+
+To see what the ranking metrics measure, pool the replication's 747 units and
+re-split them in half, so the validation side has 374 rows instead of 75, and
+refit the four learners on the other half:
+
+.. code-block:: python
+
+    import matplotlib.pyplot as plt
+    from sklearn.model_selection import train_test_split
+    from causalml.metrics import auuc_score, plot_gain, plot_toc
+
+    X_all = pd.DataFrame(np.vstack([train.data, test.data]),
+                         columns=train.feature_names)
+    w_all = np.concatenate([train.treatment, test.treatment])
+    y_all = np.concatenate([train.target, test.target])
+
+    fit_idx, val_idx = train_test_split(np.arange(len(y_all)), test_size=0.5,
+                                        random_state=RS, stratify=w_all)
+    pm_v = ElasticNetPropensityModel(Cs=np.logspace(0, 3, 8), random_state=RS)
+    pm_v.fit(X_all.iloc[fit_idx], w_all[fit_idx])
+    p_fit = pm_v.predict(X_all.iloc[fit_idx])
+    p_val = pm_v.predict(X_all.iloc[val_idx])
+
+    cate_val = {}
+    for name, m in learners.items():
+        if name in ("X-learner", "R-learner"):
+            m.fit(X=X_all.iloc[fit_idx], treatment=w_all[fit_idx],
+                  y=y_all[fit_idx], p=p_fit)
+        else:
+            m.fit(X=X_all.iloc[fit_idx], treatment=w_all[fit_idx],
+                  y=y_all[fit_idx])
+        c = (m.predict(X=X_all.iloc[val_idx], p=p_val) if name == "X-learner"
+             else m.predict(X=X_all.iloc[val_idx]))
+        cate_val[name] = c.flatten()
+
+    df_val = pd.DataFrame({"y": y_all[val_idx], "w": w_all[val_idx], **cate_val})
+    print(auuc_score(df_val, outcome_col="y", treatment_col="w",
+                     return_ci=True, random_state=RS).round(3))
+
+.. code-block:: text
+
+                auuc     se  ci_lower  ci_upper
+    model
+    S-learner  0.535  0.013     0.510     0.560
+    T-learner  0.529  0.013     0.505     0.554
+    X-learner  0.527  0.014     0.500     0.554
+    R-learner  0.530  0.013     0.504     0.555
+
+The AUUC (area under the cumulative gain curve, normalized so 0.5 is random
+targeting) sits a hair above 0.5 for all four models, and the gain curves show
+why:
+
+.. code-block:: python
+
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    plot_gain(df_val, outcome_col="y", treatment_col="w", ax=ax)
+
+.. image:: ./_static/img/tutorial_gain.png
+    :width: 629
+    :alt: Cumulative gain curves for the four learners sitting just above the random diagonal.
+
+Every curve hugs the random diagonal, because most units share a similar
+effect: ranking cannot beat random by much when there is little spread to
+exploit. Whatever advantage exists is concentrated in the top-ranked few
+percent, which is exactly what the TOC curve isolates -- TOC(q) is the excess
+effect among the top-q fraction over the overall ATE:
+
+.. code-block:: python
+
+    fig, ax = plt.subplots(figsize=(7, 4.2))
+    plot_toc(df_val, outcome_col="y", treatment_col="w", ax=ax)
+
+.. image:: ./_static/img/tutorial_toc.png
+    :width: 629
+    :alt: TOC curves spiking to about 1.5 in the top few percent of ranked units and decaying toward zero.
+
+The units the models rank highest show an excess effect of about 1.5 on top of
+the overall 4.0 -- a real, if narrow, targeting opportunity that the gain
+curve's scale hides. :ref:`RATE <methodology:RATE>` with its default
+``autoc`` weighting integrates the TOC with weight :math:`1/q`, emphasizing
+precisely this region:
+
+.. code-block:: python
+
+    print(rate_score(df_val, outcome_col="y", treatment_col="w",
+                     return_ci=True, random_state=RS).round(3))
+
+.. code-block:: text
+
+                rate     se  ci_lower  ci_upper  p_value
+    model
+    S-learner  0.437  0.294    -0.139     1.012    0.137
+    T-learner  0.302  0.274    -0.236     0.840    0.272
+    X-learner  0.381  0.191     0.006     0.757    0.046
+    R-learner  0.196  0.231    -0.256     0.648    0.395
+
+With five times the validation rows of Step 6, every point estimate is now
+positive and the X-learner's RATE excludes zero (p = 0.046): its
+prioritization demonstrably beats treating at random, a conclusion AUUC could
+not reach because the signal lives in a region AUUC weights no more than any
+other. This division of labor -- gain curves for the overall picture, TOC and
+RATE for concentrated heterogeneity -- is the reason both exist.
+
+Step 8: Stress the assumptions
+==============================
+
+Every estimate above leans on unconfoundedness: that the 25 covariates capture
+everything driving both treatment and outcome. Sensitivity analysis (see
+:ref:`Validation with Sensitivity Analysis <validation:Validation with Sensitivity Analysis>`)
+perturbs the analysis and re-estimates. Replacing the treatment with random
+noise -- the placebo test -- should destroy the effect; adding a random
+covariate or halving the sample should not:
+
+.. code-block:: python
+
+    from causalml.metrics.sensitivity import Sensitivity
+
+    df_s = X_tr.assign(treatment=w_tr, outcome=y_tr, p=p_tr)
+    sens = Sensitivity(df=df_s, inference_features=list(X_tr.columns),
+                       p_col="p", treatment_col="treatment",
+                       outcome_col="outcome",
+                       learner=BaseXRegressor(learner=XGBRegressor(random_state=RS)))
+    print(sens.sensitivity_analysis(
+        methods=["Placebo Treatment", "Random Cause", "Subset Data"],
+        sample_size=0.5).to_string())
+
+.. code-block:: text
+
+                              Method     ATE   New ATE  New ATE LB  New ATE UB
+    0              Placebo Treatment  4.1561  0.169624    0.059923    0.279326
+    1                   Random Cause  4.1561  4.050544    3.969506    4.131583
+    2  Subset Data(sample size @0.5)  4.1561  4.073714    3.953690    4.193737
+
+The placebo collapses the estimate by 96% -- not exactly to zero, since a
+flexible learner finds some structure even in noise, but to the far side of
+negligible -- while the other two perturbations barely move it. The analysis
+is behaving the way a real effect should.
+
+Step 9: The replication protocol
 ================================
 
 IHDP results are published as a mean and standard error *across* replications
@@ -265,7 +405,6 @@ Where to next
 
 * Which estimator fits your problem: :doc:`choosing_an_estimator`
 * The mathematics of each method: :doc:`methodology`
-* The full evaluation workflow, including sensitivity analysis for the
-  unconfoundedness assumption: :doc:`validation`
+* The full evaluation workflow: :doc:`validation`
 * What uncertainty each estimator reports: :doc:`inference`
 * Interpreting a fitted model: :doc:`interpretation`
