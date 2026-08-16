@@ -28,9 +28,11 @@ research [[1]](#Literature). It provides a standard interface that allows user t
 
 # Documentation
 
-Documentation is available at:
+Documentation is available at https://causalml.readthedocs.io/. Good places to start:
 
-https://causalml.readthedocs.io/en/latest/about.html
+* [Estimating and Validating Heterogeneous Treatment Effects](https://causalml.readthedocs.io/en/latest/tutorial.html): an end-to-end walkthrough that trains one estimator per family and shows how to decide which one to believe
+* [Choosing an Estimator](https://causalml.readthedocs.io/en/latest/choosing_an_estimator.html): a decision path and capability matrix over the estimators
+* [FAQ](https://causalml.readthedocs.io/en/latest/faq.html): answers to common installation and usage questions
 
 
 # Installation
@@ -54,6 +56,11 @@ Example notebooks are available at:
 https://causalml.readthedocs.io/en/latest/examples.html
 
 
+# Benchmark Datasets and Leaderboard
+
+CausalML ships loaders for the standard causal inference benchmarks (LaLonde, IHDP, Twins) with SHA256-verified downloads, plus the ground-truth metrics (PEHE, ATE error, policy risk) they enable. See the [benchmark datasets](https://causalml.readthedocs.io/en/latest/datasets.html) page for each dataset's provenance and terms, and the [leaderboard notebook](https://causalml.readthedocs.io/en/latest/examples/benchmark_leaderboard.html), which regenerates every published number end to end.
+
+
 # Contributing
 
 We welcome community contributors to the project. Before you start, please read our [code of conduct](https://github.com/uber/causalml/blob/master/CODE_OF_CONDUCT.md) and check out [contributing guidelines](./CONTRIBUTING.md) first.
@@ -72,7 +79,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](https:
 # References
 
 ## Documentation
-* [Causal ML API documentation](https://causalml.readthedocs.io/en/latest/about.html)
+* [Causal ML API reference](https://causalml.readthedocs.io/en/latest/causalml.html)
 
 ## Workshops, Talks, and Publications
 * (Workshop) [3rd Workshop on Causal Inference and Machine Learning in Practice](https://causal-machine-learning.github.io/kdd2025-workshop/) at KDD 2025
