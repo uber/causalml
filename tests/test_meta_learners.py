@@ -109,13 +109,13 @@ def test_BaseSLearner(generate_regression_data):
     learner = BaseSLearner(learner=LinearRegression())
 
     # check the accuracy of the ATE estimation
-    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True)
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
     # check pre-train model
     ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
-        X=X, treatment=treatment, y=y, return_ci=True, pretrain=True
+        X=X, treatment=treatment, y=y, pretrain=True
     )
     assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
@@ -141,15 +141,13 @@ def test_BaseSRegressor(generate_regression_data):
     learner = BaseSRegressor(learner=XGBRegressor())
 
     # check the accuracy of the ATE estimation
-    ate_p, lb, ub = learner.estimate_ate(
-        X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10
-    )
+    ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, n_bootstraps=10)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
 
     # check pre-train model
     ate_p_pt, lb_pt, ub_pt = learner.estimate_ate(
-        X=X, treatment=treatment, y=y, return_ci=True, n_bootstraps=10, pretrain=True
+        X=X, treatment=treatment, y=y, n_bootstraps=10, pretrain=True
     )
     assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
 
@@ -193,6 +191,20 @@ def test_LRSRegressor(generate_regression_data):
         X=X, treatment=treatment, y=y, pretrain=True
     )
     assert (ate_p_pt == ate_p) and (lb_pt == lb) and (ub_pt == ub)
+
+
+def test_LRSRegressor_dataframe(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+    X_df = pd.DataFrame(X, columns=["col_" + str(i) for i in range(X.shape[1])])
+    learner = LRSRegressor()
+    result = learner.estimate_ate(X=X_df, treatment=treatment, y=y)
+
+    assert isinstance(result, tuple) and len(result) == 3
+    ate_p, lb, ub = result
+    assert isinstance(ate_p, np.ndarray) and ate_p.shape == (1,)
+    assert isinstance(lb, np.ndarray) and lb.shape == (1,)
+    assert isinstance(ub, np.ndarray) and ub.shape == (1,)
+    assert (ate_p >= lb) and (ate_p <= ub)
 
 
 def test_BaseTLearner(generate_regression_data):
@@ -1149,9 +1161,7 @@ def test_pandas_input(generate_regression_data):
 
     try:
         learner = BaseSLearner(learner=LinearRegression())
-        ate_p, lb, ub = learner.estimate_ate(
-            X=X, treatment=treatment, y=y, return_ci=True
-        )
+        ate_p, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y)
     except AttributeError:
         assert False
     try:
@@ -1710,13 +1720,10 @@ def test_multi_treatment_learners():
         name,
         "fit_predict",
     )
-    ate_only = sl.estimate_ate(X=X, treatment=treatment, y=y, return_ci=False)
-    assert isinstance(ate_only, np.ndarray) and ate_only.shape == (
-        n_groups,
-    ), f"{name}.estimate_ate(return_ci=False) must be shape (n_groups,)"
-    _assert_ate(sl.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True), name)
+
+    _assert_ate(sl.estimate_ate(X=X, treatment=treatment, y=y), name)
     _assert_ate(
-        sl.estimate_ate(X=X, treatment=treatment, y=y, return_ci=True, pretrain=True),
+        sl.estimate_ate(X=X, treatment=treatment, y=y, pretrain=True),
         name,
     )
 
@@ -2241,13 +2248,9 @@ def test_finite_predict_stochastic(Cls, kwargs):
 def test_bit_identical_estimate_ate_s():
     """S-learner estimate_ate() CI triple is bit-identical across clone+refit."""
     m1 = BaseSRegressor(learner=_DT_REG)
-    ate1, lb1, ub1 = m1.estimate_ate(
-        X=_X, treatment=_TREATMENT, y=_Y_CONT, return_ci=True
-    )
+    ate1, lb1, ub1 = m1.estimate_ate(X=_X, treatment=_TREATMENT, y=_Y_CONT)
     m2 = clone(m1)
-    ate2, lb2, ub2 = m2.estimate_ate(
-        X=_X, treatment=_TREATMENT, y=_Y_CONT, return_ci=True
-    )
+    ate2, lb2, ub2 = m2.estimate_ate(X=_X, treatment=_TREATMENT, y=_Y_CONT)
     np.testing.assert_array_equal(ate1, ate2)
     np.testing.assert_array_equal(lb1, lb2)
     np.testing.assert_array_equal(ub1, ub2)

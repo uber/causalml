@@ -44,8 +44,8 @@ class StatsmodelsOLS:
         # Append ones. The first column is for the treatment indicator.
         X = sm.add_constant(X, prepend=False, has_constant="add")
         self.model = sm.OLS(y, X).fit(cov_type=self.cov_type)
-        self.coefficients = self.model.params
-        self.conf_ints = self.model.conf_int(alpha=self.alpha)
+        self.coefficients = np.asarray(self.model.params)
+        self.conf_ints = np.asarray(self.model.conf_int(alpha=self.alpha))
         return self
 
     def predict(self, X):
@@ -233,7 +233,6 @@ class BaseSLearner(BaseLearner):
         treatment,
         y,
         p=None,
-        return_ci=False,
         bootstrap_ci=False,
         n_bootstraps=1000,
         bootstrap_size=10000,
@@ -245,7 +244,6 @@ class BaseSLearner(BaseLearner):
             X (np.matrix, np.array, pd.DataFrame, pl.DataFrame, or pl.LazyFrame): a feature matrix
             treatment (np.array, pd.Series, or pl.Series): a treatment vector
             y (np.array, pd.Series, or pl.Series): an outcome vector
-            return_ci (bool, optional): whether to return confidence intervals
             bootstrap_ci (bool): whether to return confidence intervals
             n_bootstraps (int): number of bootstrap iterations
             bootstrap_size (int): number of samples per bootstrap
@@ -296,9 +294,7 @@ class BaseSLearner(BaseLearner):
             ate_lb[i] = _ate_lb
             ate_ub[i] = _ate_ub
 
-        if not return_ci:
-            return ate
-        elif return_ci and not bootstrap_ci:
+        if not bootstrap_ci:
             return ate, ate_lb, ate_ub
         else:
             t_groups_global = self.t_groups
