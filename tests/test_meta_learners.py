@@ -1478,8 +1478,7 @@ def test_multi_treatment_learners():
       - ``fit_predict(..., return_ci=False)`` → CATE ``np.ndarray`` only (not a tuple)
       - ``fit_predict(..., return_ci=True)`` → ``tuple`` ``(te, lb, ub)`` of three ndarrays
       - ``estimate_ate(...)`` → ``tuple`` ``(ate, lb, ub)`` with each vector of shape
-        ``(n_treatment_groups,)`` for T/X/R/DR by default; **BaseSLearner** returns only
-        ``ate`` unless ``return_ci=True`` (then same triple as the others).
+        ``(n_treatment_groups,)`` for all meta-learners.
     """
     np.random.seed(RANDOM_SEED)
     n, p, n_groups = 600, 5, 3

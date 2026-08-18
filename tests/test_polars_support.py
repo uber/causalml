@@ -280,14 +280,11 @@ class TestSLearnerPolars:
 
     def test_estimate_ate_polars(self, synthetic_data_polars):
         X, treatment, y = synthetic_data_polars
-        # BaseSLearner.estimate_ate returns only `ate` when return_ci=False (default)
-        ate = self.learner.estimate_ate(X=X, treatment=treatment, y=y)
+        ate, lb, ub = self.learner.estimate_ate(X=X, treatment=treatment, y=y)
         assert isinstance(ate, np.ndarray)
-        # With return_ci=True it returns (ate, lb, ub)
-        ate, lb, ub = self.learner.estimate_ate(
-            X=X, treatment=treatment, y=y, return_ci=True
-        )
-        assert lb[0] < ate[0] < ub[0]
+        assert isinstance(lb, np.ndarray)
+        assert isinstance(ub, np.ndarray)
+        assert lb[0] <= ate[0] <= ub[0]
 
 
 # X-Learner
