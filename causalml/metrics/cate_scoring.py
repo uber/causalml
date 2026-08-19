@@ -3,6 +3,7 @@ import logging
 
 import numpy as np
 import pandas as pd
+from lightgbm import LGBMRegressor
 from scipy import stats
 from sklearn.model_selection import StratifiedKFold
 
@@ -31,9 +32,12 @@ def _resolve_outcome_learners(
     Returns:
         (tuple): the resolved (control_outcome_learner, treatment_outcome_learner)
     """
-    if (learner is None) and (
-        (control_outcome_learner is None) or (treatment_outcome_learner is None)
-    ):
+    if (control_outcome_learner is None) != (treatment_outcome_learner is None):
+        raise ValueError(
+            "Specify both `control_outcome_learner` and `treatment_outcome_learner`, "
+            "or neither."
+        )
+    if learner is None and control_outcome_learner is None:
         raise ValueError(
             "Either `learner` or both `control_outcome_learner` and "
             "`treatment_outcome_learner` must be specified."
@@ -56,7 +60,9 @@ def compute_dr_pseudo_outcomes(
     treatment,
     y,
     p=None,
-    learner=None,
+    learner=LGBMRegressor(
+        num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1
+    ),
     control_outcome_learner=None,
     treatment_outcome_learner=None,
     n_folds=5,
@@ -266,7 +272,9 @@ def dr_score(
     outcome_col="y",
     pseudo_outcome_col=None,
     p=None,
-    learner=None,
+    learner=LGBMRegressor(
+        num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1
+    ),
     control_outcome_learner=None,
     treatment_outcome_learner=None,
     n_folds=5,
@@ -311,8 +319,7 @@ def dr_score(
         p (numpy.ndarray or pandas.Series, optional): propensity scores. Only
             used when pseudo-outcomes are computed internally
         learner (model, optional): a model for both control and treatment outcome
-            regressions if the group-specific learners below are not given.
-            Required unless ``pseudo_outcome_col`` is provided
+            regressions if the group-specific learners below are not given
         control_outcome_learner (model, optional): a model to estimate outcomes
             in the control group
         treatment_outcome_learner (model, optional): a model to estimate outcomes
@@ -389,7 +396,9 @@ def plug_in_t_score(
     X,
     treatment_col="w",
     outcome_col="y",
-    learner=None,
+    learner=LGBMRegressor(
+        num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1
+    ),
     control_outcome_learner=None,
     treatment_outcome_learner=None,
     n_folds=5,

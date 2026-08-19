@@ -523,3 +523,43 @@ def test_compute_r_residuals_skips_propensity_when_w_residual_not_needed(
     assert y_residual.shape == (len(df),)
     assert np.isfinite(y_residual).all()
     assert w_residual is None
+
+
+def test_dr_score_without_learner(synthetic_data):
+    df, X = synthetic_data
+    result = dr_score(
+        df,
+        X=X,
+        outcome_col="y",
+        treatment_col="w",
+        random_state=RANDOM_SEED,
+    )
+    assert result is not None
+
+
+def test_plug_in_t_score_without_learner(synthetic_data):
+    df, X = synthetic_data
+    result = plug_in_t_score(
+        df,
+        X=X,
+        outcome_col="y",
+        treatment_col="w",
+        random_state=RANDOM_SEED,
+    )
+    assert result is not None
+
+
+def test_dr_score_missing_one_learner(synthetic_data):
+    df, X = synthetic_data
+    with pytest.raises(
+        ValueError,
+        match=".*Specify both `control_outcome_learner` and `treatment_outcome_learner`, or neither.*",
+    ):
+        dr_score(
+            df,
+            X=X,
+            outcome_col="y",
+            treatment_col="w",
+            control_outcome_learner=LinearRegression(),
+            random_state=RANDOM_SEED,
+        )
