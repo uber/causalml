@@ -69,3 +69,18 @@ def test_gradientboosted_propensity_model_earlystopping(generate_regression_data
     ps = pm.fit_predict(X, treatment)
 
     assert roc_auc_score(treatment, ps) > 0.5
+
+
+def test_propensity_models_imbalanced_1027():
+    rng = np.random.RandomState(RANDOM_SEED)
+    X = rng.normal(size=(400, 25))
+    logit = 0.3 * X[:, 0] + rng.normal(size=400)
+    treatment = (logit > np.quantile(logit, 0.90)).astype(int)
+
+    pm_lr = LogisticRegressionPropensityModel(random_state=RANDOM_SEED)
+    pm_lr.fit_predict(X, treatment)
+    assert pm_lr.model.C_[0] > 1e-4
+
+    pm_en = ElasticNetPropensityModel(random_state=RANDOM_SEED)
+    pm_en.fit_predict(X, treatment)
+    assert pm_en.model.C_[0] > 1e-4

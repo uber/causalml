@@ -108,6 +108,7 @@ class LogisticRegressionPropensityModel(PropensityModel):
             "penalty": "elasticnet",
             "solver": "saga",
             "Cs": 4,
+            "scoring": "neg_log_loss",
             "l1_ratios": np.linspace(1e-3, 1 - 1e-3, 4),
             "cv": StratifiedKFold(
                 n_splits=(
@@ -152,7 +153,7 @@ class GradientBoostedPropensityModel(PropensityModel):
     @property
     def _model(self):
         kwargs = {
-            "max_depth": 8,
+            "max_depth": 3,
             "learning_rate": 0.1,
             "n_estimators": 100,
             "objective": "binary:logistic",
