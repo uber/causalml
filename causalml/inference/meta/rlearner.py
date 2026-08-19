@@ -4,6 +4,7 @@ import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.model_selection import cross_val_predict, KFold, train_test_split
+from sklearn.utils import check_random_state
 
 try:
     from xgboost import XGBRegressor, XGBClassifier
@@ -312,12 +313,15 @@ class BaseRLearner(BaseLearner):
             )
 
             logger.info("Bootstrap Confidence Intervals")
+            rng = check_random_state(self.random_state)
             for i in tqdm(range(n_bootstraps)):
                 if p is None:
                     p = self.propensity
                 else:
                     p = self._format_p(p, self.t_groups)
-                te_b = self.bootstrap(X, treatment_np, y_np, p, size=bootstrap_size)
+                te_b = self.bootstrap(
+                    X, treatment_np, y_np, p, size=bootstrap_size, rng=rng
+                )
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -414,12 +418,15 @@ class BaseRLearner(BaseLearner):
             logger.info("Bootstrap Confidence Intervals for ATE")
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
+            rng = check_random_state(self.random_state)
             for n in tqdm(range(n_bootstraps)):
                 if p is None:
                     p = self.propensity
                 else:
                     p = self._format_p(p, self.t_groups)
-                cate_b = self.bootstrap(X, treatment_np, y_np, p, size=bootstrap_size)
+                cate_b = self.bootstrap(
+                    X, treatment_np, y_np, p, size=bootstrap_size, rng=rng
+                )
                 ate_bootstraps[:, n] = cate_b.mean(axis=0)
 
             ate_lower = np.percentile(

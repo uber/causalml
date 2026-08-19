@@ -2316,3 +2316,58 @@ def test_dr_learner_pretrain_before_fit_raises():
         BaseDRRegressor(learner=_DT_REG).estimate_ate(
             X=_X, treatment=_TREATMENT, y=_Y_CONT, pretrain=True
         )
+
+
+def test_base_rlearner_bootstrap_reproducibility(generate_regression_data):
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    np.random.seed(RANDOM_SEED)
+    learner1 = BaseRRegressor(learner=LinearRegression(), random_state=42)
+    ate1, lb1_ate, ub1_ate = learner1.estimate_ate(
+        X, treatment=treatment, y=y, bootstrap_ci=True, n_bootstraps=5
+    )
+    te1, lb1_te, ub1_te = learner1.fit_predict(
+        X, treatment=treatment, y=y, return_ci=True, n_bootstraps=5
+    )
+
+    np.random.rand(100)
+
+    learner2 = BaseRRegressor(learner=LinearRegression(), random_state=42)
+    ate2, lb2_ate, ub2_ate = learner2.estimate_ate(
+        X, treatment=treatment, y=y, bootstrap_ci=True, n_bootstraps=5
+    )
+    te2, lb2_te, ub2_te = learner2.fit_predict(
+        X, treatment=treatment, y=y, return_ci=True, n_bootstraps=5
+    )
+
+    learner3 = BaseRRegressor(
+        learner=LinearRegression(), random_state=np.random.RandomState(42)
+    )
+    ate3, lb3_ate, ub3_ate = learner3.estimate_ate(
+        X, treatment=treatment, y=y, bootstrap_ci=True, n_bootstraps=5
+    )
+    te3, lb3_te, ub3_te = learner3.fit_predict(
+        X, treatment=treatment, y=y, return_ci=True, n_bootstraps=5
+    )
+
+    np.random.rand(100)
+
+    learner4 = BaseRRegressor(
+        learner=LinearRegression(), random_state=np.random.RandomState(42)
+    )
+    ate4, lb4_ate, ub4_ate = learner4.estimate_ate(
+        X, treatment=treatment, y=y, bootstrap_ci=True, n_bootstraps=5
+    )
+    te4, lb4_te, ub4_te = learner4.fit_predict(
+        X, treatment=treatment, y=y, return_ci=True, n_bootstraps=5
+    )
+
+    np.testing.assert_array_equal(lb1_ate, lb2_ate)
+    np.testing.assert_array_equal(ub1_ate, ub2_ate)
+    np.testing.assert_array_equal(lb1_te, lb2_te)
+    np.testing.assert_array_equal(ub1_te, ub2_te)
+
+    np.testing.assert_array_equal(lb3_ate, lb4_ate)
+    np.testing.assert_array_equal(ub3_ate, ub4_ate)
+    np.testing.assert_array_equal(lb3_te, lb4_te)
+    np.testing.assert_array_equal(ub3_te, ub4_te)
