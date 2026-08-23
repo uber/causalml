@@ -11,6 +11,70 @@ from causalml.propensity import compute_propensity_score, compute_r_residuals
 
 logger = logging.getLogger("causalml")
 
+# Sentinel default for `learner` in compute_dr_pseudo_outcomes() / dr_score() /
+# plug_in_t_score(). These functions fit per-fold, per-arm (with the default
+# n_folds=5, that's 10 fits per call, each on a fraction of a single arm), so a
+# single fixed-size default learner is either oversized for small slices or
+# undersized for large ones. Using a sentinel instead of a pre-built estimator
+# lets _make_fold_learner() build one sized to each fit's actual row count --
+# see _sized_default_learner(). It also avoids the mutable-default-argument
+# pitfall of instantiating one shared estimator at import time.
+_AUTO = "auto"
+
+
+def _sized_default_learner(n_samples, min_child_samples=20, max_leaves=64):
+    """Build a default LGBMRegressor with num_leaves capped to what n_samples supports.
+
+    LightGBM's own default ``min_child_samples`` (20) means a tree can't grow
+    past roughly ``n_samples // min_child_samples`` leaves anyway -- asking for
+    more just produces "No further splits with positive gain" log noise rather
+    than a more expressive model. This module fits per-fold and, for
+    ``compute_dr_pseudo_outcomes``/``plug_in_t_score``, per-arm on top of that
+    (e.g. the default ``n_folds=5`` means 10 fits per call, each on well under
+    a full arm's worth of rows), so a fixed ``num_leaves=64`` is frequently
+    past what a single fit's slice can support. Sizing it to the slice keeps
+    the model honest about what it can learn from that slice.
+
+    Args:
+        n_samples (int): number of training rows this learner will be fit on
+        min_child_samples (int, optional): min_child_samples for the learner;
+            also used to size num_leaves. Default 20 (LightGBM's own default).
+        max_leaves (int, optional): ceiling on num_leaves regardless of
+            n_samples, matching the previous fixed default. Default 64.
+
+    Returns:
+        (LGBMRegressor): a fresh, unfitted default learner
+    """
+    num_leaves = int(np.clip(n_samples // min_child_samples, 2, max_leaves))
+    return LGBMRegressor(
+        num_leaves=num_leaves,
+        min_child_samples=min_child_samples,
+        learning_rate=0.05,
+        n_estimators=300,
+        verbose=-1,
+    )
+
+
+def _make_fold_learner(resolved_learner, n_samples):
+    """Materialize a fresh, unfitted learner for a single fold/arm fit.
+
+    If ``resolved_learner`` is the ``_AUTO`` sentinel (the caller didn't pass
+    an explicit learner), build a default learner sized to ``n_samples`` via
+    ``_sized_default_learner()``. Otherwise, deep-copy the caller-supplied
+    learner so that different folds/arms don't share fitted state.
+
+    Args:
+        resolved_learner: either the ``_AUTO`` sentinel or an estimator
+            already isolated per arm by ``_resolve_outcome_learners()``
+        n_samples (int): number of rows this learner is about to be fit on
+
+    Returns:
+        An unfitted estimator ready for ``.fit()``.
+    """
+    if resolved_learner is _AUTO:
+        return _sized_default_learner(n_samples)
+    return deepcopy(resolved_learner)
+
 
 def _resolve_outcome_learners(
     learner, control_outcome_learner, treatment_outcome_learner
@@ -22,15 +86,18 @@ def _resolve_outcome_learners(
     ``BaseTLearner``).
 
     Args:
-        learner (model, optional): a model used for both control and treatment
-            outcome regressions if the group-specific learners are not given
+        learner (model or the ``_AUTO`` sentinel, optional): a model used for
+            both control and treatment outcome regressions if the
+            group-specific learners are not given. ``_AUTO`` defers learner
+            construction to ``_make_fold_learner()`` at fit time.
         control_outcome_learner (model, optional): a model to estimate outcomes
             in the control group
         treatment_outcome_learner (model, optional): a model to estimate outcomes
             in the treatment group
 
     Returns:
-        (tuple): the resolved (control_outcome_learner, treatment_outcome_learner)
+        (tuple): the resolved (control_outcome_learner, treatment_outcome_learner),
+        each either an estimator or the ``_AUTO`` sentinel
     """
     if (control_outcome_learner is None) != (treatment_outcome_learner is None):
         raise ValueError(
@@ -42,15 +109,17 @@ def _resolve_outcome_learners(
             "Either `learner` or both `control_outcome_learner` and "
             "`treatment_outcome_learner` must be specified."
         )
+
+    def _default():
+        return _AUTO if learner is _AUTO else deepcopy(learner)
+
     _control_outcome_learner = (
-        control_outcome_learner
-        if control_outcome_learner is not None
-        else deepcopy(learner)
+        control_outcome_learner if control_outcome_learner is not None else _default()
     )
     _treatment_outcome_learner = (
         treatment_outcome_learner
         if treatment_outcome_learner is not None
-        else deepcopy(learner)
+        else _default()
     )
     return _control_outcome_learner, _treatment_outcome_learner
 
@@ -60,9 +129,7 @@ def compute_dr_pseudo_outcomes(
     treatment,
     y,
     p=None,
-    learner=LGBMRegressor(
-        num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1
-    ),
+    learner=_AUTO,
     control_outcome_learner=None,
     treatment_outcome_learner=None,
     n_folds=5,
@@ -99,7 +166,11 @@ def compute_dr_pseudo_outcomes(
             they are estimated in-fold via ``causalml.propensity.compute_propensity_score``
             (``ElasticNetPropensityModel`` by default)
         learner (model, optional): a model used for both control and treatment outcome
-            regressions if the group-specific learners below are not given
+            regressions if the group-specific learners below are not given. If
+            left as the default, a fresh ``LGBMRegressor`` is built for each
+            fold/arm fit with ``num_leaves`` capped to what that fit's row
+            count can support (see ``_sized_default_learner()``), rather than
+            a single fixed-size model shared across every fit
         control_outcome_learner (model, optional): a model to estimate outcomes
             in the control group
         treatment_outcome_learner (model, optional): a model to estimate outcomes
@@ -144,10 +215,15 @@ def compute_dr_pseudo_outcomes(
         w_train = treatment[train_idx]
         w_test = treatment[test_idx]
 
-        mu_c = deepcopy(_control_outcome_learner)
-        mu_c.fit(X[train_idx][w_train == 0], y[train_idx][w_train == 0])
-        mu_t = deepcopy(_treatment_outcome_learner)
-        mu_t.fit(X[train_idx][w_train == 1], y[train_idx][w_train == 1])
+        X_train_c = X[train_idx][w_train == 0]
+        y_train_c = y[train_idx][w_train == 0]
+        mu_c = _make_fold_learner(_control_outcome_learner, X_train_c.shape[0])
+        mu_c.fit(X_train_c, y_train_c)
+
+        X_train_t = X[train_idx][w_train == 1]
+        y_train_t = y[train_idx][w_train == 1]
+        mu_t = _make_fold_learner(_treatment_outcome_learner, X_train_t.shape[0])
+        mu_t.fit(X_train_t, y_train_t)
 
         mu_c_pred = mu_c.predict(X[test_idx])
         mu_t_pred = mu_t.predict(X[test_idx])
@@ -272,9 +348,7 @@ def dr_score(
     outcome_col="y",
     pseudo_outcome_col=None,
     p=None,
-    learner=LGBMRegressor(
-        num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1
-    ),
+    learner=_AUTO,
     control_outcome_learner=None,
     treatment_outcome_learner=None,
     n_folds=5,
@@ -302,6 +376,15 @@ def dr_score(
     multiple scoring calls or shared with ``rate_score()``) or computed internally
     from ``X``, ``treatment_col``, and ``outcome_col``.
 
+    Note:
+        Comparing several candidate CATE models in one ``df`` without an
+        explicit ``learner``/``pseudo_outcome_col`` re-fits the DR nuisance
+        models (``n_folds`` folds x 2 arms) on every call to ``dr_score()``,
+        even though the pseudo-outcomes don't depend on which model columns
+        are being scored. Precompute them once with
+        ``compute_dr_pseudo_outcomes()`` and pass the result via
+        ``pseudo_outcome_col`` instead.
+
     Args:
         df (pandas.DataFrame): a data frame with fitted CATE model estimates as
             columns, plus either ``pseudo_outcome_col`` or both ``outcome_col``
@@ -319,7 +402,9 @@ def dr_score(
         p (numpy.ndarray or pandas.Series, optional): propensity scores. Only
             used when pseudo-outcomes are computed internally
         learner (model, optional): a model for both control and treatment outcome
-            regressions if the group-specific learners below are not given
+            regressions if the group-specific learners below are not given. If
+            left as the default, see ``compute_dr_pseudo_outcomes()`` for how
+            the default learner is sized
         control_outcome_learner (model, optional): a model to estimate outcomes
             in the control group
         treatment_outcome_learner (model, optional): a model to estimate outcomes
@@ -396,9 +481,7 @@ def plug_in_t_score(
     X,
     treatment_col="w",
     outcome_col="y",
-    learner=LGBMRegressor(
-        num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1
-    ),
+    learner=_AUTO,
     control_outcome_learner=None,
     treatment_outcome_learner=None,
     n_folds=5,
@@ -422,6 +505,16 @@ def plug_in_t_score(
     despite its simplicity, making it a useful complement to DR-based scoring
     rather than a replacement.
 
+    Note:
+        Comparing several candidate CATE models in one ``df`` without an
+        explicit ``learner`` re-fits the plug-in T-learner nuisance models
+        (``n_folds`` folds x 2 arms) on every call, even though the proxy
+        doesn't depend on which model columns are being scored. If you're
+        calling this repeatedly for the same ``X``/``treatment_col``/
+        ``outcome_col``, consider computing the proxy once yourself and
+        reusing it, the way ``compute_dr_pseudo_outcomes()`` lets you do for
+        ``dr_score()``.
+
     Args:
         df (pandas.DataFrame): a data frame with fitted CATE model estimates as columns
         X (numpy.ndarray or pandas.DataFrame): feature matrix used to fit the
@@ -430,7 +523,9 @@ def plug_in_t_score(
             indicator (0 or 1)
         outcome_col (str, optional): the column name for the actual outcome
         learner (model, optional): a model for both control and treatment outcome
-            regressions if the group-specific learners below are not given
+            regressions if the group-specific learners below are not given. If
+            left as the default, see ``compute_dr_pseudo_outcomes()`` for how
+            the default learner is sized
         control_outcome_learner (model, optional): a model to estimate outcomes
             in the control group
         treatment_outcome_learner (model, optional): a model to estimate outcomes
@@ -473,10 +568,15 @@ def plug_in_t_score(
     for train_idx, test_idx in cv.split(X_arr, treatment):
         w_train = treatment[train_idx]
 
-        mu_c = deepcopy(_control_outcome_learner)
-        mu_c.fit(X_arr[train_idx][w_train == 0], y[train_idx][w_train == 0])
-        mu_t = deepcopy(_treatment_outcome_learner)
-        mu_t.fit(X_arr[train_idx][w_train == 1], y[train_idx][w_train == 1])
+        X_train_c = X_arr[train_idx][w_train == 0]
+        y_train_c = y[train_idx][w_train == 0]
+        mu_c = _make_fold_learner(_control_outcome_learner, X_train_c.shape[0])
+        mu_c.fit(X_train_c, y_train_c)
+
+        X_train_t = X_arr[train_idx][w_train == 1]
+        y_train_t = y[train_idx][w_train == 1]
+        mu_t = _make_fold_learner(_treatment_outcome_learner, X_train_t.shape[0])
+        mu_t.fit(X_train_t, y_train_t)
 
         tau_proxy[test_idx] = mu_t.predict(X_arr[test_idx]) - mu_c.predict(
             X_arr[test_idx]

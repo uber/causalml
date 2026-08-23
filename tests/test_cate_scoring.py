@@ -8,6 +8,7 @@ from causalml.metrics.cate_scoring import (
     dr_score,
     plug_in_t_score,
     rlearner_score,
+    _sized_default_learner,
 )
 from causalml.propensity import compute_r_residuals
 from causalml.metrics.rate import rate_score
@@ -563,3 +564,40 @@ def test_dr_score_missing_one_learner(synthetic_data):
             control_outcome_learner=LinearRegression(),
             random_state=RANDOM_SEED,
         )
+
+
+def test_sized_default_learner_caps_num_leaves_to_sample_size():
+    # A fold/arm slice much smaller than num_leaves=64 * min_child_samples=20
+    # should get a proportionally smaller num_leaves instead of the fixed
+    # default -- see GH #1037.
+    small = _sized_default_learner(60)
+    assert small.get_params()["num_leaves"] == 3
+
+    tiny = _sized_default_learner(10)
+    assert tiny.get_params()["num_leaves"] == 2  # floor, never below 2
+
+    large = _sized_default_learner(10_000)
+    assert large.get_params()["num_leaves"] == 64  # ceiling, matches old default
+
+
+def test_dr_score_and_plug_in_t_score_without_learner_on_small_data():
+    # Regression test for GH #1037: on a dataset where a single fold/arm's
+    # training slice is small, the default learner should still fit cleanly
+    # (via the auto-sized num_leaves) without requiring the caller to pass an
+    # explicit learner.
+    rng = np.random.default_rng(RANDOM_SEED)
+    n, p = 200, 4
+    X = rng.normal(0, 1, (n, p))
+    tau = 1.0 + X[:, 0]
+    w = rng.binomial(1, 0.5, n)
+    y = X[:, 1] + w * tau + rng.normal(0, 0.5, n)
+    df = pd.DataFrame({"y": y, "w": w, "candidate_model": tau})
+
+    dr = dr_score(
+        df, X=X, treatment_col="w", outcome_col="y", n_folds=5, random_state=RANDOM_SEED
+    )
+    t = plug_in_t_score(
+        df, X, treatment_col="w", outcome_col="y", n_folds=5, random_state=RANDOM_SEED
+    )
+    assert np.isfinite(dr.values).all()
+    assert np.isfinite(t.values).all()
