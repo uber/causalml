@@ -1,5 +1,6 @@
 import logging
 import numpy as np
+from sklearn.utils import check_random_state
 from tqdm import tqdm
 from scipy.stats import norm
 from sklearn.dummy import DummyRegressor
@@ -24,7 +25,7 @@ logger = logging.getLogger("causalml")
 class StatsmodelsOLS:
     """A sklearn style wrapper class for statsmodels' OLS."""
 
-    def __init__(self, cov_type="HC1", alpha=0.05):
+    def __init__(self, cov_type="HC1", alpha=0.05, random_state=None):
         """Initialize a statsmodels' OLS wrapper class object.
 
         Args:
@@ -33,6 +34,7 @@ class StatsmodelsOLS:
         """
         self.cov_type = cov_type
         self.alpha = alpha
+        self.random_state = random_state
 
     def fit(self, X, y):
         """Fit OLS.
@@ -62,7 +64,7 @@ class BaseSLearner(BaseLearner):
     Details of S-learner are available at `Kunzel et al. (2018) <https://arxiv.org/abs/1706.03461>`_.
     """
 
-    def __init__(self, learner=None, ate_alpha=0.05, control_name=0):
+    def __init__(self, learner=None, ate_alpha=0.05, control_name=0, random_state=None):
         """Initialize an S-learner.
 
         Args:
@@ -77,6 +79,7 @@ class BaseSLearner(BaseLearner):
         self.learner = learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.random_state = random_state
 
     def fit(self, X, treatment, y, p=None):
         """Fit the inference model.
@@ -211,8 +214,11 @@ class BaseSLearner(BaseLearner):
             )
 
             logger.info("Bootstrap Confidence Intervals")
+            rng = check_random_state(self.random_state)
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X, treatment_np, y_np, size=bootstrap_size)
+                te_b = self.bootstrap(
+                    X, treatment_np, y_np, size=bootstrap_size, rng=rng
+                )
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -304,8 +310,11 @@ class BaseSLearner(BaseLearner):
             logger.info("Bootstrap Confidence Intervals for ATE")
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
+            rng = check_random_state(self.random_state)
             for n in tqdm(range(n_bootstraps)):
-                ate_b = self.bootstrap(X, treatment_np, y_np, size=bootstrap_size)
+                ate_b = self.bootstrap(
+                    X, treatment_np, y_np, size=bootstrap_size, rng=rng
+                )
                 ate_bootstraps[:, n] = ate_b.mean(axis=0)
 
             ate_lower = np.percentile(
@@ -326,7 +335,7 @@ class BaseSLearner(BaseLearner):
 class BaseSRegressor(BaseSLearner):
     """A parent class for S-learner regressor classes."""
 
-    def __init__(self, learner=None, ate_alpha=0.05, control_name=0):
+    def __init__(self, learner=None, ate_alpha=0.05, control_name=0, random_state=None):
         """Initialize an S-learner regressor.
 
         Args:
@@ -335,14 +344,17 @@ class BaseSRegressor(BaseSLearner):
             control_name (str or int, optional): name of control group
         """
         super().__init__(
-            learner=learner, ate_alpha=ate_alpha, control_name=control_name
+            learner=learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+            random_state=random_state,
         )
 
 
 class BaseSClassifier(BaseSLearner):
     """A parent class for S-learner classifier classes."""
 
-    def __init__(self, learner=None, ate_alpha=0.05, control_name=0):
+    def __init__(self, learner=None, ate_alpha=0.05, control_name=0, random_state=None):
         """Initialize an S-learner classifier.
 
         Args:
@@ -352,7 +364,10 @@ class BaseSClassifier(BaseSLearner):
             control_name (str or int, optional): name of control group
         """
         super().__init__(
-            learner=learner, ate_alpha=ate_alpha, control_name=control_name
+            learner=learner,
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+            random_state=random_state,
         )
 
     def predict(
@@ -412,14 +427,19 @@ class BaseSClassifier(BaseSLearner):
 
 
 class LRSRegressor(BaseSRegressor):
-    def __init__(self, ate_alpha=0.05, control_name=0):
+    def __init__(self, ate_alpha=0.05, control_name=0, random_state=None):
         """Initialize an S-learner with a linear regression model.
 
         Args:
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
         """
-        super().__init__(StatsmodelsOLS(alpha=ate_alpha), ate_alpha, control_name)
+        super().__init__(
+            learner=StatsmodelsOLS(alpha=ate_alpha),
+            ate_alpha=ate_alpha,
+            control_name=control_name,
+            random_state=random_state,
+        )
 
     def estimate_ate(self, X, treatment, y, p=None, pretrain=False):
         """Estimate the Average Treatment Effect (ATE).
