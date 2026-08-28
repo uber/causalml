@@ -347,10 +347,11 @@ def dr_score(
     have_pseudo_outcome = (
         pseudo_outcome_col is not None and pseudo_outcome_col in df.columns
     )
-    assert have_pseudo_outcome or (X is not None), (
-        "Either `pseudo_outcome_col` (present in df) or `X` "
-        "(to compute pseudo-outcomes internally) must be provided."
-    )
+    if not (have_pseudo_outcome or (X is not None)):
+        raise ValueError(
+            "Either `pseudo_outcome_col` (present in df) or `X` "
+            "(to compute pseudo-outcomes internally) must be provided."
+        )
 
     model_cols = [
         c
@@ -361,11 +362,12 @@ def dr_score(
     if have_pseudo_outcome:
         pseudo_outcome = df[pseudo_outcome_col].to_numpy()
     else:
-        assert (
-            outcome_col in df.columns and treatment_col in df.columns
-        ), "{} and {} must be present in df to compute DR pseudo-outcomes.".format(
-            outcome_col, treatment_col
-        )
+        if not (outcome_col in df.columns and treatment_col in df.columns):
+            raise ValueError(
+                "{} and {} must be present in df to compute DR pseudo-outcomes.".format(
+                    outcome_col, treatment_col
+                )
+            )
         pseudo_outcome = compute_dr_pseudo_outcomes(
             X=X,
             treatment=df[treatment_col],
@@ -449,9 +451,10 @@ def plug_in_t_score(
         If return_ci=False: (pandas.Series): plug-in T-learner loss for each model column (lower is better)
         If return_ci=True: (pandas.DataFrame): loss, standard error, and confidence interval bounds for each model column
     """
-    assert (
-        outcome_col in df.columns and treatment_col in df.columns
-    ), "{} and {} must be present in df.".format(outcome_col, treatment_col)
+    if not (outcome_col in df.columns and treatment_col in df.columns):
+        raise ValueError(
+            "{} and {} must be present in df.".format(outcome_col, treatment_col)
+        )
 
     _control_outcome_learner, _treatment_outcome_learner = _resolve_outcome_learners(
         learner, control_outcome_learner, treatment_outcome_learner
@@ -503,7 +506,9 @@ def rlearner_score(
     outcome_col="y",
     y_residual_col=None,
     w_residual_col=None,
-    outcome_learner=None,
+    outcome_learner=LGBMRegressor(
+        num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1
+    ),
     propensity_learner=None,
     n_folds=5,
     return_ci=False,
@@ -564,10 +569,11 @@ def rlearner_score(
         and w_residual_col is not None
         and w_residual_col in df.columns
     )
-    assert have_residuals or (X is not None and outcome_learner is not None), (
-        "Either `y_residual_col`/`w_residual_col` (present in df) or `X` and "
-        "`outcome_learner` (to compute residuals internally) must be provided."
-    )
+    if not (have_residuals or (X is not None and outcome_learner is not None)):
+        raise ValueError(
+            "Either `y_residual_col`/`w_residual_col` (present in df) or `X` and "
+            "`outcome_learner` (to compute residuals internally) must be provided."
+        )
 
     model_cols = [
         c
@@ -579,11 +585,12 @@ def rlearner_score(
         y_residual = df[y_residual_col].to_numpy()
         w_residual = df[w_residual_col].to_numpy()
     else:
-        assert (
-            outcome_col in df.columns and treatment_col in df.columns
-        ), "{} and {} must be present in df to compute R-loss residuals.".format(
-            outcome_col, treatment_col
-        )
+        if not (outcome_col in df.columns and treatment_col in df.columns):
+            raise ValueError(
+                "{} and {} must be present in df to compute R-loss residuals.".format(
+                    outcome_col, treatment_col
+                )
+            )
         y_residual, w_residual = compute_r_residuals(
             X=X,
             treatment=df[treatment_col],
