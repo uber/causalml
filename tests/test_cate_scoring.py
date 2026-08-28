@@ -525,6 +525,18 @@ def test_compute_r_residuals_skips_propensity_when_w_residual_not_needed(
     assert w_residual is None
 
 
+def test_compute_dr_pseudo_outcomes_without_learner(synthetic_data):
+    df, X = synthetic_data
+    result = compute_dr_pseudo_outcomes(
+        X,
+        treatment=df["w"],
+        y=df["y"],
+        random_state=RANDOM_SEED,
+    )
+    assert result is not None
+    assert np.isfinite(result).all()
+
+
 def test_dr_score_without_learner(synthetic_data):
     df, X = synthetic_data
     result = dr_score(
@@ -535,6 +547,7 @@ def test_dr_score_without_learner(synthetic_data):
         random_state=RANDOM_SEED,
     )
     assert result is not None
+    assert result["perfect_model"] < result["noisy_model"] < result["bad_model"]
 
 
 def test_plug_in_t_score_without_learner(synthetic_data):
@@ -547,6 +560,7 @@ def test_plug_in_t_score_without_learner(synthetic_data):
         random_state=RANDOM_SEED,
     )
     assert result is not None
+    assert result["perfect_model"] < result["noisy_model"] < result["bad_model"]
 
 
 def test_dr_score_missing_one_learner(synthetic_data):
