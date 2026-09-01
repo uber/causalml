@@ -84,3 +84,47 @@ def test_propensity_models_imbalanced_1027():
     pm_en = ElasticNetPropensityModel(random_state=RANDOM_SEED)
     pm_en.fit_predict(X, treatment)
     assert pm_en.model.C_[0] > 1e-4
+
+
+def test_compute_propensity_score_clips_a_user_supplied_model():
+    """clip_bounds has to hold for any model, not only the built-in ones.
+
+    ``PropensityModel.predict`` clips, but a plain scikit-learn classifier does
+    not, and a score of exactly 0 or 1 divides by zero in the DR-learner and in
+    TMLE, and fails ``check_p_conditions``.
+    """
+    from sklearn.linear_model import LogisticRegression
+
+    from causalml.propensity import compute_propensity_score
+
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 400
+    X = rng.normal(size=(n, 3))
+    # perfectly separable, so an unregularised classifier saturates at 0 and 1
+    treatment = (X[:, 0] > 0).astype(int)
+
+    clip_bounds = (1e-3, 1 - 1e-3)
+    p, _ = compute_propensity_score(
+        X=X,
+        treatment=treatment,
+        p_model=LogisticRegression(C=1e9, max_iter=1000),
+        clip_bounds=clip_bounds,
+    )
+
+    assert p.min() >= clip_bounds[0]
+    assert p.max() <= clip_bounds[1]
+
+
+def test_compute_propensity_score_honors_custom_clip_bounds():
+    from causalml.propensity import compute_propensity_score
+
+    rng = np.random.RandomState(RANDOM_SEED)
+    n = 400
+    X = rng.normal(size=(n, 3))
+    treatment = (X[:, 0] > 0).astype(int)
+
+    clip_bounds = (0.2, 0.8)
+    p, _ = compute_propensity_score(X=X, treatment=treatment, clip_bounds=clip_bounds)
+
+    assert p.min() >= clip_bounds[0]
+    assert p.max() <= clip_bounds[1]

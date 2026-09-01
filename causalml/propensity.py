@@ -243,7 +243,11 @@ def compute_propensity_score(
         logger.info("predict_proba not available, using predict instead")
         p = p_model.predict(X_pred)
 
-    return p, p_model
+    # PropensityModel.predict already clips, but a user-supplied classifier
+    # does not, and a score of exactly 0 or 1 divides by zero in the DR-learner
+    # and TMLE, and trips check_p_conditions. Clip whatever the model returned
+    # so clip_bounds holds for every model.
+    return np.clip(p, *clip_bounds), p_model
 
 
 def compute_r_residuals(
