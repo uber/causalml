@@ -1092,12 +1092,19 @@ def _get_numeric_vars(X, threshold=5):
     is set to 5 by default.
     """
 
+    # Only numeric columns can be averaged, and a non-numeric column that
+    # happened to have enough distinct values used to be classified as
+    # continuous and then failed in the mean with a numpy type error.
+    numeric = [pd.api.types.is_numeric_dtype(X.iloc[:, i]) for i in range(X.shape[1])]
+
     cont = [
-        (not hasattr(X.iloc[:, i], "cat")) and (X.iloc[:, i].nunique() >= threshold)
+        numeric[i]
+        and (not hasattr(X.iloc[:, i], "cat"))
+        and (X.iloc[:, i].nunique() >= threshold)
         for i in range(X.shape[1])
     ]
 
-    prop = [X.iloc[:, i].nunique() == 2 for i in range(X.shape[1])]
+    prop = [numeric[i] and X.iloc[:, i].nunique() == 2 for i in range(X.shape[1])]
 
     cont_cols = list(X.loc[:, cont].columns)
     prop_cols = list(X.loc[:, prop].columns)
@@ -1106,7 +1113,7 @@ def _get_numeric_vars(X, threshold=5):
 
     if dropped:
         logger.info(
-            'Some non-binary variables were dropped because they had fewer than {} unique values or were of the \
+            'Some variables were dropped because they were not numeric, had fewer than {} unique values, or were of the \
                      dtype "cat". The dropped variables are: {}'.format(
                 threshold, dropped
             )
