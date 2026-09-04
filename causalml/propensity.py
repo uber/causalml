@@ -179,8 +179,17 @@ class GradientBoostedPropensityModel(PropensityModel):
                 so this vector must be the treatment assignment.
         """
         if self.early_stop:
+            # Seed the split with the same random_state the underlying
+            # XGBClassifier resolves to, so that early stopping -- and
+            # therefore the fitted model -- is reproducible. Stratify on the
+            # treatment indicator so the validation set retains both arms,
+            # matching how the rest of the library splits on treatment.
             X_train, X_val, y_train, y_val = train_test_split(
-                X, y, test_size=stop_val_size
+                X,
+                y,
+                test_size=stop_val_size,
+                random_state=self.model_kwargs.get("random_state", 42),
+                stratify=y,
             )
 
             self.model.fit(
