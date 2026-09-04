@@ -1,5 +1,7 @@
 import numpy as np
+import pytest
 
+from causalml import propensity
 from causalml.propensity import (
     ElasticNetPropensityModel,
     GradientBoostedPropensityModel,
@@ -69,6 +71,45 @@ def test_gradientboosted_propensity_model_earlystopping(generate_regression_data
     ps = pm.fit_predict(X, treatment)
 
     assert roc_auc_score(treatment, ps) > 0.5
+
+
+def test_gradientboosted_propensity_model_earlystopping_reproducible(
+    generate_regression_data,
+):
+    """Early stopping is reproducible: the validation split is seeded (#1045)."""
+    y, X, treatment, tau, b, e = generate_regression_data()
+
+    def fit_predict(random_state):
+        pm = GradientBoostedPropensityModel(random_state=random_state, early_stop=True)
+        return pm.fit_predict(X, treatment)
+
+    np.testing.assert_array_equal(fit_predict(RANDOM_SEED), fit_predict(RANDOM_SEED))
+    # A different seed must still move the split; otherwise the seed would be
+    # ignored in a different way (e.g. a hard-coded constant).
+    assert not np.array_equal(fit_predict(RANDOM_SEED), fit_predict(RANDOM_SEED + 1))
+
+
+def test_gradientboosted_propensity_model_earlystopping_stratified(monkeypatch):
+    """The early-stopping validation split keeps both treatment arms (#1045)."""
+    rng = np.random.RandomState(RANDOM_SEED)
+    X = rng.normal(size=(400, 10))
+    treatment = (rng.uniform(size=400) < 0.1).astype(int)
+
+    captured = {}
+    train_test_split = propensity.train_test_split
+
+    def spy(*args, **kwargs):
+        split = train_test_split(*args, **kwargs)
+        captured["y_val"] = split[3]
+        return split
+
+    monkeypatch.setattr(propensity, "train_test_split", spy)
+
+    pm = GradientBoostedPropensityModel(random_state=RANDOM_SEED, early_stop=True)
+    pm.fit(X, treatment)
+
+    # Stratification preserves the treatment rate up to rounding.
+    assert captured["y_val"].mean() == pytest.approx(treatment.mean(), abs=0.01)
 
 
 def test_propensity_models_imbalanced_1027():
