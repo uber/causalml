@@ -1,7 +1,10 @@
 import numpy as np
 import pandas as pd
+import pytest
 from numpy import isclose
 from causalml.metrics.classification import logloss
+from causalml.metrics.const import EPS
+from causalml.metrics.regression import mape, smape
 from causalml.metrics.visualize import qini_score
 
 
@@ -46,3 +49,32 @@ def test_logloss_clips_degenerate_predictions():
     p = np.array([0.0, 1.0])
 
     assert np.isfinite(logloss(y, p))
+
+
+def test_mape_on_nonzero_targets():
+    y = np.array([1.0, 2.0, 4.0])
+    p = np.array([1.0, 1.0, 2.0])
+    assert isclose(mape(y, p), np.mean([0.0, 0.5, 0.5]))
+
+
+def test_mape_raises_when_all_targets_are_near_zero():
+    y = np.zeros(8)
+    p = np.zeros(8)
+    with pytest.raises(ValueError, match="mape is undefined"):
+        mape(y, p)
+    with pytest.raises(ValueError, match="mape is undefined"):
+        mape(np.full(4, EPS / 10), np.ones(4))
+
+
+def test_smape_on_typical_inputs():
+    y = np.array([1.0, 2.0])
+    p = np.array([1.0, 1.0])
+    expected = 2.0 * np.mean(np.abs(y - p) / (np.abs(y) + np.abs(p)))
+    assert isclose(smape(y, p), expected)
+
+
+def test_smape_raises_when_all_values_are_near_zero():
+    y = np.zeros(8)
+    p = np.zeros(8)
+    with pytest.raises(ValueError, match="smape is undefined"):
+        smape(y, p)
