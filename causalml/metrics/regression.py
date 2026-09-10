@@ -31,9 +31,16 @@ def mape(y, p):
 
     Returns:
         e (numpy.float64): MAPE
+
+    Raises:
+        ValueError: if every target is within EPS of zero, so MAPE is undefined.
     """
 
+    y = np.asarray(y)
+    p = np.asarray(p)
     filt = np.abs(y) > EPS
+    if not np.any(filt):
+        raise ValueError("mape is undefined when every target is within EPS of zero")
     return np.mean(np.abs(1 - p[filt] / y[filt]))
 
 
@@ -45,8 +52,18 @@ def smape(y, p):
 
     Returns:
         e (numpy.float64): sMAPE
+
+    Raises:
+        ValueError: if every target and prediction is within EPS of zero, so sMAPE is undefined.
     """
-    return 2.0 * np.mean(np.abs(y - p) / (np.abs(y) + np.abs(p)))
+    y = np.asarray(y)
+    p = np.asarray(p)
+    denom = np.abs(y) + np.abs(p)
+    if not np.any(denom > EPS):
+        raise ValueError(
+            "smape is undefined when every target and prediction is within EPS of zero"
+        )
+    return 2.0 * np.mean(np.abs(y - p) / denom)
 
 
 def rmse(y, p):
