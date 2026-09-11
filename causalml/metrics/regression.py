@@ -34,6 +34,11 @@ def mape(y, p):
     """
 
     filt = np.abs(y) > EPS
+    if not filt.any():
+        raise ValueError(
+            "MAPE is undefined when every target is zero or smaller than EPS "
+            f"({EPS}); no element survives the filter."
+        )
     return np.mean(np.abs(1 - p[filt] / y[filt]))
 
 
@@ -46,7 +51,13 @@ def smape(y, p):
     Returns:
         e (numpy.float64): sMAPE
     """
-    return 2.0 * np.mean(np.abs(y - p) / (np.abs(y) + np.abs(p)))
+    denominator = np.abs(y) + np.abs(p)
+    # Where the target and the prediction are both zero the prediction is exact,
+    # and the 0 / 0 term is defined as 0 rather than propagating a NaN.
+    ratio = np.divide(
+        np.abs(y - p), denominator, out=np.zeros_like(denominator, dtype=float), where=denominator > EPS
+    )
+    return 2.0 * np.mean(ratio)
 
 
 def rmse(y, p):
