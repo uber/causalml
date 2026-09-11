@@ -55,7 +55,10 @@ def smape(y, p):
     # Where the target and the prediction are both zero the prediction is exact,
     # and the 0 / 0 term is defined as 0 rather than propagating a NaN.
     ratio = np.divide(
-        np.abs(y - p), denominator, out=np.zeros_like(denominator, dtype=float), where=denominator > EPS
+        np.abs(y - p),
+        denominator,
+        out=np.zeros_like(denominator, dtype=float),
+        where=denominator > EPS,
     )
     return 2.0 * np.mean(ratio)
 
