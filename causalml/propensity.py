@@ -179,8 +179,18 @@ class GradientBoostedPropensityModel(PropensityModel):
                 so this vector must be the treatment assignment.
         """
         if self.early_stop:
+            # Same seed as the classifier (see _model), and stratified on
+            # treatment so the validation set keeps both arms. stratify needs
+            # at least two members per class, so fall back to a plain split
+            # for degenerate treatment vectors.
+            _, class_counts = np.unique(y, return_counts=True)
+            stratify = y if class_counts.min() >= 2 else None
             X_train, X_val, y_train, y_val = train_test_split(
-                X, y, test_size=stop_val_size
+                X,
+                y,
+                test_size=stop_val_size,
+                random_state=self.model_kwargs.get("random_state", 42),
+                stratify=stratify,
             )
 
             self.model.fit(
