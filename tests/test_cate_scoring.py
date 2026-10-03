@@ -145,7 +145,7 @@ def test_dr_score_shares_pseudo_outcomes_with_rate_score(synthetic_data):
 
 def test_dr_score_missing_X_and_pseudo_outcome_raises(synthetic_data):
     df, _ = synthetic_data
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         dr_score(df, treatment_col="w", outcome_col="y")
 
 
@@ -231,7 +231,7 @@ def test_plug_in_t_score_return_ci_returns_dataframe(synthetic_data):
 
 def test_plug_in_t_score_missing_columns_raises(synthetic_data):
     df, X = synthetic_data
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         plug_in_t_score(df.drop(columns=["w"]), X, treatment_col="w", outcome_col="y")
 
 
@@ -380,7 +380,7 @@ def test_rlearner_score_with_precomputed_residuals(synthetic_data):
 
 def test_rlearner_score_missing_X_and_residuals_raises(synthetic_data):
     df, _ = synthetic_data
-    with pytest.raises(AssertionError):
+    with pytest.raises(ValueError):
         rlearner_score(df, treatment_col="w", outcome_col="y")
 
 
