@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from joblib import Parallel, delayed
 from sklearn.base import BaseEstimator, clone
+from sklearn.utils import check_random_state
 from tqdm import tqdm
 
 from causalml.inference.meta.explainer import Explainer
@@ -37,7 +38,7 @@ def _fit_bootstrap_clone(learner_template, X, treatment, y, p, seed, bootstrap_s
     Returns:
         A fitted clone of learner_template trained on a bootstrap sample.
     """
-    rng = np.random.RandomState(seed)
+    rng = check_random_state(seed)
     idxs = rng.choice(np.arange(n_rows(X)), size=bootstrap_size)
 
     X_b = filter_index(X, idxs)
@@ -125,7 +126,7 @@ class BaseLearner(SerializableLearner, BaseEstimator, metaclass=ABCMeta):
             y (np.array): an outcome vector (numpy)
             p (dict, optional): a dict of {treatment group: propensity scores (numpy)}
             size (int, optional): number of samples to draw with replacement
-            rng (np.random.Generator, optional): random number generator for
+            rng (np.random.Generator or np.random.RandomState, optional): random number generator for
                 deterministic resampling
         Returns:
             (numpy.ndarray): Predictions of treatment effects on the full X
@@ -177,13 +178,13 @@ class BaseLearner(SerializableLearner, BaseEstimator, metaclass=ABCMeta):
             p: propensity scores, passed through to fit() if provided
             n_bootstraps (int, optional): number of bootstrap iterations. Default: 200.
             bootstrap_size (int, optional): number of samples per bootstrap. Default: 10000.
-            random_state (int, optional): random seed for reproducibility.
+            random_state (int, RandomState instance, or None, optional): random seed for reproducibility.
             n_jobs (int, optional): number of parallel jobs. -1 uses all cores. Default: 1.
         """
         # clone(self) is now a proper sklearn clone — unfitted and cheap.
         unfitted_template = clone(self)
 
-        rng = np.random.RandomState(random_state)
+        rng = check_random_state(random_state)
         seeds = rng.randint(0, np.iinfo(np.int32).max, size=n_bootstraps)
         logger.info("Storing bootstrap ensemble ({} iterations)".format(n_bootstraps))
 
