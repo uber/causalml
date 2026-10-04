@@ -33,7 +33,7 @@ dependencies = [
     "statsmodels>=0.14.5",
     "seaborn",
     "xgboost",
-    "pydotplus",
+    "pydot>=3.0.0",
     "tqdm",
     "shap",
     "dill",
