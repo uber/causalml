@@ -8,7 +8,7 @@ from typing import Union
 
 import matplotlib.pyplot as plt
 import numpy as np
-import pydotplus
+import pydot
 import seaborn as sns
 from sklearn.tree import _tree
 from sklearn.tree._export import _MPLTreeExporter, _color_brew
@@ -81,7 +81,7 @@ def uplift_tree_plot(decisionTree, x_names):
 
     Returns
     -------
-    Dot class representing the tree graph.
+    pydot.Dot representing the tree graph.
     """
 
     # Column Heading
@@ -287,7 +287,7 @@ def uplift_tree_plot(decisionTree, x_names):
             indexOfLevel += 1
     lsDot.append("}")
     dot_data = "\n".join(lsDot)
-    graph = pydotplus.graph_from_dot_data(dot_data)
+    (graph,) = pydot.graph_from_dot_data(dot_data)
     return graph
 
 

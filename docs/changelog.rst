@@ -149,6 +149,13 @@ Bug Fixes
   by the same rows either way, so the values transfer unchanged; the remap replays the
   pruner's traversal and matches a full recomputation exactly.
 
+* **`uplift_tree_plot` failed with pyparsing 3.3.3 (#1052).** Its graph was parsed by
+  ``pydotplus``, unmaintained since 2014, whose parser raises ``TypeError`` on the
+  HTML-style node labels the function writes once pyparsing 3.3.3 is installed. The
+  dependency is now `pydot <https://github.com/pydot/pydot>`__, the maintained library
+  ``pydotplus`` was forked from; the returned ``pydot.Dot`` has the same
+  ``create_png()`` / ``write_png()`` methods.
+
 Behavior Changes
 ~~~~~~~~~~~~~~~~
 * **`CausalTreeRegressor` and `CausalRandomForestRegressor` now estimate leaves honestly by
