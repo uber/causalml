@@ -71,3 +71,45 @@ def test_plot_tmlegain(generate_regression_data, monkeypatch):
         cv=kf,
         ci=False,
     )
+
+
+def test_get_std_diffs_skips_non_numeric_covariates():
+    """A string covariate has no mean, so it belongs in the dropped set.
+
+    Before, any column with enough distinct values was classified as
+    continuous whatever its dtype, and the diagnostic died inside numpy with
+    "ufunc 'divide' not supported for the input types" rather than reporting
+    the balance of the columns it could measure.
+    """
+    from causalml.metrics.visualize import _get_numeric_vars, get_std_diffs
+
+    rng = np.random.RandomState(42)
+    n = 50
+    X = pd.DataFrame(
+        {
+            "age": rng.normal(size=n),
+            "group": rng.choice(list("abcdef"), size=n),
+            "flag": rng.randint(0, 2, size=n),
+        }
+    )
+    w = pd.Series(rng.randint(0, 2, size=n))
+
+    cont_cols, prop_cols = _get_numeric_vars(X)
+    assert cont_cols == ["age"]
+    assert prop_cols == ["flag"]
+
+    std_diffs = get_std_diffs(X, w)
+    assert list(std_diffs.index) == ["age", "flag"]
+    assert np.isfinite(std_diffs.values).all()
+
+
+def test_get_std_diffs_errors_when_no_covariate_is_usable():
+    from causalml.metrics.visualize import get_std_diffs
+
+    rng = np.random.RandomState(42)
+    n = 20
+    X = pd.DataFrame({"group": rng.choice(list("abcdef"), size=n)})
+    w = pd.Series(rng.randint(0, 2, size=n))
+
+    with pytest.raises(ValueError):
+        get_std_diffs(X, w)
