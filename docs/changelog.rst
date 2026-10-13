@@ -5,8 +5,22 @@ Changelog
 
 You can find the latest changes in the `GitHub releases <https://github.com/uber/causalml/releases>`_
 
-Unreleased
-----------
+0.18.0 (Oct 2026)
+-----------------
+* **Deprecates positional** ``treatment`` **and** ``y`` ahead of the v1.0 switch to
+  ``fit(X, y, treatment, ...)`` (#854). Positional order is unchanged in this release;
+  see the :ref:`migration guide <fit-argument-order>`.
+* **Causal trees and forests estimate leaves honestly by default** (#584), and a single
+  ``CausalTreeRegressor`` can select its size by cross-validation with ``ccp_alpha="cv"``.
+* **Uplift trees and forests run on the shared Cython tree kernel** (#945), with native
+  missing-value support.
+* **New evaluation tools:** benchmark dataset loaders and ground-truth metrics,
+  ``dr_score`` / ``plug_in_t_score`` / ``rlearner_score``, bootstrap confidence intervals
+  for ``auuc_score`` / ``qini_score``, and Marginal Sensitivity Model bounds for the ATE.
+* **Model** ``save()`` / ``load()`` with version metadata, a JAX backend for CEVAE, and
+  ``XGBTClassifier`` / ``XGBRClassifier``.
+* **A rebuilt documentation site**, with an end-to-end tutorial, an estimator guide and
+  an FAQ.
 
 New Features
 ~~~~~~~~~~~~
@@ -29,6 +43,8 @@ New Features
   ``docs/examples/benchmark_leaderboard.ipynb`` is the leaderboard itself: running it
   end to end regenerates every published number. It reports three tables rather than
   one, because what is measurable is a property of how each dataset was made.
+
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/1015
 
 * **`CausalTreeRegressor` and `CausalRandomForestRegressor` accept** ``ccp_alpha="cv"``
   **(#584).** ``honesty=True`` supplies held-out leaf estimation; this setting adds the
@@ -86,6 +102,8 @@ New Features
   ``ccp_alpha="cv"`` requires ``honesty=True`` and raises otherwise, since the
   cross-validation scores candidate subtrees with the honest objective.
 
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/1001
+
 * **`CausalTreeRegressor.estimate_ate` and `BaseDRIVLearner.estimate_ate` accept**
   ``pretrain`` **(#517).** ``pretrain=True`` estimates from the already-fitted model
   instead of refitting on ``X``, so the rows passed in can be held out from the fit.
@@ -101,6 +119,8 @@ New Features
   ``BaseDRIVLearner`` requires ``p`` when ``pretrain=True``: the propensity stored by
   ``fit`` is indexed by the rows it was fit on, while the standard error indexes it by
   the rows passed here. ``assignment`` and ``pZ`` are only used to fit and go unused.
+
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/1024
 
 * **`UpliftTreeClassifier` can prune inside** ``fit`` **(#1003).** ``prune_fraction``
   (default ``None``, off) holds out that fraction of the rows stratified on
@@ -125,6 +145,38 @@ New Features
   ``prune_fraction=0.3``, and to 0.83 combined with ``honesty=True``. One simulated
   design, so the magnitudes are indicative.
 
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/1004
+
+Also in this release:
+
+* Add a model serialization API (``save()`` / ``load()`` / ``load_learner``) with version metadata to the meta-learners by @genrichez in https://github.com/uber/causalml/pull/929
+* Extend serialization to the causal and uplift trees and forests, ``BaseDRIVLearner`` and ``IVRegressor`` by @genrichez in https://github.com/uber/causalml/pull/932
+* Add ``dr_score()`` and ``plug_in_t_score()`` for evaluating CATE models without ground truth by @aman-coder03 in https://github.com/uber/causalml/pull/930
+* Add ``rlearner_score()`` (R-loss) for CATE model evaluation, matching EconML's ``RScorer`` by @aman-coder03 in https://github.com/uber/causalml/pull/935
+* Add bootstrap confidence intervals to ``auuc_score()`` and ``qini_score()`` by @ipezygj in https://github.com/uber/causalml/pull/994
+* Add ``SensitivityMSM``: ATE bounds under the Marginal Sensitivity Model by @aman-coder03 in https://github.com/uber/causalml/pull/925
+* Improve ``SensitivityMSM`` robustness and test coverage by @aman-coder03 in https://github.com/uber/causalml/pull/933
+* Add ``return_components`` to the R-learner's ``predict()`` and ``fit_predict()`` by @aman-coder03 in https://github.com/uber/causalml/pull/923
+* Add ``XGBTClassifier`` and ``XGBRClassifier`` meta-learners (#824) by @jeongyoonlee in https://github.com/uber/causalml/pull/942
+* Add a JAX/flax.nnx backend for CEVAE by @xrhd in https://github.com/uber/causalml/pull/957
+* Expose matched index pairs as ``NearestNeighborMatch.matched_indexes_`` (#621), reimplementing @jbbqqf's #897 by @jeongyoonlee in https://github.com/uber/causalml/pull/940
+* Add node p-value display to ``plot_causal_tree`` (#805) by @genrichez in https://github.com/uber/causalml/pull/976
+
+Tree Unification (#945)
+~~~~~~~~~~~~~~~~~~~~~~~
+* Kernel-backed uplift criteria (KL/ED/Chi) with legacy parity (#946) by @jeongyoonlee in https://github.com/uber/causalml/pull/959
+* Add uplift split regularization (``n_reg`` / ``min_samples_treatment``) to the kernel tree (#947) by @jeongyoonlee in https://github.com/uber/causalml/pull/961
+* Kernel uplift normalization + CTS (#948) and two-class criteria DDP/IT/CIT (#949) by @jeongyoonlee in https://github.com/uber/causalml/pull/965
+* Add the honest approach and the IDDP criterion to the kernel uplift tree (#950) by @jeongyoonlee in https://github.com/uber/causalml/pull/964
+* Add validation-based pruning to the kernel uplift tree (#951) by @jeongyoonlee in https://github.com/uber/causalml/pull/966
+* Add a kernel-backed uplift random forest (#952) by @jeongyoonlee in https://github.com/uber/causalml/pull/967
+* Make ``plot.py`` work with the kernel uplift tree (#953) by @jeongyoonlee in https://github.com/uber/causalml/pull/968
+* Serialization and ``BaseEstimator`` conformance for the kernel uplift classes (#954) by @jeongyoonlee in https://github.com/uber/causalml/pull/971
+* Add a kernel-vs-legacy uplift tree parity notebook by @jeongyoonlee in https://github.com/uber/causalml/pull/969
+* Native missing-value (NaN) support for the kernel uplift and causal trees by @jeongyoonlee in https://github.com/uber/causalml/pull/972
+* Share the tree kernel: hoist the group criterion base and unify the builders by @jeongyoonlee in https://github.com/uber/causalml/pull/974
+* Switch the public uplift trees to the kernel backend and delete ``uplift.pyx`` (#955) by @jeongyoonlee in https://github.com/uber/causalml/pull/973
+
 Bug Fixes
 ~~~~~~~~~
 * **`CausalTreeRegressor.estimate_ate` understated the standard error (#1006).** The
@@ -140,6 +192,8 @@ Bug Fixes
   fits and estimates on the same rows (#517). Point estimates are unchanged; only the
   interval moves, and it is wider.
 
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/1007
+
 * **`UpliftTreeClassifier.prune` left `_node_group_counts` stale (#1003).** ``prune()``
   replaced ``tree_`` without rebuilding the per-node group counts, which are indexed by
   node id and read by the uplift-score p-value and the plot's ``group_size``. The stale
@@ -148,6 +202,35 @@ Bug Fixes
   standalone call is fixed too, not only the fit-time path. A surviving node is reached
   by the same rows either way, so the values transfer unchanged; the remap replays the
   pruner's traversal and matches a full recomputation exactly.
+
+* **`uplift_tree_plot` failed with pyparsing 3.3.3 (#1052).** Its graph was parsed by
+  ``pydotplus``, unmaintained since 2014, whose parser raises ``TypeError`` on the
+  HTML-style node labels the function writes once pyparsing 3.3.3 is installed. The
+  dependency is now `pydot <https://github.com/pydot/pydot>`__, the maintained library
+  ``pydotplus`` was forked from; the returned ``pydot.Dot`` has the same
+  ``create_png()`` / ``write_png()`` methods.
+
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/1053
+
+* **macOS without the OpenMP runtime now reports an actionable error (#908).**
+  The installation guide now documents the required OpenMP runtime and
+  installation options. By @su-jin1425 in https://github.com/uber/causalml/pull/1005
+
+* Fix ``LRSRegressor.estimate_ate`` raising ``KeyError`` on DataFrame input (#1026) by @su-jin1425 in https://github.com/uber/causalml/pull/1031
+* Thread ``random_state`` to ``BaseRLearner`` bootstraps (#1029) by @su-jin1425 in https://github.com/uber/causalml/pull/1032
+* Accept ``RandomState`` instances as the meta-learners' ``random_state`` (#1035) by @su-jin1425 in https://github.com/uber/causalml/pull/1040
+* Supply a default LightGBM outcome learner in the public ``cate_scoring`` functions (#1028) by @su-jin1425 in https://github.com/uber/causalml/pull/1030
+* Give ``rlearner_score`` a default outcome learner, and raise ``ValueError`` instead of asserting in the CATE scoring functions (#1034) by @su-jin1425 in https://github.com/uber/causalml/pull/1039
+* Seed and stratify ``GradientBoostedPropensityModel``'s early-stopping validation split (#1045) by @ismailvc1111 in https://github.com/uber/causalml/pull/1051
+* Use a custom ``propensity_learner`` on the R-learner's first fit by @arpitjain099 in https://github.com/uber/causalml/pull/937
+* Raise in ``mape`` when every target is near zero, and define ``smape``'s 0/0 term as 0 (#1047) by @arpitjain099 in https://github.com/uber/causalml/pull/1050
+* Stop ``logloss`` from clipping the caller's prediction array in place by @arpitjain099 in https://github.com/uber/causalml/pull/943
+* Fix NaN scores in ``FilterSelect``'s KL filter when a bin has no treated converters by @arpitjain099 in https://github.com/uber/causalml/pull/999
+* Take the exact KL limits at ``pk = 0`` and ``pk = 1`` instead of clamping by @arpitjain099 in https://github.com/uber/causalml/pull/1000
+* Validate a binary outcome in ``filter_LR`` / ``filter_D`` (#349) by @jeongyoonlee in https://github.com/uber/causalml/pull/941
+* Fix the ``ATE`` column filled with NaN in ``SensitivitySelectionBias.summary`` by @arpitjain099 in https://github.com/uber/causalml/pull/958
+* Fix a ``NearestNeighborMatch`` crash when the control pool runs below ``ratio`` by @arpitjain099 in https://github.com/uber/causalml/pull/934
+* Preserve the decorated function's name, docstring and signature in ``timeit`` by @jeongyoonlee in https://github.com/uber/causalml/pull/987
 
 Behavior Changes
 ~~~~~~~~~~~~~~~~
@@ -177,6 +260,8 @@ Behavior Changes
   fit and the leaf re-estimation, so this is not the subsample-without-replacement scheme
   of :cite:`athey2019generalized`.
 
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/1001
+
 * **`UpliftRandomForestClassifier` now defaults to** ``n_jobs=None`` **(one worker) instead of**
   ``n_jobs=-1`` **(#991).** Trees are fitted in parallel and each concurrent fit holds its own
   working set, so peak memory grew in proportion to the machine's core count — the same fit
@@ -191,6 +276,8 @@ Behavior Changes
   This matches ``CausalRandomForestRegressor`` and scikit-learn's forests, which use the same
   across-trees parallelism and default to serial.
 
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/992
+
 * **`causalml.features.load_data` now returns** ``numpy.ndarray`` **instead of**
   ``numpy.matrix`` **(#978).** This was the only function in the package that returned a
   ``numpy.matrix``. Code that relied on matrix semantics — ``*`` as matrix multiplication,
@@ -202,6 +289,29 @@ Behavior Changes
   no columns: with an all-numeric feature list, a constant categorical column, or a
   high-cardinality column whose levels all fall below ``min_obs``. All three now return a
   feature matrix instead of raising (#978, #979).
+
+  By @arpitjain099 in https://github.com/uber/causalml/pull/978 and https://github.com/uber/causalml/pull/979
+
+* **The default propensity models produce different scores (#1027).**
+  ``ElasticNetPropensityModel`` and ``LogisticRegressionPropensityModel`` now select the
+  regularization strength by log-loss over a wider grid: the previous grid held only
+  ``C >= 1`` and the default accuracy scoring could not tell candidates apart on
+  imbalanced treatment, so on IHDP the model collapsed to the treated share. Also,
+  ``GradientBoostedPropensityModel`` defaults to ``max_depth=3`` instead of ``8``, which
+  had fit the training data almost perfectly and pushed scores to the clip bounds. With
+  ``early_stop=True`` its validation split is now seeded and stratified, so a fixed
+  ``random_state`` gives the same scores on every fit. Any estimate built on a default
+  propensity model moves. By @arpitjain099 in https://github.com/uber/causalml/pull/944,
+  @su-jin1425 in https://github.com/uber/causalml/pull/1033 and @ismailvc1111 in
+  https://github.com/uber/causalml/pull/1051
+
+* **`UpliftTreeClassifier` and `UpliftRandomForestClassifier` run on the shared tree
+  kernel (#955).** Names, arguments, defaults and the ``predict`` output shape are kept.
+  ``fit``'s ``X_val`` / ``treatment_val`` / ``y_val`` and
+  ``early_stopping_eval_diff_scale`` are accepted but ignored, with a ``UserWarning``,
+  because the kernel has no validation-set early stopping; for validation-based pruning,
+  use ``prune_fraction`` (above). ``DecisionTree`` stays importable behind a ``DeprecationWarning``.
+  By @jeongyoonlee in https://github.com/uber/causalml/pull/973
 
 Deprecations
 ~~~~~~~~~~~~
@@ -225,11 +335,38 @@ Deprecations
 
   By @jeongyoonlee in https://github.com/uber/causalml/pull/975
 
-Bug Fixes
-~~~~~~~~~
-* **macOS without the OpenMP runtime now reports an actionable error (#908).**
-  The installation guide now documents the required OpenMP runtime and
-  installation options.
+Breaking Changes
+~~~~~~~~~~~~~~~~
+* **`BaseSLearner.estimate_ate` always returns** ``(ate, lb, ub)`` **and no longer accepts**
+  ``return_ci`` **(#1026).** It previously returned the bare ATE unless
+  ``return_ci=True``, unlike the T-, X- and R-learners, which always return the triple.
+  ``ate = learner.estimate_ate(...)`` now binds a tuple, and passing ``return_ci`` raises
+  ``TypeError``. Unpack the result instead: ``ate, lb, ub = learner.estimate_ate(...)``.
+  By @su-jin1425 in https://github.com/uber/causalml/pull/1031
+
+Documentation
+~~~~~~~~~~~~~
+* Switch the docs theme to pydata-sphinx-theme by @jeongyoonlee in https://github.com/uber/causalml/pull/1014
+* Fix broken references and drop internal files from ``docs/`` by @jeongyoonlee in https://github.com/uber/causalml/pull/1016
+* Correctness pass over the published pages, and a five-section structure by @jeongyoonlee in https://github.com/uber/causalml/pull/1018
+* Take the docs build to zero warnings and fail on new ones by @jeongyoonlee in https://github.com/uber/causalml/pull/1020
+* Document honest estimation and pruning in the methodology by @jeongyoonlee in https://github.com/uber/causalml/pull/1021
+* Group the example notebooks by topic by @jeongyoonlee in https://github.com/uber/causalml/pull/1022
+* Order the validation page as an evaluation workflow by @jeongyoonlee in https://github.com/uber/causalml/pull/1023
+* Add the IHDP tutorial, choosing-an-estimator guide, FAQ and uncertainty catalog by @jeongyoonlee in https://github.com/uber/causalml/pull/1025
+* Document DragonNet and CEVAE in the methodology (#417) by @jeongyoonlee in https://github.com/uber/causalml/pull/998
+* Add CatBoost documentation and test coverage for the Explainer by @aman-coder03 in https://github.com/uber/causalml/pull/924
+* Add the ``fit()`` argument-order migration guide (#984) by @jeongyoonlee in https://github.com/uber/causalml/pull/990
+* Publish the release schedule and the #854 deprecation window by @jeongyoonlee in https://github.com/uber/causalml/pull/993
+* Record the ``load_data`` return-type change in the changelog by @jeongyoonlee in https://github.com/uber/causalml/pull/996
+
+Build / CI
+~~~~~~~~~~
+* Run the optional-backend tests on pull requests by @mohsinm-dev in https://github.com/uber/causalml/pull/977
+* Fail the suite on causalml's own arg-order ``FutureWarning`` (#995) by @jeongyoonlee in https://github.com/uber/causalml/pull/997
+* Stop the #854 shim warning on causalml's own internal ``fit`` calls by @jeongyoonlee in https://github.com/uber/causalml/pull/988
+* Migrate tests and docs to keyword ``fit`` / ``predict`` calls (#982, #983) by @jeongyoonlee in https://github.com/uber/causalml/pull/989
+* Filter caught warnings by category in the serialization tests by @jeongyoonlee in https://github.com/uber/causalml/pull/1002
 
 Release Schedule
 ~~~~~~~~~~~~~~~~
@@ -242,7 +379,7 @@ Quarterly, targeting:
      - Target
      - Argument order
    * - 0.18.0
-     - September 2026
+     - October 2026
      - ``fit(X, treatment, y, ...)`` — deprecation warning added
    * - 0.19.0
      - December 2026

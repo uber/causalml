@@ -48,7 +48,7 @@ scikit-learn convention.
 What happens when
 -----------------
 
-**0.18.0 (September 2026), the release that ships this guide.** Positional order
+**0.18.0 (October 2026), the release that ships this guide.** Positional order
 is *unchanged*. Passing ``treatment`` or ``y`` positionally emits a
 ``FutureWarning`` pointing here. Nothing breaks.
 

@@ -6,7 +6,7 @@
 
 [![PyPI Version](https://badge.fury.io/py/causalml.svg)](https://pypi.org/project/causalml/)
 [![Build Status](https://github.com/uber/causalml/actions/workflows/python-test.yaml/badge.svg)](https://github.com/uber/causalml/actions/workflows/python-test.yaml)
-[![Documentation Status](https://readthedocs.org/projects/causalml/badge/?version=latest)](http://causalml.readthedocs.io/en/latest/?badge=latest)
+[![Documentation Status](https://readthedocs.org/projects/causalml/badge/?version=stable)](https://causalml.readthedocs.io/en/stable/?badge=stable)
 [![Downloads](https://static.pepy.tech/badge/causalml)](https://pepy.tech/project/causalml)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/3015/badge)](https://bestpractices.coreinfrastructure.org/projects/3015)
 
@@ -30,35 +30,35 @@ research [[1]](#Literature). It provides a standard interface that allows user t
 
 Documentation is available at https://causalml.readthedocs.io/. Good places to start:
 
-* [Estimating and Validating Heterogeneous Treatment Effects](https://causalml.readthedocs.io/en/latest/tutorial.html): an end-to-end walkthrough that trains one estimator per family and shows how to decide which one to believe
-* [Choosing an Estimator](https://causalml.readthedocs.io/en/latest/choosing_an_estimator.html): a decision path and capability matrix over the estimators
-* [FAQ](https://causalml.readthedocs.io/en/latest/faq.html): answers to common installation and usage questions
+* [Estimating and Validating Heterogeneous Treatment Effects](https://causalml.readthedocs.io/en/stable/tutorial.html): an end-to-end walkthrough that trains one estimator per family and shows how to decide which one to believe
+* [Choosing an Estimator](https://causalml.readthedocs.io/en/stable/choosing_an_estimator.html): a decision path and capability matrix over the estimators
+* [FAQ](https://causalml.readthedocs.io/en/stable/faq.html): answers to common installation and usage questions
 
 
 # Installation
 
 Installation instructions are available at:
 
-https://causalml.readthedocs.io/en/latest/installation.html
+https://causalml.readthedocs.io/en/stable/installation.html
 
 
 # Quickstart
 
 Quickstarts with code-snippets are available at:
 
-https://causalml.readthedocs.io/en/latest/quickstart.html
+https://causalml.readthedocs.io/en/stable/quickstart.html
 
 
 # Example Notebooks
 
 Example notebooks are available at:
 
-https://causalml.readthedocs.io/en/latest/examples.html
+https://causalml.readthedocs.io/en/stable/examples.html
 
 
 # Benchmark Datasets and Leaderboard
 
-CausalML ships loaders for the standard causal inference benchmarks (LaLonde, IHDP, Twins) with SHA256-verified downloads, plus the ground-truth metrics (PEHE, ATE error, policy risk) they enable. See the [benchmark datasets](https://causalml.readthedocs.io/en/latest/datasets.html) page for each dataset's provenance and terms, and the [leaderboard notebook](https://causalml.readthedocs.io/en/latest/examples/benchmark_leaderboard.html), which regenerates every published number end to end.
+CausalML ships loaders for the standard causal inference benchmarks (LaLonde, IHDP, Twins) with SHA256-verified downloads, plus the ground-truth metrics (PEHE, ATE error, policy risk) they enable. See the [benchmark datasets](https://causalml.readthedocs.io/en/stable/datasets.html) page for each dataset's provenance and terms, and the [leaderboard notebook](https://causalml.readthedocs.io/en/stable/examples/benchmark_leaderboard.html), which regenerates every published number end to end.
 
 
 # Contributing
@@ -79,7 +79,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](https:
 # References
 
 ## Documentation
-* [Causal ML API reference](https://causalml.readthedocs.io/en/latest/causalml.html)
+* [Causal ML API reference](https://causalml.readthedocs.io/en/stable/causalml.html)
 
 ## Workshops, Talks, and Publications
 * (Workshop) [3rd Workshop on Causal Inference and Machine Learning in Practice](https://causal-machine-learning.github.io/kdd2025-workshop/) at KDD 2025
