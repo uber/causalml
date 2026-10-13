@@ -61,7 +61,7 @@ def compute_dr_pseudo_outcomes(
     y,
     p=None,
     learner=LGBMRegressor(
-        num_leaves=31, learning_rate=0.05, n_estimators=300, verbose=-1
+        num_leaves=64, learning_rate=0.05, n_estimators=100, verbose=-1
     ),
     control_outcome_learner=None,
     treatment_outcome_learner=None,
@@ -273,7 +273,7 @@ def dr_score(
     pseudo_outcome_col=None,
     p=None,
     learner=LGBMRegressor(
-        num_leaves=31, learning_rate=0.05, n_estimators=300, verbose=-1
+        num_leaves=64, learning_rate=0.05, n_estimators=100, verbose=-1
     ),
     control_outcome_learner=None,
     treatment_outcome_learner=None,
@@ -405,7 +405,7 @@ def plug_in_t_score(
     treatment_col="w",
     outcome_col="y",
     learner=LGBMRegressor(
-        num_leaves=31, learning_rate=0.05, n_estimators=300, verbose=-1
+        num_leaves=64, learning_rate=0.05, n_estimators=100, verbose=-1
     ),
     control_outcome_learner=None,
     treatment_outcome_learner=None,
@@ -513,7 +513,7 @@ def rlearner_score(
     y_residual_col=None,
     w_residual_col=None,
     outcome_learner=LGBMRegressor(
-        num_leaves=64, learning_rate=0.05, n_estimators=300, verbose=-1
+        num_leaves=64, learning_rate=0.05, n_estimators=100, verbose=-1
     ),
     propensity_learner=None,
     n_folds=5,

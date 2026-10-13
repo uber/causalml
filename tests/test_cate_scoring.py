@@ -563,6 +563,19 @@ def test_plug_in_t_score_without_learner(synthetic_data):
     assert result["perfect_model"] < result["noisy_model"] < result["bad_model"]
 
 
+def test_rlearner_score_without_learner(synthetic_data):
+    df, X = synthetic_data
+    result = rlearner_score(
+        df,
+        X=X,
+        outcome_col="y",
+        treatment_col="w",
+        random_state=RANDOM_SEED,
+    )
+    assert result is not None
+    assert result["perfect_model"] < result["noisy_model"] < result["bad_model"]
+
+
 def test_dr_score_missing_one_learner(synthetic_data):
     df, X = synthetic_data
     with pytest.raises(
