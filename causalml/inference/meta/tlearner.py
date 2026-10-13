@@ -155,7 +155,9 @@ class BaseTLearner(BaseLearner):
                 y=y_np,
                 n_bootstraps=n_bootstraps,
                 bootstrap_size=bootstrap_size,
-                random_state=random_state,
+                random_state=(
+                    random_state if random_state is not None else self.random_state
+                ),
                 n_jobs=n_jobs,
             )
         else:
@@ -550,7 +552,7 @@ class BaseTClassifier(BaseTLearner):
 
 class XGBTRegressor(BaseTRegressor):
     def __init__(
-        self, ate_alpha=0.05, control_name=0, random_state=None, *args, **kwargs
+        self, ate_alpha=0.05, control_name=0, *args, random_state=None, **kwargs
     ):
         """Initialize a T-learner with two XGBoost models."""
         super().__init__(
@@ -563,7 +565,7 @@ class XGBTRegressor(BaseTRegressor):
 
 class MLPTRegressor(BaseTRegressor):
     def __init__(
-        self, ate_alpha=0.05, control_name=0, random_state=None, *args, **kwargs
+        self, ate_alpha=0.05, control_name=0, *args, random_state=None, **kwargs
     ):
         """Initialize a T-learner with two MLP models."""
         super().__init__(
@@ -583,7 +585,7 @@ class XGBTClassifier(BaseTClassifier):
     """
 
     def __init__(
-        self, ate_alpha=0.05, control_name=0, random_state=None, xgb_kwargs=None
+        self, ate_alpha=0.05, control_name=0, xgb_kwargs=None, random_state=None
     ):
         """Initialize a T-learner classifier with two XGBoost models.
 
@@ -592,6 +594,8 @@ class XGBTClassifier(BaseTClassifier):
             control_name (str or int, optional): name of control group
             xgb_kwargs (dict, optional): keyword arguments forwarded verbatim to each
                 ``XGBClassifier``, e.g. ``xgb_kwargs={'max_depth': 4, 'learning_rate': 0.05}``.
+            random_state (int, RandomState instance or None, optional): random seed
+                for reproducible bootstrap sampling.
 
         Note: all arguments are stored verbatim (scikit-learn convention) so that
         ``get_params`` / ``clone`` work correctly. ``XGBClassifier`` construction
