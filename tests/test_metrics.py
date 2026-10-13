@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
+import pytest
 from numpy import isclose
 from causalml.metrics.classification import logloss
+from causalml.metrics.regression import mape, smape
 from causalml.metrics.visualize import qini_score
 
 
@@ -46,3 +48,43 @@ def test_logloss_clips_degenerate_predictions():
     p = np.array([0.0, 1.0])
 
     assert np.isfinite(logloss(y, p))
+
+
+def test_mape_raises_when_every_target_is_zero():
+    y = np.zeros(100)
+    p = np.zeros(100)
+
+    with pytest.raises(ValueError):
+        mape(y, p)
+
+
+def test_mape_ignores_zero_targets_but_keeps_the_rest():
+    y = np.array([0.0, 2.0, 0.0, 8.0])
+    p = np.array([0.0, 1.8, 0.5, 7.0])
+
+    # Only the two non-zero targets contribute: |1 - 1.8/2| and |1 - 7/8|.
+    assert isclose(mape(y, p), 0.1125)
+
+
+def test_smape_is_zero_when_target_and_prediction_are_both_zero():
+    y = np.zeros(100)
+    p = np.zeros(100)
+
+    # A zero prediction for a zero target is exact, not undefined.
+    assert smape(y, p) == 0.0
+
+
+def test_smape_does_not_nan_on_a_single_zero_pair():
+    y = np.array([0.0, 2.0, 0.0, 8.0])
+    p = np.array([0.0, 1.8, 0.5, 7.0])
+
+    result = smape(y, p)
+    assert not np.isnan(result)
+    assert isclose(result, 0.5596491228070176)
+
+
+def test_smape_unchanged_for_non_degenerate_input():
+    y = np.array([1.0, 2.0, 4.0, 8.0])
+    p = np.array([1.1, 1.8, 4.4, 7.0])
+
+    assert isclose(smape(y, p), 0.1072681704260651)

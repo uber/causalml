@@ -84,3 +84,41 @@ def test_propensity_models_imbalanced_1027():
     pm_en = ElasticNetPropensityModel(random_state=RANDOM_SEED)
     pm_en.fit_predict(X, treatment)
     assert pm_en.model.C_[0] > 1e-4
+
+
+def test_gradientboosted_propensity_model_earlystopping_is_reproducible():
+    # The early-stopping validation split used to ignore random_state, so the
+    # same seed could return different propensity scores on every fit.
+    rng = np.random.RandomState(RANDOM_SEED)
+    X = rng.normal(size=(1000, 10))
+    treatment = (0.8 * X[:, 0] + 0.5 * X[:, 1] + rng.normal(size=1000) > 0).astype(int)
+
+    runs = []
+    for _ in range(3):
+        pm = GradientBoostedPropensityModel(random_state=RANDOM_SEED, early_stop=True)
+        runs.append(pm.fit_predict(X, treatment))
+
+    for other in runs[1:]:
+        np.testing.assert_array_equal(runs[0], other)
+
+
+def test_gradientboosted_propensity_model_earlystopping_keeps_both_arms():
+    # Stratifying on treatment keeps treated units in the validation split even
+    # when treatment is rare, so the early-stopping metric stays meaningful.
+    from unittest import mock
+
+    from causalml import propensity
+
+    rng = np.random.RandomState(RANDOM_SEED)
+    X = rng.normal(size=(200, 5))
+    treatment = np.zeros(200, dtype=int)
+    treatment[:20] = 1
+
+    real_split = propensity.train_test_split
+    with mock.patch.object(propensity, "train_test_split", wraps=real_split) as split:
+        pm = GradientBoostedPropensityModel(random_state=RANDOM_SEED, early_stop=True)
+        pm.fit(X, treatment)
+
+    kwargs = split.call_args.kwargs
+    assert kwargs["random_state"] == RANDOM_SEED
+    np.testing.assert_array_equal(kwargs["stratify"], treatment)
