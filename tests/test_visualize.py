@@ -113,3 +113,31 @@ def test_get_std_diffs_errors_when_no_covariate_is_usable():
 
     with pytest.raises(ValueError):
         get_std_diffs(X, w)
+
+
+def test_get_std_diffs_keeps_a_numeric_categorical_covariate():
+    """A two-level categorical of numbers is still a usable binary covariate.
+
+    Its dtype is "category" rather than a numeric one, so testing the column
+    dtype on its own would drop a column that has a perfectly good mean. The
+    numbers are on the categories.
+    """
+    from causalml.metrics.visualize import _get_numeric_vars, get_std_diffs
+
+    rng = np.random.RandomState(42)
+    n = 60
+    flag = rng.randint(0, 2, size=n)
+    X = pd.DataFrame({"age": rng.normal(size=n), "flag": pd.Categorical(flag)})
+    w = pd.Series(rng.randint(0, 2, size=n))
+
+    assert _get_numeric_vars(X) == (["age"], ["flag"])
+
+    std_diffs = get_std_diffs(X, w)
+    assert list(std_diffs.index) == ["age", "flag"]
+    np.testing.assert_allclose(std_diffs.values, get_std_diffs(X.assign(flag=flag), w))
+
+    # the categories decide it, so a two-level categorical of strings, which
+    # has no mean, still drops out
+    X_str = X.assign(flag=pd.Categorical(rng.choice(["a", "b"], size=n)))
+    assert _get_numeric_vars(X_str) == (["age"], [])
+    assert list(get_std_diffs(X_str, w).index) == ["age"]

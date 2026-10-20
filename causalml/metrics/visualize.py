@@ -1092,10 +1092,17 @@ def _get_numeric_vars(X, threshold=5):
     is set to 5 by default.
     """
 
-    # Only numeric columns can be averaged, and a non-numeric column that
-    # happened to have enough distinct values used to be classified as
-    # continuous and then failed in the mean with a numpy type error.
-    numeric = [pd.api.types.is_numeric_dtype(X.iloc[:, i]) for i in range(X.shape[1])]
+    # Only numeric columns can be averaged. A categorical column averages fine
+    # when its categories are numbers, and its own dtype is "category" either
+    # way, so test the categories instead.
+    numeric = [
+        pd.api.types.is_numeric_dtype(
+            X.iloc[:, i].cat.categories
+            if hasattr(X.iloc[:, i], "cat")
+            else X.iloc[:, i]
+        )
+        for i in range(X.shape[1])
+    ]
 
     cont = [
         numeric[i]
