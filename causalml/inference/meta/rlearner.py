@@ -564,7 +564,12 @@ class BaseRClassifier(BaseRLearner):
         if verbose:
             logger.info("generating out-of-fold CV outcome estimates")
         yhat = cross_val_predict(
-            self.model_mu, X, y_np, cv=self.cv, method="predict_proba", n_jobs=-1
+            self.model_mu,
+            X,
+            y_np,
+            cv=self.cv,
+            method="predict_proba",
+            n_jobs=self.cv_n_jobs,
         )[:, 1]
         self.model_mu.fit(X, y_np)
 
@@ -782,7 +787,9 @@ class XGBRRegressor(BaseRRegressor):
 
         if verbose:
             logger.info("generating out-of-fold CV outcome estimates")
-        yhat = cross_val_predict(self.model_mu, X, y_np, cv=self.cv, n_jobs=-1)
+        yhat = cross_val_predict(
+            self.model_mu, X, y_np, cv=self.cv, n_jobs=self.cv_n_jobs
+        )
         self.model_mu.fit(X, y_np)
 
         for group in self.t_groups:

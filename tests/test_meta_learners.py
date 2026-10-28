@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
+from unittest.mock import patch
 
 from sklearn.base import clone
 from sklearn.linear_model import LinearRegression
@@ -34,6 +35,7 @@ from causalml.inference.meta import (
     XGBRRegressor,
     XGBRClassifier,
 )
+from causalml.inference.meta import rlearner
 from causalml.inference.meta import TMLELearner
 from causalml.inference.meta import BaseDRLearner
 from causalml.inference.meta import BaseDRRegressor
@@ -2373,3 +2375,35 @@ def test_base_rlearner_bootstrap_reproducibility(generate_regression_data):
     np.testing.assert_array_equal(ub3_ate, ub4_ate)
     np.testing.assert_array_equal(lb3_te, lb4_te)
     np.testing.assert_array_equal(ub3_te, ub4_te)
+
+
+@pytest.mark.parametrize(
+    "make_learner, binary_outcome",
+    [
+        (
+            lambda: BaseRClassifier(
+                outcome_learner=LogisticRegression(),
+                effect_learner=LinearRegression(),
+                random_state=RANDOM_SEED,
+            ),
+            True,
+        ),
+        (lambda: XGBRRegressor(random_state=RANDOM_SEED), False),
+    ],
+    ids=["BaseRClassifier", "XGBRRegressor"],
+)
+def test_r_learner_cross_val_predict_respects_cv_n_jobs(make_learner, binary_outcome):
+    rng = np.random.default_rng(RANDOM_SEED)
+    X = rng.normal(size=(100, 3))
+    treatment = rng.integers(0, 2, size=100)
+    y = rng.integers(0, 2, size=100) if binary_outcome else rng.normal(size=100)
+
+    model = make_learner()
+    model.cv_n_jobs = 1
+    with patch.object(
+        rlearner, "cross_val_predict", wraps=rlearner.cross_val_predict
+    ) as cross_val_predict:
+        model.fit(X, treatment=treatment, y=y, p=np.full(100, 0.5), verbose=False)
+
+    assert cross_val_predict.call_count == 1
+    assert cross_val_predict.call_args.kwargs["n_jobs"] == 1
