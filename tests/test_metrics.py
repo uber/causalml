@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 from numpy import isclose
 from causalml.metrics.classification import logloss
-from causalml.metrics.regression import mape, smape
+from causalml.metrics.regression import gini, mape, smape
 from causalml.metrics.visualize import qini_score
 
 
@@ -88,3 +88,22 @@ def test_smape_unchanged_for_non_degenerate_input():
     p = np.array([1.1, 1.8, 4.4, 7.0])
 
     assert isclose(smape(y, p), 0.1072681704260651)
+
+
+def test_gini_tied_predictions_do_not_depend_on_row_order():
+    y = np.array([0.0, 0.0, 1.0, 1.0])
+    p = np.full(4, 0.5)
+
+    # a constant prediction has no ranking power, whatever the row order
+    assert isclose(gini(y, p), 0.0)
+    assert isclose(gini(y[::-1], p), 0.0)
+
+
+def test_gini_perfect_and_untied_predictions_unchanged():
+    y = np.array([0.0, 0.0, 1.0, 1.0])
+    assert isclose(gini(y, y), 1.0)
+
+    rng = np.random.default_rng(1)
+    y = rng.normal(size=500)
+    p = y + rng.normal(size=500)
+    assert isclose(gini(y, p), 0.6518378939231072)
