@@ -10,6 +10,17 @@ logger = logging.getLogger("causalml")
 NAN_INT = -98765  # A random integer to impute missing values with
 
 
+def _fillna_nan_int(x):
+    """Replace missing values in a column with NAN_INT.
+
+    A pandas ``category`` column cannot take a value that is not one of its
+    categories, so it is cast to ``object`` first.
+    """
+    if isinstance(x.dtype, pd.CategoricalDtype):
+        x = x.astype(object)
+    return x.fillna(NAN_INT)
+
+
 class LabelEncoder(base.BaseEstimator):
     """Label Encoder that groups infrequent values into one label.
 
@@ -45,7 +56,7 @@ class LabelEncoder(base.BaseEstimator):
         """
 
         # NaN cannot be used as a key for dict. So replace it with a random integer.
-        label_count = x.fillna(NAN_INT).value_counts()
+        label_count = _fillna_nan_int(x).value_counts()
         n_uniq = label_count.shape[0]
 
         label_count = label_count[label_count >= self.min_obs]
@@ -74,7 +85,7 @@ class LabelEncoder(base.BaseEstimator):
         Returns:
             x (pandas.Series): a column with labels.
         """
-        return x.fillna(NAN_INT).map(self.label_encoders[i]).fillna(0)
+        return _fillna_nan_int(x).map(self.label_encoders[i]).fillna(0)
 
     def fit(self, X, y=None):
         self.label_encoders = [None] * X.shape[1]
@@ -123,8 +134,7 @@ class LabelEncoder(base.BaseEstimator):
             ) = self._get_label_encoder_and_max(X[col])
 
             X[col] = (
-                X[col]
-                .fillna(NAN_INT)
+                _fillna_nan_int(X[col])
                 .map(self.label_encoders[i])
                 .fillna(0)
                 .astype(float)
