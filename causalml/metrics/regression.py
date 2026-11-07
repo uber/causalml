@@ -93,25 +93,29 @@ def gini(y, p):
     # check and get number of samples
     assert y.shape == p.shape
 
+    y = np.asarray(y, dtype=float)
+    p = np.asarray(p)
     n_samples = y.shape[0]
-
-    # sort rows on prediction column
-    # (from largest to smallest)
-    arr = np.array([y, p]).transpose()
-    true_order = arr[arr[:, 0].argsort()][::-1, 0]
-    pred_order = arr[arr[:, 1].argsort()][::-1, 0]
-
-    # get Lorenz curves
-    l_true = np.cumsum(true_order) / np.sum(true_order)
-    l_pred = np.cumsum(pred_order) / np.sum(pred_order)
     l_ones = np.linspace(1 / n_samples, 1, n_samples)
 
-    # get Gini coefficients (area between curves)
-    g_true = np.sum(l_ones - l_true)
-    g_pred = np.sum(l_ones - l_pred)
+    def _gini_sorted_by(key):
+        # sort y on key (from largest to smallest)
+        order = np.argsort(-key, kind="stable")
+        y_sorted = y[order]
+        # rows with tied keys have no order between them, so give each
+        # row in a tie the group's mean y; otherwise the result depends
+        # on the input row order (e.g. a constant prediction scores 1.0)
+        _, inverse, counts = np.unique(
+            key[order], return_inverse=True, return_counts=True
+        )
+        y_sorted = np.bincount(inverse, weights=y_sorted)[inverse] / counts[inverse]
+
+        # get Lorenz curve and Gini coefficient (area between curves)
+        lorenz = np.cumsum(y_sorted) / np.sum(y_sorted)
+        return np.sum(l_ones - lorenz)
 
     # normalize to true Gini coefficient
-    return g_pred / g_true
+    return _gini_sorted_by(p) / _gini_sorted_by(y)
 
 
 def regression_metrics(
