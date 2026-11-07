@@ -104,3 +104,25 @@ def test_OneHotEncoder(generate_categorical_data):
     X_cat = ohe.fit_transform(df[cat_cols]).todense()
 
     assert df.shape[0] == X_cat.shape[0] and X_cat.shape[1] < n_category
+
+
+@pytest.mark.parametrize("encoder_class", [LabelEncoder, OneHotEncoder])
+def test_encoders_category_dtype_with_missing_values(encoder_class):
+    values = ["a", "a", "b", None, "a", "b", None]
+    df_str = pd.DataFrame({"cat": pd.Series(values, dtype=object)})
+    df_cat = pd.DataFrame({"cat": pd.Series(values, dtype="category")})
+
+    expected = encoder_class(min_obs=2).fit_transform(df_str)
+    result = encoder_class(min_obs=2).fit_transform(df_cat)
+
+    if encoder_class is OneHotEncoder:
+        expected, result = expected.toarray(), result.toarray()
+    else:
+        expected, result = expected.values, result.values
+    np.testing.assert_array_equal(result, expected)
+
+    # transform after fit takes the same path
+    encoder = encoder_class(min_obs=2).fit(df_cat)
+    out = encoder.transform(df_cat)
+    out = out.toarray() if encoder_class is OneHotEncoder else out.values
+    np.testing.assert_array_equal(out, expected)
