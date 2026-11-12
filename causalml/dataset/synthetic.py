@@ -381,6 +381,23 @@ def get_synthetic_preds_holdout(
     p_hat_train = p_model.fit_predict(X_train, w_train)
     p_hat_val = p_model.fit_predict(X_val, w_val)
 
+    if estimators:
+        for name, learner in estimators.items():
+            try:
+                learner.fit(X=X_train, treatment=w_train, y=y_train, p=p_hat_train)
+            except TypeError:
+                learner.fit(X=X_train, treatment=w_train, y=y_train)
+            try:
+                preds_dict_train[name] = learner.predict(
+                    X=X_train, p=p_hat_train
+                ).flatten()
+                preds_dict_valid[name] = learner.predict(X=X_val, p=p_hat_val).flatten()
+            except TypeError:
+                preds_dict_train[name] = learner.predict(X=X_train).flatten()
+                preds_dict_valid[name] = learner.predict(X=X_val).flatten()
+
+        return preds_dict_train, preds_dict_valid
+
     for base_learner, label_l in zip(
         [BaseSRegressor, BaseTRegressor, BaseXRegressor, BaseRRegressor],
         ["S", "T", "X", "R"],
