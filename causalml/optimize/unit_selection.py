@@ -290,7 +290,7 @@ class CounterfactualUnitSelector:
             lower_bound = np.max(params_1, axis=1)
             upper_bound = np.min(params_2, axis=1)
 
-        elif sigma > 0:
+        else:
             lower_bound = np.max(params_2, axis=1)
             upper_bound = np.min(params_1, axis=1)
 
