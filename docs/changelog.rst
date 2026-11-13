@@ -5,6 +5,7 @@ Changelog
 
 You can find the latest changes in the `GitHub releases <https://github.com/uber/causalml/releases>`_
 
+
 0.18.0 (Oct 2026)
 -----------------
 * **Deprecates positional** ``treatment`` **and** ``y`` ahead of the v1.0 switch to
