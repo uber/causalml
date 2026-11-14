@@ -85,7 +85,7 @@ This project is licensed under the Apache 2.0 License - see the [LICENSE](https:
 * (Workshop) [3rd Workshop on Causal Inference and Machine Learning in Practice](https://causal-machine-learning.github.io/kdd2025-workshop/) at KDD 2025
 * (Workshop) [2nd Workshop on Causal Inference and Machine Learning in Practice](https://causal-machine-learning.github.io/kdd2024-workshop/) at KDD 2024
 * (Workshop) [Causal Inference and Machine Learning in Practice: Use cases for Product, Brand, Policy and Beyond](https://causal-machine-learning.github.io/kdd2023-workshop/) at KDD 2023
-* (Talk) Introduction to CausalML at [Causal Data Science Meeting 2021](https://www.causalscience.org/meeting/program/day-2/)
+* (Talk) Introduction to CausalML at Causal Data Science Meeting 2021
 * (Talk) Introduction to CausalML at [2021 Conference on Digital Experimentation @ MIT (CODE@MIT)](https://ide.mit.edu/events/2021-conference-on-digital-experimentation-mit-codemit/)
 * (Tutorial) [Causal Inference and Machine Learning in Practice with EconML and CausalML: Industrial Use Cases at Microsoft, TripAdvisor, Uber](https://causal-machine-learning.github.io/kdd2021-tutorial/) at KDD 2021
 * (Publication) [CausalML: Python package for causal machine learning](https://arxiv.org/abs/2002.11631)
