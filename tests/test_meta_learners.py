@@ -7,6 +7,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from scipy.stats import norm
 from xgboost import XGBRegressor
 from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestRegressor
@@ -705,6 +706,48 @@ def test_explainer_auto_importance_catboost(generate_regression_data):
     assert CONTROL_NAME in importance
     assert isinstance(importance[CONTROL_NAME], pd.Series)
     assert len(importance[CONTROL_NAME]) == X.shape[1]
+
+
+def test_BaseRLearner_ate_standard_error():
+    np.random.seed(RANDOM_SEED)
+
+    n = 500
+    X = np.random.normal(size=(n, 3))
+    treatment = np.random.binomial(1, 0.5, size=n)
+    y = 2.0 * treatment + np.random.normal(size=n)
+
+    learner = BaseRLearner(
+        learner=LinearRegression(),
+        effect_learner=LinearRegression(),
+        cv_n_jobs=1,
+    )
+
+    ate, lb, ub = learner.estimate_ate(
+        X=X,
+        treatment=treatment,
+        y=y,
+        p=np.full(n, 0.5),
+    )
+
+    te = learner.predict(X, p=np.full(n, 0.5))
+    group = learner.t_groups[0]
+    prob_treatment = np.mean(treatment == group)
+
+    expected_se = np.sqrt(
+        (
+            learner.vars_t[group] / prob_treatment
+            + learner.vars_c[group] / (1 - prob_treatment)
+            + te[:, 0].var()
+        )
+        / n
+    )
+
+    z = norm.ppf(1 - learner.ate_alpha / 2)
+    expected_lb = ate[0] - expected_se * z
+    expected_ub = ate[0] + expected_se * z
+
+    np.testing.assert_allclose(lb[0], expected_lb)
+    np.testing.assert_allclose(ub[0], expected_ub)
 
 
 def test_BaseRLearner_without_p(generate_regression_data):
