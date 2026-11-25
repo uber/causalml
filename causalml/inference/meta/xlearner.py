@@ -1,6 +1,7 @@
 from copy import deepcopy
 import logging
 import numpy as np
+from sklearn.utils import check_random_state
 from tqdm import tqdm
 from scipy.stats import norm
 
@@ -34,6 +35,7 @@ class BaseXLearner(BaseLearner):
         treatment_effect_learner=None,
         ate_alpha=0.05,
         control_name=0,
+        random_state=None,
     ):
         """Initialize a X-learner.
 
@@ -60,6 +62,7 @@ class BaseXLearner(BaseLearner):
         self.treatment_effect_learner = treatment_effect_learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.random_state = random_state
         # Sentinel so estimate_ate(pretrain=True) raises a clean ValueError
         # ("no propensity score, please call fit() first") instead of
         # AttributeError when called before fit().
@@ -301,8 +304,11 @@ class BaseXLearner(BaseLearner):
             )
 
             logger.info("Bootstrap Confidence Intervals")
+            rng = check_random_state(self.random_state)
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X, treatment_np, y_np, p, size=bootstrap_size)
+                te_b = self.bootstrap(
+                    X, treatment_np, y_np, p, size=bootstrap_size, rng=rng
+                )
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -418,8 +424,11 @@ class BaseXLearner(BaseLearner):
             logger.info("Bootstrap Confidence Intervals for ATE")
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
+            rng = check_random_state(self.random_state)
             for n in tqdm(range(n_bootstraps)):
-                cate_b = self.bootstrap(X, treatment_np, y_np, p, size=bootstrap_size)
+                cate_b = self.bootstrap(
+                    X, treatment_np, y_np, p, size=bootstrap_size, rng=rng
+                )
                 ate_bootstraps[:, n] = cate_b.mean(axis=0)
 
             ate_lower = np.percentile(
@@ -450,6 +459,7 @@ class BaseXRegressor(BaseXLearner):
         treatment_effect_learner=None,
         ate_alpha=0.05,
         control_name=0,
+        random_state=None,
     ):
         super().__init__(
             learner=learner,
@@ -459,6 +469,7 @@ class BaseXRegressor(BaseXLearner):
             treatment_effect_learner=treatment_effect_learner,
             ate_alpha=ate_alpha,
             control_name=control_name,
+            random_state=random_state,
         )
 
 
@@ -475,6 +486,7 @@ class BaseXClassifier(BaseXLearner):
         treatment_effect_learner=None,
         ate_alpha=0.05,
         control_name=0,
+        random_state=None,
     ):
         """Initialize an X-learner classifier.
 
@@ -497,6 +509,7 @@ class BaseXClassifier(BaseXLearner):
         self.treatment_effect_learner = treatment_effect_learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.random_state = random_state
         # Sentinel so estimate_ate(pretrain=True) raises cleanly before fit().
         self.propensity = {}
 

@@ -1,6 +1,7 @@
 from copy import deepcopy
 import logging
 import numpy as np
+from sklearn.utils import check_random_state
 from packaging import version
 from scipy.stats import norm
 import sklearn
@@ -48,6 +49,7 @@ class BaseTLearner(BaseLearner):
         treatment_learner=None,
         ate_alpha=0.05,
         control_name=0,
+        random_state=None,
     ):
         """Initialize a T-learner.
 
@@ -69,6 +71,7 @@ class BaseTLearner(BaseLearner):
         self.treatment_learner = treatment_learner
         self.ate_alpha = ate_alpha
         self.control_name = control_name
+        self.random_state = random_state
 
     @ignore_warnings(category=ConvergenceWarning)
     def fit(
@@ -152,7 +155,9 @@ class BaseTLearner(BaseLearner):
                 y=y_np,
                 n_bootstraps=n_bootstraps,
                 bootstrap_size=bootstrap_size,
-                random_state=random_state,
+                random_state=(
+                    random_state if random_state is not None else self.random_state
+                ),
                 n_jobs=n_jobs,
             )
         else:
@@ -293,8 +298,11 @@ class BaseTLearner(BaseLearner):
             )
 
             logger.info("Bootstrap Confidence Intervals")
+            rng = check_random_state(self.random_state)
             for i in tqdm(range(n_bootstraps)):
-                te_b = self.bootstrap(X, treatment_np, y_np, size=bootstrap_size)
+                te_b = self.bootstrap(
+                    X, treatment_np, y_np, size=bootstrap_size, rng=rng
+                )
                 te_bootstraps[:, :, i] = te_b
 
             te_lower = np.percentile(te_bootstraps, (self.ate_alpha / 2) * 100, axis=2)
@@ -391,8 +399,11 @@ class BaseTLearner(BaseLearner):
             logger.info("Bootstrap Confidence Intervals for ATE")
             ate_bootstraps = np.zeros(shape=(self.t_groups.shape[0], n_bootstraps))
 
+            rng = check_random_state(self.random_state)
             for n in tqdm(range(n_bootstraps)):
-                ate_b = self.bootstrap(X, treatment_np, y_np, size=bootstrap_size)
+                ate_b = self.bootstrap(
+                    X, treatment_np, y_np, size=bootstrap_size, rng=rng
+                )
                 ate_bootstraps[:, n] = ate_b.mean(axis=0)
 
             ate_lower = np.percentile(
@@ -422,6 +433,7 @@ class BaseTRegressor(BaseTLearner):
         treatment_learner=None,
         ate_alpha=0.05,
         control_name=0,
+        random_state=None,
     ):
         """Initialize a T-learner regressor.
 
@@ -438,6 +450,7 @@ class BaseTRegressor(BaseTLearner):
             treatment_learner=treatment_learner,
             ate_alpha=ate_alpha,
             control_name=control_name,
+            random_state=random_state,
         )
 
 
@@ -451,6 +464,7 @@ class BaseTClassifier(BaseTLearner):
         treatment_learner=None,
         ate_alpha=0.05,
         control_name=0,
+        random_state=None,
     ):
         """Initialize a T-learner classifier.
 
@@ -467,6 +481,7 @@ class BaseTClassifier(BaseTLearner):
             treatment_learner=treatment_learner,
             ate_alpha=ate_alpha,
             control_name=control_name,
+            random_state=random_state,
         )
 
     def predict(
@@ -536,22 +551,28 @@ class BaseTClassifier(BaseTLearner):
 
 
 class XGBTRegressor(BaseTRegressor):
-    def __init__(self, ate_alpha=0.05, control_name=0, *args, **kwargs):
+    def __init__(
+        self, ate_alpha=0.05, control_name=0, *args, random_state=None, **kwargs
+    ):
         """Initialize a T-learner with two XGBoost models."""
         super().__init__(
             learner=XGBRegressor(*args, **kwargs),
             ate_alpha=ate_alpha,
             control_name=control_name,
+            random_state=random_state,
         )
 
 
 class MLPTRegressor(BaseTRegressor):
-    def __init__(self, ate_alpha=0.05, control_name=0, *args, **kwargs):
+    def __init__(
+        self, ate_alpha=0.05, control_name=0, *args, random_state=None, **kwargs
+    ):
         """Initialize a T-learner with two MLP models."""
         super().__init__(
             learner=MLPRegressor(*args, **kwargs),
             ate_alpha=ate_alpha,
             control_name=control_name,
+            random_state=random_state,
         )
 
 
@@ -563,7 +584,9 @@ class XGBTClassifier(BaseTClassifier):
     are constructed in ``fit()``.
     """
 
-    def __init__(self, ate_alpha=0.05, control_name=0, xgb_kwargs=None):
+    def __init__(
+        self, ate_alpha=0.05, control_name=0, xgb_kwargs=None, random_state=None
+    ):
         """Initialize a T-learner classifier with two XGBoost models.
 
         Args:
@@ -571,6 +594,8 @@ class XGBTClassifier(BaseTClassifier):
             control_name (str or int, optional): name of control group
             xgb_kwargs (dict, optional): keyword arguments forwarded verbatim to each
                 ``XGBClassifier``, e.g. ``xgb_kwargs={'max_depth': 4, 'learning_rate': 0.05}``.
+            random_state (int, RandomState instance or None, optional): random seed
+                for reproducible bootstrap sampling.
 
         Note: all arguments are stored verbatim (scikit-learn convention) so that
         ``get_params`` / ``clone`` work correctly. ``XGBClassifier`` construction
@@ -578,7 +603,9 @@ class XGBTClassifier(BaseTClassifier):
         """
         # Store verbatim — no XGBClassifier construction here.
         self.xgb_kwargs = xgb_kwargs
-        super().__init__(ate_alpha=ate_alpha, control_name=control_name)
+        super().__init__(
+            ate_alpha=ate_alpha, control_name=control_name, random_state=random_state
+        )
 
     def fit(self, X, treatment, y, *args, **kwargs):
         """Build the XGBoost outcome model, then fit as a T-learner classifier."""
