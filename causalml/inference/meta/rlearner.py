@@ -69,7 +69,7 @@ class BaseRLearner(BaseLearner):
                 be used by default.
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
-            n_fold (int, optional): the number of cross validation folds for outcome_learner
+            n_fold (int, optional): the number of cross-fitting folds for outcome_learner and propensity_learner
             random_state (int or RandomState, optional): a seed (int) or random number generator (RandomState)
             cv_n_jobs (int, optional): number of parallel jobs to run for cross_val_predict. -1 means using all
                 processors
@@ -104,7 +104,7 @@ class BaseRLearner(BaseLearner):
             y (np.array, pd.Series, or pl.Series): an outcome vector
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+                float (0,1); if None, propensity_learner is cross-fitted on the outcome model's folds.
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
@@ -304,7 +304,7 @@ class BaseRLearner(BaseLearner):
             y (np.array, pd.Series, or pl.Series): an outcome vector
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+                float (0,1); if None, propensity_learner is cross-fitted on the outcome model's folds.
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
             return_ci (bool): whether to return confidence intervals
@@ -391,7 +391,7 @@ class BaseRLearner(BaseLearner):
             y (np.array, pd.Series, or pl.Series): only needed when pretrain=False, an outcome vector
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+                float (0,1); if None, propensity_learner is cross-fitted on the outcome model's folds.
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
             bootstrap_ci (bool): whether run bootstrap for confidence intervals
@@ -528,7 +528,7 @@ class BaseRClassifier(BaseRLearner):
             propensity_learner (optional): a propensity model. Defaults to ElasticNetPropensityModel.
             ate_alpha (float, optional): confidence level alpha
             control_name (str or int, optional): name of control group
-            n_fold (int, optional): CV folds for outcome_learner
+            n_fold (int, optional): cross-fitting folds for outcome_learner and propensity_learner
             random_state (int or RandomState, optional): random seed
         """
         if (outcome_learner is None) and (effect_learner is None):
@@ -557,7 +557,7 @@ class BaseRClassifier(BaseRLearner):
             y (np.array, pd.Series, or pl.Series): an outcome vector
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+                float (0,1); if None, propensity_learner is cross-fitted on the outcome model's folds.
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
@@ -718,7 +718,7 @@ class XGBRRegressor(BaseRRegressor):
             random_state (int, optional): random seed (must be int)
             ate_alpha (float, optional): confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
-            n_fold (int, optional): CV folds for the outcome learner
+            n_fold (int, optional): cross-fitting folds for the outcome and propensity learners
             xgb_kwargs (dict, optional): additional keyword arguments forwarded verbatim
                 to both XGBRegressor instances (outcome and effect learners), e.g.
                 ``xgb_kwargs={'max_depth': 4, 'learning_rate': 0.05}``.
@@ -757,7 +757,7 @@ class XGBRRegressor(BaseRRegressor):
             y (np.array, pd.Series, or pl.Series): an outcome vector
             p (np.ndarray, pd.Series, pl.Series, or dict, optional): an array of propensity scores of float (0,1) in the
                 single-treatment case; or, a dictionary of treatment groups that map to propensity vectors of
-                float (0,1); if None will run ElasticNetPropensityModel() to generate the propensity scores.
+                float (0,1); if None, propensity_learner is cross-fitted on the outcome model's folds.
             sample_weight (np.array, pd.Series, or pl.Series, optional): an array of sample weights indicating the
                 weight of each observation for `effect_learner`. If None, it assumes equal weight.
             verbose (bool, optional): whether to output progress logs
@@ -934,7 +934,7 @@ class XGBRClassifier(BaseRClassifier):
                 ``ElasticNetPropensityModel()``.
             ate_alpha (float, optional): the confidence level alpha of the ATE estimate
             control_name (str or int, optional): name of control group
-            n_fold (int, optional): CV folds for the outcome learner
+            n_fold (int, optional): cross-fitting folds for the outcome and propensity learners
             random_state (int or RandomState, optional): random seed
             outcome_xgb_kwargs (dict, optional): keyword arguments forwarded verbatim
                 to the ``XGBClassifier`` outcome model, e.g. ``{'max_depth': 4}``.

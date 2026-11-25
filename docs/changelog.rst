@@ -5,6 +5,14 @@ Changelog
 
 You can find the latest changes in the `GitHub releases <https://github.com/uber/causalml/releases>`_
 
+Unreleased
+----------
+
+Bug Fixes
+~~~~~~~~~
+* R-learners with ``p=None`` cross-fit the propensity model on the outcome model's folds and
+  fit a separate copy per treatment arm and learner, so their estimates change (#1073).
+
 0.18.0 (Oct 2026)
 -----------------
 * **Deprecates positional** ``treatment`` **and** ``y`` ahead of the v1.0 switch to
