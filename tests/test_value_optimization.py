@@ -77,3 +77,31 @@ def test_counterfactual_value_optimization():
     cve_value = actual_value.loc[test_idx][actual_is_cve_best].mean()
 
     assert cve_value > random_allocation_value
+
+
+def test_get_treatment_costs_column_order_matches_conditions():
+    # The returned cost columns are read positionally against the returned
+    # conditions list, so the same costs written in a different dict order must
+    # still charge each unit its own treatment's cost.
+    treatment = pd.Series(["control", "treatment1", "treatment2"] * 2)
+    outcome = pd.Series(np.ones(6))
+    value = np.full(6, 100.0)
+    costs = {"treatment1": 2.0, "treatment2": 7.0, "control": 0.0}
+
+    cc_array, ic_array, conditions = get_treatment_costs(
+        treatment=treatment,
+        control_name="control",
+        cc_dict=costs,
+        ic_dict={key: 0.0 for key in costs},
+    )
+    actual_value = get_actual_value(
+        treatment=treatment,
+        observed_outcome=outcome,
+        conversion_value=value,
+        conditions=conditions,
+        conversion_cost=cc_array,
+        impression_cost=ic_array,
+    )
+
+    expected = np.array([100.0 - costs[group] for group in treatment])
+    np.testing.assert_allclose(np.asarray(actual_value), expected)

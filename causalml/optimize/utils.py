@@ -34,21 +34,19 @@ def get_treatment_costs(treatment, control_name, cc_dict, ic_dict):
         A list of experimental conditions.
     """
 
-    # Set the conversion costs of the treatments
-    conversion_cost = np.zeros((len(treatment), len(cc_dict.keys())))
-    for idx, dict_key in enumerate(cc_dict.keys()):
-        conversion_cost[:, idx] = cc_dict.get(dict_key)
-
-    # Set the impression costs of the treatments
-    impression_cost = np.zeros((len(treatment), len(ic_dict.keys())))
-    for idx, dict_key in enumerate(ic_dict.keys()):
-        impression_cost[:, idx] = ic_dict.get(dict_key)
-
     # Get a sorted list of conditions
     conditions = list(set(treatment))
     conditions.remove(control_name)
     conditions_sorted = sorted(conditions)
     conditions_sorted.insert(0, control_name)
+
+    # One column per condition, in the same order as conditions_sorted, because
+    # callers read column j as the cost of conditions[j].
+    conversion_cost = np.zeros((len(treatment), len(conditions_sorted)))
+    impression_cost = np.zeros((len(treatment), len(conditions_sorted)))
+    for idx, condition in enumerate(conditions_sorted):
+        conversion_cost[:, idx] = cc_dict[condition]
+        impression_cost[:, idx] = ic_dict[condition]
 
     return conversion_cost, impression_cost, conditions_sorted
 
