@@ -395,10 +395,13 @@ class BaseRLearner(BaseLearner):
             _ate = te[:, i].mean()
 
             se = np.sqrt(
-                (self.vars_t[group] / prob_treatment)
-                + (self.vars_c[group] / (1 - prob_treatment))
-                + te[:, i].var()
-            ) / n_rows(X)
+                (
+                    (self.vars_t[group] / prob_treatment)
+                    + (self.vars_c[group] / (1 - prob_treatment))
+                    + te[:, i].var()
+                )
+                / n_rows(X)
+            )
 
             _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
             _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
