@@ -3,7 +3,13 @@ import logging
 import numpy as np
 from tqdm import tqdm
 from scipy.stats import norm
-from sklearn.model_selection import cross_val_predict, KFold, train_test_split
+from sklearn.base import clone
+from sklearn.model_selection import (
+    cross_val_predict,
+    KFold,
+    StratifiedKFold,
+    train_test_split,
+)
 from sklearn.utils import check_random_state
 
 try:
@@ -23,7 +29,11 @@ from causalml.inference.meta.utils import (
     get_xgboost_objective_metric,
     get_weighted_variance,
 )
-from causalml.propensity import ElasticNetPropensityModel, compute_r_residuals
+from causalml.propensity import (
+    ElasticNetPropensityModel,
+    compute_propensity_score,
+    compute_r_residuals,
+)
 
 logger = logging.getLogger("causalml")
 
@@ -129,7 +139,10 @@ class BaseRLearner(BaseLearner):
         self.model_p = self.propensity_learner
 
         if p is None:
-            self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
+            cv = StratifiedKFold(
+                n_splits=self.n_fold, shuffle=True, random_state=self.random_state
+            )
+            self._set_crossfit_propensity(X=X, treatment=treatment_np, cv=cv)
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
@@ -247,6 +260,28 @@ class BaseRLearner(BaseLearner):
         yhat = self.model_mu.predict(X)
 
         return te, yhat, p
+
+    def _set_crossfit_propensity(self, X, treatment, cv):
+        """Set self.propensity to out-of-fold scores per arm, fit on the folds of cv.
+
+        self.propensity_model keeps full-data models for predict(p=None).
+        """
+        self._set_propensity_models(X=X, treatment=treatment, y=None)
+        n = len(treatment)
+        for group in self.t_groups:
+            arm = (treatment == group) | (treatment == self.control_name)
+            p = np.empty(n)
+            for train, test in cv.split(np.zeros(n), treatment):
+                fit_rows, test_rows = np.zeros(n, bool), np.zeros(n, bool)
+                fit_rows[train], test_rows[test] = True, True
+                fit_rows &= arm
+                p[test_rows], _ = compute_propensity_score(
+                    X=filter_mask(X, fit_rows),
+                    treatment=(treatment[fit_rows] == group).astype(int),
+                    p_model=clone(self.model_p),
+                    X_pred=filter_mask(X, test_rows),
+                )
+            self.propensity[group] = p
 
     def fit_predict(
         self,
@@ -545,8 +580,11 @@ class BaseRClassifier(BaseRLearner):
         # propensity_learner is used on the first fit (see BaseRLearner.fit).
         self.model_p = self.propensity_learner
 
+        self.cv = KFold(
+            n_splits=self.n_fold, shuffle=True, random_state=self.random_state
+        )
         if p is None:
-            self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
+            self._set_crossfit_propensity(X=X, treatment=treatment_np, cv=self.cv)
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
@@ -556,9 +594,6 @@ class BaseRClassifier(BaseRLearner):
         # Resolve base models from stored constructor args.
         self.model_mu = self.outcome_learner
         self.model_tau = self.effect_learner
-        self.cv = KFold(
-            n_splits=self.n_fold, shuffle=True, random_state=self.random_state
-        )
 
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
         self.vars_c = {}
@@ -746,8 +781,11 @@ class XGBRRegressor(BaseRRegressor):
         # propensity_learner is used on the first fit (see BaseRLearner.fit).
         self.model_p = self.propensity_learner
 
+        self.cv = KFold(
+            n_splits=self.n_fold, shuffle=True, random_state=self.random_state
+        )
         if p is None:
-            self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
+            self._set_crossfit_propensity(X=X, treatment=treatment_np, cv=self.cv)
             p = self.propensity
         else:
             p = self._format_p(p, self.t_groups)
@@ -780,9 +818,6 @@ class XGBRRegressor(BaseRRegressor):
 
         self.model_mu = outcome_learner
         self.model_tau = effect_learner
-        self.cv = KFold(
-            n_splits=self.n_fold, shuffle=True, random_state=self.random_state
-        )
 
         self.models_tau = {group: deepcopy(self.model_tau) for group in self.t_groups}
         self.vars_c = {}

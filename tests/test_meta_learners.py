@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 from sklearn.base import clone
 from sklearn.linear_model import LinearRegression
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
@@ -2462,3 +2463,25 @@ def test_rlearner_does_not_share_propensity_model(generate_regression_data):
 
     assert a.propensity_model["a"] is not a.propensity_model["b"]
     assert a.propensity_model["a"] is not b.propensity_model["a"]
+
+
+@pytest.mark.parametrize(
+    "learner",
+    [
+        BaseRRegressor(learner=LinearRegression()),
+        BaseRClassifier(
+            outcome_learner=LogisticRegression(), effect_learner=LinearRegression()
+        ),
+        XGBRRegressor(),
+    ],
+)
+def test_rlearner_propensity_is_out_of_fold(learner):
+    # 1-NN memorizes the treatment in-sample, but predicts it at chance out of fold.
+    rng = np.random.default_rng(RANDOM_SEED)
+    X = rng.normal(size=(500, 3))
+    treatment = rng.integers(0, 2, size=500)
+    y = rng.integers(0, 2, size=500)
+    learner.propensity_learner = KNeighborsClassifier(n_neighbors=1)
+    learner.fit(X=X, treatment=treatment, y=y, verbose=False)
+
+    assert abs(np.corrcoef(learner.propensity[1], treatment)[0, 1]) < 0.2

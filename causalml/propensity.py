@@ -1,8 +1,7 @@
 from abc import ABCMeta, abstractmethod
-from copy import deepcopy
 import logging
 import numpy as np
-from sklearn.base import BaseEstimator
+from sklearn.base import BaseEstimator, clone
 from sklearn.metrics import roc_auc_score as auc
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
@@ -364,7 +363,7 @@ def compute_r_residuals(
                 X=X[train_idx],
                 treatment=treatment[train_idx],
                 p_model=(
-                    deepcopy(propensity_learner)
+                    clone(propensity_learner)
                     if propensity_learner is not None
                     else None
                 ),
