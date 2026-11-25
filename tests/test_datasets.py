@@ -89,3 +89,18 @@ def test_get_synthetic_auuc():
 
     auuc_df = get_synthetic_auuc(preds_dict, plot=False)
     print(auuc_df)
+
+
+def test_get_synthetic_preds_holdout_uses_given_estimators():
+    # The default labels are "<S|T|X|R> Learner (LR|XGB)", so a name outside that
+    # set can only appear if the estimators argument is actually used.
+    preds_train, preds_valid = get_synthetic_preds_holdout(
+        synthetic_data_func=simulate_nuisance_and_easy_treatment,
+        n=500,
+        estimators={"My S Learner": LRSRegressor()},
+    )
+
+    assert "My S Learner" in preds_train
+    assert "My S Learner" in preds_valid
+    assert not [k for k in preds_train if "Learner (" in k]
+    assert not [k for k in preds_valid if "Learner (" in k]
