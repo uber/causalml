@@ -76,3 +76,31 @@ def test_counterfactual_unit_selection():
     cus_value = actual_value.loc[test_idx][actual_is_cus].mean()
 
     assert cus_value > random_allocation_value
+
+
+def test_counterfactual_unit_selection_bounds_with_zero_sigma():
+    # Payoffs where gain equality holds but the two sums are not float-equal:
+    # 1.30 + 9.26 and 7.93 + 2.63 differ in the last bit, so _gain_equality_check
+    # sends predict() down the bounds path, where beta - gamma - theta + delta
+    # evaluates to exactly 0.0 and neither bound branch used to be taken.
+    df, X_names = make_uplift_classification(
+        n_samples=500, treatment_name=["control", "treatment"]
+    )
+    df["treatment_numeric"] = df["treatment_group_key"].replace(
+        {"control": 0, "treatment": 1}
+    )
+    data = df.drop("treatment_group_key", axis=1)
+
+    cus = CounterfactualUnitSelector(
+        learner=LogisticRegressionCV(),
+        nevertaker_payoff=2.63,
+        alwaystaker_payoff=7.93,
+        complier_payoff=1.30,
+        defier_payoff=9.26,
+        organic_conversion=0.3,
+    )
+    cus.fit(data=data, treatment="treatment_numeric", outcome="conversion")
+    payoff = cus.predict(data=data, treatment="treatment_numeric", outcome="conversion")
+
+    assert payoff.shape[0] == data.shape[0]
+    assert np.isfinite(payoff).all()
