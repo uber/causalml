@@ -2450,3 +2450,13 @@ def test_r_learner_cross_val_predict_respects_cv_n_jobs(make_learner, binary_out
 
     assert cross_val_predict.call_count == 1
     assert cross_val_predict.call_args.kwargs["n_jobs"] == 1
+
+
+def test_rlearner_does_not_share_default_propensity_model(generate_regression_data):
+    y, X, treatment, _, _, _ = generate_regression_data()
+    a = BaseRRegressor(learner=LinearRegression())
+    b = BaseRRegressor(learner=LinearRegression())
+    a.fit(X=X, treatment=treatment, y=y)
+    b.fit(X=X, treatment=treatment, y=y)
+
+    assert a.model_p is not b.model_p
