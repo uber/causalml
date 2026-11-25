@@ -41,6 +41,15 @@ class PropensityModel(BaseEstimator, metaclass=ABCMeta):
     def get_params(self, deep=True):
         return {**super().get_params(deep=False), **self.model_kwargs}
 
+    def set_params(self, **params):
+        for k, v in params.items():
+            if k in self._get_param_names():
+                setattr(self, k, v)
+            else:
+                self.model_kwargs[k] = v
+        self.model = self._model
+        return self
+
     def __repr__(self):
         return self.model.__repr__()
 

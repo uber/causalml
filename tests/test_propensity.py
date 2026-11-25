@@ -176,3 +176,4 @@ def test_propensity_model_clone():
     ):
         assert clone(m).get_params() == m.get_params()
     assert clone(ElasticNetPropensityModel(n_fold=3)).model.cv.n_splits == 3
+    assert ElasticNetPropensityModel().set_params(Cs=3).model.Cs == 3
