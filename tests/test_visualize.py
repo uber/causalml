@@ -71,3 +71,73 @@ def test_plot_tmlegain(generate_regression_data, monkeypatch):
         cv=kf,
         ci=False,
     )
+
+
+def test_get_std_diffs_skips_non_numeric_covariates():
+    """A string covariate has no mean, so it belongs in the dropped set.
+
+    Before, any column with enough distinct values was classified as
+    continuous whatever its dtype, and the diagnostic died inside numpy with
+    "ufunc 'divide' not supported for the input types" rather than reporting
+    the balance of the columns it could measure.
+    """
+    from causalml.metrics.visualize import _get_numeric_vars, get_std_diffs
+
+    rng = np.random.RandomState(42)
+    n = 50
+    X = pd.DataFrame(
+        {
+            "age": rng.normal(size=n),
+            "group": rng.choice(list("abcdef"), size=n),
+            "flag": rng.randint(0, 2, size=n),
+        }
+    )
+    w = pd.Series(rng.randint(0, 2, size=n))
+
+    cont_cols, prop_cols = _get_numeric_vars(X)
+    assert cont_cols == ["age"]
+    assert prop_cols == ["flag"]
+
+    std_diffs = get_std_diffs(X, w)
+    assert list(std_diffs.index) == ["age", "flag"]
+    assert np.isfinite(std_diffs.values).all()
+
+
+def test_get_std_diffs_errors_when_no_covariate_is_usable():
+    from causalml.metrics.visualize import get_std_diffs
+
+    rng = np.random.RandomState(42)
+    n = 20
+    X = pd.DataFrame({"group": rng.choice(list("abcdef"), size=n)})
+    w = pd.Series(rng.randint(0, 2, size=n))
+
+    with pytest.raises(ValueError):
+        get_std_diffs(X, w)
+
+
+def test_get_std_diffs_keeps_a_numeric_categorical_covariate():
+    """A two-level categorical of numbers is still a usable binary covariate.
+
+    Its dtype is "category" rather than a numeric one, so testing the column
+    dtype on its own would drop a column that has a perfectly good mean. The
+    numbers are on the categories.
+    """
+    from causalml.metrics.visualize import _get_numeric_vars, get_std_diffs
+
+    rng = np.random.RandomState(42)
+    n = 60
+    flag = rng.randint(0, 2, size=n)
+    X = pd.DataFrame({"age": rng.normal(size=n), "flag": pd.Categorical(flag)})
+    w = pd.Series(rng.randint(0, 2, size=n))
+
+    assert _get_numeric_vars(X) == (["age"], ["flag"])
+
+    std_diffs = get_std_diffs(X, w)
+    assert list(std_diffs.index) == ["age", "flag"]
+    np.testing.assert_allclose(std_diffs.values, get_std_diffs(X.assign(flag=flag), w))
+
+    # the categories decide it, so a two-level categorical of strings, which
+    # has no mean, still drops out
+    X_str = X.assign(flag=pd.Categorical(rng.choice(["a", "b"], size=n)))
+    assert _get_numeric_vars(X_str) == (["age"], [])
+    assert list(get_std_diffs(X_str, w).index) == ["age"]

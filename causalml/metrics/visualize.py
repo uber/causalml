@@ -1092,12 +1092,26 @@ def _get_numeric_vars(X, threshold=5):
     is set to 5 by default.
     """
 
-    cont = [
-        (not hasattr(X.iloc[:, i], "cat")) and (X.iloc[:, i].nunique() >= threshold)
+    # Only numeric columns can be averaged. A categorical column averages fine
+    # when its categories are numbers, and its own dtype is "category" either
+    # way, so test the categories instead.
+    numeric = [
+        pd.api.types.is_numeric_dtype(
+            X.iloc[:, i].cat.categories
+            if hasattr(X.iloc[:, i], "cat")
+            else X.iloc[:, i]
+        )
         for i in range(X.shape[1])
     ]
 
-    prop = [X.iloc[:, i].nunique() == 2 for i in range(X.shape[1])]
+    cont = [
+        numeric[i]
+        and (not hasattr(X.iloc[:, i], "cat"))
+        and (X.iloc[:, i].nunique() >= threshold)
+        for i in range(X.shape[1])
+    ]
+
+    prop = [numeric[i] and X.iloc[:, i].nunique() == 2 for i in range(X.shape[1])]
 
     cont_cols = list(X.loc[:, cont].columns)
     prop_cols = list(X.loc[:, prop].columns)
@@ -1106,7 +1120,7 @@ def _get_numeric_vars(X, threshold=5):
 
     if dropped:
         logger.info(
-            'Some non-binary variables were dropped because they had fewer than {} unique values or were of the \
+            'Some variables were dropped because they were not numeric, had fewer than {} unique values, or were of the \
                      dtype "cat". The dropped variables are: {}'.format(
                 threshold, dropped
             )
