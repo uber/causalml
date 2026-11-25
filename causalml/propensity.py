@@ -2,6 +2,7 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 import logging
 import numpy as np
+from sklearn.base import BaseEstimator
 from sklearn.metrics import roc_auc_score as auc
 from sklearn.linear_model import LogisticRegressionCV
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, train_test_split
@@ -17,7 +18,7 @@ except ValueError as exc:
 logger = logging.getLogger("causalml")
 
 
-class PropensityModel(metaclass=ABCMeta):
+class PropensityModel(BaseEstimator, metaclass=ABCMeta):
     def __init__(self, clip_bounds=(1e-3, 1 - 1e-3), calibrate=True, **model_kwargs):
         """
         Args:
@@ -36,6 +37,9 @@ class PropensityModel(metaclass=ABCMeta):
     @abstractmethod
     def _model(self):
         pass
+
+    def get_params(self, deep=True):
+        return {**super().get_params(deep=False), **self.model_kwargs}
 
     def __repr__(self):
         return self.model.__repr__()
@@ -111,17 +115,13 @@ class LogisticRegressionPropensityModel(PropensityModel):
             "scoring": "neg_log_loss",
             "l1_ratios": np.linspace(1e-3, 1 - 1e-3, 4),
             "cv": StratifiedKFold(
-                n_splits=(
-                    self.model_kwargs.pop("n_fold")
-                    if "n_fold" in self.model_kwargs
-                    else 4
-                ),
+                n_splits=self.model_kwargs.get("n_fold", 4),
                 shuffle=True,
                 random_state=self.model_kwargs.get("random_state", 42),
             ),
             "random_state": 42,
         }
-        kwargs.update(self.model_kwargs)
+        kwargs.update({k: v for k, v in self.model_kwargs.items() if k != "n_fold"})
 
         return LogisticRegressionCV(**kwargs)
 

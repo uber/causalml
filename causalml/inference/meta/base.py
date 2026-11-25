@@ -242,7 +242,7 @@ class BaseLearner(SerializableLearner, BaseEstimator, metaclass=ABCMeta):
             X_filt = filter_mask(X, mask)
             w_filt = (treatment_filt_np == group).astype(int)
             w = (treatment_np == group).astype(int)
-            propensity_model = self.model_p if hasattr(self, "model_p") else None
+            propensity_model = clone(self.model_p) if hasattr(self, "model_p") else None
             p[group], p_model[group] = compute_propensity_score(
                 X=X_filt,
                 treatment=w_filt,

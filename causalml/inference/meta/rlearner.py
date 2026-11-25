@@ -126,7 +126,7 @@ class BaseRLearner(BaseLearner):
         # propensity_learner is honored on the first fit. _set_propensity_models
         # reads self.model_p, so setting it afterwards meant the first fit of a
         # fresh object silently fell back to the default ElasticNet.
-        self.model_p = deepcopy(self.propensity_learner)
+        self.model_p = self.propensity_learner
 
         if p is None:
             self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
@@ -543,7 +543,7 @@ class BaseRClassifier(BaseRLearner):
 
         # Set model_p before _set_propensity_models runs so a custom
         # propensity_learner is used on the first fit (see BaseRLearner.fit).
-        self.model_p = deepcopy(self.propensity_learner)
+        self.model_p = self.propensity_learner
 
         if p is None:
             self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
@@ -744,7 +744,7 @@ class XGBRRegressor(BaseRRegressor):
 
         # Set model_p before _set_propensity_models runs so a custom
         # propensity_learner is used on the first fit (see BaseRLearner.fit).
-        self.model_p = deepcopy(self.propensity_learner)
+        self.model_p = self.propensity_learner
 
         if p is None:
             self._set_propensity_models(X=X, treatment=treatment_np, y=y_np)
