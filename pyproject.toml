@@ -39,8 +39,6 @@ dependencies = [
     "dill",
     "lightgbm",
     "packaging",
-    "graphviz",
-    "black>=26.1.0",
 ]
 
 [project.optional-dependencies]
