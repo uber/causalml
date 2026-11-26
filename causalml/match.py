@@ -219,7 +219,7 @@ class NearestNeighborMatch:
             to_idx_matched = []
             # Track each accepted (from, to) pair so ``matched_indexes_`` can
             # report the actual row-aligned pairing: ``from_idx_matched`` only
-            # records a from-index the first time it is accepted (``i == 0``),
+            # records a from-index the first time a candidate is accepted,
             # so it cannot be repeated to recover pairs under ``ratio > 1``.
             from_pairs_list = []
             to_pairs_list = []
@@ -242,10 +242,12 @@ class NearestNeighborMatch:
                 kth = min(self.ratio, len(dist) - 1)
                 to_np_idx_list = np.argpartition(dist, kth)[: self.ratio]
                 to_idx_list = dist.index[to_np_idx_list]
+                from_idx_added = False
                 for i, to_idx in enumerate(to_idx_list):
                     if dist[to_idx] <= sdcal:
-                        if i == 0:
+                        if not from_idx_added:
                             from_idx_matched.append(from_idx)
+                            from_idx_added = True
                         to_idx_matched.append(to_idx)
                         from_pairs_list.append(from_idx)
                         to_pairs_list.append(to_idx)
