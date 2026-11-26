@@ -160,34 +160,48 @@ class TMLELearner:
 
         for _, group in enumerate(self.t_groups):
             logger.info("Estimating ATE for group {}.".format(group))
-            w_group = (treatment == group).astype(int)
-            p_group = p[group]
+            # Compare the group with the control group only; the rows of the
+            # other treatment groups belong to neither side of this contrast.
+            mask = (treatment == group) | (treatment == self.control_name)
+            X_group = X[mask]
+            y_group = y[mask]
+            w_group = (treatment[mask] == group).astype(int)
+            p_group = np.asarray(p[group])[mask]
 
-            yhat_c = np.zeros_like(y, dtype=float)
-            yhat_t = np.zeros_like(y, dtype=float)
+            yhat_c = np.zeros_like(y_group, dtype=float)
+            yhat_t = np.zeros_like(y_group, dtype=float)
             if self.cv:
-                for i_fold, (i_trn, i_val) in enumerate(self.cv.split(X, y), 1):
+                for i_fold, (i_trn, i_val) in enumerate(
+                    self.cv.split(X_group, y_group), 1
+                ):
                     logger.info("Training an outcome model for CV #{}".format(i_fold))
                     self.model_tau.fit(
-                        np.hstack((X[i_trn], w_group[i_trn].reshape(-1, 1))), y[i_trn]
+                        np.hstack((X_group[i_trn], w_group[i_trn].reshape(-1, 1))),
+                        y_group[i_trn],
                     )
 
                     yhat_c[i_val] = self.model_tau.predict(
-                        np.hstack((X[i_val], np.zeros((len(i_val), 1))))
+                        np.hstack((X_group[i_val], np.zeros((len(i_val), 1))))
                     )
                     yhat_t[i_val] = self.model_tau.predict(
-                        np.hstack((X[i_val], np.ones((len(i_val), 1))))
+                        np.hstack((X_group[i_val], np.ones((len(i_val), 1))))
                     )
 
             else:
-                self.model_tau.fit(np.hstack((X, w_group.reshape(-1, 1))), y)
+                self.model_tau.fit(
+                    np.hstack((X_group, w_group.reshape(-1, 1))), y_group
+                )
 
-                yhat_c = self.model_tau.predict(np.hstack((X, np.zeros((len(y), 1)))))
-                yhat_t = self.model_tau.predict(np.hstack((X, np.ones((len(y), 1)))))
+                yhat_c = self.model_tau.predict(
+                    np.hstack((X_group, np.zeros((len(y_group), 1))))
+                )
+                yhat_t = self.model_tau.predict(
+                    np.hstack((X_group, np.ones((len(y_group), 1))))
+                )
 
             if segment is None:
                 logger.info("Training the TMLE learner.")
-                _ate, se = simple_tmle(y, w_group, yhat_c, yhat_t, p_group)
+                _ate, se = simple_tmle(y_group, w_group, yhat_c, yhat_t, p_group)
                 _ate_lb = _ate - se * norm.ppf(1 - self.ate_alpha / 2)
                 _ate_ub = _ate + se * norm.ppf(1 - self.ate_alpha / 2)
             else:
@@ -195,15 +209,16 @@ class TMLELearner:
                     segment.shape[0] == X.shape[0] and segment.ndim == 1
                 ), "Segment must be the 1-d np.array of int."
                 segments = np.unique(segment)
+                segment_group = segment[mask]
 
                 _ate = []
                 _ate_lb = []
                 _ate_ub = []
                 for s in sorted(segments):
                     logger.info("Training the TMLE learner for segment {}.".format(s))
-                    filt = (segment == s) & (yhat_c < np.quantile(yhat_c, q=0.99))
+                    filt = (segment_group == s) & (yhat_c < np.quantile(yhat_c, q=0.99))
                     _ate_s, se = simple_tmle(
-                        y[filt],
+                        y_group[filt],
                         w_group[filt],
                         yhat_c[filt],
                         yhat_t[filt],

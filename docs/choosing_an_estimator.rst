@@ -119,7 +119,7 @@ Capability matrix
      - --
    * - ``TMLELearner`` (ATE only)
      - continuous
-     - binary
+     - binary or multiple discrete
      - yes, with a propensity score
      - ATE CI
      - --
