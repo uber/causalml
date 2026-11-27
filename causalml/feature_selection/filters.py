@@ -514,11 +514,14 @@ class FilterSelect:
 
         totalSize = len(data.index)
 
-        # impute null if enabled
+        # impute null if enabled, without writing the imputed values back into the caller's data
+        x = data[feature_name].values
         if null_impute is not None:
-            data[feature_name] = SimpleImputer(
-                missing_values=np.nan, strategy=null_impute
-            ).fit_transform(data[feature_name].values.reshape(-1, 1))
+            x = (
+                SimpleImputer(missing_values=np.nan, strategy=null_impute)
+                .fit_transform(x.reshape(-1, 1))
+                .ravel()
+            )
         elif data[feature_name].isna().any():
             raise Exception(
                 "Null value(s) present in column '{}'. Please impute the null value or use null_impute parameter "
@@ -526,9 +529,7 @@ class FilterSelect:
             )
 
         # drop duplicate edges in pq.cut result to avoid issues
-        x_bin = pd.qcut(
-            data[feature_name].values, n_bins, labels=False, duplicates="drop"
-        )
+        x_bin = pd.qcut(x, n_bins, labels=False, duplicates="drop")
 
         d_children = 0
 

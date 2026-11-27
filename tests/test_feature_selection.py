@@ -67,6 +67,29 @@ def test_filter_kl(generate_classification_data):
     assert imp["score"].values[0] >= imp["score"].values[1]
 
 
+@pytest.mark.parametrize("method", ["KL", "ED", "Chi"])
+def test_filter_d_null_impute_leaves_input_unchanged(
+    generate_classification_data, method
+):
+    np.random.seed(RANDOM_SEED)
+    df, X_names = generate_classification_data()
+    df.loc[df.index[:10], X_names[0]] = np.nan
+    original = df.copy()
+
+    imp = FilterSelect().get_importance(
+        df,
+        X_names,
+        CONVERSION,
+        method,
+        treatment_group="treatment1",
+        null_impute="mean",
+    )
+
+    assert imp.shape[0] == len(X_names)
+    # The imputation is only used for binning: the caller's NaNs are kept
+    pd.testing.assert_frame_equal(df, original)
+
+
 @pytest.mark.parametrize("method", ["LR", "KL", "ED", "Chi"])
 def test_filter_rejects_non_binary_outcome(generate_classification_data, method):
     """Regression test for uber/causalml#349.
