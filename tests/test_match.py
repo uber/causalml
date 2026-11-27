@@ -156,6 +156,53 @@ def test_nearest_neighbor_match_exhausts_control_pool():
     assert sum(matched_scarce[TREATMENT_COL] == 0) == 2
 
 
+def test_nearest_neighbor_match_keeps_from_unit_when_later_candidate_matches(
+    monkeypatch,
+):
+    df = pd.DataFrame(
+        {
+            SCORE_COL: [0.500, 0.501, 0.502, 0.600],
+            TREATMENT_COL: [1, 0, 0, 0],
+        }
+    )
+    caliper = 0.1
+    ratio = 3
+    sdcal = caliper * np.std(df[[SCORE_COL]].values)
+    assert abs(0.502 - 0.500) <= sdcal < abs(0.600 - 0.500)
+
+    real_argpartition = np.argpartition
+
+    def adverse_argpartition(*args, **kwargs):
+        partition = real_argpartition(*args, **kwargs)
+        # argpartition leaves the selected entries unordered; use the worst order.
+        selected = min(len(partition), ratio)
+        partition[:selected] = partition[:selected][::-1]
+        return partition
+
+    monkeypatch.setattr(np, "argpartition", adverse_argpartition)
+
+    psm = NearestNeighborMatch(
+        caliper=caliper,
+        replace=False,
+        ratio=ratio,
+        shuffle=False,
+        random_state=RANDOM_SEED,
+    )
+    matched = psm.match(data=df, treatment_col=TREATMENT_COL, score_cols=[SCORE_COL])
+
+    assert not matched.empty
+    returned_treated = set(matched.index[matched[TREATMENT_COL] == 1])
+    assert returned_treated == set(psm.matched_indexes_["from"])
+    assert 0 in matched.index
+    assert set(matched.index[matched[TREATMENT_COL] == 0]) == {1, 2}
+    for control_idx in matched.index[matched[TREATMENT_COL] == 0]:
+        paired_treated = set(
+            psm.matched_indexes_.loc[psm.matched_indexes_["to"] == control_idx, "from"]
+        )
+        assert paired_treated
+        assert paired_treated.issubset(returned_treated)
+
+
 def test_match_optimizer(generate_unmatched_data):
     df, features = generate_unmatched_data()
 
