@@ -166,9 +166,16 @@ class PolicyLearner:
             X (np.matrix): a feature matrix
 
         Returns:
-            (numpy.ndarray): predictions of treatment assignment score.
+            (numpy.ndarray): probabilities of the positive (treat) class, or zero
+                for every row when the policy model never saw the treat class (class 1).
         """
 
-        pi_hat = self.model_pi.predict_proba(X)[:, 1]
+        proba = self.model_pi.predict_proba(X)
+        classes = getattr(self.model_pi, "classes_", None)
+        if classes is None:
+            return proba[:, 1]
 
-        return pi_hat
+        treat_class = np.flatnonzero(np.asarray(classes) == 1)
+        return (
+            proba[:, treat_class[0]] if treat_class.size else np.zeros(proba.shape[0])
+        )
