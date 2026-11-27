@@ -208,3 +208,20 @@ def test_rate_score_ci_qini_weighting(synthetic_df):
     )
     assert isinstance(result, pd.DataFrame)
     assert not result["se"].isnull().any()
+
+
+@pytest.mark.parametrize("with_tau", [False, True])
+def test_rate_score_of_a_constant_model_is_zero(with_tau):
+    # Rows are stored with the largest treatment effect first; a constant score
+    # must not pick that order up as a ranking.
+    rng = np.random.default_rng(0)
+    n = 2000
+    tau = np.sort(rng.normal(1, 1, n))[::-1]
+    w = rng.integers(0, 2, n)
+    df = pd.DataFrame(
+        {"y": rng.normal(0, 1, n) + w * tau, "w": w, "const": np.zeros(n)}
+    )
+    if with_tau:
+        df = df.assign(tau=tau)[["tau", "const"]]
+
+    assert rate_score(df)["const"] == pytest.approx(0, abs=1e-9)
