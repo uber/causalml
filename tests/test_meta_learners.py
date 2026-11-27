@@ -6,7 +6,7 @@ from unittest.mock import patch
 from sklearn.base import clone
 from sklearn.linear_model import LinearRegression
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold, train_test_split
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 from scipy.stats import norm
 from xgboost import XGBRegressor
@@ -891,6 +891,46 @@ def test_TMLELearner(generate_regression_data):
     ate_p, lb, ub = learner.estimate_ate(X=X, p=e, treatment=treatment, y=y)
     assert (ate_p >= lb) and (ate_p <= ub)
     assert ape(tau.mean(), ate_p) < ERROR_THRESHOLD
+
+
+@pytest.mark.parametrize(
+    "cv", [None, KFold(n_splits=3, shuffle=True, random_state=RANDOM_SEED)]
+)
+def test_TMLELearner_multi_treatment(cv):
+    """Each treatment group is compared with the control group only.
+
+    The rows of the other treatment groups must not be used as control rows.
+    """
+    np.random.seed(RANDOM_SEED)
+    n = 3000
+    X = np.random.randn(n, 3)
+    treatment = np.tile([0, 1, 2], n // 3)
+    tau = np.select([treatment == 1, treatment == 2], [1.0, 5.0], 0.0)
+    y = X[:, 0] + tau + 0.5 * np.random.randn(n)
+    segment = (X[:, 1] > 0).astype(int)
+    # Within {group, control}, each treatment group has a propensity of 0.5.
+    p = {1: np.full(n, 0.5), 2: np.full(n, 0.5)}
+
+    learner = TMLELearner(learner=LinearRegression(), control_name=0, cv=cv)
+    ate, lb, ub = learner.estimate_ate(X=X, treatment=treatment, y=y, p=p)
+    np.testing.assert_allclose(ate, [1.0, 5.0], atol=0.1)
+    assert np.all((lb <= ate) & (ate <= ub))
+
+    ate_seg, _, _ = learner.estimate_ate(
+        X=X, treatment=treatment, y=y, p=p, segment=segment
+    )
+    assert ate_seg.shape == (2, 2)
+    np.testing.assert_allclose(ate_seg, [[1.0, 1.0], [5.0, 5.0]], atol=0.15)
+
+    # A group's estimate does not change when the other group's rows are removed.
+    for i, group in enumerate([1, 2]):
+        mask = (treatment == 0) | (treatment == group)
+        ate_group, _, _ = TMLELearner(
+            learner=LinearRegression(), control_name=0, cv=cv
+        ).estimate_ate(
+            X=X[mask], treatment=treatment[mask], y=y[mask], p=p[group][mask]
+        )
+        np.testing.assert_allclose(ate[i], ate_group[0])
 
 
 def test_BaseSClassifier(generate_classification_data):
