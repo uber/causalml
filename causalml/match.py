@@ -65,10 +65,7 @@ def create_table_one(data, treatment_col, features, with_std=True, with_counts=T
     t1["SMD"] = data[features].apply(lambda x: smd(x, data[treatment_col])).round(4)
 
     if with_counts:
-        n_row = pd.pivot_table(
-            data[[features[0], treatment_col]], columns=treatment_col, aggfunc=["count"]
-        )
-        n_row.columns = n_row.columns.droplevel(level=0)
+        n_row = data.groupby(treatment_col).size().to_frame().T
         n_row["SMD"] = ""
         n_row.index = ["n"]
 
