@@ -4,7 +4,12 @@ import pandas as pd
 import pytest
 from sklearn.model_selection import KFold, train_test_split
 
-from causalml.metrics.visualize import get_cumlift, plot_tmlegain
+from causalml.metrics.visualize import (
+    auuc_score,
+    get_cumlift,
+    plot_tmlegain,
+    qini_score,
+)
 from causalml.inference.meta import LRSRegressor
 
 
@@ -141,3 +146,29 @@ def test_get_std_diffs_keeps_a_numeric_categorical_covariate():
     X_str = X.assign(flag=pd.Categorical(rng.choice(["a", "b"], size=n)))
     assert _get_numeric_vars(X_str) == (["age"], [])
     assert list(get_std_diffs(X_str, w).index) == ["age"]
+
+
+def _effect_ordered_data(n=2000):
+    # Rows are stored with the largest treatment effect first, so any result
+    # that depends on the row order of tied scores is visibly wrong.
+    rng = np.random.default_rng(0)
+    tau = np.sort(rng.normal(1, 1, n))[::-1]
+    w = rng.integers(0, 2, n)
+    y = rng.normal(0, 1, n) + w * tau
+    return pd.DataFrame({"y": y, "w": w, "tau": tau, "const": np.zeros(n)})
+
+
+@pytest.mark.parametrize("with_tau", [False, True])
+def test_uplift_scores_of_a_constant_model_are_random(with_tau):
+    df = _effect_ordered_data()
+    if not with_tau:
+        df = df.drop(columns="tau")
+    shuffled = df.sample(frac=1, random_state=1)
+
+    # A constant score ranks no unit above another, so it is no better than random.
+    auuc = auuc_score(df, normalize=True)["const"]
+    qini = qini_score(df, normalize=True)["const"]
+    assert auuc == pytest.approx(0.5)
+    assert qini == pytest.approx(0, abs=1e-9)
+    assert auuc_score(shuffled, normalize=True)["const"] == pytest.approx(auuc)
+    assert qini_score(shuffled, normalize=True)["const"] == pytest.approx(qini)

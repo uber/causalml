@@ -12,6 +12,25 @@ RANDOM_COL = "Random"
 logger = logging.getLogger("causalml")
 
 
+def _average_over_ties(values, keys):
+    """Replace each value with its mean over the rows that share the same key.
+
+    Rows with tied scores have no order between them, so a cumulative sum over
+    them should not depend on how they happen to be ordered in the input.
+    Averaging within each tie makes the cumulative sum exact at the tie
+    boundaries and linear inside the tie.
+
+    Args:
+        values (numpy.array): per-row values, in the sorted order
+        keys (numpy.array): the scores the rows were sorted by
+
+    Returns:
+        (numpy.array): the values averaged within each group of tied keys
+    """
+    _, inverse, counts = np.unique(keys, return_inverse=True, return_counts=True)
+    return np.bincount(inverse, weights=values)[inverse] / counts[inverse]
+
+
 def _compute_rate_from_toc(toc, weighting):
     """Compute the RATE scalar from a TOC DataFrame.
 
@@ -209,23 +228,22 @@ def get_toc(
     toc = []
     for col in model_names:
         sorted_df = df.sort_values(col, ascending=False).reset_index(drop=True)
+        scores = sorted_df[col].values
 
         if use_oracle:
             # O(n) via cumulative sum
-            cumsum_tau = sorted_df[treatment_effect_col].cumsum().values
+            cumsum_tau = _average_over_ties(
+                sorted_df[treatment_effect_col].values, scores
+            ).cumsum()
             counts = np.arange(1, n_total + 1)
             subset_ates = cumsum_tau / counts
         else:
-            cumsum_tr = sorted_df[treatment_col].cumsum().values
+            w = sorted_df[treatment_col].values
+            y = sorted_df[outcome_col].values
+            cumsum_tr = _average_over_ties(w, scores).cumsum()
             cumsum_ct = np.arange(1, n_total + 1) - cumsum_tr
-            cumsum_y_tr = (
-                (sorted_df[outcome_col] * sorted_df[treatment_col]).cumsum().values
-            )
-            cumsum_y_ct = (
-                (sorted_df[outcome_col] * (1 - sorted_df[treatment_col]))
-                .cumsum()
-                .values
-            )
+            cumsum_y_tr = _average_over_ties(y * w, scores).cumsum()
+            cumsum_y_ct = _average_over_ties(y * (1 - w), scores).cumsum()
 
             # Guard against division by zero when a band is all-treated or all-control;
             # fall back to overall_ate (TOC = 0) for those positions.

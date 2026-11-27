@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 from lightgbm import LGBMRegressor
 from ..inference.meta.tmle import TMLELearner
-from .rate import _bootstrap_score_ci, _validate_bootstrap_args
+from .rate import _average_over_ties, _bootstrap_score_ci, _validate_bootstrap_args
 
 plt.style.use("fivethirtyeight")
 sns.set_palette("Paired")
@@ -163,22 +163,24 @@ def get_cumlift(
     for i, col in enumerate(model_names):
         sorted_df = df.sort_values(col, ascending=False).reset_index(drop=True)
         sorted_df.index = sorted_df.index + 1
+        scores = sorted_df[col].values
 
         if treatment_effect_col in sorted_df.columns:
             # When treatment_effect_col is given, use it to calculate the average treatment effects
             # of cumulative population.
-            lift.append(sorted_df[treatment_effect_col].cumsum() / sorted_df.index)
+            tau = _average_over_ties(sorted_df[treatment_effect_col].values, scores)
+            lift.append(
+                pd.Series(tau, index=sorted_df.index).cumsum() / sorted_df.index
+            )
         else:
             # When treatment_effect_col is not given, use outcome_col and treatment_col
             # to calculate the average treatment_effects of cumulative population.
-            sorted_df["cumsum_tr"] = sorted_df[treatment_col].cumsum()
+            w = sorted_df[treatment_col].values
+            y = sorted_df[outcome_col].values
+            sorted_df["cumsum_tr"] = _average_over_ties(w, scores).cumsum()
             sorted_df["cumsum_ct"] = sorted_df.index.values - sorted_df["cumsum_tr"]
-            sorted_df["cumsum_y_tr"] = (
-                sorted_df[outcome_col] * sorted_df[treatment_col]
-            ).cumsum()
-            sorted_df["cumsum_y_ct"] = (
-                sorted_df[outcome_col] * (1 - sorted_df[treatment_col])
-            ).cumsum()
+            sorted_df["cumsum_y_tr"] = _average_over_ties(y * w, scores).cumsum()
+            sorted_df["cumsum_y_ct"] = _average_over_ties(y * (1 - w), scores).cumsum()
 
             lift.append(
                 sorted_df["cumsum_y_tr"] / sorted_df["cumsum_tr"]
@@ -295,26 +297,22 @@ def get_qini(
     for i, col in enumerate(model_names):
         sorted_df = df.sort_values(col, ascending=False).reset_index(drop=True)
         sorted_df.index = sorted_df.index + 1
-        sorted_df["cumsum_tr"] = sorted_df[treatment_col].cumsum()
+        scores = sorted_df[col].values
+        w = sorted_df[treatment_col].values
+        sorted_df["cumsum_tr"] = _average_over_ties(w, scores).cumsum()
 
         if treatment_effect_col in sorted_df.columns:
             # When treatment_effect_col is given, use it to calculate the average treatment effects
             # of cumulative population.
-            l = (
-                sorted_df[treatment_effect_col].cumsum()
-                / sorted_df.index
-                * sorted_df["cumsum_tr"]
-            )
+            tau = _average_over_ties(sorted_df[treatment_effect_col].values, scores)
+            l = tau.cumsum() / sorted_df.index * sorted_df["cumsum_tr"]
         else:
             # When treatment_effect_col is not given, use outcome_col and treatment_col
             # to calculate the average treatment_effects of cumulative population.
+            y = sorted_df[outcome_col].values
             sorted_df["cumsum_ct"] = sorted_df.index.values - sorted_df["cumsum_tr"]
-            sorted_df["cumsum_y_tr"] = (
-                sorted_df[outcome_col] * sorted_df[treatment_col]
-            ).cumsum()
-            sorted_df["cumsum_y_ct"] = (
-                sorted_df[outcome_col] * (1 - sorted_df[treatment_col])
-            ).cumsum()
+            sorted_df["cumsum_y_tr"] = _average_over_ties(y * w, scores).cumsum()
+            sorted_df["cumsum_y_ct"] = _average_over_ties(y * (1 - w), scores).cumsum()
 
             l = (
                 sorted_df["cumsum_y_tr"]
