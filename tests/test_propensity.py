@@ -1,4 +1,5 @@
 import numpy as np
+from sklearn.base import clone
 
 from causalml.propensity import (
     ElasticNetPropensityModel,
@@ -166,3 +167,13 @@ def test_compute_propensity_score_honors_custom_clip_bounds():
 
     assert p.min() >= clip_bounds[0]
     assert p.max() <= clip_bounds[1]
+
+
+def test_propensity_model_clone():
+    for m in (
+        ElasticNetPropensityModel(n_fold=3, Cs=2),
+        GradientBoostedPropensityModel(early_stop=True, max_depth=2),
+    ):
+        assert clone(m).get_params() == m.get_params()
+    assert clone(ElasticNetPropensityModel(n_fold=3)).model.cv.n_splits == 3
+    assert ElasticNetPropensityModel().set_params(Cs=3).model.Cs == 3
