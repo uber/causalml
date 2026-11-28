@@ -141,3 +141,31 @@ def test_get_std_diffs_keeps_a_numeric_categorical_covariate():
     X_str = X.assign(flag=pd.Categorical(rng.choice(["a", "b"], size=n)))
     assert _get_numeric_vars(X_str) == (["age"], [])
     assert list(get_std_diffs(X_str, w).index) == ["age"]
+
+
+def test_get_std_diffs_is_invariant_to_binary_coding():
+    """The p(1-p) formula assumed 0/1 coding, so other binary codings gave
+    NaN or a wrong value."""
+    from causalml.metrics.visualize import get_std_diffs, get_simple_iptw
+
+    rng = np.random.default_rng(0)
+    n = 200
+    w = pd.Series(rng.integers(0, 2, n))
+    binary = rng.integers(0, 2, n)
+    X = pd.DataFrame(
+        {
+            "b01": binary,
+            "b12": binary + 1,
+            "bm11": 2 * binary - 1,
+            "bcat12": pd.Categorical(binary + 1),
+            "bfloat": 0.2 + 0.1 * binary,
+        }
+    )
+    weights = get_simple_iptw(w, rng.uniform(0.2, 0.8, n))
+
+    for kwargs in ({}, {"weight": weights, "weighted": True}):
+        std_diffs = get_std_diffs(X, w, **kwargs)[0]
+        assert np.isfinite(std_diffs).all()
+        np.testing.assert_allclose(
+            std_diffs[["b12", "bm11", "bcat12", "bfloat"]], std_diffs["b01"]
+        )

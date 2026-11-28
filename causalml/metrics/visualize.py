@@ -1037,8 +1037,15 @@ def get_std_diffs(X, W, weight=None, weighted=False, numeric_threshold=5):
     treat = W == 1
     contr = W == 0
 
-    X_1 = X.loc[treat, cols]
-    X_0 = X.loc[contr, cols]
+    X_1 = X.loc[treat, cols].copy()
+    X_0 = X.loc[contr, cols].copy()
+
+    for col in prop_cols:
+        values = X[col]
+        higher_level = values.dropna().to_numpy().max()
+        # The p(1-p) formula below assumes 0/1 coding.
+        X_1[col] = X_1[col].eq(higher_level).astype(float).where(X_1[col].notna())
+        X_0[col] = X_0[col].eq(higher_level).astype(float).where(X_0[col].notna())
 
     cont_index = np.array([col in cont_cols for col in cols])
     prop_index = np.array([col in prop_cols for col in cols])
