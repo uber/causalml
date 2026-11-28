@@ -2,9 +2,26 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from causalml.match import NearestNeighborMatch, MatchOptimizer
+from causalml.match import NearestNeighborMatch, MatchOptimizer, create_table_one
 from causalml.propensity import ElasticNetPropensityModel
 from .const import RANDOM_SEED, TREATMENT_COL, SCORE_COL, GROUP_COL
+
+
+def test_create_table_one_counts_rows_with_missing_first_feature():
+    df = pd.DataFrame(
+        {
+            "w": [1, 1, 1, 0, 0, 0, 0],
+            "x": [np.nan, 1, 2, np.nan, np.nan, 3, 4],
+            "z": range(1, 8),
+        }
+    )
+
+    n_rows = [
+        create_table_one(df, "w", features).loc["n"].tolist()
+        for features in (["x", "z"], ["z", "x"])
+    ]
+
+    assert n_rows == [[4, 3, ""], [4, 3, ""]]
 
 
 @pytest.fixture
